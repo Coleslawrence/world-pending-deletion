@@ -489,3 +489,8 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 @media (min-height: 740px) { .foe .crest { width: 72px; height: 72px; font-size: 26px; } .fo-name { font-size: 20px; } }
 @media (max-height: 640px) { .sk { min-height: 54px; padding: 6px 9px; } .crest { width: 44px; height: 44px; font-size: 17px; } .foe { padding: 8px 10px; } .opt { min-height: 48px; padding: 7px 10px; } .next { padding: 8px 10px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* ===== web: cloud sign-in ===== */
+.cloudbox { display: grid; gap: 8px; border: 1px solid var(--sys-d); border-radius: 8px; padding: 10px 12px; background: rgba(114,208,255,.05); }
+.cloudbox.compact { padding: 0; border: 0; background: none; }
+.row2.even { grid-template-columns: 1fr 1fr; }
