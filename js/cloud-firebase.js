@@ -44,6 +44,8 @@
         if (e && (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment')) return api.signInWithRedirect(api.auth, p);
         if (e && e.code === 'auth/account-exists-with-different-credential') throw { code: 'other-provider', message: 'That email already uses the other sign-in option. Try that one instead.' };
         if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+        if (e && e.code === 'auth/unauthorized-domain') throw { code: e.code, message: 'Sign-in is not allowed on this site yet. Add ' + location.hostname + ' to Authorized domains in the Firebase console.' };
+        if (e && e.code === 'auth/operation-not-allowed') throw { code: e.code, message: 'That sign-in option is not turned on yet in the Firebase console.' };
         throw e;
       }
     },

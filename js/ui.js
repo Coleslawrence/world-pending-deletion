@@ -997,11 +997,12 @@ window.addEventListener('wpd-auth', e => {
   else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, shared: [], status: 'local' }); setShared([], []); render(); }
 });
 function cloudSignInHTML(compact) {
+  const provs = (window.FIREBASE_PROVIDERS || ['google', 'github']).filter(k => k === 'google' || k === 'github');
   if (!FIREBASE) return '';
   const C = window.WPD_CLOUD;
   if (C && C.error) return compact ? '' : '<p class="sh-p fine">Cloud saves are unavailable right now (offline?). Progress is saved on this device.</p>';
   if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><p class="sh-p fine">Champions you share appear under this name to other players.</p><button class="btn small ghost" data-act="signout">Sign out</button></div>`;
-  return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="row2 even"><button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="google">${compact ? 'Sign in · ' : ''}Google</button><button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="github">${compact ? 'Sign in · ' : ''}GitHub</button></div></div>`;
+  return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
 app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
