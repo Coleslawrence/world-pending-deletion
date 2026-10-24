@@ -23,8 +23,10 @@
 <div id="app"></div>
 <div id="toasts" aria-live="polite"></div>
 <noscript><p style="padding:20px;color:#efe6d8">[World Pending Deletion] needs JavaScript to run.</p></noscript>
+<script src="js/firebase-config.js"></script>
 <script src="js/core.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/cloud-firebase.js"></script>
 <script>
   // Installable web app: cache the game for offline play (only when served over http/https)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
