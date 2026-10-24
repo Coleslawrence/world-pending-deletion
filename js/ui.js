@@ -1,0 +1,991 @@
+// ===== [World Pending Deletion] — UI =====
+'use strict';
+const app = document.getElementById('app');
+const toastsEl = document.getElementById('toasts');
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const n0 = v => String(Math.max(0, Math.round(v)));
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
+function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } if (k === 'le-run-1' && typeof schedulePush === 'function') schedulePush(); }
+const RUN_KEY = 'le-run-1', META_KEY = 'le-meta-1';
+
+const hot = window.claude && window.claude.hot;
+let meta = migrateMeta(lsGet(META_KEY));
+bindMeta(meta);
+let run = (hot && hot.data && hot.data.run) || lsGet(RUN_KEY);
+if (run && run.v !== VERSION) run = null;
+if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
+if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
+const ui = { screen: 'title', worlds: null, world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
+if (run) ui.screen = stageScreen();
+if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
+function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
+function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; meta.savedAt = Date.now(); lsSet(META_KEY, meta); if (typeof schedulePush === 'function') schedulePush(); }
+function stageScreen() { return { draft: 'draft', choose: 'choose', shop: 'shop', district: 'district', ready: 'district' }[run.stage] || 'choose'; }
+
+// ---------- Toasts ----------
+function toast(text, t = 'sys') {
+  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text;
+  toastsEl.appendChild(el); while (toastsEl.children.length > 3) toastsEl.firstChild.remove();
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350); }, t === 'broadcast' ? 4200 : t === 'class' ? 3400 : 2600);
+}
+function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
+const TOAST_RANK = { broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
+function pushMsgs(msgs) { msgs.forEach(m => logRun(m.text, m.t)); msgs.slice().sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
+
+// ---------- Small helpers ----------
+const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion' };
+function initials(name) { const w = name.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(x => x && !['the', 'of'].includes(x.toLowerCase())); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
+function crest(name, kind, big, sig) {
+  const inner = sig ? `<span class="sig" style="color:${SIGIL_COLS[sig.color] || '#fff'}">${SIGILS[sig.sigil] || '✦'}</span>` : `<span>${esc(initials(name))}</span>`;
+  return `<div class="crest k-${kind}${big ? ' big' : ''}" aria-hidden="true">${inner}</div>`;
+}
+function styleOf(spec) {
+  if (spec.snap && spec.snap.owner) return spec.kind === 'champion' ? `Saved ${spec.snap.worldName} in ${ownerName(spec.snap.owner)}'s tournament` : `Fell in ${ownerName(spec.snap.owner)}'s tournament, round ${spec.snap.round}`;
+  return specStyle(spec);
+}
+function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null); }
+function rankChip(r) { return `<span class="rank r${r}">${WORLD_RANKS[r]}</span>`; }
+function rk(r) { return `<span class="srank rk-${r}">${r}</span>`; }
+function stars(n) { return n > 1 ? `<span class="stars">${'★'.repeat(n)}</span>` : ''; }
+function hearts(n, max) { return `<span class="hearts" aria-label="${n} of ${max} Hearts">${'<i class="h on"></i>'.repeat(Math.max(0, n))}${'<i class="h"></i>'.repeat(Math.max(0, max - n))}</span>`; }
+function hpBar(cur, max, cls) { return `<div class="bar ${cls}"><i style="width:${Math.max(0, Math.min(100, cur / max * 100))}%"></i></div>`; }
+function tagDots(id) { return `<span class="dots2">${pieceDef(baseId(id)).tags.map(t => `<i class="a-${t}" title="${ARCH[t].name}"></i>`).join('')}</span>`; }
+function tagNames(id) { return pieceDef(baseId(id)).tags.map(t => `<span class="tagn a-${t}">${ARCH[t].name}</span>`).join(''); }
+function mainTag(id) { const t = pieceDef(baseId(id)).tags; return t.length ? 'a-' + t[0] : ''; }
+function roundLabel() { if (!run) return ''; if (run.elite) return `Elite ${run.eliteIdx + 1} of ${run.eliteBracket.length}`; return run.round >= ROUNDS ? 'Final' : `Round ${run.round} of ${ROUNDS}`; }
+function bracketDots() {
+  let h = '<div class="dots" aria-label="Bracket progress">';
+  for (let i = 1; i <= ROUNDS; i++) { const st = run.elite || i < run.round ? 'done' : i === run.round ? 'now' : ''; h += `<span class="dot ${st} ${i === ROUNDS ? 'fin' : ''}"></span>`; }
+  if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<span class="dot elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></span>`; });
+  return h + '</div>';
+}
+function topBar(title, extra) {
+  return `<header class="bar"><div class="bar-l"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}<span class="hcount" title="Hearts">♥${run.hearts}</span><span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+}
+function archChips(counts, small) {
+  return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span>${ARCH[k].name}</span><small>/${next}</small></button>`; }).join('')}</div>`;
+}
+function playerPower(p) { const def = moddedDef(p.id, p.mods); return skillPower(def, effStats(run), p.star) * def.powerMult; }
+function champLine() {
+  const mh = maxHp(run);
+  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level} <span class="xp"><i style="width:${run.level >= 9 ? 100 : run.xp / xpNeed(run.level) * 100}%"></i></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div></div></section>`;
+}
+
+// ---------- Title / worlds ----------
+function titleHTML() {
+  const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
+  return `<main class="screen title">
+    <div class="t-top"><div class="eyebrow">[System notice] · Prototype v5.2</div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
+    <div class="sysbox"><p>[The Grand Tournament has begun.]</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
+    <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
+    <div class="t-stats"><div><b>${meta.wins}</b><span>worlds spared</span></div><div><b>${meta.erased.length}</b><span>erased</span></div><div><b>${meta.echoes}</b><span>Echoes</span></div></div>
+    <div class="stack">
+      ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${esc(saved.world.name)}, ${saved.stage === 'draft' ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
+      <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
+      <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
+      <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
+      <button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button>
+    </div></main>`;
+}
+function worldsHTML() {
+  const cards = ui.worlds.map((w, i) => {
+    const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod];
+    return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
+      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
+      <div class="pk-sub">${esc(T.name)} · ${esc(T.flavour)}</div>
+      <div class="pk-row"><span class="tagn a-${T.home}">${ARCH[T.home].name}</span><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)}</span></div>
+      <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
+      <div class="pk-row"><span class="pk-mut">Final: ${esc(ENEMIES[T.final].name)}</span></div>
+    </button>`;
+  }).join('');
+  const w = ui.world != null ? ui.worlds[ui.world] : null;
+  return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
+    <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.</p>
+    <div class="picks">${cards}</div>
+    <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
+}
+
+// ---------- Awakening ----------
+function newAw(w) { return { tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world', offer: makeOffer(w, meta), title: null }; }
+function giftRow(k, a, w) {
+  const g = GIFTS[k], on = a.gifts.includes(k), unlocked = giftUnlocked(k, meta);
+  const cost = giftCost(k, a.offer), disc = cost !== g.cost;
+  const t = on ? a.gifts.filter(x => x !== k) : a.gifts.concat(k);
+  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
+  const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
+  return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}</span></button>`;
+}
+function awakenHTML() {
+  const a = ui.aw, w = ui.worlds[ui.world];
+  const chk = giftCheck(w, a.gifts, a.patron, a.offer);
+  const tabs = [['id', 'Name'], ['stats', 'Stats' + (a.pts ? ` · ${a.pts}` : '')], ['gifts', `Gifts · ${chk.left}`], ['patron', 'Patron']];
+  let body = '';
+  if (a.tab === 'id') {
+    body = `<label class="fld"><span>Champion's name</span><input id="aw-name" maxlength="18" value="${esc(a.name)}" autocomplete="off"></label>
+      <div class="fld"><span>Sigil</span><div class="sigrow">${SIGILS.map((g, i) => `<button class="sigb ${a.sigil === i ? 'on' : ''}" data-act="aw-sigil" data-i="${i}" style="color:${SIGIL_COLS[a.color]}" aria-label="Sigil ${i + 1}">${g}</button>`).join('')}</div></div>
+      <div class="fld"><span>Colour</span><div class="sigrow">${SIGIL_COLS.map((c, i) => `<button class="colb ${a.color === i ? 'on' : ''}" data-act="aw-color" data-i="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('')}</div></div>
+      <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>`;
+  } else if (a.tab === 'stats') {
+    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button><span class="st-v">${a.stats[k]}</span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button></div>`).join('');
+  } else if (a.tab === 'gifts') {
+    const allowed = giftsAllowed(w);
+    const list = allowed.filter(k => GIFTS[k].cat === a.cat).sort((x, y) => giftUnlocked(y, meta) - giftUnlocked(x, meta)).map(k => giftRow(k, a, w)).join('');
+    const presets = (meta.presets || []).map((p, i) => `<button class="btn small ghost" data-act="aw-preset" data-i="${i}">${esc(p.name)}</button>`).join('');
+    body = `<div class="pts-row"><span><b>${chk.left}</b> of ${chk.budget} Gift Points</span><span class="fine">${chk.cheats}/1 cheat · ${chk.flaws}/2 flaws</span></div>
+      <div class="cats c8">${Object.keys(GIFT_CATS).map(c => { const n = a.gifts.filter(k => GIFTS[k].cat === c).length; return `<button class="cat ${a.cat === c ? 'on' : ''}" data-act="aw-cat" data-c="${c}">${GIFT_CATS[c]}${n ? ` · ${n}` : ''}</button>`; }).join('')}</div>
+      <div class="glist">${list}</div>
+      <div class="aw-tools"><button class="btn small" data-act="aw-random">Let the System decide</button><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
+      <p class="sh-p fine">Unspent points become 3 gold each. Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ') || 'none'}.</p>`;
+  } else {
+    const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
+    body = `<p class="sh-p">Pledge to a god for 2 Favour with them; their wagers come up more often. Win wagers to reach 4 Favour (a free B-rank piece) and 8 (a blessing for the run).</p>` +
+      Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b></span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
+      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>` +
+      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
+  }
+  const ready = a.name.trim() && a.pts === 0 && a.patron && chk.ok;
+  const why = !a.name.trim() ? 'Name your champion' : a.pts ? `Place ${a.pts} stat point${a.pts > 1 ? 's' : ''}` : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
+  return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="back-worlds" aria-label="Back">‹</button><div><div class="eyebrow">Step 2 of 3 · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
+    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${a.tab === k ? 'on' : ''}" data-act="aw-tab" data-t="${k}" role="tab">${l}</button>`).join('')}</div>
+    <section class="aw-body sysw">${body}</section>
+    <div class="foot"><button class="btn primary" data-act="aw-ok" ${ready ? '' : 'disabled'}>${why}</button></div></main>`;
+}
+
+// ---------- Draft ----------
+function draftHTML() {
+  const cards = run.draft.map(id => {
+    const d = SKILLS[id], on = ui.draftSel.includes(id);
+    return `<button class="scard ${on ? 'on' : ''} ${mainTag(id)}" data-act="draft-pick" data-id="${id}">
+      <div class="sc-h"><span class="sc-name">${esc(d.name)}</span>${rk(d.rank)}</div>
+      <div class="sc-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}</div>
+      <div class="sc-desc">${esc(describe(d))}</div></button>`;
+  }).join('');
+  return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">Step 3 of 3 · Opening draft</div><h2>[Skill selection: choose 3]</h2></div></div>
+    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.</p>
+    <div class="sgrid">${cards}</div>
+    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-ok" ${ui.draftSel.length === 3 ? '' : 'disabled'}>Confirm ${ui.draftSel.length}/3</button></div></main>`;
+}
+
+// ---------- Choose opponent ----------
+function chooseHTML() {
+  const cards = run.choices.map((spec, i) => `<button class="opp ${ui.pick === i ? 'on' : ''} ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
+      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>
+      <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
+  const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
+  const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
+  const fin = run.choices.length === 1;
+  return `<main class="screen choose">${topBar()}${bracketDots()}${champLine()}${questLine()}
+    <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">+${run.lastIncome || 0}g income</span></div>
+    <div class="opps">${cards}</div>${wager}
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary" data-act="opp-ok" ${ui.pick != null ? '' : 'disabled'}>To the shop ›</button></footer></main>`;
+}
+
+// ---------- Shop ----------
+function shopIds() { ensureShop(run); const ids = new Set(); SHOP_KINDS.forEach(k => run.shop[k].forEach(it => it && ids.add(it.id))); if (run.bonusSlot) ids.add(run.bonusSlot.id); return ids; }
+function pieceTile(p, act, extra, inShop) {
+  const d = pieceDef(p.id), g = isGear(p.id);
+  const marker = inShop && inShop.has(p.id) && p.star < 3 ? '<span class="inshop" title="A copy is in the shop">in shop</span>' : '';
+  return `<button class="tile ${mainTag(p.id)} ${g ? 'gear' : ''} ${extra || ''} ${marker ? 'hasdup' : ''}" data-act="${act}" data-u="${p.u}">
+    <span class="tl-h">${rk(effRank(p.id, p.mods))}${stars(p.star)}</span><span class="tl-n">${p.mods && p.mods.length ? '<em class="pfx">' + esc(p.mods.map(m => PREFIXES[m].name).join(' ')) + '</em> ' : ''}${esc(d.name)}</span>${tagDots(p.id)}${marker}</button>`;
+}
+// How a shop item relates to what you own: copies at ★1, a ★2 already owned, and whether buying merges
+function dupInfo(id) {
+  const have = ownedCopies(run, id), need = mergeNeed(run, id);
+  const star2 = allPieces(run).some(p => p.id === id && p.star === 2);
+  return { have, need, star2, merge: have + 1 >= need, owned: have > 0 || star2 };
+}
+function pips(have, need) { let h = ''; for (let k = 0; k < need; k++) h += `<i class="${k < have ? 'on' : k === have ? 'nx' : ''}"></i>`; return `<span class="pips" aria-label="You own ${have} of ${need}">${h}</span>`; }
+function shopItemTile(it, kind, i) {
+  if (!it) return `<div class="tile empty">Sold</div>`;
+  const d = pieceDef(it.id), D = dupInfo(it.id);
+  const locked = kind !== 'bonus' && run.locks[kind][i];
+  const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : '';
+  return `<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}">
+    ${tag}<span class="tl-h">${rk(effRank(it.id, it.mods))}<span class="price">${price(run, it)}g</span></span><span class="tl-n">${it.mods.length ? '<em class="pfx">' + esc(it.mods.map(m => PREFIXES[m].name).join(' ')) + '</em> ' : ''}${esc(d.name)}</span>
+    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span><span class="tl-f">${tagDots(it.id)}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}</span></button>`;
+}
+function shortFx(id, mods) {
+  if (isGear(id)) return gearText(id, 1);
+  const def = moddedDef(id, mods); return previewSkill(null, { def, power: skillPower(def, effStats(run), 1) * def.powerMult });
+}
+function tabBadge(kind) {
+  ensureShop(run);
+  const items = run.shop[kind].concat(run.bonusSlot && (isGear(run.bonusSlot.id) ? 'gear' : 'skill') === kind ? [run.bonusSlot] : []).filter(Boolean);
+  const merges = items.filter(it => dupInfo(it.id).merge).length, owned = items.filter(it => dupInfo(it.id).owned).length;
+  return merges ? `<span class="tb merge">${merges} merge</span>` : owned ? `<span class="tb">${owned} owned</span>` : '';
+}
+function shopHTML() {
+  ensureShop(run);
+  const counts = runCounts(run), tab = ui.shopTab || 'skill';
+  const bonusHere = run.bonusSlot && (isGear(run.bonusSlot.id) ? 'gear' : 'skill') === tab;
+  const xpTile = `<button class="tile xptile" data-act="buy-xp" ${run.gold < 4 || run.level >= 9 ? 'disabled' : ''}><span class="tl-h"><b>Lv ${run.level}</b><span class="price">4g</span></span><span class="tl-n">Buy 4 XP</span><span class="xp wide"><i style="width:${run.level >= 9 ? 100 : run.xp / xpNeed(run.level) * 100}%"></i></span></button>`;
+  const items = run.shop[tab].map((it, i) => shopItemTile(it, tab, i)).join('') + (bonusHere ? shopItemTile(run.bonusSlot, 'bonus', 0) : xpTile);
+  const odds = oddsFor(run).map((v, i) => v ? `${['E', 'D', 'C', 'B', 'A'][i]} ${v}%` : '').filter(Boolean).join(' · ');
+  const inShop = shopIds();
+  const bar = run.bar.map((p, i) => p ? pieceTile(p, 'own', '', inShop) : `<div class="tile empty">Skill ${i + 1}</div>`).join('');
+  const gear = GEAR_SLOTS.map(sl => run.gear[sl] ? pieceTile(run.gear[sl], 'own', '', inShop) : `<div class="tile empty gear">${sl}</div>`).join('');
+  const bench = run.bench.map(p => pieceTile(p, 'own', 'sm', inShop)).join('') + '<div class="tile empty sm"></div>'.repeat(Math.max(0, 8 - run.bench.length));
+  const rc = rerollCost(run);
+  return `<main class="screen shop">${topBar(roundLabel() + ' · Shop')}
+    ${archChips(counts)}
+    <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
+    <div class="shopgrid">${items}</div>
+    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="buy-xp" ${run.gold < 4 || run.level >= 9 ? 'disabled' : ''}>XP +4 · 4g</button>` : ''}<span class="interest">Interest +${Math.min(interestCap(run), Math.floor(run.gold / 10))}g</span></div>
+    <div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
+    <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
+    <div class="sec-h"><span>Bench ${run.bench.length}/8</span><span class="fine">Tap a piece to equip, swap or sell</span></div>
+    <div class="bench">${bench}</div>
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary" data-act="shop-done">Done shopping ›</button></footer></main>`;
+}
+
+// ---------- District ----------
+const DIST_GLYPH = { infirmary: '+', sanctum: '♥', undercity: '!', scout: '?', enchanter: 'E' };
+function districtHTML() {
+  const spec = currentSpec(run), done = run.stage === 'ready';
+  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
+  return `<main class="screen district">${topBar(roundLabel() + ' · District')}${champLine()}
+    <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
+    <div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
+    <section class="inter">${opts}</section>
+    <section class="minibar c${run.slots}">${run.bar.map(p => p ? `<button class="mb ${mainTag(p.id)}" data-act="own" data-u="${p.u}"><span>${esc(SKILLS[p.id].name)}</span><small>${effRank(p.id, p.mods)}${p.star > 1 ? ' ' + '★'.repeat(p.star) : ''}${p.mods.length ? ' · ' + p.mods.map(m => PREFIXES[m].name).join(' ') : ''}</small></button>` : '<div class="mb empty"><span>Empty</span></div>').join('')}</section>
+    <footer class="foot2"><button class="btn" data-act="back-shop" ${done ? 'disabled' : ''}>‹ Shop</button><button class="btn primary fight" data-act="fight" ${done ? '' : 'disabled'}>${done ? 'Fight' : 'Pick a district'}</button></footer></main>`;
+}
+function scoutLine(spec) {
+  if (spec.snap) return `<div class="nx-scout">Skills: ${spec.snap.bar.map(s => esc(modName(s.id, s.mods)) + (s.star > 1 ? ' ' + '★'.repeat(s.star) : '')).join(', ') || 'Attack only'}</div>`;
+  return `<div class="nx-scout">Skills: ${ENEMIES[spec.id].skills.map(s => esc(s.n)).join(', ')}</div>`;
+}
+
+// ---------- Fight ----------
+function fightHTML() {
+  const f = ui.fight;
+  const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
+  return `<main class="screen fight">${topBar(roundLabel(), `<button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
+    <section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
+      <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="chips" id="stB"></div></div>
+      <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
+    <section class="log" id="log" aria-live="polite"></section>
+    <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(run.name)}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
+      <div class="bar hp-bar"><i id="hbA"></i><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
+    <section class="skills c${run.slots}" id="skills"></section></main>`;
+}
+function chipsHTML(X, f) {
+  const c = [];
+  if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
+  if (X.burn > 0) c.push(`<span class="chip burn">Burn ${n0(X.burn)}</span>`);
+  if (X.poison > 0) c.push(`<span class="chip poison">Poison ${n0(X.poison)}</span>`);
+  if (X.bleed > 0) c.push(`<span class="chip bleed">Bleed ${n0(X.bleed)}</span>`);
+  if (X.weaken > 0) c.push(`<span class="chip weaken">Weak ${X.weaken}</span>`);
+  if (X.marked > 0) c.push(`<span class="chip mark">Marked ${X.marked}</span>`);
+  if (X.brokenT > 0) c.push(`<span class="chip stun">Broken</span>`);
+  if (X.empower > 0) c.push(`<span class="chip power">Power ${X.empower}</span>`);
+  if (X.evade > 0) c.push(`<span class="chip evade">Evade ${X.evade}</span>`);
+  const th = (X.thorns || 0) + (X.P.thornsAlways ? X.P.thornsAlways * (X.hp < X.maxHp / 2 ? 2 : 1) : 0);
+  if (th > 0) c.push(`<span class="chip thorns">Thorns ${n0(th)}</span>`);
+  if (X.doomT > 0) c.push(`<span class="chip doom">Doom ${n0(X.doom)} in ${X.doomT}</span>`);
+  if (X.leechT > 0) c.push(`<span class="chip poison">Leech ${X.leechT}</span>`);
+  if (X.regenT > 0) c.push(`<span class="chip regen">Regen ${X.regenT}</span>`);
+  if (X.focus) c.push(`<span class="chip power">Focus</span>`);
+  if (X.stun > 0) c.push(`<span class="chip stun">Stunned</span>`);
+  if (X.enrage && X.hp / X.maxHp <= X.enrage) c.push(`<span class="chip burn">Enraged</span>`);
+  if (X.revive) c.push(`<span class="chip evade">Will rise</span>`);
+  if (X.isPlayer && run.wagerOn && run.wager) c.push(`<span class="chip wagerc">Wager: ${esc(WAGERS[run.wager.key].text)}</span>`);
+  return c.join('');
+}
+function updateFight() {
+  const f = ui.fight; if (!f) return;
+  [['A', f.A], ['B', f.B]].forEach(([k, X]) => {
+    const hp = document.getElementById('hp' + k); if (!hp) return;
+    hp.textContent = `${n0(X.hp)} / ${X.maxHp}`;
+    document.getElementById('hb' + k).style.width = Math.max(0, X.hp / X.maxHp * 100) + '%';
+    document.getElementById('bk' + k).style.width = Math.min(100, X.block / X.maxHp * 100) + '%';
+    document.getElementById('st' + k).innerHTML = chipsHTML(X, f);
+  });
+  const it = document.getElementById('intent');
+  if (it) {
+    if (f.over) it.innerHTML = '';
+    else { const i = intentInfo(f); it.className = 'intent k-' + i.kind; it.innerHTML = `<span class="in-l">Next</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>`; }
+  }
+  const lg = document.getElementById('log');
+  if (lg) lg.innerHTML = f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('');
+  const sk = document.getElementById('skills');
+  if (sk) {
+    const can = f.phase === 'player' && !ui.busy && !f.over;
+    const btn = (s, i, wide) => {
+      const d = s.def, cd = s.cd > 0, prev = previewSkill(f, s);
+      const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
+      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
+        <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
+        ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}<span class="sk-fx">${esc(prev)}</span>${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
+    };
+    const list = f.A.skills.slice(1).map((s, i) => btn(s, i + 1));
+    while (list.length < run.slots) list.push('<div class="sk empty">Empty slot</div>');
+    sk.innerHTML = list.join('') + btn(f.A.skills[0], 0, true);
+  }
+}
+function floatAt(side, text, cls) {
+  const host = document.getElementById('fl' + side); if (!host || host.children.length > 8) return;
+  const el = document.createElement('span'); el.className = 'fl ' + cls; el.textContent = text;
+  el.style.left = (18 + Math.random() * 60) + '%'; host.appendChild(el); setTimeout(() => el.remove(), 1000);
+}
+function shake(side) { const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function playEvents(f) {
+  let d = 0;
+  f.events.forEach(e => {
+    const at = d;
+    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
+    else if (e.k === 'dot' && e.amt > 0) { setTimeout(() => floatAt(e.side, e.amt, e.kind), at); d += 90; }
+    else if (e.k === 'heal') { setTimeout(() => floatAt(e.side, '+' + e.amt, 'heal'), at); d += 90; }
+    else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
+    else if (e.k === 'reaction') { setTimeout(() => floatAt(e.side, e.name + '!', 'react'), at); d += 160; }
+  });
+  f.events = [];
+}
+function say2(f, text, t) { f.log.push({ text, t }); if (f.log.length > 40) f.log.shift(); }
+function summarize(f, side) {
+  const evs = f.events; let used = null, dmg = 0, blocked = 0, crit = false, heals = 0, missed = false;
+  evs.forEach(e => { if (e.k === 'use' && e.side === side) used = e.name; if (e.k === 'hit' && e.side !== side && !e.thorns) { dmg += e.amt; blocked += e.blocked; crit = crit || e.crit; } if (e.k === 'heal' && e.side === side) heals += e.amt; if (e.k === 'miss' && e.side !== side) missed = true; });
+  if (!used) return;
+  const who = side === 'A' ? 'You' : f[side].name;
+  let t = `${who} ${side === 'A' ? 'use' : 'uses'} ${used}`;
+  const bits = [];
+  if (dmg) bits.push(`${dmg} damage${crit ? ' (critical)' : ''}`);
+  if (blocked) bits.push(`${blocked} blocked`);
+  if (missed && !dmg) bits.push('missed');
+  if (heals) bits.push(`healed ${heals}`);
+  if (bits.length) t += ': ' + bits.join(', ');
+  // engine log lines for this action go after the summary
+  say2(f, t + '.', side === 'A' ? 'me' : 'foe');
+}
+function startFightUI() {
+  ui.fight = newFight(run);
+  ui.busy = false; ui.screen = 'fight'; ui.sheet = null;
+  const f = ui.fight;
+  say2(f, `[${f.B.name} enters the arena.]`, 'sys');
+  if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
+  if (f.spec.kind === 'erased') say2(f, '[The System has returned a champion of an erased world. They remember you.]', 'loss');
+  if (f.spec.kind === 'final') say2(f, `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
+  if (f.spec.id === 'undefeated') say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
+  render(); playEvents(f); updateFight();
+}
+const wait = ms => new Promise(r => setTimeout(r, ms / ui.speed));
+async function onUse(i) {
+  const f = ui.fight; if (!f || ui.busy || f.phase !== 'player') return;
+  const s = f.A.skills[i];
+  if (ui.info) { ui.sheet = { type: 'skillinfo', i }; return render(); }
+  if (!canUse(s)) return;
+  ui.busy = true;
+  const before = f.log.length;
+  playerAct(f, i);
+  const engine = f.log.splice(before); summarize(f, 'A'); engine.forEach(l => f.log.push(l)); playEvents(f);
+  if (s.def.quick && !f.over) { ui.busy = false; updateFight(); return; }
+  updateFight();
+  await wait(f.over ? 300 : 650);
+  while (!f.over) {
+    const b2 = f.log.length;
+    enemyTurn(f);
+    const eng = f.log.splice(b2); summarize(f, 'B'); eng.forEach(l => f.log.push(l)); playEvents(f); updateFight();
+    if (f.over) break;
+    if (f.phase === 'stunned') { await wait(800); skipPlayer(f); updateFight(); await wait(500); continue; }
+    break;
+  }
+  ui.busy = false; updateFight();
+  if (f.over) { await wait(700); finishFight(); }
+}
+function finishFight() {
+  const f = ui.fight;
+  const res = resolveFight(run, f, run.practice ? META : meta);
+  pushMsgs(res.msgs);
+  ui.result = res;
+  if (res.practiceDone) { ui.practiceAfter = true; }
+  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes. ${ownerName(res.rested.owner)} will hear of it.]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
+  if (res.death) { const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res }; lsDel(RUN_KEY); }
+  else if (res.spared) { const out = endRun(run, meta, 'spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
+  else if (res.eliteOver) { ui.end = { kind: res.eliteCleared ? 'elite-clear' : 'elite-fall', echoes: 8 * run.eliteWins }; }
+  saveMeta(); if (!res.death) saveRun();
+  ui.sheet = { type: 'result' };
+  render();
+}
+
+// ---------- Sheets ----------
+function sheetWrap(title, body, foot, cls, noClose) {
+  return `<div class="sheet-bg"><section class="sheet ${cls || ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header class="sh-h"><h3>${esc(title)}</h3>${foot === false || noClose ? '' : '<button class="icon-btn" data-act="close" aria-label="Close">×</button>'}</header><div class="sh-b">${body}</div>${foot && foot !== false ? `<footer class="sh-f">${foot}</footer>` : ''}</section></div>`;
+}
+function pieceBody(id, star, mods, power) {
+  star = star || 1; mods = mods || [];
+  if (isGear(id)) {
+    const g = GEAR[id];
+    return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${esc(g.name)}</span>${stars(star)}${rk(g.rank)}</div><div class="sr-meta">${tagNames(id)}<span class="tagn">${g.slot}</span></div>
+      <div class="sr-desc"><b>${Object.entries(gearStats(id, star)).map(([k, v]) => `+${v} ${k}`).join(', ')}.</b> ${esc(gearText(id, star))}</div>${star < 3 ? `<div class="sr-next">At ★${star + 1}: ${esc(gearText(id, star + 1))}</div>` : ''}</div>`;
+  }
+  const d = moddedDef(id, mods);
+  const p = power || skillPower(d, effStats(run), star) * d.powerMult;
+  return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${mods.length ? `<em class="pfx">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em> ` : ''}${esc(d.name)}</span>${stars(star)}${rk(effRank(id, mods))}</div>
+    <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}</div>
+    ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${SKILLS[id].evo.map(e => esc(SKILLS[e].name)).join(' or ')}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
+}
+function pieceSheet() {
+  const S = ui.sheet;
+  if (S.shop != null) {
+    const it = shopItem(run, S.shop, S.i); if (!it) { ui.sheet = null; return ''; }
+    const D = dupInfo(it.id), have = D.have, need = D.need;
+    const where = allPieces(run).filter(p => p.id === it.id).map(p => { const f = findPiece(run, p.u); return (f.at === 'bench' ? 'bench' : f.at === 'bar' ? 'skill bar' : 'equipped') + (p.star > 1 ? ' ★' + p.star : ''); });
+    const note = D.owned ? `<div class="dupbox ${D.merge ? 'merge' : ''}">${pips(have, need)}<p>${D.merge ? `<b>Buying this merges your copies into ★2</b> (+50% power${isGear(it.id) ? ', stronger passive' : ''}).` : have ? `You own ${have} of ${need}. ${need - have - 1} more after this one for ★2.` : 'You already own this at ★2. Three more ★1 copies make another ★2, and three ★2 make ★3.'}</p><p class="fine">Yours: ${where.join(', ')}</p></div>` : '';
+    const full = run.bench.length >= 8 && !wouldMerge(run, it.id) && !(isGear(it.id) ? !run.gear[GEAR[it.id].slot] : run.bar.includes(null));
+    const pr = price(run, it);
+    return sheetWrap(S.shop === 'bonus' ? 'System reward slot' : S.shop === 'gear' ? 'Gear shop' : 'Skill shop', pieceBody(it.id, 1, it.mods) + note + (full ? '<p class="sh-p bad">Your bench is full. Sell something first.</p>' : ''),
+      `${S.shop !== 'bonus' ? `<button class="btn ghost" data-act="lock" data-k="${S.shop}" data-i="${S.i}">${run.locks[S.shop][S.i] ? 'Unlock' : 'Lock'}</button>` : ''}<button class="btn primary" data-act="buy" data-k="${S.shop}" data-i="${S.i}" ${canBuy(run, it) ? '' : 'disabled'}>${D.merge ? 'Buy and merge' : 'Buy'} · ${pr}g</button>`);
+  }
+  const f = findPiece(run, S.u); if (!f) { ui.sheet = null; return ''; }
+  const p = f.p, g = isGear(p.id);
+  const acts = [];
+  if (f.at === 'bench') {
+    if (g) { const cur = run.gear[GEAR[p.id].slot]; acts.push(`<button class="btn" data-act="move" data-u="${p.u}" data-to="gear">${cur ? 'Swap with ' + esc(GEAR[cur.id].name) : 'Equip'}</button>`); }
+    else {
+      const e = run.bar.indexOf(null);
+      if (e >= 0) acts.push(`<button class="btn" data-act="move" data-u="${p.u}" data-to="bar" data-i="${e}">Equip</button>`);
+      else run.bar.forEach((b, i) => acts.push(`<button class="btn small" data-act="move" data-u="${p.u}" data-to="bar" data-i="${i}">Replace ${esc(SKILLS[b.id].name)}</button>`));
+    }
+  } else if (run.bench.length < 8) acts.push(`<button class="btn" data-act="move" data-u="${p.u}" data-to="bench">Move to bench</button>`);
+  if (f.at === 'bar') run.bar.forEach((b, i) => { if (i !== f.i) acts.push(`<button class="btn small ghost" data-act="move" data-u="${p.u}" data-to="bar" data-i="${i}">To slot ${i + 1}</button>`); });
+  const where = f.at === 'bench' ? 'On your bench' : f.at === 'bar' ? `Skill slot ${f.i + 1}` : 'Equipped';
+  const canSell = ui.screen === 'shop';
+  return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
+    canSell ? `<button class="btn ghost danger-t" data-act="sell" data-u="${p.u}">Sell · ${sellValue(p)}g</button><button class="btn primary" data-act="close">Done</button>` : `<button class="btn primary" data-act="close">Done</button>`);
+}
+function pendingSheet() {
+  const p = run.pending[0]; if (!p) return '';
+  if (p.type === 'event') {
+    const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
+    const chainTag = E.chain ? `<p class="sh-p fine">[Event chain: ${{ official: 'The Official', poisoner: 'The Poisoner', letter: 'The Letter' }[E.chain]}]</p>` : '';
+    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((o, i) => { const can = !o.can || o.can(run); return `<button class="choice" data-act="event" data-i="${i}" ${can ? '' : 'disabled'}><div class="sr-h"><span class="sr-name">${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>`; }).join(''), false, E.chain ? 'sys' : '');
+  }
+  if (p.type === 'gift') {
+    return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
+  }
+  if (p.type === 'rune') return enchantSheet(p.mods, 'rune');
+  if (p.type === 'evo') {
+    const f = findPiece(run, p.u); if (!f) { run.pending.shift(); return ''; }
+    const d = SKILLS[f.p.id];
+    return sheetWrap(`[Evolution · ${d.name} ★3]`, `<p class="sh-p">${esc(d.name)} has reached ★3. Choose what it becomes.</p>` + d.evo.map(e => `<button class="choice ${mainTag(e)}" data-act="evolve" data-id="${e}">${pieceBody(e, 3, f.p.mods.filter(m => prefixOk(e, m, [])))}</button>`).join(''), false, 'evo');
+  }
+  return '';
+}
+function enchantSheet(mods, from) {
+  const sel = ui.enchantSel;
+  if (sel == null) {
+    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => { const n = prefixTargets(run, m).length; return `<button class="choice" data-act="ench-mod" data-i="${i}" ${n ? '' : 'disabled'}><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}${n ? '' : ' (none of your skills can take it)'}</div></button>`; }).join('');
+    return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
+  }
+  const m = mods[sel];
+  const list = prefixTargets(run, m).map(t => { const f = findPiece(run, t.u); return `<button class="choice ${mainTag(t.id)}" data-act="ench-apply" data-u="${t.u}">${pieceBody(t.id, f.p.star, t.mods.concat(m).slice(-MAX_MODS))}<div class="sr-next">${f.at === 'bench' ? 'On your bench' : 'On your bar'}${t.mods.length >= MAX_MODS ? ' · replaces ' + PREFIXES[t.mods[0]].name : ''}</div></button>`; }).join('');
+  return sheetWrap(`Carve ${PREFIXES[m].name} into…`, list, `<button class="btn ghost" data-act="ench-back">Back</button>`, 'sys', true);
+}
+function recapHTML(r) {
+  const rows = Object.entries(r.dealt || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const max = rows.length ? rows[0][1] : 1;
+  const hurt = Object.entries(r.tally.hurtBy || {}).sort((a, b) => b[1] - a[1])[0];
+  return rows.length ? `<div class="recap">${rows.map(([k, v]) => `<div class="rc"><span>${esc(k)}</span><i style="width:${Math.max(4, v / max * 100)}%"></i><b>${v}</b></div>`).join('')}</div>` + `<p class="sh-p fine">${r.turns} turns · ${r.tally.reactions} reaction${r.tally.reactions === 1 ? '' : 's'}${hurt ? ` · hurt most by ${esc(hurt[0])} (${hurt[1]})` : ''}</p>` : '';
+}
+function lastTurnsHTML() {
+  const f = ui.fight; if (!f) return '';
+  const lines = f.log.filter(l => ['me', 'foe', 'react', 'loss'].includes(l.t)).slice(-5);
+  if (!lines.length) return '';
+  return `<h4>The last turns</h4><ol class="lastturns">${lines.map((l, i) => `<li class="t-${l.t} ${i === lines.length - 1 ? 'kb' : ''}">${esc(l.text)}${i === lines.length - 1 ? ' <b>(killing blow)</b>' : ''}</li>`).join('')}</ol>`;
+}
+function runCard(s, opts) {
+  opts = opts || {};
+  const H = s.history || [];
+  const label = h => h.round > ROUNDS ? 'E' + (h.round - ROUNDS + 1) : h.kind === 'final' ? 'F' : 'R' + h.round;
+  const strip = H.length ? `<div class="hstrip">${H.map(h => `<span class="hc ${h.won ? 'w' : 'l'}" title="${esc(h.name)}">${label(h)}${h.won ? '' : h.hl ? ` −${h.hl}♥` : ''}</span>`).join('')}</div>` : '';
+  const best = H.filter(h => h.won).sort((a, b) => a.turns - b.turns || b.dealt - a.dealt)[0];
+  const lost = H.reduce((a, h) => a + (h.hl || 0), 0);
+  return `<div class="runcard ${opts.erased ? 'erased' : ''}"><div class="rc-h">${crest(s.champ, opts.erased ? 'erased' : 'champion', !!opts.big, { sigil: s.sigil, color: s.color })}<div><div class="ch-name">${esc(s.champ)}</div><div class="ch-sub">${s.entrant ? 'Entrant ' + s.entrant + ' · ' : ''}${s.path ? esc(ARCH[s.path].path) + ' · ' : ''}Lv ${s.level}${s.title && TITLES[s.title] ? ' · ' + esc(TITLES[s.title].name) : ''}</div></div></div>
+    ${strip}
+    <div class="rc-l"><span>Skills</span>${s.bar.map(x => esc(SKILLS[x.id] ? SKILLS[x.id].name : x.id) + (x.star > 1 ? ' ★' + x.star : '')).join(' · ') || '–'}</div>
+    <div class="rc-l"><span>Gear</span>${(s.gear || []).map(x => esc(GEAR[x.id] ? GEAR[x.id].name : x.id) + (x.star > 1 ? ' ★' + x.star : '')).join(' · ') || '–'}</div>
+    ${s.hiddenPath && HIDDEN_PATHS[s.hiddenPath] ? `<div class="rc-l"><span>Path</span>${esc(HIDDEN_PATHS[s.hiddenPath].name)} (hidden)</div>` : ''}
+    ${best ? `<div class="rc-l"><span>Best fight</span>${esc(best.name)} in ${best.turns} turn${best.turns === 1 ? '' : 's'}</div>` : ''}
+    <div class="rc-l"><span>${opts.erased ? 'Erased by' : 'Hearts'}</span>${opts.erased ? esc(s.cause || 'the System') : `${s.hearts != null ? s.hearts : '?'} of ${s.maxHearts || 10} left`}${lost ? ` · ${lost} lost` : ''}</div></div>`;
+}
+function resultSheet() {
+  const r = ui.result, e = ui.end;
+  if (r.rewind) return sheetWrap('[Return by Death]', `<p class="sh-p big">${esc(r.enemy)} kills you. Then the world blinks.</p><p class="sh-p">The fight begins again. Nobody else remembers. Your cheat skill is spent.</p>`, `<button class="btn primary" data-act="rewind">Try again</button>`, 'sys', true);
+  if (e && e.kind === 'spared') return sheetWrap(`[${run.world.name} is spared]`, `<p class="sh-p big">You beat the Final Champion. ${esc(run.world.name)} survives the tournament, and ${esc(run.champ)} joins the Hall of Champions.</p>${recapHTML(r)}<p class="sh-p">The System offers the <b>elite bracket</b>: 2 more matches against past winners and the Undefeated. Your world is safe either way. Each elite win earns extra Echoes.</p><p class="sh-p fine">+${e.echoes} Echoes earned.</p>`, `<button class="btn ghost" data-act="end-run">End as champion</button><button class="btn primary" data-act="enter-elite">Enter the elite bracket</button>`, 'win', true);
+  if (e && (e.kind === 'elite-clear' || e.kind === 'elite-fall')) return sheetWrap(e.kind === 'elite-clear' ? '[The Undefeated has fallen]' : '[Elite bracket over]', `<p class="sh-p big">${e.kind === 'elite-clear' ? 'Impossible. The System will need a new record.' : 'You fall in the elite bracket. Your world remains spared.'}</p><p class="sh-p fine">Elite wins: ${run.eliteWins}. +${8 * run.eliteWins} Echoes.</p>`, `<button class="btn primary" data-act="end-run">Finish</button>`, e.kind === 'elite-clear' ? 'win' : '', true);
+  if (e && e.kind === 'erased') return sheetWrap('[Eliminated]', `<p class="sh-p big">${esc(r.enemy)} wins. ${esc(e.snap.worldName)} has no Hearts left.</p>${lastTurnsHTML()}${recapHTML(r)}<p class="sh-p">${esc(e.snap.worldName)} will be erased, and ${esc(e.snap.champ)} will join the Hall of the Erased. They may return to face you.</p>`, `<button class="btn primary" data-act="result-ok">Accept</button>`, 'lose', true);
+  const lines = [];
+  if (r.won) lines.push(`+${r.gold} gold · healed 30%`);
+  if (!r.won && !run.elite) lines.push(`A piece of ${esc(run.world.name)} is erased: −${r.heartsLost} Heart${r.heartsLost > 1 ? 's' : ''}. ${run.hearts} left. ${ui.fight && ui.fight.spec.kind === 'final' ? 'You must face the Final Champion again.' : 'The tournament moves on.'}`);
+  const msgs = r.msgs.length ? `<ul class="msgs">${r.msgs.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p><p class="sh-p">${lines.join(' ')}</p>${r.won ? '' : lastTurnsHTML()}${recapHTML(r)}${msgs}`, `<button class="btn primary" data-act="result-ok">Continue</button>`, r.won ? 'win' : 'lose', true);
+}
+function statsSheet() {
+  const s = effStats(run), p = buildPlayer(run);
+  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : '<span></span>'}</div>`).join('');
+  const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g]} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, run.favour[g] / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
+  const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : ''}${rows}
+    <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
+    <h4>Stat milestones</h4><ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>
+    <h4>Title</h4>${titleList()}
+    <h4>System quests</h4>${questList()}
+    ${run.hiddenPath ? `<h4>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</h4><p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>` : ''}
+    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
+    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}. ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}</p>
+    <h4>Sponsors</h4>${gods}`;
+  return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);
+}
+function titleList() {
+  const ts = Object.keys(TITLES).filter(k => meta.titles[k]);
+  if (!ts.length) return '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena.</p>';
+  return `<div class="tlist">${ts.map(k => `<button class="gift ${run.title === k ? 'on' : ''}" data-act="equip-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b>${run.title === k ? '<span class="tagn q">Equipped</span>' : ''}</span><span class="gf-d">${esc(TITLES[k].desc)}</span></button>`).join('')}</div><p class="sh-p fine">One Title at a time. Tap to equip or remove.</p>`;
+}
+function questList() {
+  const qs = run.quests.filter(q => !QUESTS[q.id].hidden || q.done);
+  const hidden = run.quests.filter(q => QUESTS[q.id].hidden && !q.done).length;
+  return `<ul class="msgs">${qs.map(q => { const Q = QUESTS[q.id]; return `<li class="${q.failed ? 'unk' : q.done ? 't-loot' : ''}"><b>${q.done ? '✓ ' : q.failed ? '✗ ' : ''}${esc(Q.text)}</b> <small>${Q.goal > 1 && !q.done ? `${q.prog}/${Q.goal} · ` : ''}Reward: ${esc(QUEST_REWARD[Q.reward])}</small></li>`; }).join('')}${hidden ? `<li class="unk">[${hidden} hidden quest${hidden > 1 ? 's' : ''}: ???]</li>` : ''}</ul>`;
+}
+function questLine() {
+  const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed);
+  if (!q) return '';
+  const Q = QUESTS[q.id];
+  return `<button class="qline" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span>${esc(Q.text)}</span><b>${Q.goal > 1 ? `${q.prog}/${Q.goal}` : ''}</b></button>`;
+}
+function archetypesSheet() {
+  const c = runCounts(run);
+  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b>${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${esc(b)}</div>`).join('')}</div>`; }).join('');
+  const hp = run.hiddenPath ? `<div class="archrow hidden"><div class="ar-h"><b>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</b></div><div class="ar-b on">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</div></div>` : '<p class="sh-p fine">Reach 4 pieces in two archetypes at once to unlock a Hidden Path.</p>';
+  return sheetWrap('Archetypes this run', `<p class="sh-p fine">Equipped pieces (skill bar and gear) count. Each different piece counts once; pieces with two tags count for both. At 4, the System names your path.</p>${body}${hp}<h4>Reactions</h4><ul class="msgs">${Object.values(REACTIONS).map(R => `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>`).join('')}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function scoutSheet() {
+  const spec = currentSpec(run);
+  let body = '';
+  if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
+  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>`; }
+  return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
+}
+function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
+function menuSheet() {
+  const cs = !cloud.on ? 'Progress is saved on this device only.' : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
+  return sheetWrap('Menu', `<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
+    ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
+    ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
+}
+function syslogSheet() { return sheetWrap('System log', `<ul class="msgs">${run.log.slice().reverse().map(l => `<li class="t-${l.t}">${esc(l.text)}</li>`).join('') || '<li class="unk">Nothing yet.</li>'}</ul>`, `<button class="btn primary" data-act="close">Close</button>`); }
+function howtoSheet() {
+  return sheetWrap('How to play', `<ul class="msgs plain">
+    <li><b>Each round:</b> choose your opponent, shop, visit one district, then fight.</li>
+    <li><b>Fights:</b> pick one skill a turn. The opponent's next move is always shown. Quick skills don't end your turn.</li>
+    <li><b>Stun and Interrupt</b> cancel the opponent's telegraphed move and put it on cooldown.</li>
+    <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
+    <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
+    <li><b>Gold:</b> 5 a round, +interest of 1 per 10 gold you hold (up to 3). Reroll for 2, buy XP for 4. Higher levels see rarer pieces.</li>
+    <li><b>Reactions:</b> Burn + Poison, Burn + Bleed, Bleed + Mark, Stun + Weaken and more trigger bonus effects.</li>
+    <li><b>Wagers:</b> a god bets on your next fight. Stake 5 gold for 10 and their Favour.</li>
+    <li><b>Titles</b> come from feats and world firsts. Equip one for a small bonus; many unlock new Gifts.</li>
+    <li><b>System quests</b> appear each run. Some are hidden until you complete them.</li>
+    <li><b>Hidden Paths:</b> reach 4 pieces in two archetypes at once for a hybrid bonus.</li>
+    <li><b>Stat milestones:</b> 10 in a stat grants a named perk.</li>
+    <li><b>Hearts</b> are your world. Each loss erases part of it, and losses cost more later. At zero your world is erased, and its champion will return to face you.</li>
+  </ul>`, `<button class="btn primary" data-act="close">Got it</button>`);
+}
+function archiveSheet() {
+  const A = meta.archive;
+  if (run && !run.ended && hasGift(run, 'f_amnesia')) return sheetWrap('Tournament Archive', '<p class="sh-p big">[Access denied. Entrant memory is corrupted.]</p><p class="sh-p fine">Amnesia seals the Archive for this run.</p>', `<button class="btn primary" data-act="close">Close</button>`);
+  const titles = Object.entries(TITLES).map(([k, T]) => meta.titles[k] ? `<li><b>${esc(T.name)}</b>: ${esc(T.desc)} <small>${esc(T.cond)}</small></li>` : `<li class="unk">${T.first ? '' : 'Title: '}<small>${esc(T.cond)}</small></li>`).join('');
+  const hidden = Object.entries(HIDDEN_PATHS).filter(([k]) => A.hidden && A.hidden[k]).map(([k, H]) => `<li><b>${esc(H.name)}</b> (${k.split('+').map(x => ARCH[x].name).join(' + ')}): ${esc(H.desc)}</li>`).join('');
+  const nh = Object.keys(HIDDEN_PATHS).length, fh = Object.keys(A.hidden || {}).length;
+  const quests = Object.entries(QUESTS).filter(([k, Q]) => Q.hidden).map(([k, Q]) => A.quests && A.quests[k] ? `<li><b>${esc(Q.text)}</b></li>` : '<li class="unk">Hidden quest: ???</li>').join('');
+  const rivals = RIVALS.map(k => A.rivals[k] ? `<li><b>${esc(ENEMIES[k].name)}</b>: ${esc(ENEMIES[k].style)}. Skills: ${ENEMIES[k].skills.map(s => esc(s.n)).join(', ')}.</li>` : `<li class="unk">Unknown rival</li>`).join('');
+  const finals = Object.keys(ENEMIES).filter(k => ENEMIES[k].final).map(k => A.finals[k] ? `<li><b>${esc(ENEMIES[k].name)}</b>: ${esc(ENEMIES[k].style)}.</li>` : `<li class="unk">Unknown Final Champion</li>`).join('');
+  const rx = Object.entries(REACTIONS).map(([k, R]) => A.reactions[k] ? `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>` : `<li class="unk">Undiscovered reaction</li>`).join('');
+  const paths = ARCH_KEYS.map(k => A.paths[k] ? `<li><b>${ARCH[k].path}</b> (${ARCH[k].name})</li>` : '').join('');
+  const evos = Object.keys(A.evos).map(k => { const [a, b] = k.split('>'); return SKILLS[a] && SKILLS[b] ? `<li>${esc(SKILLS[a].name)} → <b>${esc(SKILLS[b].name)}</b></li>` : ''; }).join('');
+  return sheetWrap('Tournament Archive', `<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function hallsSheet() {
+  const row = (s, erased) => runCard(s, { erased }) + (cloud.on && !cloud.shareOff ? (meta.shared && meta.shared[s.at] ? '<p class="sh-p fine">Shared with other entrants.</p>' : `<button class="btn small ghost" data-act="share-hall" data-k="${erased ? 'erased' : 'spared'}" data-at="${s.at}">Share with other entrants</button>`) : '');
+  const others = cloud.shared.length ? `<h4>Other entrants' champions</h4><p class="sh-p fine">Shared by people who play this game with you. They can appear in your tournaments.</p><div class="cards">${cloud.shared.map(x => `<p class="sh-p fine">${x.kind === 'spared' ? 'Champion of' : 'Erased in'} ${esc(ownerName(x.snap.owner))}'s tournament</p>` + runCard(x.snap, { erased: x.kind === 'erased' })).join('')}</div>` : (cloud.on ? '<h4>Other entrants\' champions</h4><p class="sh-p fine">None shared yet. When people you share this game with share their champions, they appear here and in your brackets.</p>' : '');
+  return sheetWrap('The Halls', `<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div><h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function echoesSheet() {
+  const list = Object.entries(UNLOCKS).map(([k, u]) => `<div class="choice static"><div class="sr-h"><span class="sr-name">${esc(u.name)}</span><span class="price">${u.cost} Echoes</span></div><div class="sr-desc">${esc(u.desc)}</div>${meta.unlocks[k] ? '<span class="tag">Unlocked</span>' : `<button class="btn small" data-act="unlock" data-k="${k}" ${meta.echoes < u.cost ? 'disabled' : ''}>Unlock</button>`}</div>`).join('');
+  return sheetWrap('Echoes', `<p class="sh-p">Echoes are fragments of the worlds you fought for. You have <b>${meta.echoes}</b>. They buy options, never raw power.</p>${list}`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function shareBlock(s, erased) {
+  if (!cloud.on || cloud.shareOff || !s) return '';
+  if (meta.shared && meta.shared[s.at]) return `<p class="sh-p fine center">[${esc(s.champ)} is shared with other entrants.]</p>`;
+  return `<button class="btn" data-act="share" data-k="${erased ? 'erased' : 'spared'}">Share ${esc(s.name || s.champ)} with other entrants</button>`;
+}
+function endHTML() {
+  const e = ui.end, s = e.snap;
+  const erased = e.kind === 'erased';
+  const lines = erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`, '[Next world.]'] : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`];
+  return `<main class="screen title end"><div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
+    <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
+    ${runCard(s, { erased, big: true })}</div>
+    <div class="t-stats"><div><b>${s.round}</b><span>round reached</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div></div>
+    ${shareBlock(s, erased)}
+    <div class="stack"><button class="btn primary" data-act="new">Choose a new world</button><div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div></div></main>`;
+}
+
+// ---------- Render ----------
+function render() {
+  const focusName = document.activeElement && document.activeElement.id === 'aw-name';
+  let h = '';
+  const scr = ui.screen;
+  if (scr === 'title') h = titleHTML();
+  else if (scr === 'worlds') h = worldsHTML();
+  else if (scr === 'awaken') h = awakenHTML();
+  else if (scr === 'draft') h = draftHTML();
+  else if (scr === 'choose') h = chooseHTML();
+  else if (scr === 'shop') h = shopHTML();
+  else if (scr === 'district') h = districtHTML();
+  else if (scr === 'fight') h = fightHTML();
+  else if (scr === 'end') h = endHTML();
+  let sh = '';
+  const S = ui.sheet;
+  if (S) {
+    const t = S.type || S;
+    const fn = { piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    sh = fn ? fn() : '';
+  }
+  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
+  if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
+  if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
+  app.innerHTML = h + sh + coachHTML();
+  coachHighlight();
+  if (scr === 'fight') updateFight();
+  if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+}
+
+// ---------- Actions ----------
+function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
+function onAct(el) {
+  const a = el.dataset.act, d = el.dataset;
+  switch (a) {
+    case 'new': lsDel(RUN_KEY); run = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
+    case 'resume': run = lsGet(RUN_KEY); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
+    case 'back-title': return go('title');
+    case 'back-worlds': return go('worlds');
+    case 'pick-world': ui.world = +d.i; return render();
+    case 'world-ok': ui.aw = newAw(ui.worlds[ui.world]); return go('awaken');
+    case 'aw-tab': ui.aw.tab = d.t; return render();
+    case 'aw-sigil': ui.aw.sigil = +d.i; return render();
+    case 'aw-color': ui.aw.color = +d.i; return render();
+    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
+    case 'aw-cat': ui.aw.cat = d.c; return render();
+    case 'aw-gift': { const A = ui.aw, k = d.k; if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
+    case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
+    case 'aw-title': ui.aw.title = ui.aw.title === d.k ? null : d.k; return render();
+    case 'aw-random': { const A = ui.aw; A.gifts = randomGifts(ui.worlds[ui.world], meta, A.patron || 'war', A.offer); toast('[The System has chosen for you.]', 'sys'); return render(); }
+    case 'aw-save': { const A = ui.aw; meta.presets = (meta.presets || []).concat({ name: 'Preset ' + ((meta.presets || []).length + 1), gifts: A.gifts.filter(k => GIFTS[k].cat !== 'world') }).slice(-3); meta.presets.forEach((p, i) => p.name = 'Preset ' + (i + 1)); saveMeta(); toast('[Preset saved.]', 'sys'); return render(); }
+    case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, meta) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
+    case 'aw-ok': {
+      const A = ui.aw;
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : { name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, title: A.title }, A.practice ? META : meta);
+      if (run.practice) run.gold = 2;
+      pushMsgs(run.log.slice());
+      ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
+    }
+    case 'close': ui.sheet = null; ui.confirmAbandon = false; ui.enchantSel = null; return render();
+    case 'sheet': ui.sheet = { type: d.s }; return render();
+    case 'menu': ui.sheet = { type: 'menu' }; return render();
+    case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
+    case 'speed': ui.speed = +d.v; return render();
+    case 'share': { const s = ui.end && ui.end.snap; if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared with other entrants.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
+    case 'share-hall': { const list = d.k === 'erased' ? meta.erased : meta.champions; const s = list.find(x => String(x.at) === d.at); if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
+    case 'abandon': ui.confirmAbandon = true; return render();
+    case 'abandon-yes': { if (run.practice) return endPractice(false); const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap }; saveMeta(); lsDel(RUN_KEY); ui.fight = null; ui.confirmAbandon = false; return go('end'); }
+  }
+  if (!run) return;
+  const msgs = [];
+  switch (a) {
+    case 'draft-pick': { const i = ui.draftSel.indexOf(d.id); if (i >= 0) ui.draftSel.splice(i, 1); else if (ui.draftSel.length < 3) ui.draftSel.push(d.id); return render(); }
+    case 'draft-reroll': rerollDraft(run); ui.draftSel = []; saveRun(); return render();
+    case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta); ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
+    case 'pick-opp': ui.pick = +d.i; return render();
+    case 'wager': ui.wagerOn = !ui.wagerOn; return render();
+    case 'opp-ok': { if (ui.pick == null) return; chooseOpponent(run, ui.pick, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; saveRun(); return go('shop'); }
+    case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
+    case 'shop-tab': ui.shopTab = d.k; return render();
+    case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
+    case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
+    case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
+    case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
+    case 'buy-xp': if (buyXp(run, msgs)) { pushMsgs(msgs); saveRun(); } return render();
+    case 'sell': { const p = findPiece(run, +d.u); const v = sell(run, +d.u); if (v) toast(`[Sold ${pieceDef(p.p.id).name} for ${v}g]`, 'loot'); ui.sheet = null; saveRun(); return render(); }
+    case 'move': {
+      const u = +d.u, to = d.to;
+      const ok = to === 'bench' ? movePiece(run, u, 'bench', msgs) : to === 'gear' ? movePiece(run, u, { gear: GEAR[findPiece(run, u).p.id].slot }, msgs) : movePiece(run, u, { bar: +d.i }, msgs);
+      if (!ok) toast('[Not possible: your bench may be full.]', 'loss');
+      ui.sheet = null; pushMsgs(msgs); saveRun(); saveMeta(); return render();
+    }
+    case 'shop-done': leaveShop(run, null, msgs); pushMsgs(msgs); ui.distDone = null; saveRun(); return go('district');
+    case 'back-shop': run.stage = 'shop'; saveRun(); return go('shop');
+    case 'district': {
+      const k = d.k; if (!useDistrict(run, k)) return; ui.distDone = k;
+      if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
+      if (k === 'sanctum') toast(`[The world mends. +${sanctum(run)} Hearts]`, 'loot');
+      if (k === 'scout') ui.sheet = { type: 'scout' };
+
+      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(3); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
+      saveRun(); return render();
+    }
+    case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = EVENTS[p.key].opts[+d.i]; if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }
+    case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
+    case 'ench-mod': ui.enchantSel = +d.i; return render();
+    case 'ench-back': ui.enchantSel = null; return render();
+    case 'ench-skip': { ui.enchantSel = null; if (ui.sheet) ui.sheet = null; else if (run.pending[0] && run.pending[0].type === 'rune') run.pending.shift(); saveRun(); return render(); }
+    case 'ench-apply': {
+      const fromRune = !ui.sheet && run.pending[0] && run.pending[0].type === 'rune';
+      const mods = fromRune ? run.pending[0].mods : ui.enchantMods, m = mods[ui.enchantSel];
+      const f = findPiece(run, +d.u);
+      if (f && applyPrefix(run, +d.u, m)) toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill');
+      ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
+    }
+    case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
+    case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs); saveRun(); } return render();
+    case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
+    case 'fight': if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI();
+    case 'use': return onUse(+d.i);
+    case 'info': ui.info = !ui.info; return render();
+    case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
+    case 'result-ok': {
+      if (ui.practiceAfter) { ui.practiceAfter = false; ui.result = null; ui.sheet = { type: 'practicedone' }; return render(); }
+      ui.sheet = null; ui.fight = null; ui.result = null;
+      if (ui.end && ui.end.kind === 'erased') return go('end');
+      saveRun(); return go(stageScreen());
+    }
+    case 'enter-elite': startElite(run, meta); ui.end = null; ui.sheet = null; ui.fight = null; saveRun(); return go(stageScreen());
+    case 'end-run': { const extra = run.eliteWins * 8; meta.echoes += extra; saveMeta(); const snap = meta.champions[0]; ui.end = { kind: 'spared', snap, totalEchoes: echoesFor(run, 'spared') + extra }; run.ended = true; lsDel(RUN_KEY); ui.fight = null; return go('end'); }
+  }
+}
+// ---------- Practice run (tutorial) ----------
+const PRACTICE = {
+  world: { type: 'burning', name: 'the Proving Grounds', rank: 1, mod: 'none', champ: 'Novice' },
+  setup: { name: 'Novice', sigil: 3, color: 0, stats: { STR: 2, AGI: 2, INT: 4, VIT: 4, LUK: 2 }, gifts: ['deserter', 'catalyst'], patron: 'war', arch: ['pyre', 'venom', 'bastion', 'blade'] },
+  script: {
+    rounds: 3,
+    draft: ['firebolt', 'venom_blade', 'iron_guard', 'quick_slash', 'hex', 'ember_ward'],
+    shops: [
+      { skill: ['firebolt', 'firebolt', 'plague_cloud', 'lacerate', 'shield_bash'], gear: ['ember_gauntlets', 'chain_mail', 'serpent_dagger', 'prayer_beads', 'cinder_robe'] },
+      { skill: ['venom_blade', 'venom_blade', 'scorch', 'retribution', 'flame_wave'], gear: ['tower_shield', 'ember_gauntlets', 'duelist_rapier', 'grave_shroud', 'chain_mail'] },
+      { skill: ['scorch', 'ignite', 'plague_cloud', 'iron_guard', 'fan_of_knives'], gear: ['plague_censer', 'templar_plate', 'shadow_leathers', 'serpent_dagger', 'chain_mail'] },
+    ],
+    choices: [
+      [{ kind: 'monster', id: 'goblin' }, { kind: 'monster', id: 'golem', hard: true }],
+      [{ kind: 'monster', id: 'brute' }, { kind: 'monster', id: 'imp', hard: true }],
+      [{ kind: 'rival', id: 'seraphine' }, { kind: 'rival', id: 'grukk', hard: true }],
+    ],
+    districts: [['scout', 'infirmary', 'enchanter'], ['enchanter', 'undercity', 'infirmary'], ['infirmary', 'scout', 'enchanter']],
+  },
+};
+const ownsStar = (id, st) => run && allPieces(run).some(p => p.id === id && p.star >= st);
+const COACH = [
+  { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, stats, Gifts and a Patron god. For practice I've filled it in.", wait: 'next' },
+  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks and cheat skills, bought with Gift Points. Weaker worlds give more points. Open the Gifts tab.', wait: 'aw-tab' },
+  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (15 Block at the start of every fight) and Catalyst (stronger reactions). Tap Awaken.", wait: 'aw-ok' },
+  { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-ok' },
+  { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
+  { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
+  { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Pick the Goblin, then head to the shop.', wait: 'opp-ok' },
+  { scr: 'shop', pos: 'bottom', hl: '.achips', text: 'Archetype counters. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap a counter any time to read them.', wait: 'next' },
+  { scr: 'shop', pos: 'bottom', hl: '.shoptabs', text: 'There are two shops: Skills and Gear. Each has 5 slots and its own reroll. A badge on the tab tells you when it holds copies of things you own.', wait: 'next' },
+  { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Buy both Firebolts: tap a tile, then Buy.', until: () => ownsStar('firebolt', 2) },
+  { scr: 'shop', pos: 'bottom', hl: '[data-act="shop-tab"][data-k="gear"]', text: 'Merged! Now open the Gear shop. Gear gives stats and one passive, and counts toward archetypes too.', wait: 'shop-tab' },
+  { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
+  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Buying XP levels you up, and higher levels find rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
+  { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Done shopping.', wait: 'shop-done' },
+  { scr: 'district', pos: 'bottom', hl: '.inter', text: "Before each fight, visit one district. Scout's Post shows what your opponent will do two moves ahead. Pick one.", wait: 'district' },
+  { scr: 'district', pos: 'bottom', hl: '[data-act="fight"]', text: 'To the arena.', wait: 'fight' },
+  { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
+  { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Tap a skill to use it. Numbers include your stats and stars. Used skills go on cooldown for a few turns; Attack never does.', wait: 'next' },
+  { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Use Venom Blade first, then Firebolt: Burn landing on a Poisoned target triggers the reaction Toxic Flare.', until: () => ui.fight && (ui.fight.tally.reactions > 0 || ui.fight.over), skippable: true },
+  { scr: 'fight', pos: 'mid', text: 'Reaction! There are six to discover. Now finish the fight, and use Iron Guard when a big hit is coming.', until: () => ui.fight && ui.fight.over, skippable: true },
+  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Round 2. Take the Hard option for a rune if you are healthy, or play it safe.', wait: 'opp-ok' },
+  { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Two Venom Blades this time. Build however you like: merge, try new archetypes, or save gold for interest.', wait: 'shop-done' },
+  { scr: 'district', pos: 'bottom', text: 'Pick a district, then fight. Watch for big hits: Block soaks them, and Stun or Interrupt cancel them.', wait: 'fight' },
+  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Last practice round: a rival. Rivals are named champions with their own tricks. Everything else is yours to try.', wait: 'opp-ok' },
+];
+let realMeta = null;
+function startPractice() {
+  realMeta = meta;
+  const pm = newMeta(); pm.unlocks = Object.assign({}, realMeta.unlocks);
+  bindMeta(pm);
+  const w = Object.assign({}, PRACTICE.world);
+  ui.worlds = [w]; ui.world = 0;
+  ui.aw = Object.assign(newAw(w), { name: PRACTICE.setup.name, sigil: PRACTICE.setup.sigil, color: PRACTICE.setup.color, stats: Object.assign({}, PRACTICE.setup.stats), pts: 0, gifts: PRACTICE.setup.gifts.slice(), patron: PRACTICE.setup.patron, offer: {}, practice: true });
+  ui.coach = { i: 0 }; run = null; ui.end = null;
+  go('awaken');
+}
+function practiceMeta() { return META || meta; }
+function endPractice(done) {
+  ui.coach = null; ui.fight = null; ui.sheet = null;
+  bindMeta(realMeta || meta); realMeta = null;
+  const first = !meta.tutorialDone;
+  meta.tutorialDone = true;
+  if (done && first) { meta.echoes += 5; toast('[Practice complete. +5 Echoes.]', 'level'); }
+  saveMeta(); run = null;
+  go('title');
+}
+function coachStep() { return ui.coach && COACH[ui.coach.i]; }
+function coachAdvance() { if (!ui.coach) return; ui.coach.i++; if (ui.coach.i >= COACH.length) ui.coach.done = true; }
+function coachHTML() {
+  if (!ui.coach) return '';
+  let st = coachStep();
+  while (st && st.until && st.until() && ui.screen === st.scr) { coachAdvance(); st = coachStep(); }
+  const skipBtn = ui.coach.confirmSkip ? `<button class="link danger-t" data-act="coach-skip-yes">Yes, end the practice run</button>` : `<button class="link" data-act="coach-skip">Skip tutorial</button>`;
+  if (!st || st.scr !== ui.screen || (ui.sheet && ui.sheet.type !== 'menu') || (run && run.pending.length && ['choose', 'shop', 'district'].includes(ui.screen))) return ui.coach.confirmSkip ? `<div class="coach pos-bottom"><p>End the practice run?</p><div class="co-f">${skipBtn}<button class="link" data-act="coach-skip-no">Keep going</button></div></div>` : '';
+  if (ui.coach.min) return `<button class="coach-pill" data-act="coach-max">[Tutorial] ▴</button>`;
+  return `<div class="coach pos-${st.pos || 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[Tutorial]</span><button class="link" data-act="coach-min" aria-label="Minimise the tutorial">Hide ▾</button></div><p>${esc(st.text)}</p><div class="co-f">${skipBtn}${st.wait === 'next' || st.skippable ? `<button class="btn small primary" data-act="coach-next">${st.wait === 'next' ? 'Next' : 'Got it'}</button>` : ''}</div></div>`;
+}
+function coachHighlight() {
+  document.querySelectorAll('.coach-hl').forEach(e => e.classList.remove('coach-hl'));
+  const st = coachStep(); if (!st || !st.hl || st.scr !== ui.screen || ui.sheet) return;
+  const els = document.querySelectorAll(st.hl); for (let k = 0; k < Math.min(els.length, 6); k++) els[k].classList.add('coach-hl');
+}
+function practiceDoneSheet() {
+  return sheetWrap('[Practice complete]', `<p class="sh-p big">That is the loop: choose an opponent, shop, visit a district, fight.</p>
+    <ul class="msgs plain"><li>A real tournament has 8 rounds and a Final Champion for each world.</li><li>You'll also meet Titles, System quests, Hidden Paths, event chains and the Additional Gift after round 4.</li><li>Lose all your Hearts and your world is erased; its champion will come back to face you.</li></ul>
+    <p class="sh-p fine">${meta.tutorialDone ? 'You can replay the practice run from the title screen.' : '+5 Echoes for finishing.'}</p>`, `<button class="btn ghost" data-act="practice-end">Title screen</button><button class="btn primary" data-act="practice-tournament">Enter the tournament</button>`, 'win', true);
+}
+function firstTimeSheet() {
+  return sheetWrap('[New entrant detected]', `<p class="sh-p big">First time in the tournament?</p><p class="sh-p">The practice run teaches the basics in 3 short rounds with the System guiding you. It takes about 5 minutes and you can skip it at any point.</p>`, `<button class="btn ghost" data-act="skip-practice">Skip, enter the tournament</button><button class="btn primary" data-act="practice">Practice run</button>`, 'sys');
+}
+const _onAct = onAct;
+onAct = function (el) {
+  const a = el.dataset.act;
+  if (a === 'coach-next') { coachAdvance(); return render(); }
+  if (a === 'coach-skip') { ui.coach.confirmSkip = true; return render(); }
+  if (a === 'coach-min') { ui.coach.min = true; return render(); }
+  if (a === 'coach-max') { ui.coach.min = false; return render(); }
+  if (a === 'coach-skip-no') { ui.coach.confirmSkip = false; return render(); }
+  if (a === 'coach-skip-yes') return endPractice(false);
+  if (a === 'practice') { ui.sheet = null; return startPractice(); }
+  if (a === 'skip-practice') { meta.tutorialDone = true; saveMeta(); ui.sheet = null; return _onAct({ dataset: { act: 'new' } }); }
+  if (a === 'practice-end') return endPractice(true);
+  if (a === 'practice-tournament') { endPractice(true); return _onAct({ dataset: { act: 'new' } }); }
+  if (a === 'new' && !meta.tutorialDone && !ui.practiceAsked) { ui.practiceAsked = true; ui.sheet = { type: 'firsttime' }; return render(); }
+  const st = coachStep();
+  _onAct(el);
+  if (st && coachStep() === st && st.wait === a) { coachAdvance(); render(); }
+};
+
+// ---------- Cloud: synced progress and shared champions ----------
+// Everything here is optional: without a signed-in viewer the game runs on local storage alone.
+const cloud = { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, names: {}, timer: null, pushing: false, again: false, shared: [], status: 'local' };
+const jsonSafe = x => JSON.parse(JSON.stringify(x));
+async function cloudInit() {
+  if (!window.claude || typeof window.claude.use !== 'function') return;
+  try {
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) return;
+    const uid = await user.id(); if (!uid) return;
+    Object.assign(cloud, { db, user, uid, on: true, status: 'syncing' });
+    await pullProgress();
+    await loadShared();
+    await checkRests();
+    if (cloud.status === 'syncing') cloud.status = 'synced';
+    render();
+  } catch (e) { cloud.status = 'local'; }
+}
+function progressDoc() { return cloud.db.doc('data/users/' + cloud.uid + '/progress'); }
+async function pullProgress() {
+  let snap;
+  try { snap = await progressDoc().get(); } catch (e) { cloud.syncOff = true; cloud.status = 'local'; return; }
+  const r = snap.exists ? snap.data() : null;
+  let changed = false;
+  if (r && r.meta && (r.meta.savedAt || 0) > (meta.savedAt || 0) && !realMeta) {
+    meta = migrateMeta(jsonSafe(r.meta)); bindMeta(meta); lsSet(META_KEY, meta); changed = true;
+  }
+  const localRun = lsGet(RUN_KEY);
+  if (r && r.run && r.run.v === VERSION && !r.run.ended && (!localRun || (r.run.savedAt || 0) > (localRun.savedAt || 0)) && ui.screen === 'title') {
+    lsSet(RUN_KEY, r.run); changed = true;
+  }
+  if (changed) toast('[Progress synced from your account.]', 'sys');
+  if (!r || (meta.savedAt || 0) > ((r.meta && r.meta.savedAt) || 0) || (localRun && (localRun.savedAt || 0) > ((r.run && r.run.savedAt) || 0))) schedulePush();
+}
+function schedulePush() {
+  if (!cloud.on || cloud.syncOff || realMeta) return;
+  clearTimeout(cloud.timer); cloud.timer = setTimeout(pushProgress, 2000);
+}
+async function pushProgress() {
+  if (cloud.pushing) { cloud.again = true; return; }
+  cloud.pushing = true;
+  try {
+    const r = lsGet(RUN_KEY);
+    await progressDoc().set(jsonSafe({ meta, run: r && !r.ended && !r.practice ? r : null, savedAt: Date.now() }));
+    cloud.status = 'synced';
+  } catch (e) {
+    if (e && (e.code === 'invalid_argument' || e.code === 'revoked' || e.code === 'not_granted')) { cloud.syncOff = true; cloud.status = 'local'; }
+    else if (e && e.code === 'unavailable') setTimeout(schedulePush, 4000 + Math.random() * 3000);
+  }
+  cloud.pushing = false;
+  if (cloud.again) { cloud.again = false; schedulePush(); }
+}
+async function resolveNames(ids) {
+  ids = ids.filter(id => id && !(id in cloud.names)); if (!ids.length || !cloud.user) return;
+  try { const ps = await cloud.user.profiles(ids); ids.forEach(id => cloud.names[id] = (ps[id] && ps[id].name) || ''); } catch (e) { }
+}
+function ownerName(id) { return cloud.names[id] || 'another entrant'; }
+async function loadShared() {
+  if (!cloud.on) return;
+  try {
+    const qs = await cloud.db.collection('champions').get();
+    const erased = [], spared = [], all = [];
+    qs.docs.forEach(d => {
+      if (d.id === cloud.uid) return;
+      const body = d.data() || {}; (Array.isArray(body.list) ? body.list : []).slice(0, 12).forEach(e => {
+        const s = sanitizeSnap(e && e.snap, d.id); if (!s) return;
+        (e.kind === 'spared' ? spared : erased).push(s); all.push({ kind: e.kind === 'spared' ? 'spared' : 'erased', snap: s });
+      });
+    });
+    setShared(erased, spared); cloud.shared = all;
+    await resolveNames(all.map(x => x.snap.owner));
+  } catch (e) { }
+}
+async function shareChampion(snap, kind) {
+  if (!cloud.on || cloud.shareOff) return false;
+  const ref = cloud.db.doc('champions/' + cloud.uid);
+  try {
+    const cur = await ref.get();
+    const list = cur.exists && Array.isArray(cur.data().list) ? cur.data().list.slice() : [];
+    if (!list.some(e => e.snap && e.snap.at === snap.at)) list.unshift({ kind, snap: jsonSafe(snap), t: Date.now() });
+    await ref.set({ list: list.slice(0, 12) });
+    meta.shared = meta.shared || {}; meta.shared[snap.at] = true; saveMeta();
+    return true;
+  } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; return false; }
+}
+async function recordRest(r) {
+  if (!cloud.on || cloud.shareOff) return;
+  const ref = cloud.db.doc('rests/' + cloud.uid);
+  try {
+    const cur = await ref.get();
+    const list = cur.exists && Array.isArray(cur.data().list) ? cur.data().list.slice() : [];
+    list.unshift({ to: r.owner, champ: String(r.champ).slice(0, 60), at: r.at, t: Date.now() });
+    await ref.set({ list: list.slice(0, 40) });
+  } catch (e) { }
+}
+async function checkRests() {
+  if (!cloud.on) return;
+  try {
+    const qs = await cloud.db.collection('rests').get();
+    const notes = [];
+    qs.docs.forEach(d => { if (d.id === cloud.uid) return; ((d.data() || {}).list || []).forEach(e => { if (e && e.to === cloud.uid && Number(e.t) > (meta.restSeen || 0)) notes.push({ by: d.id, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t) }); }); });
+    if (!notes.length) return;
+    await resolveNames(notes.map(n => n.by));
+    notes.sort((a, b) => a.t - b.t).forEach(n => { meta.echoes += 3; logToast(`[${n.champ} was laid to rest by ${ownerName(n.by)}. +3 Echoes.]`); });
+    meta.restSeen = Math.max(...notes.map(n => n.t)); saveMeta();
+  } catch (e) { }
+}
+function logToast(text) { toast(text, 'broadcast'); }
+
+app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
+app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && ui.sheet && !['result'].includes(ui.sheet.type)) { ui.sheet = null; render(); }
+  if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }
+});
+render();
+cloudInit();
