@@ -86,6 +86,7 @@ function titleHTML() {
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
       <button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button>
+      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(window.WPD_CLOUD.displayName())} · cloud save on · <button class="link" data-act="signout">Sign out</button></p>` : ''}
     </div></main>`;
 }
 function worldsHTML() {
@@ -566,8 +567,8 @@ function scoutSheet() {
 }
 function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
 function menuSheet() {
-  const cs = !cloud.on ? 'Progress is saved on this device only.' : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
-  return sheetWrap('Menu', `<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
+  const cs = !cloud.on ? (FIREBASE ? '' : 'Progress is saved on this device only.') : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
+  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
     ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
 }
@@ -613,6 +614,7 @@ function echoesSheet() {
   return sheetWrap('Echoes', `<p class="sh-p">Echoes are fragments of the worlds you fought for. You have <b>${meta.echoes}</b>. They buy options, never raw power.</p>${list}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function shareBlock(s, erased) {
+  if (FIREBASE && !cloud.on && s) return `<p class="sh-p fine center">Sign in from the menu to share champions with other players.</p>`;
   if (!cloud.on || cloud.shareOff || !s) return '';
   if (meta.shared && meta.shared[s.at]) return `<p class="sh-p fine center">[${esc(s.champ)} is shared with other entrants.]</p>`;
   return `<button class="btn" data-act="share" data-k="${erased ? 'erased' : 'spared'}">Share ${esc(s.name || s.champ)} with other entrants</button>`;
@@ -693,6 +695,8 @@ function onAct(el) {
     case 'menu': ui.sheet = { type: 'menu' }; return render();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'speed': ui.speed = +d.v; return render();
+    case 'signin': { const C = window.WPD_CLOUD; if (!C) return; C.signIn(d.k).catch(e => toast(`[Sign-in failed: ${(e && e.message) || 'unknown error'}]`, 'loss')); return; }
+    case 'signout': { const C = window.WPD_CLOUD; if (C) C.signOut().then(() => toast('[Signed out. Progress stays on this device.]', 'sys')); ui.sheet = null; return render(); }
     case 'share': { const s = ui.end && ui.end.snap; if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared with other entrants.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
     case 'share-hall': { const list = d.k === 'erased' ? meta.erased : meta.champions; const s = list.find(x => String(x.at) === d.at); if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
     case 'abandon': ui.confirmAbandon = true; return render();
@@ -876,10 +880,17 @@ onAct = function (el) {
 // Everything here is optional: without a signed-in viewer the game runs on local storage alone.
 const cloud = { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, names: {}, timer: null, pushing: false, again: false, shared: [], status: 'local' };
 const jsonSafe = x => JSON.parse(JSON.stringify(x));
+const FIREBASE = !!window.FIREBASE_CONFIG;
 async function cloudInit() {
-  if (!window.claude || typeof window.claude.use !== 'function') return;
   try {
-    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    let db, user;
+    if (FIREBASE) {
+      const C = window.WPD_CLOUD; if (!C || !C.me) return;
+      db = C.db; user = C.user;
+    } else {
+      if (!window.claude || typeof window.claude.use !== 'function') return;
+      [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    }
     if (!db || !user) return;
     const uid = await user.id(); if (!uid) return;
     Object.assign(cloud, { db, user, uid, on: true, status: 'syncing' });
@@ -908,7 +919,7 @@ async function pullProgress() {
 }
 function schedulePush() {
   if (!cloud.on || cloud.syncOff || realMeta) return;
-  clearTimeout(cloud.timer); cloud.timer = setTimeout(pushProgress, 2000);
+  clearTimeout(cloud.timer); cloud.timer = setTimeout(pushProgress, FIREBASE ? 5000 : 2000);
 }
 async function pushProgress() {
   if (cloud.pushing) { cloud.again = true; return; }
@@ -980,6 +991,18 @@ async function checkRests() {
   } catch (e) { }
 }
 function logToast(text) { toast(text, 'broadcast'); }
+// Web version: Firebase sign-in state
+window.addEventListener('wpd-auth', e => {
+  if (e.detail && e.detail.signedIn) { if (!cloud.on) cloudInit(); }
+  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, shared: [], status: 'local' }); setShared([], []); render(); }
+});
+function cloudSignInHTML(compact) {
+  if (!FIREBASE) return '';
+  const C = window.WPD_CLOUD;
+  if (C && C.error) return compact ? '' : '<p class="sh-p fine">Cloud saves are unavailable right now (offline?). Progress is saved on this device.</p>';
+  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><p class="sh-p fine">Champions you share appear under this name to other players.</p><button class="btn small ghost" data-act="signout">Sign out</button></div>`;
+  return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="row2 even"><button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="google">${compact ? 'Sign in · ' : ''}Google</button><button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="github">${compact ? 'Sign in · ' : ''}GitHub</button></div></div>`;
+}
 
 app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });

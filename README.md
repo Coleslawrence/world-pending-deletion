@@ -22,6 +22,7 @@ On a phone, open the link and use **Add to Home Screen** to install it as an app
 | `css/style.css` | All styling (one dark theme, phone-first) |
 | `js/core.js` | Game data and rules. No DOM, so it also runs in Node for simulations |
 | `js/ui.js` | Screens, sheets and input |
+| `js/firebase-config.js`, `js/cloud-firebase.js`, `firestore.rules` | Cloud saves and shared champions (Firebase) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable web app and offline support |
 | `tools/bot.js`, `tools/stats.js` | An auto-player and balance statistics |
 | `tools/build-single.py` | Bundles everything into one HTML file in `dist/` |
@@ -44,9 +45,9 @@ node tools/stats.js 1000      # 1,000 bot runs: win rate, losses per round, per 
 node tools/bot.js v 1         # one verbose run
 ```
 
-## Saves
+## Saves and shared champions
 
-Progress (Echoes, Titles, unlocks, the Halls and the current run) is saved in the browser on each device. Cloud saves and shared champions between players are planned.
+Progress (Echoes, Titles, unlocks, the Halls and the current run) is saved in the browser. Signing in with Google or GitHub adds cloud saves across devices and lets players share champions, who can then appear in each other's tournaments. This uses Firebase; setup steps are in [docs/FIREBASE.md](docs/FIREBASE.md).
 
 ## Publishing changes
 
