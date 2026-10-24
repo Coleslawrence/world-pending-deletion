@@ -1,0 +1,40 @@
+rules_version = '2';
+// Firestore access rules for [World Pending Deletion].
+// Paste into Firebase console → Firestore Database → Rules, then Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Each player's private progress: data/users/{uid}/progress
+    match /data/users/{uid}/{docId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && docId == 'progress'
+        && request.resource.data.keys().hasOnly(['meta', 'run', 'savedAt']);
+    }
+
+    // Shared champions: every signed-in player reads them, each player writes only their own document
+    match /champions/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['list', 'name'])
+        && request.resource.data.list is list && request.resource.data.list.size() <= 12
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 24));
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // "Laid to rest" notes: each player writes only their own document; owners read them all to find notes addressed to them
+    match /rests/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['list', 'name'])
+        && request.resource.data.list is list && request.resource.data.list.size() <= 40
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 24));
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Everything else is closed
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
