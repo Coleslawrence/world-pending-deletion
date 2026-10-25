@@ -41,7 +41,8 @@ function fight(run) {
 function targets(run) {
   const c = {};
   G.allPieces(run).forEach(p => G.pieceDef(G.baseId(p.id)).tags.forEach(t => c[t] = (c[t] || 0) + p.star));
-  const order = run.arch.slice().sort((a, b) => (c[b] || 0) - (c[a] || 0) + (b === run.arch[0] ? 0.5 : 0) - (a === run.arch[0] ? 0.5 : 0));
+  const lead = run.botMain || run.arch[0], bias = run.botMain ? 6 : 0.5;
+  const order = run.arch.slice().sort((a, b) => (c[b] || 0) - (c[a] || 0) + (b === lead ? bias : 0) - (a === lead ? bias : 0));
   return order.slice(0, 2);
 }
 function pieceScore(run, id, star, tg) {
@@ -103,17 +104,20 @@ function stats(run) {
   while (run.statPts > 0) { run.stats[Math.random() < 0.6 ? k : 'VIT']++; run.statPts--; }
 }
 function playRun(meta, verbose, opts = {}) {
-  const worlds = G.offerWorlds(meta);
-  const w = worlds[0];
-  const home = G.WORLD_TYPES[w.type].home, hs = G.ARCH[home].stat;
+  // opts.world forces a world type; opts.main makes the bot build around one archetype
+  let w = G.offerWorlds(meta)[0], tries = 0;
+  while (opts.world && w.type !== opts.world && tries++ < 200) w = G.offerWorlds(meta).find(x => x.type === opts.world) || w;
+  const home = G.WORLD_TYPES[w.type].home, main = opts.main || home, hs = G.ARCH[main].stat;
   const st = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; st[hs] += 2; st.VIT += 2;
   const patron = G.pick(['war', 'trick', 'ruin']);
   G.bindMeta(meta);
   const offer = G.makeOffer(w, meta);
   const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer);
   const titles = Object.keys(meta.titles);
-  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, title: titles.length ? G.pick(titles) : null }, meta);
-  const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(home) ? 1 : 0) - (G.SKILLS[a].tags.includes(home) ? 1 : 0)).slice(0, 3);
+  const arch = opts.main && opts.main !== home ? [opts.main].concat(G.shuffle(G.unlockedArch(meta).filter(k => k !== home && k !== opts.main))) : undefined;
+  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, arch, title: titles.length ? G.pick(titles) : null }, meta);
+  if (opts.main) run.botMain = opts.main;
+  const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(main) ? 1 : 0) - (G.SKILLS[a].tags.includes(main) ? 1 : 0)).slice(0, 3);
   G.confirmDraft(run, ids, meta);
   let guard = 0;
   while (guard++ < 40) {
