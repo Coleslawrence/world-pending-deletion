@@ -7,6 +7,8 @@
 //   --unlock U     unlock U in every meta (arch_storm, arch_arcanist, ...; "all" for every unlock)
 //   --json FILE    also write the results as JSON, for comparing before and after a change
 //   --rounds       add a loss-by-round table for each main archetype
+//   --rank L       give every meta Entrant Rank L (F to SSS), with its world gating, Rank Trials and Elite bracket.
+//                  Without it there is no rank at all: every world rank can come up and no trials appear.
 const fs = require('fs');
 const G = require('../js/core.js'); const B = require('./bot.js');
 
@@ -19,13 +21,14 @@ for (let i = 2; i < process.argv.length; i++) {
 }
 const N = +pos[0] || 400, ELITE = pos[1] === 'elite', BATCHES = +opt.batches || 1;
 if (opt.world && !G.WORLD_TYPES[opt.world]) throw new Error('unknown world ' + opt.world + ': ' + Object.keys(G.WORLD_TYPES).join(', '));
+if (opt.rank && G.rankIdx(opt.rank) < 0) throw new Error('unknown rank ' + opt.rank + ': ' + G.RANK_LADDER.join(', '));
 if (opt.main && !G.ARCH[opt.main]) throw new Error('unknown archetype ' + opt.main + ': ' + G.ARCH_KEYS.join(', '));
 const unlocks = !opt.unlock ? [] : opt.unlock === 'all' ? Object.keys(G.UNLOCKS) : opt.unlock.split(',');
 unlocks.forEach(u => { if (!G.UNLOCKS[u]) throw new Error('unknown unlock ' + u + ': ' + Object.keys(G.UNLOCKS).join(', ')); });
 
 // mulberry32: the game and the bot both draw from Math.random, so seeding it makes a run repeatable
 function seeded(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-function newMeta() { const m = G.newMeta(); unlocks.forEach(u => m.unlocks[u] = true); return m; }
+function newMeta() { const m = G.newMeta(); unlocks.forEach(u => m.unlocks[u] = true); if (opt.rank) m.rank.letter = opt.rank; else delete m.rank; return m; }
 const add = (o, k, won) => { o[k] = o[k] || [0, 0]; o[k][1]++; if (won) o[k][0]++; };
 
 function batch(b) {

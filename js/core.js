@@ -627,6 +627,8 @@ const ENEMIES = {
   thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, rank: 'A', final: true, hp: 92, briar: 1, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
   archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, rank: 'A', final: true, hp: 85, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
   forge_king: { name: 'The Forge King', style: 'His Block never fades and grows every turn', tier: 3, rank: 'A', final: true, hp: 120, forge: 3, skills: [{ n: 'Molten Hammer', fx: { dmg: 6, blockDmg: 0.4 } }, { n: 'Anvil Guard', fx: { block: 10 } }, { n: 'Quench', fx: { dmg: 13 } }], script: [0, 1, 2, 0] },
+  // The Rank Trial examiner. Its rank letter is the grade it tests for, and it fights at that grade's world rank (see trialMul).
+  proctor: { name: 'Proctor', style: "The System's examiner. Pass the condition to be promoted", tier: 2, hp: 70, skills: [{ n: 'Marked Strike', fx: { dmg: 9 } }, { n: 'Assessment', fx: { block: 8 } }, { n: 'Pop Quiz', fx: { dmg: 5, weaken: 2 } }, { n: 'Final Exam', fx: { dmg: 7, hits: 2 }, label: 'Preparing the final exam' }], script: [0, 1, 2, 3] },
   legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
   undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
 };
@@ -682,23 +684,24 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0 }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank() }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
 
 // ---------- Worlds ----------
-function genWorld(rng) {
+// cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
+function genWorld(rng, cap) {
   const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
   const name = pick(T.names[0], rng) + pick(T.names[1], rng);
-  const rank = wpick([0, 1, 2, 3, 4, 5], RANK_W, rng);
+  const rank = cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
   const mod = wpick(Object.keys(MODIFIERS), [30, 15, 15, 15, 15], rng);
   return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs, rng) };
 }
-function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
+function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng, cap); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
 
 // ---------- Run ----------
 // setup: { name, sigil, color, stats, gifts:[], patron: 'war'|'trick'|'ruin'|'none' }
@@ -733,6 +736,15 @@ function newRun(world, setup, meta, rng) {
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
   else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
+  // Entrant Rank: promotion perks and a waiting Rank Trial. Pending World and practice runs use neither.
+  run.perks = [];
+  if (!setup.seed && !run.practice && meta.rank) {
+    run.perks = meta.rank.perks.filter(k => PERKS[k]);
+    if (run.perks.includes('stipend')) run.gold += 1;
+    if (run.perks.includes('redraft')) run.rerolls += 1;
+    if (run.perks.includes('patron') && run.patron && run.patron !== 'none') run.favour[run.patron] += 1;
+    if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
+  }
   run.draft = rollDraft(run, stream(run, 'draft', rng));
   ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
   run.hp = maxHp(run);
@@ -746,7 +758,7 @@ function effStats(run) {
   return s;
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 2 + run.level * 4) * hpMult(run.gifts)); }
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 2 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
 const XP_NEED = [0, 2, 4, 6, 10, 14, 20, 26, 32, 999];
 function xpNeed(level) { return XP_NEED[Math.min(level, 9)]; }
 function gainXp(run, n, msgs) {
@@ -810,7 +822,7 @@ function rerollCost(run) { return run.freeRerolls > 0 ? 0 : hasGift(run, 'f_unlu
 function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
-function interestCap(run) { return hasGift(run, 'golden') ? 5 : 3; }
+function interestCap(run) { return (hasGift(run, 'golden') ? 5 : 3) + (hasPerk(run, 'ledger') ? 1 : 0); }
 function income(run) { return 5 + Math.min(interestCap(run), Math.floor(run.gold / 10)) + (run.world.mod === 'golden' ? 2 : 0); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
@@ -1045,6 +1057,14 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (T === 'ascendant') add('dmgPct', 0.05);
   if (T === 'pathfinder') { add('startBlock', 5); add('regen', 1); }
   if (T === 'unbeaten') add('dmgPct', 0.1);
+  // Promotion perks, about the size of a Title each
+  const K = x.perks || [];
+  if (K.includes('kindling')) add('burnPlus', 1);
+  if (K.includes('steeped')) add('poisonPlus', 1);
+  if (K.includes('whetted')) add('bleedPlus', 1);
+  if (K.includes('guard')) add('startBlock', 5);
+  if (K.includes('keen')) add('critBonus', 0.04);
+  if (K.includes('light')) add('dodge', 0.03);
   // Stat milestones
   const M = x.milestones || {};
   if (M.STR) set('mighty', 0.1);
@@ -1057,16 +1077,16 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
-function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones }); }
+function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks }); }
 
 // ---------- Opponents: choice of two each round ----------
 const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
-function curRound(run) { return run.elite ? ROUNDS + run.eliteIdx : run.round; }
+function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
 const HEART_COST = [1, 1, 2, 2, 3, 3, 4, 5];
-function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
+function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
   if (run.round >= ROUNDS) return [{ kind: 'final', id: WORLD_TYPES[run.world.type].final }];
@@ -1081,10 +1101,12 @@ function makeChoices(run, meta, rng) {
   // Pending World never draws other champions, so every player faces the same fights
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
+  if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
 function specName(spec) {
+  if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
   if (spec.kind === 'erased' || spec.kind === 'champion') return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
@@ -1092,17 +1114,20 @@ function specName(spec) {
 }
 // The rank letter an opponent fights at: Alphas are a rank above other monsters, and the Masked Entrant copies yours
 function specRank(spec, meta) {
+  if (spec.kind === 'trial') return spec.to;
   if (spec.snap) return spec.snap.rank || null;
   const t = ENEMIES[spec.id]; if (!t) return null;
   if (spec.id === 'masked') return meta && meta.rank ? meta.rank.letter : null;
   return spec.hard && spec.kind === 'monster' ? 'D' : t.rank || null;
 }
 function specStyle(spec) {
+  if (spec.kind === 'trial') return "The System's examiner. Pass the condition to be promoted";
   if (spec.kind === 'erased') return `Erased. Fell in round ${spec.snap.round} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   if (spec.kind === 'champion') return `Saved ${spec.snap.worldName} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
+  if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
   if (spec.kind === 'final') return 'Spares your world';
   if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
   if (spec.hard) return '3 gold, a rune and a rare shop slot';
@@ -1314,6 +1339,7 @@ function enterChoose(run, meta, rng, msgs) {
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) run.pending.push({ type: 'event', key: k }); });
   if (run.elite) { run.wager = null; run.stage = 'shop'; return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
+  const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
   run.wager = makeWager(run, stream(run, 'opps', rng));
   run.stage = 'choose';
 }
@@ -1353,7 +1379,8 @@ function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
-  const p = enemyPower(run) * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * (spec.hard ? TUNE.hardHp : 1) * alpha;
+  const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
+  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha;
   if (spec.kind === 'erased' || spec.kind === 'champion') return buildSnapEnemy(spec.snap, p, hm, run);
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3;
@@ -1891,6 +1918,7 @@ function resolveFight(run, f, meta, rng) {
   if (f.usedBreath) run.usedBreath = true;
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
+  if (spec.kind === 'rival' && won) meta.archive.beat[spec.id] = true;
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
   const res = { won, gold: 0, xp: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
@@ -1931,11 +1959,12 @@ function resolveFight(run, f, meta, rng) {
   if (T.reactions >= 3) earnTitle(run, 'alchemist', msgs);
   if (T.bigHit >= 60) earnTitle(run, 'executioner', msgs);
   questEvent(run, 'fight', { f, won, spec }, msgs);
+  if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
     run.wins++;
     res.gold = 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
-    run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF));
+    run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
@@ -1975,6 +2004,12 @@ function startElite(run, meta, rng) {
   const champs = run.seed ? [] : meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
   const first = champs.length ? { kind: 'champion', snap: pick(champs, rng) } : { kind: 'legend', id: 'legend' };
   run.eliteBracket = [first, { kind: 'legend', id: 'undefeated' }];
+  // From A-rank the bracket gets a middle fight: another spared champion, or Varn when there isn't one
+  if (!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A')) {
+    const rest = champs.filter(c => !first.snap || c.at !== first.snap.at);
+    const mid = rest.length ? { kind: 'champion', snap: pick(rest, rng) } : first.kind === 'legend' ? null : { kind: 'legend', id: 'legend' };
+    if (mid) run.eliteBracket.splice(1, 0, mid);
+  }
   run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * 0.3));
   enterChoose(run, meta, rng);
 }
@@ -1991,14 +2026,172 @@ function endRun(run, meta, outcome) {
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
+  const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
-  return { echoes: e, snap };
+  return { echoes: e, snap, rp: rk.rp, trial: rk.trial };
+}
+
+// ---------- Entrant Rank ----------
+// A permanent grade from F to S, with SS and SSS hidden above. RP opens a Rank Trial; only passing it promotes. Rank never goes down.
+const RANK_LADDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+const RANK_RP = { E: 80, D: 300, C: 700, B: 1400, A: 2600, S: 4500, SS: 7000, SSS: 10000 }; // SS and SSS are placeholders
+const TRIAL_ROUND = { E: 3, D: 3, C: 4, B: 4, A: 5, S: 6, SS: 6, SSS: 6 };
+const TRIAL_CONDS = ['fast', 'react', 'stop', 'healthy']; // never "without healing": Zealot and Leech builds can't meet it
+const PERKS = {
+  stipend: { name: "Sponsor's Stipend", desc: '+1 starting gold.', flavour: 'A god has started sending pocket money.' },
+  kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start." },
+  steeped: { name: 'Steeped Blades', desc: 'Poison you apply +1.', flavour: 'Your edges never quite dry.' },
+  whetted: { name: 'Whetted Edge', desc: 'Bleed you apply +1.', flavour: 'Sharper than it needs to be.' },
+  guard: { name: 'Drilled Guard', desc: 'Start each fight with 5 Block.', flavour: 'Your shield is up before the bell.' },
+  frame: { name: 'Seasoned Frame', desc: '+8 max HP.', flavour: 'Scar tissue counts.' },
+  keen: { name: 'Keen Eye', desc: '+4% critical chance.', flavour: 'You see the gap a moment sooner.' },
+  light: { name: 'Light Feet', desc: '+3% dodge.', flavour: 'Harder to pin down than you used to be.' },
+  dressing: { name: 'Field Dressing', desc: 'Heal 6 more after each won fight.', flavour: 'You patch yourself up between bouts.' },
+  redraft: { name: 'Second Draft', desc: 'One extra opening draft reroll.', flavour: 'The System lets you look twice.' },
+  patron: { name: "Patron's Ear", desc: 'Start with +1 Favour with your Patron.', flavour: 'Your god remembers your name.' },
+  ledger: { name: 'Ledger Sense', desc: 'Interest cap +1.', flavour: 'You count your gold the way the Official does.' },
+};
+const TRIAL_TEXT = {
+  E: ['[Promotion match: prove you are not an accident.{c}]', '[Promoted to E-rank. The System is mildly surprised.]', '[Trial failed. F-rank retained. Try again next world.]'],
+  D: ['[Promotion match: defeat a D-rank Proctor.{c}]', '[Promoted to D-rank. Your file has been upgraded to paper.]', '[Trial failed. The Proctor will wait.]'],
+  C: ['[Promotion match: defeat a C-rank Proctor.{c}]', '[Promoted to C-rank. Rivals have been informed.]', '[Trial failed. D-rank retained.]'],
+  B: ['[Promotion match: defeat a B-rank Proctor.{c} The gods are watching.]', '[Promoted to B-rank. The gods have adjusted their odds.]', '[Trial failed. The gods have collected their bets.]'],
+  A: ['[Promotion match: defeat an A-rank Proctor.{c} Few pass.]', '[Promoted to A-rank. Final Champions have been notified.]', '[Trial failed. Few pass. You remain few-adjacent.]'],
+  S: ['[Final promotion match: defeat an S-rank Proctor.{c} There is no rank above S.]', '[Promoted to S-rank. There is no rank above S.]', '[Trial failed. A-rank retained. S-rank remains theoretical.]'],
+  SS: ['[Promotion match: ███-rank Proctor. Rank not found.{c}]', '[Promoted to SS-rank. Record updated. Record should not exist.]', '[Trial failed. Record not created.]'],
+  SSS: ["[Promotion match. The Proctor has no rank. The Proctor has never lost.{c}]", '[Promoted to SSS-rank. The System has run out of letters.]', "[Trial failed. The Proctor's record remains unbroken.]"],
+};
+const COND_TEXT = { fast: 'Win within 6 turns.', react: 'Trigger 2 reactions.', stop: "Stun or Interrupt the Proctor's big move.", healthy: 'Win with more than half your HP.' };
+function newRank() { return { letter: 'F', rp: 0, trial: null, history: [], perks: [] }; }
+function rankIdx(l) { return RANK_LADDER.indexOf(l); }
+function nextRank(l) { return RANK_LADDER[rankIdx(l) + 1] || null; }
+function hasPerk(run, k) { return !!(run.perks && run.perks.includes(k)); }
+// World offers go up to one rank above yours: F and E see E and D worlds, C opens B worlds, A opens S worlds
+// A meta without a rank (the balance tools) is not gated.
+function worldCap(meta) { const r = meta && meta.rank; return r ? Math.min(5, Math.max(1, rankIdx(r.letter))) : null; }
+// Saves from before Entrant Rank start at F with RP from their Halls, so a returning player's first trials come quickly
+function sanitizeRank(r, m) {
+  const out = newRank();
+  if (r && typeof r === 'object') {
+    if (rankIdx(r.letter) >= 0) out.letter = r.letter;
+    out.rp = Math.max(0, Math.floor(+r.rp || 0));
+    out.trial = r.trial && rankIdx(r.trial) === rankIdx(out.letter) + 1 ? r.trial : null;
+    out.history = Array.isArray(r.history) ? r.history.filter(h => h && rankIdx(h.to) > 0).slice(-12) : [];
+    out.perks = Array.isArray(r.perks) ? r.perks.filter(k => PERKS[k]).filter((k, i, a) => a.indexOf(k) === i) : [];
+    return out;
+  }
+  const pay = (x, spared) => 10 * (x.wins || 0) + Math.max(0, x.hearts || 0) + (spared ? 20 : 0);
+  out.rp = (m.erased || []).reduce((a, x) => a + pay(x, false), 0) + (m.champions || []).reduce((a, x) => a + pay(x, true), 0);
+  if (out.rp >= RANK_RP.E) out.trial = 'E';
+  return out;
+}
+// RP for a finished run: 10 a win, 1 a Heart left, 20 for a spared world, times the world's rank (E ×1 up to S ×2)
+function rpFor(run, outcome) {
+  const spared = outcome !== 'erased';
+  return Math.round((10 * (run.wins || 0) + Math.max(0, run.hearts) + (spared ? 20 : 0)) * (1 + 0.2 * run.world.rank));
+}
+function awardRank(run, meta, outcome) {
+  if (run.practice || !meta.rank) return { rp: 0, trial: null };
+  const R = meta.rank, rp = rpFor(run, outcome); R.rp += rp;
+  const left = run.pending.find(p => p.type === 'perk'); if (left) choosePerk(run, meta, left.offers[0]); // a run that ends before the choice keeps the first perk
+  if (run.promoted) R.history.push({ to: run.promoted, world: run.world.name, outcome, lost: run.record ? run.record.ids.length - recLeft(run.record) : 0, at: Date.now() });
+  R.history = R.history.slice(-12);
+  return { rp, trial: openTrial(R) };
+}
+function openTrial(R) { const nx = nextRank(R.letter); if (R.trial || !nx || R.rp < RANK_RP[nx]) return null; R.trial = nx; return nx; }
+// Elite wins come after the spared world is filed, so they pay their RP when the run closes
+function eliteRank(run, meta) {
+  if (run.practice || !meta.rank || !run.eliteWins) return { rp: 0, trial: null };
+  const rp = Math.round(10 * run.eliteWins * (1 + 0.2 * run.world.rank)); meta.rank.rp += rp;
+  run.rpEarned = (run.rpEarned || 0) + rp; run.trialOpened = run.trialOpened || openTrial(meta.rank);
+  return { rp, trial: run.trialOpened };
+}
+function trialSpec(run, rng) {
+  const to = run.trial.to, early = rankIdx(to) <= rankIdx('D');
+  const conds = TRIAL_CONDS.filter(k => k !== 'stop' || canStop(run));
+  return { kind: 'trial', id: 'proctor', to, hard: !early, cond: early ? null : pick(conds, rng) };
+}
+// The Proctor fights at the world rank of the grade it examines: E-rank at E worlds up to S-rank (and beyond) at S
+function trialMul(run, spec) { const w = Math.min(5, rankIdx(spec.to) - 1); return (0.92 + 0.05 * w) / (0.92 + 0.05 * run.world.rank); }
+function trialLine(to, i, cond) { return TRIAL_TEXT[to][i].replace('{c}', cond ? ' ' + COND_TEXT[cond] : ''); }
+function perkOffers(meta, rng) { return shuffle(Object.keys(PERKS).filter(k => !meta.rank.perks.includes(k)), rng).slice(0, 2); }
+// A lost fight costs the round's normal Hearts as usual. A won fight that misses the condition costs nothing. Either way the trial waits for the next run.
+function settleTrial(run, f, won, meta, msgs, rng) {
+  const spec = f.spec, ok = won && (!spec.cond || WAGERS[spec.cond].check(f));
+  run.trial.done = true;
+  if (!ok) { msgs.push({ t: 'loss', text: trialLine(spec.to, 2) }); return { ok, to: spec.to }; }
+  const R = meta.rank; R.letter = spec.to; R.trial = null; run.promoted = spec.to;
+  msgs.push({ t: 'class', text: trialLine(spec.to, 1) });
+  const offers = perkOffers(meta, rng);
+  if (offers.length) run.pending.push({ type: 'perk', offers, to: spec.to });
+  return { ok, to: spec.to };
+}
+// Lines from the lore thread (entrant-rank.md). {champ} is the champion's name.
+const RANK_ADDRESS = {
+  F: ['[F-rank Entrant. Your world has been noted.]', '[F-rank. Expectations have been set accordingly.]'],
+  E: ['[E-rank Entrant. You are now slightly harder to forget.]', '[E-rank. The System has learned your number.]'],
+  D: ['[D-rank Entrant. The crowd has started betting on you. Small amounts.]', '[D-rank. Your file has been moved to a thicker folder.]'],
+  C: ['[C-rank Entrant. Rivals have begun to read your record.]', '[C-rank. Competent. The System does not say this often.]'],
+  B: ['[B-rank Entrant. The gods have stopped laughing during your fights.]', '[B-rank. Your worlds are judged with some reluctance.]'],
+  A: ['[A-rank Entrant. Final Champions have been informed.]', '[A-rank. The System is watching more closely. For your benefit.]'],
+  S: ['[S-rank Entrant {champ}. The tournament knows your name.]', '[S-rank. There is no higher rank. Records indicate otherwise.]'],
+  SS: ['[SS-rank. This rank was not supposed to be reachable.]', '[SS-rank Entrant. Several records have been unsealed for you.]'],
+  SSS: ['[SSS-rank. The Undefeated has been notified.]', '[SSS-rank Entrant {champ}. The System has no further grades. It is making one up.]'],
+};
+// below: you're below them; level; above: you outrank them; grudge: you've beaten them before
+const RIVAL_LINES = {
+  grukk: { below: 'Little rank. Grukk go easy. Grukk not know how, but try.', level: 'Same letter as Grukk! Good. Fair fight. Grukk still win.', above: 'Big letter. Grukk lose to big letters lots. Grukk not mind.', grudge: 'You beat Grukk before. Grukk remember. Grukk get up again.' },
+  calder: { below: "A lower rank. I'll observe the rules all the same.", level: 'An equal. Salute, and we begin properly.', above: 'Outranked. Then it will be an honour to lose correctly.', grudge: "You beat me last time. I've filed a complaint. Shall we?" },
+  seraphine: { below: "You're new. Shield up. I won't hold back, but I'll pray for you after.", level: 'A worthy rank. My faith against yours, then.', above: "So high already. Remember who you're fighting for.", grudge: "You beat me once. I've been praying about that." },
+  lyss: { below: "A low rank. You won't even notice the poison.", level: "Same grade. Then I'll have to actually try. How dull.", above: 'Ooh, a high rank. Did you drink your water today?', grudge: "You again. I've switched to a stronger poison." },
+  kaito: { below: "Your rank is low. Your habits are lower. I've seen them before.", level: "We're equals. That's never happened in this tournament.", above: "You outrank me. Then you've seen what I've seen. Be careful.", grudge: "You beat me. I've studied that fight. Show me something new." },
+};
+const FINAL_GREET = {
+  leviathan: '{champ}. Even the deep has heard of you. It will still take you.',
+  kharros: '{champ}. At last, an enemy worth a war. I will not insult you with mercy.',
+  bone_saint: '{champ}. I have prayed for you. Lie down, and let me finish the prayer.',
+  thorn_mother: '{champ}. The forest has been saving a place for you.',
+  archmage: "{champ}. Ah. You're the first thing I've had to look up at in centuries.",
+  forge_king: '{champ}. I had the gates reinforced when I heard you were coming.',
+};
+function rankAddress(meta, champ, n) { const L = RANK_ADDRESS[meta.rank.letter]; return L[(n || 0) % L.length].replace('{champ}', champ || 'Entrant'); }
+// The fight intro, rank against rank. Returns the lines to show after "[X enters the arena.]"; the System's own lines are bracketed.
+function rankIntro(run, meta, spec, foeName) {
+  if (!meta.rank || run.practice) return [];
+  const me = meta.rank.letter, champ = run.name, out = [];
+  if (spec.id === 'undefeated') return rankIdx(me) >= rankIdx('SS') ? [{ t: 'loss', text: `[Entrant record for the Undefeated: ERROR. Entrant record for ${champ}: ERROR.]`, replaces: 'sealed' }] : [];
+  const foe = specRank(spec, meta);
+  if (foe) {
+    const gap = rankIdx(me) - rankIdx(foe);
+    const tail = gap <= -2 ? 'Mismatch logged. The System accepts no complaints.' : gap >= 2 ? 'Mismatch logged. Please try not to embarrass them.' : gap < 0 ? 'The odds have been adjusted against you.' : gap > 0 ? 'The crowd expects a short fight.' : 'An even match, on paper.';
+    out.push({ t: 'sys', text: `[${me}-rank Entrant vs ${foe}-rank ${spec.kind === 'trial' ? 'Proctor' : foeName}. ${tail}]` });
+    const R = spec.kind === 'rival' && RIVAL_LINES[spec.id];
+    if (R) out.push({ t: 'foe', text: `"${meta.archive.beat[spec.id] ? R.grudge : gap < 0 ? R.below : gap > 0 ? R.above : R.level}"` });
+    if (spec.id === 'masked') out.push(meta.archive.beat.masked ? { t: 'loss', text: '[The Masked Entrant has copied your record. Including the loss.]' } : { t: 'sys', text: `[Entrant rank: ${me}. Entrant rank: ${me}.]` });
+  }
+  if (spec.kind === 'final' && rankIdx(me) >= rankIdx('S') && FINAL_GREET[spec.id]) out.push({ t: 'foe', text: `"${FINAL_GREET[spec.id].replace('{champ}', champ)}"` });
+  if (spec.kind === 'trial') out.unshift({ t: 'class', text: trialLine(spec.to, 0, spec.cond) });
+  return out;
+}
+// The Halls' rank history, one line per promotion
+function historyLine(h) {
+  if (h.daily) return `[Promoted to ${h.to}-rank in the Pending World.]`;
+  if (h.outcome === 'erased') return `[Promoted to ${h.to}-rank. ${h.world} was erased on the way.]`;
+  return h.lost ? `[Promoted to ${h.to}-rank. ${h.world} was spared, missing ${h.lost} entr${h.lost === 1 ? 'y' : 'ies'}.]` : `[Promoted to ${h.to}-rank. ${h.world} was spared without a scratch.]`;
+}
+function choosePerk(run, meta, k, msgs) {
+  const i = run.pending.findIndex(p => p.type === 'perk'); if (i < 0) return false;
+  const p = run.pending[i]; if (!p.offers.includes(k) || meta.rank.perks.includes(k)) return false;
+  run.pending.splice(i, 1); meta.rank.perks.push(k);
+  msgs && msgs.push({ t: 'class', text: `[Class advancement: ${PERKS[k].name}. Active from your next world.]` });
+  return true;
 }
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
+  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
