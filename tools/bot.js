@@ -41,7 +41,8 @@ function fight(run) {
 function targets(run) {
   const c = {};
   G.allPieces(run).forEach(p => G.pieceDef(G.baseId(p.id)).tags.forEach(t => c[t] = (c[t] || 0) + p.star));
-  const order = run.arch.slice().sort((a, b) => (c[b] || 0) - (c[a] || 0) + (b === run.arch[0] ? 0.5 : 0) - (a === run.arch[0] ? 0.5 : 0));
+  const lead = run.botMain || run.arch[0], bias = run.botMain ? 6 : 0.5;
+  const order = run.arch.slice().sort((a, b) => (c[b] || 0) - (c[a] || 0) + (b === lead ? bias : 0) - (a === lead ? bias : 0));
   return order.slice(0, 2);
 }
 function pieceScore(run, id, star, tg) {
@@ -70,7 +71,8 @@ function shop(run, meta, opts) {
     G.SHOP_KINDS.forEach(k => run.shop[k].forEach((it, i) => { if (it) items.push({ it, k, i }); }));
     if (run.bonusSlot) items.push({ it: run.bonusSlot, k: 'bonus', i: 0 });
     items.sort((a, b) => score(b.it) - score(a.it));
-    function score(it) { const have = G.allPieces(run).filter(p => p.id === it.id).length; return pieceScore(run, it.id, 1, tg) + have * 4; }
+    // an empty gear slot is worth filling even with low-rank gear, which otherwise scores under the buy threshold
+    function score(it) { const have = G.allPieces(run).filter(p => p.id === it.id).length, open = G.isGear(it.id) && !run.gear[G.GEAR[it.id].slot] && !run.bench.some(p => G.isGear(p.id) && G.GEAR[p.id].slot === G.GEAR[it.id].slot); return pieceScore(run, it.id, 1, tg) + have * 4 + (open ? 3 : 0); }
     for (const x of items) {
       const sc = score(x.it), pr = G.price(run, x.it);
       if (sc < (opts.picky || 5)) continue;
@@ -95,6 +97,7 @@ function pending(run, meta) {
     if (p.type === 'rune') { for (const m of p.mods) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     if (p.type === 'event') { const E = G.EVENTS[p.key]; for (let i = 0; i < E.opts.length; i++) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; }
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
+    if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
     if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
   }
 }
@@ -103,23 +106,27 @@ function stats(run) {
   while (run.statPts > 0) { run.stats[Math.random() < 0.6 ? k : 'VIT']++; run.statPts--; }
 }
 function playRun(meta, verbose, opts = {}) {
-  const worlds = G.offerWorlds(meta);
-  const w = worlds[0];
-  const home = G.WORLD_TYPES[w.type].home, hs = G.ARCH[home].stat;
+  // opts.world forces a world type; opts.main makes the bot build around one archetype
+  let w = G.offerWorlds(meta)[0], tries = 0;
+  while (opts.world && w.type !== opts.world && tries++ < 200) w = G.offerWorlds(meta).find(x => x.type === opts.world) || w;
+  const home = G.WORLD_TYPES[w.type].home, main = opts.main || home, hs = G.ARCH[main].stat;
   const st = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; st[hs] += 2; st.VIT += 2;
   const patron = G.pick(['war', 'trick', 'ruin']);
   G.bindMeta(meta);
   const offer = G.makeOffer(w, meta);
   const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer);
   const titles = Object.keys(meta.titles);
-  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, title: titles.length ? G.pick(titles) : null }, meta);
-  const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(home) ? 1 : 0) - (G.SKILLS[a].tags.includes(home) ? 1 : 0)).slice(0, 3);
+  const arch = opts.main && opts.main !== home ? [opts.main].concat(G.shuffle(G.unlockedArch(meta).filter(k => k !== home && k !== opts.main))) : undefined;
+  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, arch, title: titles.length ? G.pick(titles) : null }, meta);
+  if (opts.main) run.botMain = opts.main;
+  const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(main) ? 1 : 0) - (G.SKILLS[a].tags.includes(main) ? 1 : 0)).slice(0, 3);
   G.confirmDraft(run, ids, meta);
   let guard = 0;
   while (guard++ < 40) {
     pending(run, meta);
     if (run.stage === 'choose') {
-      const hard = run.choices.length > 1 && run.hp > G.maxHp(run) * 0.75 && run.hearts > 5 && Math.random() < (opts.hardRate != null ? opts.hardRate : 0.35);
+      const trial = run.choices[1] && run.choices[1].kind === 'trial';
+      const hard = trial || run.choices.length > 1 && run.hp > G.maxHp(run) * 0.75 && run.hearts > 5 && Math.random() < (opts.hardRate != null ? opts.hardRate : 0.35);
       G.chooseOpponent(run, hard ? 1 : 0, run.gold >= 15);
     }
     stats(run);

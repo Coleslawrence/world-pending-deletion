@@ -8,6 +8,7 @@ read = lambda p: open(os.path.join(ROOT, p), encoding='utf-8').read()
 html = read('index.html')
 html = html.replace('<link rel="stylesheet" href="css/style.css">', '<style>\n' + read('css/style.css') + '</style>')
 html = html.replace('<script src="js/core.js"></script>', '<script>\n' + read('js/core.js') + '</script>')
+html = html.replace('<script src="js/notes.js"></script>', '<script>\n' + read('js/notes.js') + '</script>')
 html = html.replace('<script src="js/ui.js"></script>', '<script>\n' + read('js/ui.js') + '</script>')
 # drop the web-app-only parts
 html = re.sub(r'<link rel="manifest"[^>]*>\n', '', html)
