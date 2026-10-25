@@ -956,12 +956,31 @@ async function resolveNames(ids) {
   try { const ps = await cloud.user.profiles(ids); ids.forEach(id => cloud.names[id] = (ps[id] && ps[id].name) || ''); } catch (e) { console.warn('[cloud] names failed:', e && e.code, e); }
 }
 function ownerName(id) { return cloud.names[id] || 'another entrant'; }
+// Shared champions: read a random handful of players' documents, not the whole collection.
+// Each champions document carries a random key r in [0, 1); we start at a random point and wrap around.
+const SHARED_SAMPLE = 8;
+async function sampleChampions() {
+  const col = cloud.db.collection('champions');
+  if (!col.query) return (await col.get()).docs;
+  const x = Math.random(), n = SHARED_SAMPLE + 1; // +1: our own document may be among them
+  const a = (await col.query({ where: ['r', '>=', x], orderBy: 'r', limit: n })).docs;
+  const b = a.length < n ? (await col.query({ where: ['r', '<', x], orderBy: 'r', limit: n - a.length })).docs : [];
+  return a.concat(b);
+}
+// Documents written before the random key existed are invisible to the sample until they get one
+async function ensureChampionKey() {
+  if (meta.champKey === cloud.uid) return;
+  const ref = cloud.db.doc('champions/' + cloud.uid), cur = await ref.get();
+  if (cur.exists && typeof cur.data().r !== 'number') await ref.set({ list: cur.data().list || [], r: Math.random() });
+  meta.champKey = cloud.uid; saveMeta();
+}
 async function loadShared() {
   if (!cloud.on) return;
   try {
-    const qs = await cloud.db.collection('champions').get();
+    if (cloud.db.collection('champions').query) await ensureChampionKey();
+    const docs = await sampleChampions();
     const erased = [], spared = [], all = [];
-    qs.docs.forEach(d => {
+    docs.forEach(d => {
       if (d.id === cloud.uid) return;
       const body = d.data() || {}; (Array.isArray(body.list) ? body.list : []).slice(0, 12).forEach(e => {
         const s = sanitizeSnap(e && e.snap, d.id); if (!s) return;
@@ -979,27 +998,26 @@ async function shareChampion(snap, kind) {
     const cur = await ref.get();
     const list = cur.exists && Array.isArray(cur.data().list) ? cur.data().list.slice() : [];
     if (!list.some(e => e.snap && e.snap.at === snap.at)) list.unshift({ kind, snap: jsonSafe(snap), t: Date.now() });
-    await ref.set({ list: list.slice(0, 12) });
+    const r = cur.exists && typeof cur.data().r === 'number' ? cur.data().r : Math.random();
+    await ref.set({ list: list.slice(0, 12), r });
     meta.shared = meta.shared || {}; meta.shared[snap.at] = true; saveMeta();
     return true;
   } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; cloudFail('share', 'share champion', e); return false; }
 }
+// "Laid to rest" notes go straight into the champion owner's inbox, so each player reads only notes addressed to them
 async function recordRest(r) {
-  if (!cloud.on || cloud.shareOff) return;
-  const ref = cloud.db.doc('rests/' + cloud.uid);
-  try {
-    const cur = await ref.get();
-    const list = cur.exists && Array.isArray(cur.data().list) ? cur.data().list.slice() : [];
-    list.unshift({ to: r.owner, champ: String(r.champ).slice(0, 60), at: r.at, t: Date.now() });
-    await ref.set({ list: list.slice(0, 40) });
-  } catch (e) { cloudFail('share', 'record rest', e); }
+  if (!cloud.on || cloud.shareOff || !r.owner || r.owner === cloud.uid) return;
+  const t = Date.now();
+  try { await cloud.db.doc(`inbox/${r.owner}/notes/${cloud.uid}_${t}`).set({ by: cloud.uid, champ: String(r.champ).slice(0, 60), t }); }
+  catch (e) { cloudFail('share', 'record rest', e); }
 }
 async function checkRests() {
   if (!cloud.on) return;
   try {
-    const qs = await cloud.db.collection('rests').get();
+    const seen = meta.restSeen || 0, col = cloud.db.collection(`inbox/${cloud.uid}/notes`);
+    const qs = col.query ? await col.query({ where: ['t', '>', seen], orderBy: 't', limit: 30 }) : await col.get();
     const notes = [];
-    qs.docs.forEach(d => { if (d.id === cloud.uid) return; ((d.data() || {}).list || []).forEach(e => { if (e && e.to === cloud.uid && Number(e.t) > (meta.restSeen || 0)) notes.push({ by: d.id, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t) }); }); });
+    qs.docs.forEach(d => { const e = d.data() || {}; if (e.by && e.by !== cloud.uid && Number(e.t) > seen) notes.push({ by: e.by, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t) }); });
     if (!notes.length) return;
     await resolveNames(notes.map(n => n.by));
     notes.sort((a, b) => a.t - b.t).forEach(n => { meta.echoes += 3; logToast(`[${n.champ} was laid to rest by ${ownerName(n.by)}. +3 Echoes.]`); });
