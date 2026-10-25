@@ -12,19 +12,33 @@
     id: path.split('/').pop(), path,
     get: async () => { try { const s = await api.getDoc(api.doc(api.fs, path)); return { id: s.id, exists: s.exists(), data: () => s.data() }; } catch (e) { throw mapErr(e); } },
     set: async d => {
-      if (/^(champions|rests)\//.test(path) && me) d = Object.assign({}, d, { name: shortName(me) });
+      if (/^(champions|rests|inbox)\//.test(path) && me) d = Object.assign({}, d, { name: shortName(me) });
       try { await api.setDoc(api.doc(api.fs, path), d); } catch (e) { throw mapErr(e); }
     },
   });
+  // Inbox notes are keyed by note, so their sender's name belongs to `by`, not the document id
+  const wrapDocs = qs => {
+    const docs = qs.docs.map(s => { const d = s.data(); if (d && d.name) names[d.by || s.id] = String(d.name).slice(0, 24); return { id: s.id, exists: true, data: () => d }; });
+    return { docs, size: docs.length, empty: !docs.length };
+  };
+  const makeQuery = (path, q) => {
+    const parts = [];
+    if (q.where) parts.push(api.where(...q.where));
+    if (q.orderBy) parts.push(api.orderBy(...[].concat(q.orderBy)));
+    if (q.limit) parts.push(api.limit(q.limit));
+    return api.query(api.collection(api.fs, path), ...parts);
+  };
   const db = {
     doc: wrapDoc,
     collection: path => ({
-      get: async () => {
-        try {
-          const qs = await api.getDocs(api.collection(api.fs, path));
-          const docs = qs.docs.map(s => { const d = s.data(); if (d && d.name) names[s.id] = String(d.name).slice(0, 24); return { id: s.id, exists: true, data: () => d }; });
-          return { docs, size: docs.length, empty: !docs.length };
-        } catch (e) { throw mapErr(e); }
+      get: async () => { try { return wrapDocs(await api.getDocs(api.collection(api.fs, path))); } catch (e) { throw mapErr(e); } },
+      // q: { where: [field, op, value], orderBy: field or [field, 'desc'], limit: n }
+      query: async q => {
+        try { return wrapDocs(await api.getDocs(makeQuery(path, q))); } catch (e) { throw mapErr(e); }
+      },
+      // Counts matching documents on the server without reading them: 1 read per 1,000 documents
+      count: async q => {
+        try { return (await api.getCountFromServer(makeQuery(path, q || {}))).data().count; } catch (e) { throw mapErr(e); }
       },
     }),
   };
@@ -57,7 +71,7 @@
       const app = A.initializeApp(cfg);
       const auth = Au.getAuth(app);
       const fs = F.getFirestore(app);
-      api = { auth, fs, doc: F.doc, getDoc: F.getDoc, setDoc: F.setDoc, collection: F.collection, getDocs: F.getDocs, GoogleAuthProvider: Au.GoogleAuthProvider, GithubAuthProvider: Au.GithubAuthProvider, signInWithPopup: Au.signInWithPopup, signInWithRedirect: Au.signInWithRedirect, signOut: Au.signOut };
+      api = { auth, fs, doc: F.doc, getDoc: F.getDoc, setDoc: F.setDoc, collection: F.collection, getDocs: F.getDocs, query: F.query, where: F.where, orderBy: F.orderBy, limit: F.limit, getCountFromServer: F.getCountFromServer, GoogleAuthProvider: Au.GoogleAuthProvider, GithubAuthProvider: Au.GithubAuthProvider, signInWithPopup: Au.signInWithPopup, signInWithRedirect: Au.signInWithRedirect, signOut: Au.signOut };
       Au.getRedirectResult(auth).catch(() => { });
       Au.onAuthStateChanged(auth, u => { me = u; C.ready = true; window.dispatchEvent(new CustomEvent('wpd-auth', { detail: { signedIn: !!u } })); });
     } catch (e) {

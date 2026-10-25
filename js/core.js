@@ -17,15 +17,18 @@ const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 const ARCH = {
   pyre: { name: 'Pyre', stat: 'INT', theme: 'Burn', path: 'Pyromancer', b: ['Burn on the opponent fades half as fast.', 'Burn you apply +4.', 'Burn on the opponent never fades.'] },
   venom: { name: 'Venom', stat: 'AGI', theme: 'Poison and drain', path: 'Plaguebringer', b: ['Poison you apply +1.', 'Poison you apply +1 more.', 'Poison deals 50% more damage.'] },
-  blade: { name: 'Bladedancer', stat: 'AGI', theme: 'Bleed and multi-hit', path: 'Bladedancer', b: ['Multi-hit skills hit once more.', 'Bleed you apply +2.', 'Bleed deals double damage.'] },
+  blade: { name: 'Bladedancer', stat: 'AGI', theme: 'Bleed and multi-hit', path: 'Bladesinger', b: ['Multi-hit skills hit once more.', 'Bleed you apply +2.', 'Bleed deals double damage.'] },
   bastion: { name: 'Bastion', stat: 'VIT', theme: 'Block and Thorns', path: 'Bulwark', b: ['Keep 25% of your Block between turns.', 'Always have 4 Thorns.', 'Gaining Block also deals half of it as damage.'] },
-  arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown.', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
+  arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown. Your other skills: 1 turn shorter for every 8 INT (minimum 1).', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
   zealot: { name: 'Zealot', stat: 'VIT', theme: 'Healing and Regen', path: 'Saint', b: ['Healing +10%.', 'Heal 2 at the start of each of your turns (grows with level).', 'Overhealing becomes Block.'] },
-  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Reaper', b: ['+25% damage to opponents below half HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
-  storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 8 damage.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
+  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Deathbringer', b: ['Opponents below half HP take 25% more damage from you, and your hits ignore their Block. The first time you hit an opponent below half HP, heal 15% of your max HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
+  storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 12 damage plus your STR and shatter the opponent\'s Block. Stopping a big attack Empowers you for 2 turns.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
 };
 const ARCH_KEYS = Object.keys(ARCH);
 const START_ARCH = ['pyre', 'venom', 'blade', 'bastion', 'zealot', 'reaper'];
+// The class wheel: neighbours are allies, opposites are enemies. A run is dealt its home archetype's allies first.
+const WHEEL = ['zealot', 'bastion', 'storm', 'arcanist', 'pyre', 'reaper', 'venom', 'blade'];
+function alliesOf(k) { const i = WHEEL.indexOf(k); return [WHEEL[(i + 7) % 8], WHEEL[(i + 1) % 8]]; }
 function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 
 // ---------- Skills ----------
@@ -121,14 +124,16 @@ const GEAR = {
   pilgrim_mace: { name: 'Pilgrim Mace', slot: 'weapon', tags: ['zealot'], rank: 'E', stats: { VIT: 1, STR: 1 }, pas: { hitHeal: 2 }, text: v => `Heal ${v.hitHeal} whenever a skill of yours deals damage.` },
   duelist_rapier: { name: "Duelist's Rapier", slot: 'weapon', tags: ['blade'], rank: 'D', stats: { AGI: 2 }, pas: { critBonus: 0.1 }, fix: { firstCrit: 1 }, text: v => `+${pct(v.critBonus)} critical chance. Your first hit each fight is critical.` },
   executioner_axe: { name: "Executioner's Axe", slot: 'weapon', tags: ['reaper'], rank: 'D', stats: { STR: 2 }, pas: { execBonus: 0.4 }, text: v => `+${pct(v.execBonus)} damage to opponents below 30% HP.` },
+  spiked_buckler: { name: 'Spiked Buckler', slot: 'weapon', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockThorns: 0.3 }, text: v => `Gaining Block also gives Thorns equal to ${pct(v.blockThorns)} of it.` },
+  blight_kris: { name: 'Blight Kris', slot: 'weapon', tags: ['venom'], rank: 'E', stats: { AGI: 2 }, pas: { startPoison: 3 }, text: v => `Your opponent starts each fight with ${v.startPoison} Poison.` },
   thunder_maul: { name: 'Thunder Maul', slot: 'weapon', tags: ['storm'], rank: 'C', stats: { STR: 2 }, pas: { stunDmg: 6 }, fix: { firstStun: 1 }, text: v => `Your first damaging skill each fight Stuns. Your Stuns deal ${v.stunDmg} damage.` },
   chain_mail: { name: 'Chain Mail', slot: 'armour', tags: ['bastion'], rank: 'E', stats: { VIT: 2 }, pas: { startBlock: 8 }, text: v => `Start each fight with ${v.startBlock} Block.` },
   tower_shield: { name: 'Tower Shield', slot: 'armour', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockKeep: 0.3 }, text: v => `Keep ${pct(v.blockKeep)} of your Block between turns.` },
   shadow_leathers: { name: 'Shadow Leathers', slot: 'armour', tags: ['blade', 'arcanist'], rank: 'D', stats: { AGI: 2 }, pas: { dodge: 0.06 }, fix: { firstEvade: 1 }, text: v => `+${pct(v.dodge)} dodge. Evade the first attack each fight.` },
   cinder_robe: { name: 'Cinder Robe', slot: 'armour', tags: ['pyre', 'zealot'], rank: 'D', stats: { INT: 1, VIT: 1 }, pas: { burnHeal: 0.3 }, text: v => `Heal ${pct(v.burnHeal)} of the Burn damage your opponent takes.` },
-  conductive_mail: { name: 'Conductive Mail', slot: 'armour', tags: ['storm', 'bastion'], rank: 'D', stats: { VIT: 2 }, pas: { stunBlock: 10 }, text: v => `Gain ${v.stunBlock} Block whenever you Stun or Interrupt.` },
+  conductive_mail: { name: 'Conductive Mail', slot: 'armour', tags: ['storm', 'bastion'], rank: 'D', stats: { VIT: 2 }, pas: { stunEmpower: 1 }, text: v => `Whenever you Stun or Interrupt, you are Empowered for ${v.stunEmpower} turn${v.stunEmpower > 1 ? 's' : ''}.` },
   templar_plate: { name: 'Templar Plate', slot: 'armour', tags: ['zealot', 'bastion'], rank: 'C', stats: { VIT: 3 }, pas: { healBlock: 0.3 }, text: v => `Healing also gives Block equal to ${pct(v.healBlock)} of it.` },
-  grave_shroud: { name: 'Grave Shroud', slot: 'armour', tags: ['venom', 'reaper'], rank: 'C', stats: { VIT: 2 }, pas: { poisonHeal: 0.2 }, text: v => `Heal ${pct(v.poisonHeal)} of the Poison damage your opponent takes.` },
+  grave_shroud: { name: 'Grave Shroud', slot: 'armour', tags: ['venom', 'reaper'], rank: 'C', stats: { VIT: 2 }, pas: { poisonHeal: 0.2 }, text: v => `Heal ${pct(Math.min(POISON_HEAL_CAP, v.poisonHeal))} of Poison damage dealt (max 30% from all sources).` },
   prayer_beads: { name: 'Prayer Beads', slot: 'accessory', tags: ['zealot'], rank: 'E', stats: { VIT: 1 }, pas: { regen: 3 }, text: v => `Heal ${v.regen} at the start of each of your turns.` },
   bloodstone_amulet: { name: 'Bloodstone Amulet', slot: 'accessory', tags: ['blade', 'zealot'], rank: 'C', stats: { VIT: 1 }, pas: { healOnBleed: 3 }, text: v => `Heal ${v.healOnBleed} whenever you apply Bleed.` },
   crown_of_thorns: { name: 'Crown of Thorns', slot: 'accessory', tags: ['bastion'], rank: 'C', stats: { VIT: 1 }, pas: { thornsAlways: 3 }, text: v => `Always have ${v.thornsAlways} Thorns, doubled below half HP.` },
@@ -139,6 +144,8 @@ const GEAR = {
 };
 const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
 function pct(v) { return Math.round(v * 100) + '%'; }
+// Healing from Poison damage (Grave Warden, Grave Shroud, Plague Doctor) adds up to at most this share
+const POISON_HEAL_CAP = 0.3;
 const STAR_MULT = [0, 1, 1.5, 1.6];
 const GEAR_STAR = [0, 1, 1.5, 2], GEAR_STAR_PCT = [0, 1, 1.4, 1.8];
 function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); return Object.assign(o, g.fix || {}); }
@@ -212,13 +219,236 @@ const MODIFIERS = {
   restless: { name: 'Restless Dead', desc: 'Erased champions appear more often.' },
 };
 
+// ---------- World Record ----------
+// Each run files 10 entries about its world, one per Heart, plus a bio for the champion. Losing Hearts erases entries.
+// Runs and snapshots store pool indexes, never text, so pool order is fixed once shipped: add new entries at the end, never reorder or delete.
+// k: place | person | custom. tier sets deletion order: far, then city, then home. near is the bio phrase for a home place; rel is a person's relation.
+const LORE = {
+  drowned: {
+    roles: ['lamplighter', 'pearl diver', 'tide priest', 'net mender', 'harbour runner'],
+    promises: ['bring back dry land', 'ring the bells again', 'come home before the tide'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Sunken Archive', text: 'Every book the isles ever wrote, now read only by eels.' },
+      { k: 'place', tier: 'far', name: 'The First Shore', text: 'Where the first settlers landed. It went under two hundred years ago.' },
+      { k: 'place', tier: 'far', name: 'The Coral Library', text: 'Scholars grow their records in coral. A page takes a century.' },
+      { k: 'custom', tier: 'far', name: 'The Saltwar', text: 'The last war between the isles. Both sides lost the island they fought over.' },
+      { k: 'custom', tier: 'city', name: 'The Bell Vigil', text: 'When an island sinks, its bell is rung until the water reaches it.' },
+      { k: 'place', tier: 'city', name: 'The bells of Cor Aven', text: 'Seven bells, rung every dusk to count the islands still above water.' },
+      { k: 'custom', tier: 'city', name: 'The Tide Council', text: 'Nine elders who vote each year on which island to abandon next.' },
+      { k: 'person', tier: 'city', name: 'Harbourmaster Thel', text: 'Has evacuated eleven islands. Keeps a key to each one.' },
+      { k: 'place', tier: 'city', name: 'The Floating Market', text: 'Lashed-together boats that move whenever the coast does.' },
+      { k: 'custom', tier: 'city', name: 'Drowning Day', text: 'Once a year, everyone wades into the sea to remember what it took.' },
+      { k: 'place', tier: 'home', name: 'The Drowned Lighthouse', text: 'Still lit, though its base has been underwater for a generation.', near: 'in the shadow of the Drowned Lighthouse' },
+      { k: 'place', tier: 'home', name: 'The stilt house on Marrow Reef', text: 'Your family has raised it four times.', near: 'in a stilt house on Marrow Reef' },
+      { k: 'person', tier: 'home', name: 'Your sister Ilsa', text: 'Mends nets, and swears she can smell land on the wind.', rel: 'sister' },
+      { k: 'person', tier: 'home', name: 'Old Corwen', text: 'Taught you to swim before you could walk. Says the sea owes him one.', rel: 'teacher' },
+    ],
+  },
+  burning: {
+    roles: ['legionnaire', "smith's apprentice", 'standard-bearer', 'field medic', 'courier'],
+    promises: ['bring the legion home', 'end the war', 'light the Ember Gate again'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Ashen Frontier', text: 'A border that has moved forty times. Nobody remembers who started it.' },
+      { k: 'custom', tier: 'far', name: 'The Thousand-Year Campaign', text: 'The war the empire was founded to win. It is in its thousand and twelfth year.' },
+      { k: 'place', tier: 'far', name: 'The Glass Desert', text: 'A battlefield burned so hot the sand turned to glass. Soldiers still find their reflections there.' },
+      { k: 'place', tier: 'far', name: 'The Treaty Stone', text: "Carved for a peace that lasted nine days. It is the empire's most visited monument." },
+      { k: 'place', tier: 'city', name: 'The Ember Gate', text: "The capital's great gate. It has been rebuilt after every siege, always a little taller." },
+      { k: 'place', tier: 'city', name: 'The Legion Rolls', text: "Every soldier's name, burned into iron plates that cover a whole street." },
+      { k: 'custom', tier: 'city', name: 'The Night of Cinders', text: 'Once a year the city puts out every fire and sits in the dark, to remember the cold.' },
+      { k: 'person', tier: 'city', name: 'Quartermaster Vossa', text: 'Has fed three armies on half rations. Never once lost a ledger.' },
+      { k: 'custom', tier: 'city', name: 'The Smoke Choir', text: 'Widows who sing the names of the fallen from the city walls at dusk.' },
+      { k: 'custom', tier: 'city', name: "Founders' Feast", text: 'The one day a year when nobody is allowed to draw a blade. Mostly.' },
+      { k: 'place', tier: 'home', name: 'The barracks on Kiln Street', text: 'Four generations of your family slept in the same bunk.', near: 'in the barracks on Kiln Street' },
+      { k: 'place', tier: 'home', name: 'The forge where you were born', text: 'Your mother refused to stop working, even for that.', near: 'beside the forge where you were born' },
+      { k: 'person', tier: 'home', name: 'Your brother Cass', text: 'Lost a hand at the frontier. Writes to you with the other one every week.', rel: 'brother' },
+      { k: 'person', tier: 'home', name: 'Sergeant Halla', text: 'Trained you with a wooden sword until you broke it. Then she gave you a real one.', rel: 'sergeant' },
+    ],
+  },
+  hollow: {
+    roles: ['lantern warden', 'gravedigger', 'candle-maker', 'bone-setter', 'chapel keeper'],
+    promises: ['let the dead rest', 'bring Ada peace', 'keep the lanterns lit'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Unquiet Fields', text: 'Farmland where the old dead still work the soil at night. The harvests are excellent.' },
+      { k: 'custom', tier: 'far', name: 'The Last Funeral', text: 'Three hundred years ago, the kingdom buried someone and they stayed buried. Nobody knows how.' },
+      { k: 'place', tier: 'far', name: 'The Barrow Kings', text: 'Seven kings in seven hills. They still send tax demands.' },
+      { k: 'place', tier: 'far', name: 'The Ossuary Road', text: 'A highway paved with the bones of volunteers. It never needs repair.' },
+      { k: 'custom', tier: 'city', name: 'The Lantern Wardens', text: 'Keepers who walk the streets at night, reminding the dead which house is theirs.' },
+      { k: 'place', tier: 'city', name: 'The Grave Market', text: 'Where the living buy back things the dead took with them.' },
+      { k: 'custom', tier: 'city', name: "Mourners' Week", text: 'A week of feasting where every family sets one extra place, and it gets used.' },
+      { k: 'person', tier: 'city', name: 'Mother Rook', text: "The city's oldest gravedigger. Has buried the same man nine times." },
+      { k: 'place', tier: 'city', name: 'The Quiet Bell', text: 'A bell with no clapper. When it rings anyway, everyone goes indoors.' },
+      { k: 'custom', tier: 'city', name: 'The Salt Line', text: 'A ring of salt around the city, renewed every dawn by children.' },
+      { k: 'place', tier: 'home', name: 'The cottage by the yew', text: 'The yew is older than the kingdom, and its roots hold your ancestors.', near: 'in a cottage by the old yew' },
+      { k: 'place', tier: 'home', name: 'The chapel of St. Ves', text: 'Small, cold and always full. Not all the congregation breathes.', near: 'in the bell tower of St. Ves' },
+      { k: 'person', tier: 'home', name: 'Your grandmother Ada', text: 'Died when you were six. Still tucks you in when you visit.', rel: 'grandmother' },
+      { k: 'person', tier: 'home', name: 'Your friend Tobin', text: "A gravedigger's son who dared you into every crypt in the kingdom.", rel: 'friend' },
+    ],
+  },
+  verdant: {
+    roles: ['woodcutter', 'lantern-keeper', "hedge witch's apprentice", 'trapper', 'miller'],
+    promises: ['keep the lanterns burning', "bring Briar's voice back", 'walk home through the wood'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Hungry Wood', text: 'The deepest forest. Maps of it are always missing the person who drew them.' },
+      { k: 'place', tier: 'far', name: 'The Court Under the Hill', text: 'Where the fey hold their feasts. Guests arrive for a night and leave a century later.' },
+      { k: 'custom', tier: 'far', name: 'The Treaty of Briars', text: 'The old pact: the forest leaves the villages alone, and the villages never count the trees.' },
+      { k: 'place', tier: 'far', name: 'The Moonmere', text: 'A lake that shows you as you will be. Most people stop looking after one visit.' },
+      { k: 'custom', tier: 'city', name: 'The Ring of Lanterns', text: "A circle of lights around every village. Step outside it after dark and you are the forest's." },
+      { k: 'place', tier: 'city', name: 'The Bargain Stone', text: 'Where deals are struck with the fey. Read every word twice.' },
+      { k: 'custom', tier: 'city', name: 'Name Day', text: 'Children are given a true name in secret and a false one for the forest to hear.' },
+      { k: 'person', tier: 'city', name: 'Warden Ash', text: "Has walked the Hungry Wood and come back. Twice. Won't say what she gave for it." },
+      { k: 'place', tier: 'city', name: 'The Thornwall', text: 'A living hedge around the town, fed every spring with a little blood.' },
+      { k: 'custom', tier: 'city', name: 'The Antler Fair', text: 'Once a year, the fey trade openly in the market. Everyone counts their children afterwards.' },
+      { k: 'place', tier: 'home', name: 'The house in the great oak', text: 'Your family lives inside a tree that agreed to it. Mostly.', near: 'inside the great oak' },
+      { k: 'place', tier: 'home', name: 'The mill at Wyn Ford', text: "Its wheel turns even when the river doesn't.", near: 'by the mill at Wyn Ford' },
+      { k: 'person', tier: 'home', name: 'Your sister Briar', text: 'Was taken by the fey for a year and came back speaking only in riddles.', rel: 'sister' },
+      { k: 'person', tier: 'home', name: 'Old Hob', text: 'A hedge-wizard who taught you which mushrooms to eat and which to apologise to.', rel: 'teacher' },
+    ],
+  },
+  sky: {
+    roles: ['spell-mechanic', 'chain-walker', 'academy student', 'skyship deckhand', 'cartographer'],
+    promises: ['keep the city in the sky', 'see the ground one day', 'finish your duel'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Ground', text: 'Nobody has been down there in four hundred years. It is taught as a myth.' },
+      { k: 'place', tier: 'far', name: 'The Fallen City', text: 'One of the old floating cities lost its spell. Its wreckage is somewhere below the clouds.' },
+      { k: 'custom', tier: 'far', name: 'The First Ascent', text: 'The night the mages lifted the cities into the sky. The reasons were never written down.' },
+      { k: 'place', tier: 'far', name: 'The Storm Wall', text: 'A barrier of lightning around the Reaches. It keeps something out. Or in.' },
+      { k: 'place', tier: 'city', name: 'The Anchor Chains', text: 'Iron chains that tie the cities together. Children dare each other to walk them.' },
+      { k: 'place', tier: 'city', name: 'The Academy Spire', text: 'The highest tower in the Reaches. Every student who graduates moves one floor up.' },
+      { k: 'custom', tier: 'city', name: 'The Lift Toll', text: 'Everyone pays a little mana each morning to keep the city in the air.' },
+      { k: 'person', tier: 'city', name: 'Chancellor Vey', text: 'Rules the council of mages. Has not touched solid stone in sixty years.' },
+      { k: 'custom', tier: 'city', name: 'Windfall Day', text: 'Once a year, the cities drift close enough to step between them.' },
+      { k: 'place', tier: 'city', name: 'The Cloud Docks', text: 'Where skyships tie up, rattling in the wind like nervous horses.' },
+      { k: 'place', tier: 'home', name: 'The rooftop garden', text: 'Your family grows the only real soil in the district, in pots, very carefully.', near: 'in a rooftop garden above the Cloud Docks' },
+      { k: 'place', tier: 'home', name: 'The lower ring', text: 'The poorest part of the city, closest to the edge. You could always see the clouds.', near: 'on the lower ring, near the edge' },
+      { k: 'person', tier: 'home', name: 'Your father Oren', text: "A spell-mechanic who keeps the city's oldest engine running with his bare hands.", rel: 'father' },
+      { k: 'person', tier: 'home', name: 'Your rival Selis', text: 'Beat you at every exam. You still owe each other a duel.', rel: 'rival' },
+    ],
+  },
+  iron: {
+    roles: ['smith', 'miner', 'gate guard', 'tunnel runner', 'rune carver'],
+    promises: ['open the gates', 'keep the forge lit', 'see the sky above the mountain'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Deep Roads', text: 'Tunnels running under the whole mountain range. The far ends were sealed for a reason.' },
+      { k: 'place', tier: 'far', name: 'The First Anvil', text: 'Struck by the founder of the Hold. It still rings if you touch it.' },
+      { k: 'custom', tier: 'far', name: 'The Long Siege', text: 'The army at the gates has been there for eighty years. Some of them were born there.' },
+      { k: 'place', tier: 'far', name: 'The Collapsed Mine', text: 'Three hundred miners were lost. Their hammers can still be heard on quiet nights.' },
+      { k: 'place', tier: 'city', name: 'The Great Gate', text: 'Twenty feet of steel. It has not opened in a lifetime.' },
+      { k: 'place', tier: 'city', name: 'The Ration Hall', text: 'Where everyone eats together, at long tables, in shifts, under strict rules.' },
+      { k: 'custom', tier: 'city', name: 'The Hearth Oath', text: 'Every child swears at twelve to keep a fire burning in the Hold.' },
+      { k: 'person', tier: 'city', name: 'Gatewarden Brekka', text: 'Has never left her post. Her family brings her meals.' },
+      { k: 'custom', tier: 'city', name: 'The Song of Seams', text: 'Miners sing to find weak rock. Every tunnel has its own verse.' },
+      { k: 'custom', tier: 'city', name: 'Stonefall Night', text: 'When the mountain shifts, everyone holds hands in the dark until it stops.' },
+      { k: 'place', tier: 'home', name: 'The forge on the third deep', text: "Your family's forge, hot for six generations.", near: 'at the forge on the third deep' },
+      { k: 'place', tier: 'home', name: 'The vent-house', text: 'A cramped home by an air shaft. You learned to sleep through the wind.', near: 'in a vent-house by the air shafts' },
+      { k: 'person', tier: 'home', name: 'Your mother Hild', text: 'A smith who makes a new blade every time the siege takes someone.', rel: 'mother' },
+      { k: 'person', tier: 'home', name: 'Your friend Pell', text: 'A runner who knows every tunnel. Taught you to find your way in the dark.', rel: 'friend' },
+    ],
+  },
+};
+const REC_SIZE = 10, REC_MAX = 20, TIER_ORDER = { far: 0, city: 1, home: 2 };
+const loreName = e => e.name.replace(/^(The|Your) /, m => m.toLowerCase()); // mid-sentence: "the Drowned Lighthouse", "your sister Ilsa"
+const loreWho = e => e.name.replace(/^Your \S+ /, ''); // a person in the Halls: "Ilsa"
+// Pick 10 entries: at least 3 places, 2 people and 2 customs, always including the bio's home place and person.
+// ids is in deletion order (far, city, home, with the bio's person last); lost and partial are bitmasks over ids.
+function buildRecord(type, rng) {
+  const L = LORE[type], E = L.entries, all = E.map((_, i) => i);
+  const of = (k, tier) => all.filter(i => E[i].k === k && E[i].tier === tier);
+  const home = pick(of('place', 'home'), rng), person = pick(of('person', 'home'), rng);
+  const ids = [home, person], need = { place: 3, person: 2, custom: 2 };
+  shuffle(all, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
+  shuffle(all, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
+  const key = i => i === person ? 9 : TIER_ORDER[E[i].tier];
+  const bio = { role: Math.floor(rnd(rng) * L.roles.length), home, person, promise: Math.floor(rnd(rng) * L.promises.length) };
+  return { ids: shuffle(ids, rng).sort((a, b) => key(a) - key(b)), lost: 0, partial: 0, bio };
+}
+// Saves from before the record get one that matches the Hearts they have left
+function ensureRecord(run, rng) {
+  if (!run || run.record || run.practice || !LORE[run.world.type]) return;
+  run.record = buildRecord(run.world.type, rng);
+  run.record.lost = (1 << Math.max(0, Math.min(REC_SIZE, run.maxHearts - run.hearts))) - 1;
+}
+// Erase the next n entries that are still standing. Returns their positions in ids.
+function eraseRecord(run, n, msgs) {
+  const R = run.record, out = []; if (!R) return out;
+  const E = LORE[run.world.type].entries;
+  for (let i = 0; i < R.ids.length && out.length < n; i++) if (!(R.lost & 1 << i)) {
+    R.lost |= 1 << i; R.partial &= ~(1 << i); out.push(i);
+    msgs && msgs.push({ t: 'loss', text: `[Erasing: ${loreName(E[R.ids[i]])}… done.]` });
+  }
+  return out;
+}
+// Restored Hearts bring back the most recently erased entries, not cleanly: each comes back partial
+function restoreRecord(run, n, msgs) {
+  const R = run.record; let k = 0; if (!R) return 0;
+  for (let i = R.ids.length - 1; i >= 0 && k < n; i--) if (R.lost & 1 << i) { R.lost &= ~(1 << i); R.partial |= 1 << i; k++; }
+  if (k && msgs) msgs.push({ t: 'sys', text: `[Restoring from backup… ${k} record${k > 1 ? 's' : ''} recovered. Partial.]` });
+  return k;
+}
+// An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Past 14 entries, extra Hearts go unrecorded.
+function amendRecord(run, msgs, rng) {
+  const R = run.record; if (!R || R.ids.length >= REC_MAX) return false;
+  const E = LORE[run.world.type].entries, unused = E.map((_, i) => i).filter(i => !R.ids.includes(i));
+  if (!unused.length) return false;
+  const low = Math.min(...unused.map(i => TIER_ORDER[E[i].tier]));
+  const id = pick(unused.filter(i => TIER_ORDER[E[i].tier] === low), rng);
+  let at = 0; while (at < R.ids.length && R.lost & 1 << at) at++;
+  const ins = m => (m & ((1 << at) - 1)) | ((m >> at) << (at + 1));
+  R.ids.splice(at, 0, id); R.lost = ins(R.lost); R.partial = ins(R.partial);
+  msgs && msgs.push({ t: 'sys', text: '[Record amended: 1 entry added.]' });
+  return true;
+}
+// Reading a record. halls: third person for the Halls, which name people without "your".
+function recLeft(rec) { let n = 0; rec.ids.forEach((_, p) => { if (!(rec.lost & 1 << p)) n++; }); return n; }
+function recWorldGone(rec) { return recLeft(rec) === 0; }
+// A partial entry has one or two words of its line barred, picked from the entry index so every device shows the same ones
+function partialWords(i, n) { const a = (i * 7 + 3) % n; return n > 6 ? [a, (a + 3) % n] : [a]; }
+function recEntries(rec, type, halls) {
+  const E = LORE[type].entries;
+  return rec.ids.map((i, p) => {
+    const e = E[i], lost = !!(rec.lost & 1 << p), partial = !lost && !!(rec.partial & 1 << p);
+    const words = e.text.split(' '), bar = partial ? partialWords(i, words.length) : [];
+    return { pos: p, i, k: e.k, lost, partial, name: halls && e.k === 'person' ? loreWho(e) : e.name, line: words.map((w, j) => ({ t: w, gone: bar.includes(j) })) };
+  });
+}
+// The bio as text pieces; erased pieces have gone set. champ gives the third-person Halls voice.
+function bioParts(rec, type, worldName, champ) {
+  const L = LORE[type], E = L.entries, b = rec.bio;
+  const gone = i => !!(rec.lost & 1 << rec.ids.indexOf(i));
+  const home = E[b.home], who = E[b.person], wgone = recWorldGone(rec);
+  const key = home.name.replace(/^The /, '').toLowerCase(), at = home.near.toLowerCase().indexOf(key);
+  const cut = at > 0 ? at : home.near.indexOf(' ') + 1; // bar the landmark, keep "in the shadow of"
+  const near = [{ t: home.near.slice(0, cut) }, { t: home.near.slice(cut), gone: gone(b.home) }];
+  const person = { t: champ ? loreWho(who) : /^Your /.test(who.name) ? loreName(who) : who.name, gone: gone(b.person) };
+  const world = { t: worldName, gone: wgone }, role = L.roles[b.role], promise = L.promises[b.promise];
+  return champ
+    ? [{ t: `${champ} was a ${role} of ` }, world, { t: ', raised ' }, ...near, { t: `. ${champ} swore to ` }, person, { t: ` to ${promise}.` }]
+    : [{ t: `You were a ${role} of ` }, world, { t: '. You grew up ' }, ...near, { t: '. You promised ' }, person, { t: ` you would ${promise}.` }];
+}
+// What a returning Erased champion remembers: the last entry still standing, or else the last one to go
+function recFragment(rec, type) {
+  const E = LORE[type].entries; let p = -1;
+  rec.ids.forEach((_, j) => { if (!(rec.lost & 1 << j)) p = j; });
+  if (p < 0) p = rec.ids.length - 1;
+  const e = E[rec.ids[p]]; return e.k === 'person' ? loreWho(e) : loreName(e);
+}
+// Shared records are untrusted: indexes must exist in the pool, masks must fit, and the bio must point into ids
+function sanitizeRec(r, type) {
+  const L = LORE[type]; if (!L || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
+  const ids = r.ids.slice(0, REC_MAX), n = L.entries.length, b = r.bio || {};
+  const idx = (v, len) => Number.isInteger(v) && v >= 0 && v < len;
+  const mask = v => Number.isInteger(v) && v >= 0 && v < 1 << ids.length;
+  if (!ids.length || !ids.every(i => idx(i, n)) || new Set(ids).size !== ids.length || !mask(r.lost) || !mask(r.partial)) return null;
+  if (!idx(b.role, L.roles.length) || !idx(b.promise, L.promises.length) || !ids.includes(b.home) || !ids.includes(b.person)) return null;
+  return { w: type, ids, lost: r.lost, partial: r.partial, bio: { role: b.role, home: b.home, person: b.person, promise: b.promise } };
+}
+
 // ---------- Gifts ----------
 // cat: world | cheat (max 1) | growth | combat | fortune | divine | bloodline | flaw (max 2)
 // lock: a Title id that unlocks it, 'echo' (bought with Echoes) or 'chain' (found in an event chain)
 const GIFTS = {
   tidecaller: { name: 'Tidecaller', cat: 'world', cost: 1, desc: 'Heal 2 at the start of each of your turns.' },
   deserter: { name: 'Legion Deserter', cat: 'world', cost: 1, desc: 'Start each fight with 15 Block.' },
-  warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of the Poison damage your opponent takes.' },
+  warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of Poison damage dealt (max 30% from all sources).' },
   hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Burn fades slower and Poison deals 25% more.' },
   prodigy: { name: 'Arcane Prodigy', cat: 'world', cost: 1, desc: 'A 5th skill slot, but 10% less max HP.' },
   runesmith: { name: 'Runesmith', cat: 'world', cost: 1, desc: 'Your gear merges at 2 copies instead of 3.' },
@@ -229,7 +459,7 @@ const GIFTS = {
   swordsaint: { name: 'Sword Saint', cat: 'cheat', cost: 5, desc: 'Your basic Attack becomes S-rank: far stronger, and it ignores Block.', lock: 'giant_slayer' },
   gacha: { name: 'Gacha Luck', cat: 'cheat', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo' },
   fastlearner: { name: 'Fast Learner', cat: 'growth', cost: 3, desc: '+50% XP.' },
-  merger: { name: 'Prodigy', cat: 'growth', cost: 3, desc: 'Your first 3 merges need only 2 copies.' },
+  merger: { name: 'Quick Study', cat: 'growth', cost: 3, desc: 'Your first 3 merges need only 2 copies.' },
   veteran: { name: 'Tournament Veteran', cat: 'growth', cost: 2, desc: 'Start with 6 more gold and an extra draft reroll.' },
   latebloomer: { name: 'Late Bloomer', cat: 'growth', cost: 2, desc: 'Every stat starts 1 lower, but each level gives 3 stat points instead of 2.', lock: 'echo' },
   affinity: { name: 'Skill Affinity', cat: 'growth', cost: 2, desc: "Your world's home archetype pieces cost 1 less (minimum 1).", lock: 'echo' },
@@ -250,7 +480,7 @@ const GIFTS = {
   treasure: { name: 'Treasure Sense', cat: 'fortune', cost: 2, desc: 'Beating a hard opponent also pays 5 gold.', lock: 'underdog' },
   chosen_war: { name: 'Chosen of War', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the God of War: their gift arrives at once.' },
   chosen_trick: { name: 'Chosen of the Trickster', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Trickster: their gift arrives at once.' },
-  chosen_ruin: { name: 'Chosen of Ruin', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Goddess of Ruin: her gift arrives at once.' },
+  chosen_ruin: { name: 'Chosen of Ruin', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Goddess of Ruin: their gift arrives at once.' },
   ironwill: { name: 'Iron Will', cat: 'bloodline', cost: 3, desc: 'Lose 1 fewer Heart per defeat (minimum 1).' },
   dragon: { name: 'Dragon Blood', cat: 'bloodline', cost: 4, desc: '+15% max HP. Toxic Flare and Cauterise heal you 5.', lock: 'emberfall' },
   elf: { name: 'Elf-touched', cat: 'bloodline', cost: 3, desc: '+10% dodge, and Bleed you apply +1.', lock: 'thornbane' },
@@ -347,7 +577,7 @@ const HIDDEN_PATHS = {
   'reaper+zealot': { name: 'Last Rites', desc: 'Your healing also deals 30% of it as damage to the opponent.', fx: { healDmg: 0.3 } },
   'blade+pyre': { name: 'Cinderblade', desc: 'Multi-hit skills apply 1 Burn per hit.', fx: { hitBurn: 1 } },
   'blade+venom': { name: 'Viper Dance', desc: 'Every Bleed you apply also applies 2 Poison.', fx: { bleedPoison: 2 } },
-  'reaper+venom': { name: 'Plague Doctor', desc: 'Heal 25% of the Poison damage your opponent takes.', fx: { poisonHeal: 0.25 } },
+  'reaper+venom': { name: 'Plague Doctor', desc: 'Heal 25% of Poison damage dealt (max 30% from all sources).', fx: { poisonHeal: 0.25 } },
   'bastion+zealot': { name: 'Paladin', desc: 'Healing also gives Block equal to half of it.', fx: { healBlock: 0.5 } },
   'arcanist+storm': { name: 'Tempest Mage', desc: 'Damaging Quick skills have a 25% chance to Stun.', fx: { quickStun: 0.25 } },
   'reaper+storm': { name: 'Warlord', desc: '+25% damage to Stunned or Weakened opponents.', fx: { vsDisabled: 0.25 } },
@@ -360,9 +590,9 @@ const HIDDEN_PATHS = {
   'blade+zealot': { name: 'Blood Saint', desc: 'Heal 3 whenever you apply Bleed.', fx: { healOnBleed: 3 } },
   'arcanist+bastion': { name: 'Spellshield', desc: 'Quick skills also give 5 Block.', fx: { quickBlock: 5 } },
   'pyre+reaper': { name: 'Funeral Pyre', desc: '+25% damage to Burning opponents below half HP.', fx: { burnExec: 0.25 } },
-  'pyre+storm': { name: 'Firestorm', desc: 'Your Stuns and Interrupts also apply 5 Burn.', fx: { stunBurn: 5 } },
+  'pyre+storm': { name: 'Wildstorm', desc: 'Your Stuns and Interrupts also apply 5 Burn.', fx: { stunBurn: 5 } },
   'bastion+venom': { name: 'Thornbark', desc: 'Thorns also apply 2 Poison.', fx: { thornPoison: 2 } },
-  'arcanist+venom': { name: 'Alchemist', desc: 'Quick skills apply 2 Poison.', fx: { quickPoison: 2 } },
+  'arcanist+venom': { name: 'Apothecary', desc: 'Quick skills apply 2 Poison.', fx: { quickPoison: 2 } },
   'venom+zealot': { name: 'Plague Saint', desc: 'Each skill that heals you also applies 3 Poison.', fx: { healPoison: 3 } },
   'arcanist+zealot': { name: 'Chronomancer', desc: 'Quick skills heal you 4.', fx: { quickHeal: 4 } },
   'arcanist+reaper': { name: 'Soul Weaver', desc: 'Doom and Leech you apply are 40% stronger.', fx: { doomLeech: 0.4 } },
@@ -379,26 +609,28 @@ function hiddenPathOf(counts) {
 
 // ---------- Enemies ----------
 const ENEMIES = {
-  goblin: { name: 'Goblin Pit-Fighter', style: 'Fast, dirty fighter', tier: 1, hp: 40, skills: [{ n: 'Shiv', fx: { dmg: 6 } }, { n: 'Dirty Trick', fx: { dmg: 3, weaken: 1 } }], script: [0, 0, 1] },
-  golem: { name: 'Shield Golem', style: 'Walls up, hits hard', tier: 1, hp: 52, skills: [{ n: 'Slam', fx: { dmg: 9 } }, { n: 'Stone Wall', fx: { block: 10 } }], script: [1, 0] },
-  drake: { name: 'Venom Drake', style: 'Poisons, then waits', tier: 1, hp: 44, skills: [{ n: 'Bite', fx: { dmg: 5 } }, { n: 'Venom Spit', fx: { poison: 4 } }], script: [1, 0, 0] },
-  ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, hp: 42, skills: [{ n: 'Claw', fx: { dmg: 3, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 5, lifesteal: 1 } }], script: [0, 0, 1] },
-  imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 4, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
-  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 18 } }, { n: 'Shove', fx: { dmg: 6 } }], script: [2, 0, 1] },
-  seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, rival: true, hp: 64, skills: [{ n: 'Shield of Faith', fx: { block: 12 } }, { n: 'Judgement', fx: { dmg: 3, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 10 } }], script: [0, 1, 2, 0, 1] },
-  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rival: true, hp: 74, enrage: 0.5, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
-  lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, rival: true, hp: 60, dodge: 0.1, skills: [{ n: 'Needle', fx: { dmg: 4, poison: 2 } }, { n: 'Thousand Needles', fx: { poison: 4, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
+  goblin: { name: 'Goblin Pit-Fighter', style: 'Fast, dirty fighter', tier: 1, rank: 'E', hp: 40, skills: [{ n: 'Shiv', fx: { dmg: 6 } }, { n: 'Dirty Trick', fx: { dmg: 3, weaken: 1 } }], script: [0, 0, 1] },
+  golem: { name: 'Shield Golem', style: 'Walls up, hits hard', tier: 1, rank: 'E', hp: 52, skills: [{ n: 'Slam', fx: { dmg: 9 } }, { n: 'Stone Wall', fx: { block: 10 } }], script: [1, 0] },
+  drake: { name: 'Venom Drake', style: 'Poisons, then waits', tier: 1, rank: 'E', hp: 44, skills: [{ n: 'Bite', fx: { dmg: 5 } }, { n: 'Venom Spit', fx: { poison: 4 } }], script: [1, 0, 0] },
+  ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, rank: 'E', hp: 42, skills: [{ n: 'Claw', fx: { dmg: 3, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 5, lifesteal: 1 } }], script: [0, 0, 1] },
+  imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, rank: 'E', hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 4, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
+  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 18 } }, { n: 'Shove', fx: { dmg: 6 } }], script: [2, 0, 1] },
+  seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, rank: 'B', rival: true, hp: 80, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 16, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
+  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rank: 'D', rival: true, hp: 56, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
+  lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 4, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
   masked: { name: 'The Masked Entrant', style: 'Copies your last skill', tier: 2, rival: true, hp: 62, skills: [{ n: 'Strike', fx: { dmg: 8 } }, { n: 'Mirror Form', fx: { mirror: 1 }, label: 'Copying your last skill' }], script: [0, 1] },
-  kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
-  calder: { name: 'Ser Calder', style: 'A knight who fights by the book', tier: 2, rival: true, hp: 68, skills: [{ n: 'Lance', fx: { dmg: 10 } }, { n: 'Shield Wall', fx: { block: 10 } }, { n: 'Disgrace', fx: { dmg: 4, weaken: 2 } }], script: [0, 1, 2] },
-  leviathan: { name: 'The Leviathan Queen', style: 'Floods the arena every 3rd turn, Weakening whoever has less Block', tier: 3, final: true, hp: 215, flood: true, skills: [{ n: 'Tidal Lash', fx: { dmg: 19 } }, { n: 'Coral Armour', fx: { block: 16 } }, { n: 'Crushing Depths', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2] },
-  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, final: true, hp: 112, aura: 1, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Pyre', fx: { burn: 5 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
-  bone_saint: { name: 'The Bone Saint', style: 'Poisons, drains, and rises once at 30% HP', tier: 3, final: true, hp: 135, revive: 0.3, skills: [{ n: 'Bone Lance', fx: { dmg: 10 } }, { n: 'Plague Hymn', fx: { poison: 3 } }, { n: 'Marrow Feast', fx: { dmg: 7, lifesteal: 0.5 } }], script: [1, 0, 2, 0] },
-  thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, final: true, hp: 92, briar: 1.2, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
-  archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, final: true, hp: 98, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
-  forge_king: { name: 'The Forge King', style: 'His Block never fades and grows every turn', tier: 3, final: true, hp: 120, forge: 5, skills: [{ n: 'Molten Hammer', fx: { dmg: 6, blockDmg: 0.4 } }, { n: 'Anvil Guard', fx: { block: 10 } }, { n: 'Quench', fx: { dmg: 13 } }], script: [0, 1, 2, 0] },
-  legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
-  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
+  kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rank: 'A', rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
+  calder: { name: 'Ser Calder', style: 'A knight who fights by the book', tier: 2, rank: 'C', rival: true, hp: 76, skills: [{ n: 'Lance', fx: { dmg: 14 } }, { n: 'Shield Wall', fx: { block: 10 } }, { n: 'Disgrace', fx: { dmg: 6, weaken: 2 } }], script: [0, 1, 0, 2] },
+  leviathan: { name: 'The Leviathan Queen', style: 'Floods the arena every 3rd turn, Weakening whoever has less Block', tier: 3, rank: 'A', final: true, hp: 165, flood: true, skills: [{ n: 'Tidal Lash', fx: { dmg: 22 } }, { n: 'Coral Armour', fx: { block: 16 } }, { n: 'Crushing Depths', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2] },
+  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, rank: 'A', final: true, hp: 112, aura: 0.7, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Ashen Pyre', fx: { burn: 3 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
+  bone_saint: { name: 'The Bone Saint', style: 'Poisons, drains, and rises once at 30% HP', tier: 3, rank: 'A', final: true, hp: 135, revive: 0.3, skills: [{ n: 'Bone Lance', fx: { dmg: 10 } }, { n: 'Plague Hymn', fx: { poison: 3 } }, { n: 'Marrow Feast', fx: { dmg: 7, lifesteal: 0.5 } }], script: [1, 0, 2, 0] },
+  thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, rank: 'A', final: true, hp: 92, briar: 1, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
+  archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, rank: 'A', final: true, hp: 85, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
+  forge_king: { name: 'The Forge King', style: 'His Block never fades and grows every turn', tier: 3, rank: 'A', final: true, hp: 120, forge: 3, skills: [{ n: 'Molten Hammer', fx: { dmg: 6, blockDmg: 0.4 } }, { n: 'Anvil Guard', fx: { block: 10 } }, { n: 'Quench', fx: { dmg: 13 } }], script: [0, 1, 2, 0] },
+  // The Rank Trial examiner. Its rank letter is the grade it tests for, and it fights at that grade's world rank (see trialMul).
+  proctor: { name: 'Proctor', style: "The System's examiner. Pass the condition to be promoted", tier: 2, hp: 70, skills: [{ n: 'Marked Strike', fx: { dmg: 9 } }, { n: 'Assessment', fx: { block: 8 } }, { n: 'Pop Quiz', fx: { dmg: 5, weaken: 2 } }, { n: 'Final Exam', fx: { dmg: 7, hits: 2 }, label: 'Preparing the final exam' }], script: [0, 1, 2, 3] },
+  legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
+  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
 };
 const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute'];
 const RIVALS = ['seraphine', 'grukk', 'lyss', 'masked', 'kaito', 'calder'];
@@ -423,55 +655,98 @@ function shuffle(a, rng) { a = a.slice(); for (let i = a.length - 1; i > 0; i--)
 function wpick(items, weights, rng) { let t = 0; weights.forEach(w => t += w); let x = rnd(rng) * t; for (let i = 0; i < items.length; i++) { x -= weights[i]; if (x <= 0) return items[i]; } return items[items.length - 1]; }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0 }; }
+// ---------- Seeded runs (Pending World) ----------
+// A run with run.seed draws from named streams instead of Math.random, so everyone playing the same seed gets the same world,
+// record, draft, shops, opponents and events. Each call gets a fresh generator keyed by purpose, round and how many times that
+// purpose has drawn this round, so a shop reroll never shifts the opponents, and a reloaded save carries on where it left off.
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function seedRng(str) { return mulberry32(hashStr(str)); }
+function runRng(run, purpose) {
+  run.rngN = run.rngN || {};
+  const r = curRound(run), k = purpose + ':' + r, n = run.rngN[k] = (run.rngN[k] || 0) + 1;
+  return seedRng(run.seed + ':' + purpose + ':' + r + ':' + n);
+}
+// The rng to use: the one passed in, else the run's stream for this purpose, else Math.random for a normal run
+function stream(run, purpose, rng) { return rng || (run && run.seed ? runRng(run, purpose) : undefined); }
+// The game day: the date at UTC+9:30 (a fixed offset, no daylight saving), so each day starts at 14:30 UTC
+const DAY_OFFSET = 9.5 * 3600 * 1000;
+function dailyDate(now) { return new Date((now == null ? Date.now() : now) + DAY_OFFSET).toISOString().slice(0, 10); }
+function dailySeed(date) { return 'wpd:' + date; }
+function dailyWorld(date) { return genWorld(seedRng(dailySeed(date) + ':world')); }
+function dailyRecord(date, type) { return buildRecord(type, seedRng(dailySeed(date) + ':record')); }
+// Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
+function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {} }); }
+// Leaderboard score: round reached, then Hearts left, then fewest turns, in one sortable number
+function dailyScore(run) {
+  const turns = (run.history || []).reduce((a, h) => a + (h.turns || 0), 0);
+  const wins = Math.min(12, run.wins || 0), hearts = Math.min(20, Math.max(0, run.hearts)), t = Math.min(999, turns);
+  return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
+}
+
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank() }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
 
 // ---------- Worlds ----------
-function genWorld(rng) {
+// cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
+function genWorld(rng, cap) {
   const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
   const name = pick(T.names[0], rng) + pick(T.names[1], rng);
-  const rank = wpick([0, 1, 2, 3, 4, 5], RANK_W, rng);
+  const rank = cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
   const mod = wpick(Object.keys(MODIFIERS), [30, 15, 15, 15, 15], rng);
   return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs, rng) };
 }
-function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
+function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng, cap); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
 
 // ---------- Run ----------
 // setup: { name, sigil, color, stats, gifts:[], patron: 'war'|'trick'|'ruin'|'none' }
 function newRun(world, setup, meta, rng) {
   bindMeta(meta);
+  const U = setup.seed ? {} : meta.unlocks, rs = rng || (setup.seed ? seedRng(setup.seed + ':setup') : undefined);
   const home = WORLD_TYPES[world.type].home;
-  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(unlockedArch(meta).filter(k => k !== home), rng).slice(0, 3);
+  const pool = unlockedArch({ unlocks: U }).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
+  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer);
   const G = setup.gifts;
   const run = {
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
     stats: Object.assign({}, setup.stats), statPts: 0, level: 1, xp: 0,
-    gold: Math.max(0, chk.left) * 3 + (meta.unlocks.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
+    gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
     favour: { war: 0, trick: 0, ruin: 0 }, gifted: { war: 0, trick: 0, ruin: 0 },
     slots: setup.gifts.includes('prodigy') ? 5 : 4, bar: [], gear: { weapon: null, armour: null, accessory: null }, bench: [], uid: 0,
     shop: null, locks: null, bonusSlot: null, merges: setup.gifts.includes('merger') ? 3 : 0,
     round: 1, losses: 0, elite: false, eliteIdx: 0, wins: 0, eliteWins: 0, hearts: 10, maxHearts: 10,
-    pending: [], log: [], hp: 0, ended: false, stage: 'draft', rerolls: 1 + (meta.unlocks.reroll ? 1 : 0) + (G.includes('veteran') ? 1 : 0), draft: [],
+    pending: [], log: [], hp: 0, ended: false, stage: 'draft', rerolls: 1 + (U.reroll ? 1 : 0) + (G.includes('veteran') ? 1 : 0), draft: [],
     met: [], choices: null, chosen: null, wager: null, wagerOn: false, districts: [], scouted: false, nextFlags: {}, usedRewind: false, usedBreath: false, path: null, history: [],
     title: setup.title && meta.titles[setup.title] ? setup.title : null, hiddenPath: null, milestones: {}, chains: {}, quests: [], wagersWon: 0, freeRerolls: 0, haggle: false,
-    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rng) * 7), extraGiven: false, earned: [],
+    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, earned: [],
   };
+  if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // System quests: two visible, every hidden one quietly active
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden), rng).slice(0, 2);
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden), rs).slice(0, 2);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
+  else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
-  run.draft = rollDraft(run, rng);
-  ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, rng); });
+  // Entrant Rank: promotion perks and a waiting Rank Trial. Pending World and practice runs use neither.
+  run.perks = [];
+  if (!setup.seed && !run.practice && meta.rank) {
+    run.perks = meta.rank.perks.filter(k => PERKS[k]);
+    if (run.perks.includes('stipend')) run.gold += 1;
+    if (run.perks.includes('redraft')) run.rerolls += 1;
+    if (run.perks.includes('patron') && run.patron && run.patron !== 'none') run.favour[run.patron] += 1;
+    if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
+  }
+  run.draft = rollDraft(run, stream(run, 'draft', rng));
+  ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
   run.hp = maxHp(run);
   return run;
 }
@@ -483,7 +758,7 @@ function effStats(run) {
   return s;
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 2 + run.level * 4) * hpMult(run.gifts)); }
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 2 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
 const XP_NEED = [0, 2, 4, 6, 10, 14, 20, 26, 32, 999];
 function xpNeed(level) { return XP_NEED[Math.min(level, 9)]; }
 function gainXp(run, n, msgs) {
@@ -544,10 +819,10 @@ function refreshShop(run, rng, kind) {
   });
 }
 function rerollCost(run) { return run.freeRerolls > 0 ? 0 : hasGift(run, 'f_unlucky') ? 3 : 2; }
-function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, rng, kind || 'skill'); return true; }
+function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
-function interestCap(run) { return hasGift(run, 'golden') ? 5 : 3; }
+function interestCap(run) { return (hasGift(run, 'golden') ? 5 : 3) + (hasPerk(run, 'ledger') ? 1 : 0); }
 function income(run) { return 5 + Math.min(interestCap(run), Math.floor(run.gold / 10)) + (run.world.mod === 'golden' ? 2 : 0); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
@@ -668,6 +943,8 @@ function sanitizeSnap(x, owner) {
     path: ARCH[x.path] ? x.path : null, stats, level: num(x.level, 1, 9, 1), maxHp: num(x.maxHp, 20, 700, 80), round: num(x.round, 1, 8, 1), gifts, title: TITLES[x.title] ? x.title : null, milestones: ms,
     bar, gear, history, cause: str(x.cause, 60) || null, hearts: num(x.hearts, 0, 20, 0), maxHearts: num(x.maxHearts, 1, 20, 10), wins: num(x.wins, 0, 20, 0), elite: num(x.elite, 0, 4, 0), entrant: num(x.entrant, 0, 99999, 0),
     hiddenPath: HIDDEN_PATHS[x.hiddenPath] ? x.hiddenPath : null, at: num(x.at, 0, 1e15, 0), owner: owner || null, shared: !!owner,
+    rec: sanitizeRec(x.rec, x.worldType),
+    rank: rankIdx(x.rank) >= 0 ? x.rank : null, rp: num(x.rp, 0, 1e6, 0), kills: num(x.kills, 0, 9999, 0),
   };
 }
 function earnTitle(run, id, msgs) {
@@ -706,7 +983,7 @@ const MILESTONES = {
   STR: { name: 'Mighty Frame', desc: 'Reaper and Stormcaller skills deal 10% more.' },
   AGI: { name: 'Afterimage', desc: 'Evade the first attack each fight.' },
   INT: { name: 'Arcane Mind', desc: 'Your first damaging skill each fight deals 30% more.' },
-  VIT: { name: 'Unbreakable', desc: '+1 max Heart.' },
+  VIT: { name: 'Iron Constitution', desc: '+1 max Heart.' },
   LUK: { name: "Fortune's Favourite", desc: 'One free reroll every round.' },
 };
 function checkMilestones(run, msgs) {
@@ -715,7 +992,7 @@ function checkMilestones(run, msgs) {
     if (s[k] >= 10 && !run.milestones[k]) {
       run.milestones[k] = true;
       msgs && msgs.push({ t: 'level', text: `[Stat milestone: ${k} 10. ${MILESTONES[k].name}: ${MILESTONES[k].desc}]` });
-      if (k === 'VIT') { run.maxHearts++; run.hearts++; }
+      if (k === 'VIT') { run.maxHearts++; run.hearts++; amendRecord(run, msgs, stream(run, 'record')); }
       if (k === 'LUK') run.freeRerolls++;
     }
   });
@@ -731,10 +1008,10 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (t('venom') >= 1) add('poisonPlus', 1); if (t('venom') >= 2) add('poisonPlus', 1); if (t('venom') >= 3) set('poisonMult', 1.5);
   if (t('blade') >= 1) set('extraHit', 1); if (t('blade') >= 2) add('bleedPlus', 2); if (t('blade') >= 3) set('bleedMult', 2);
   if (t('bastion') >= 1) add('blockKeep', 0.25); if (t('bastion') >= 2) add('thornsAlways', Math.round(4 * lm)); if (t('bastion') >= 3) set('blockStrike', 0.5);
-  if (t('arcanist') >= 1) add('quickCd', 1); if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
+  if (t('arcanist') >= 1) { add('quickCd', 1); set('arcCd', 8); } if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
   if (t('zealot') >= 1) add('healPct', 0.1); if (t('zealot') >= 2) add('regen', Math.round(2 * lm)); if (t('zealot') >= 3) set('overhealBlock', 1);
-  if (t('reaper') >= 1) add('vsHalf', 0.25); if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
-  if (t('storm') >= 1) add('stunDmg', Math.round(8 * lm)); if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
+  if (t('reaper') >= 1) { add('vsHalf', 0.25); set('reapPierce', 1); set('reapBlood', 0.15); } if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
+  if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
   gearPieces.filter(Boolean).forEach(g => Object.entries(gearPas(g.id, g.star)).forEach(([k, v]) => { if (k === 'firstCrit' || k === 'firstStun' || k === 'firstEvade') set(k, 1); else add(k, k === 'stunDmg' || k === 'thornsAlways' || k === 'regen' || k === 'startBlock' ? Math.round(v * lm) : v); }));
   // Hidden Path
   const hp = hiddenPathOf(c);
@@ -781,6 +1058,14 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (T === 'ascendant') add('dmgPct', 0.05);
   if (T === 'pathfinder') { add('startBlock', 5); add('regen', 1); }
   if (T === 'unbeaten') add('dmgPct', 0.1);
+  // Promotion perks, about the size of a Title each
+  const K = x.perks || [];
+  if (K.includes('kindling')) add('burnPlus', 1);
+  if (K.includes('steeped')) add('poisonPlus', 1);
+  if (K.includes('whetted')) add('bleedPlus', 1);
+  if (K.includes('guard')) add('startBlock', 5);
+  if (K.includes('keen')) add('critBonus', 0.04);
+  if (K.includes('light')) add('dodge', 0.03);
   // Stat milestones
   const M = x.milestones || {};
   if (M.STR) set('mighty', 0.1);
@@ -793,42 +1078,57 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
-function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones }); }
+function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks }); }
 
 // ---------- Opponents: choice of two each round ----------
-const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95 };
+const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
-function curRound(run) { return run.elite ? ROUNDS + run.eliteIdx : run.round; }
+function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
 const HEART_COST = [1, 1, 2, 2, 3, 3, 4, 5];
-function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
+function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
   if (run.round >= ROUNDS) return [{ kind: 'final', id: WORLD_TYPES[run.world.type].final }];
   const early = run.round <= 3;
-  const pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
+  let pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
+  // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
+  if (!early) { const want = RANKS.indexOf('D') + run.round - 4, gap = id => ENEMIES[id].rank ? Math.abs(RANKS.indexOf(ENEMIES[id].rank) - want) : 0.5; pool = pool.map(id => ({ id, k: gap(id) + rnd(rng) * 1.5 })).sort((x, y) => x.k - y.k).map(x => x.id); }
   const easy = { kind: early ? 'monster' : 'rival', id: pool[0] };
   if (!early && run.sabotage && !run.met.includes(run.sabotage)) { easy.id = run.sabotage; easy.sabotaged = true; if (pool[1] === run.sabotage) pool[1] = pool[0]; }
   let hard = { kind: early ? 'monster' : 'rival', id: pool[1] || pool[0], hard: true };
   const chance = run.world.mod === 'restless' ? 0.6 : 0.3;
-  const erased = meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
-  if (run.round >= 3 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
+  // Pending World never draws other champions, so every player faces the same fights
+  const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
+  if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
+  if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
 function specName(spec) {
+  if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
   if (spec.kind === 'erased' || spec.kind === 'champion') return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
   return n;
 }
+// The rank letter an opponent fights at: Alphas are a rank above other monsters, and the Masked Entrant copies yours
+function specRank(spec, meta) {
+  if (spec.kind === 'trial') return spec.to;
+  if (spec.snap) return spec.snap.rank || null;
+  const t = ENEMIES[spec.id]; if (!t) return null;
+  if (spec.id === 'masked') return meta && meta.rank ? meta.rank.letter : null;
+  return spec.hard && spec.kind === 'monster' ? 'D' : t.rank || null;
+}
 function specStyle(spec) {
+  if (spec.kind === 'trial') return "The System's examiner. Pass the condition to be promoted";
   if (spec.kind === 'erased') return `Erased. Fell in round ${spec.snap.round} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   if (spec.kind === 'champion') return `Saved ${spec.snap.worldName} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
+  if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
   if (spec.kind === 'final') return 'Spares your world';
   if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
   if (spec.hard) return '3 gold, a rune and a rare shop slot';
@@ -884,9 +1184,11 @@ function rollDistricts(run, rng) {
   return out;
 }
 function infirmary(run) { const f = run.world.mod === 'famine' ? 0.25 : 0.5; const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
-function sanctum(run) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); return run.hearts - b; }
+function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); restoreRecord(run, run.hearts - b, msgs); return run.hearts - b; }
 // Events. Chains set flags that later events check: they come back on their own a round or two later.
-// opts: { label, desc, can(run), go(run, meta, rng, msgs) }
+// opts: { label, desc, can(run), go(run, meta, rng, msgs), reveal }
+// In chains, desc is a hint and the reward stays hidden: reveal (a string or fn(run)) is shown after choosing
+// when go() adds no message of its own. Costs always stay visible in the label or desc.
 const EVENTS = {
   merchant: { title: 'Hooded merchant', text: () => 'A merchant in the tunnels sells forbidden techniques. The price is a little of your life.', opts: [
     { label: 'Pay 10% of your max HP', desc: 'A random C or B-rank piece from your pool', go: (run, meta, rng, msgs) => { run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * 0.1)); const pool = poolIds(run).filter(x => ['C', 'B'].includes(pieceDef(x).rank)); const id = pick(pool, rng); if (id) { msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } } },
@@ -896,31 +1198,31 @@ const EVENTS = {
     { label: 'Wave and rest', desc: 'Heal 10 HP', go: run => { run.hp = Math.min(maxHp(run), run.hp + 10); } }] },
   // --- The Official ---
   official_1: { chain: 'official', title: 'A quiet word', text: () => 'A tournament official offers to "adjust" your next match. He smiles too much.', opts: [
-    { label: 'Pay 6 gold', desc: 'Your next opponent starts with 20% less HP', can: run => run.gold >= 6, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
-    { label: 'Refuse', desc: '+2 Favour with the God of War', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
+    { label: 'Pay 6 gold', desc: 'He will "adjust" your next match.', reveal: '[Your next opponent starts with 20% less HP.]', can: run => run.gold >= 6, need: run => `Need 6 gold (you have ${run.gold})`, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
+    { label: 'Refuse', desc: 'Someone up there might respect that.', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
   official_bribed: { chain: 'official', title: 'Blackmail', text: () => 'The official is back. He has a ledger with your name in it, and the System would love to read it.', opts: [
-    { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
-    { label: 'Let him talk', desc: 'The scandal costs your world 1 Heart', go: run => { run.hearts = Math.max(1, run.hearts - 1); run.chains.official = 'done'; } }] },
+    { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, need: run => `Need 8 gold (you have ${run.gold})`, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
+    { label: 'Let him talk', desc: 'The scandal costs your world 1 Heart', go: (run, meta, rng, msgs) => { if (run.hearts > 1) { run.hearts--; eraseRecord(run, 1, msgs); } run.chains.official = 'done'; } }] },
   official_refused: { chain: 'official', title: 'The honest official', text: () => 'The official you refused finds you after a match. "Nobody turns me down. I respect that." He slips you a folded page: notes on how the Final Champion fights.', opts: [
-    { label: 'Take the notes', desc: "In the final, you'll see the champion's next 2 moves", go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: '[Final Champion notes acquired.]' }); } }] },
+    { label: 'Take the notes', desc: 'A folded page about the final.', go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: "[Final Champion notes acquired. In the final, you'll see their next 2 moves.]" }); } }] },
   // --- The Poisoner ---
   poisoner_1: { chain: 'poisoner', title: 'Tampered water', text: () => 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
-    { label: 'Drink it anyway', desc: '+2 VIT, but start the next fight with 4 Poison', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
-    { label: 'Investigate (3 gold)', desc: 'Find out who did it', can: run => run.gold >= 3, go: (run, meta, rng) => { run.gold -= 3; const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; } },
+    { label: 'Drink it anyway', desc: 'Start the next fight Poisoned. It might be worth it.', reveal: '[+2 VIT. You start the next fight with 4 Poison.]', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
+    { label: 'Investigate (3 gold)', desc: 'Find out who did it', can: run => run.gold >= 3, need: run => `Need 3 gold (you have ${run.gold})`, go: (run, meta, rng) => { run.gold -= 3; const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; } },
     { label: 'Pour it out', desc: 'Nothing happens', go: run => { run.chains.poisoner = 'done'; } }] },
   poisoner_found: { chain: 'poisoner', title: 'The poisoner', text: run => `A stable boy talks for a coin: it was ${ENEMIES[run.chains.poisoner.who].name}'s people who tampered with your water.`, opts: [
-    { label: 'Expose them to the crowd', desc: '+3 Favour with the Trickster', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
-    { label: 'Return the favour', desc: 'They will appear among your next rival choices, Weakened for 3 turns and with 15% less HP', go: run => { run.sabotage = run.chains.poisoner.who; run.chains.poisoner = 'done'; } }] },
+    { label: 'Expose them to the crowd', desc: 'Let the crowd judge them. Someone will enjoy it.', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
+    { label: 'Return the favour', desc: 'A taste of their own medicine.', reveal: run => `[${ENEMIES[run.sabotage].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]`, go: run => { run.sabotage = run.chains.poisoner.who; run.chains.poisoner = 'done'; } }] },
   // --- The Letter ---
   letter_1: { chain: 'letter', title: 'A letter from the Erased', text: () => 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
-    { label: 'Read it', desc: '+1 to a random stat, and follow the map', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
+    { label: 'Read it', desc: 'Follow the map.', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
     { label: 'Sell it', desc: '+5 gold', go: run => { run.gold += 5; run.chains.letter = 'done'; } }] },
   letter_map: { chain: 'letter', title: 'The old quarter', text: () => "The letter's map leads to a rusted grate in the old quarter. A bored sentry leans on it.", opts: [
-    { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
+    { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, need: run => `Need 5 gold (you have ${run.gold})`, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
     { label: 'Sneak past', desc: 'Lose 15% of your max HP, go through', go: run => { run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * 0.15)); run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { label: 'Give up', desc: 'The chain ends', go: run => { run.chains.letter = 'done'; } }] },
+    { label: 'Give up', desc: 'Turn back. The map is lost.', go: run => { run.chains.letter = 'done'; } }] },
   letter_cache: { chain: 'letter', title: 'The cache', text: () => "Behind the grate: a box with the Erased champion's last possession, and a note. [I lost. Make sure it meant something.]", opts: [
-    { label: 'Take it', desc: 'Gain the hidden Gift Last Words for this run, and unlock it in the library', go: (run, meta, rng, msgs) => {
+    { label: 'Take it', desc: 'Whatever it is, it was theirs.', go: (run, meta, rng, msgs) => {
       run.chains.letter = 'done';
       if (meta) { meta.found = meta.found || {}; meta.found.lastwords = true; }
       if (!hasGift(run, 'lastwords')) { run.gifts.push('lastwords'); msgs.push({ t: 'class', text: '[Hidden Gift acquired: Last Words.]' }); } else { run.gold += 10; msgs.push({ t: 'loot', text: '[+10 gold]' }); }
@@ -940,7 +1242,9 @@ function dueChainEvents(run) {
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const E = EVENTS[key], o = E && E.opts[idx];
   if (!o || (o.can && !o.can(run))) return false;
-  o.go(run, meta, rng, msgs || []);
+  msgs = msgs || []; const before = msgs.length;
+  o.go(run, meta, stream(run, 'event', rng), msgs);
+  if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
   return true;
 }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -980,17 +1284,18 @@ function completeQuest(run, q, msgs) {
   if (META) META.archive.quests[q.id] = true;
   msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${QUEST_REWARD[Q.reward]}.]` });
   const r = Q.reward;
-  if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3) });
+  if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(run, 'loot')) });
   if (r === 'gold5') run.gold += 5; if (r === 'gold6') run.gold += 6; if (r === 'gold8') run.gold += 8;
-  if (r === 'heart') { run.maxHearts++; run.hearts++; }
+  if (r === 'heart') { run.maxHearts++; run.hearts++; amendRecord(run, msgs, stream(run, 'record')); }
   if (r === 'favour') addFavour(run, 'war', 2, META, msgs);
-  if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
+  if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool, stream(run, 'loot')); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
 }
 // ---------- Additional Gift (after round 4) ----------
 function extraGiftOffers(run, rng) {
   const c = runCounts(run);
   const top = Object.keys(c).filter(k => run.arch.includes(k)).sort((a, b) => c[b] - c[a])[0] || run.arch[0];
-  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, META) && !['latebloomer', 'veteran'].includes(k));
+  const M = run.seed && META ? levelMeta(META) : META;
+  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
   return ['aff_' + top].concat(shuffle(pool, rng).slice(0, 2));
 }
 function applyGift(run, k, msgs) {
@@ -1014,32 +1319,33 @@ function rollDraft(run, rng) {
   while (out.length < 6 && g++ < 200) { const id = pick(pool, rng); if (!out.includes(id)) out.push(id); }
   return shuffle(out, rng);
 }
-function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, rng); return true; }
+function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); return true; }
 function confirmDraft(run, ids, meta, rng) {
   ids.forEach(id => addPiece(run, id, []));
   run.draft = [];
-  run.shop = null; run.locks = null; refreshShop(run, rng);
+  run.shop = null; run.locks = null; refreshShop(run, stream(run, 'shop', rng));
   enterChoose(run, meta, rng);
 }
 function enterChoose(run, meta, rng, msgs) {
   run.scouted = false; run.wagerOn = false; run.chosen = null;
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
-  if (run.visit > 1) { gainXp(run, 2, msgs); refreshShop(run, rng); }
+  if (run.visit > 1) { gainXp(run, 2, msgs); refreshShop(run, stream(run, 'shop', rng)); }
   run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
-  if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects his debt: −${d} gold.]` }); }
+  if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
-  if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, rng) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
+  if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) run.pending.push({ type: 'event', key: k }); });
   if (run.elite) { run.wager = null; run.stage = 'shop'; return; }
-  run.choices = makeChoices(run, meta, rng);
-  run.wager = makeWager(run, rng);
+  run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
+  const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
+  run.wager = makeWager(run, stream(run, 'opps', rng));
   run.stage = 'choose';
 }
-function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'district'; if (!run.districts || !run.districts.length) run.districts = rollDistricts(run, rng); }
-function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') run.scouted = true; if (k === 'undercity') run.pending.push({ type: 'event', key: undercityEvent(run, rng) }); return true; }
+function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'district'; if (!run.districts || !run.districts.length) run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
+function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') run.scouted = true; if (k === 'undercity') run.pending.push({ type: 'event', key: undercityEvent(run, stream(run, 'event', rng)) }); return true; }
 
 // ---------- Fighters ----------
 function skillStat(def) { return def.basic ? null : ARCH[def.tags[0]].stat; }
@@ -1053,6 +1359,7 @@ function fighterSkills(barPieces, s, P) {
     const def = moddedDef(p.id, p.mods);
     if (P.extraHit && (def.fx.hits || 1) >= 2) def.fx.hits = def.fx.hits + 1;
     if (def.quick && P.quickCd) def.cd = Math.max(1, def.cd - P.quickCd);
+    if (!def.quick && P.arcCd && def.cd > 1) def.cd = Math.max(1, def.cd - Math.floor(s.INT / P.arcCd)); // Arcanist: INT shortens cooldowns
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
     out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0 });
   });
@@ -1062,6 +1369,7 @@ function fighterSkills(barPieces, s, P) {
 function blankFighter(o) { return Object.assign({ block: 0, burn: 0, poison: 0, bleed: 0, weaken: 0, empower: 0, stun: 0, evade: 0, thorns: 0, critNext: false, marked: 0, brokenT: 0, P: {}, uses: 0 }, o); }
 function buildPlayer(run) {
   const s = effStats(run), P = runP(run), mh = maxHp(run);
+  if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, P,
     crit: 0.05 + 0.015 * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, 0.01 * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
@@ -1071,7 +1379,9 @@ function buildPlayer(run) {
 function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
-  const p = enemyPower(run) * (spec.hard ? TUNE.hard : 1), hm = enemyHpMul(run) * (spec.hard ? TUNE.hardHp : 1);
+  const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
+  const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
+  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha;
   if (spec.kind === 'erased' || spec.kind === 'champion') return buildSnapEnemy(spec.snap, p, hm, run);
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3;
@@ -1085,13 +1395,15 @@ function buildEnemy(run, spec) {
   });
 }
 function snapshot(run) {
-  const s = effStats(run);
-  return {
+  const s = effStats(run), R = run.record;
+  const snap = {
     champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, path: run.path,
     stats: s, level: run.level, maxHp: maxHp(run), round: run.round, gifts: run.gifts.filter(k => GIFTS[k].cat !== 'flaw' && k !== 'copycat'), title: run.title, milestones: run.milestones,
     history: (run.history || []).slice(), cause: run.cause || null, hearts: run.hearts, maxHearts: run.maxHearts, wins: run.wins, elite: run.eliteWins || 0, entrant: run.entrant, hiddenPath: run.hiddenPath,
     bar: run.bar.filter(Boolean).map(p => ({ id: p.id, star: p.star, mods: p.mods.slice() })), gear: GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean).map(p => ({ id: p.id, star: p.star })), at: Date.now() + Math.floor(Math.random() * 1000),
   };
+  if (R) snap.rec = { w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) };
+  return snap;
 }
 function buildSnapEnemy(snap, p, hm, run) {
   const scale = Math.max(1, p / roundPower(snap.round || 1));
@@ -1107,7 +1419,7 @@ function newFight(run, rng) {
   const spec = currentSpec(run);
   const A = buildPlayer(run), B = buildEnemy(run, spec);
   const f = {
-    rng: rng || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
+    rng: stream(run, 'fight', rng) || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
     tally: { burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && run.chains && run.chains.official === 'tip'),
@@ -1118,6 +1430,7 @@ function newFight(run, rng) {
     X.block += (P.startBlock || 0) + Math.round((P.startBlockPct || 0) * X.maxHp);
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
+    if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
   planIntent(f, B);
@@ -1165,6 +1478,7 @@ function hit(f, X, Y, raw, o = {}) {
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   const rest = d - absorbed;
   Y.hp -= rest;
+  if (X.P.reapBlood && !Y.bloodied && Y.hp > 0 && half(Y)) { Y.bloodied = true; heal(f, X, X.maxHp * X.P.reapBlood); say(f, '[Reaper: first blood. You feed on it.]', 'class'); } // Reaper: heal on bringing a foe below half
   if (Y.isPlayer) { f.tally.blocked += absorbed; f.tally.taken += rest; if (o.src) f.tally.hurtBy[o.src] = (f.tally.hurtBy[o.src] || 0) + rest; }
   if (X.isPlayer) { f.tally.bigHit = Math.max(f.tally.bigHit, d); if (o.src) f.dealt[o.src] = (f.dealt[o.src] || 0) + rest; if (Y.hp <= 0) f.tally.overkill = Math.max(f.tally.overkill, -Y.hp); }
   if (Y.lastWords && Y.hp > 0 && Y.hp < Y.maxHp * 0.25 && !Y.lwUsed) { Y.lwUsed = true; const b = Math.round(Y.maxHp * Y.lastWords); Y.block += b; say(f, `[Last Words: +${b} Block.]`, 'class'); }
@@ -1196,6 +1510,7 @@ function heal(f, X, v) {
 function gainBlock(f, X, v) {
   v = Math.round(v); if (v <= 0) return;
   X.block += v;
+  if (X.P.blockThorns) X.thorns += v * X.P.blockThorns;
   if (X.P.blockStrike) { const Y = opp(f, X); if (Y.hp > 0) hit(f, X, Y, v * X.P.blockStrike, { noCrit: 1, noDodge: 1, isThorns: true, src: 'Bastion' }); }
 }
 // --- statuses and reactions ---
@@ -1228,7 +1543,7 @@ function react(f, X, Y, kind) {
     reactName(f, X, Y, 'cauterise', 'Cauterise', 'Bleed is seared away and Burn doubles.');
     if (X.P.reactHeal) heal(f, X, X.P.reactHeal);
   }
-  if (Y.bleed > 0 && Y.marked > 0 && !Y.hemo) { Y.hemo = true; reactName(f, X, Y, 'hemorrhage', 'Hemorrhage', 'Bleed deals double while Marked.'); }
+  if (Y.bleed > 0 && Y.marked > 0 && !Y.hemo) { Y.hemo = true; reactName(f, X, Y, 'hemorrhage', 'Haemorrhage', 'Bleed deals double while Marked.'); }
   if (Y.stun > 0 && Y.weaken > 0 && Y.brokenT <= 0) { Y.brokenT = 2; reactName(f, X, Y, 'broken', 'Broken', `${Y.isPlayer ? 'You take' : Y.name + ' takes'} 50% more damage.`); }
   if (Y.poison > 0 && Y.leechT > 0 && !Y.blight) { Y.blight = true; reactName(f, X, Y, 'blight', 'Blight', 'Leech drains double.'); }
   if (Y.doomT > 1 && !Y.doomHastened && effectCount(Y) >= 2) { Y.doomHastened = true; Y.doomT--; reactName(f, X, Y, 'hastened', 'Hastened Doom', 'Doom lands a turn sooner.'); }
@@ -1255,12 +1570,16 @@ function isBig(f, Y) {
 function interrupt(f, X, Y, stunned) {
   if (Y.isPlayer || !Y.intent || Y.interrupted) return;
   const s = Y.intent;
-  if (X.isPlayer && isBig(f, Y)) f.tally.bigStopped++;
+  if (X.isPlayer && isBig(f, Y)) {
+    f.tally.bigStopped++;
+    if (X.P.stormBreak) { X.empower = Math.max(X.empower, 3); say(f, '[Stormcaller: big attack broken. Empowered for 2 turns.]', 'skill'); }
+  }
   s.cd = Math.max(s.cd, 2); Y.interrupted = s.def.name;
   say(f, `[${s.def.name} interrupted! It goes on cooldown.]`, 'skill'); ev(f, { k: 'interrupt', side: Y.side, name: s.def.name });
   if (X.isPlayer) f.tally.stuns++;
   if (X.P.stunDmg) hit(f, X, Y, X.P.stunDmg, { noCrit: 1, noDodge: 1, isThorns: true, src: 'Static' });
-  if (X.P.stunBlock) X.block += X.P.stunBlock;
+  if (X.P.stunEmpower) X.empower = Math.max(X.empower, X.P.stunEmpower + 1);
+  if (X.P.stormBreak && Y.block > 0) { say(f, `[Stormcaller: ${Math.round(Y.block)} Block shattered.]`, 'skill'); Y.block = 0; }
   if (X.P.stunBurn) addStatus(f, X, Y, 'burn', X.P.stunBurn);
   if (X.P.stunHeal) heal(f, X, X.P.stunHeal);
   if (!stunned) planIntent(f, Y);
@@ -1307,7 +1626,7 @@ function useSkill(f, X, s, opt) {
     if (fx.execute && Y.hp / Y.maxHp <= fx.execute) base *= fx.execMult;
     const hits = fx.hits || 1;
     for (let i = 0; i < hits && Y.hp > 0; i++) {
-      dealt += hit(f, X, Y, base * m, { pierce: fx.pierce, critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
+      dealt += hit(f, X, Y, base * m, { pierce: fx.pierce || (X.P.reapPierce && half(Y)), critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
       if (fx.perHit) applyStatus(f, X, Y, fx, p);
       if (hits >= 2 && X.P.hitBurn) addStatus(f, X, Y, 'burn', X.P.hitBurn);
     }
@@ -1324,7 +1643,7 @@ function useSkill(f, X, s, opt) {
   if (fx.empower) X.empower = Math.max(X.empower, fx.empower + 1);
   if (fx.evade) X.evade += fx.evade;
   if (fx.nextCrit) X.critNext = true;
-  if (fx.thorns) X.thorns = fx.thorns * p;
+  if (fx.thorns) X.thorns = Math.max(X.thorns, fx.thorns * p);
   if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); X.burn = 0; X.poison = 0; X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
   if (ls && dealt > 0) heal(f, X, dealt * ls);
@@ -1387,7 +1706,7 @@ function startTurn(f, X, first) {
     const v = Math.round(X.poison * (Y.P.poisonMult || 1));
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
-    if (Y.P.poisonHeal) heal(f, Y, v * Y.P.poisonHeal);
+    if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
   }
   checkRevive(f, X);
   if (X.hp <= 0) return false;
@@ -1586,7 +1905,7 @@ function describe(def, p = 1) {
 const REACTIONS = {
   flare: { name: 'Toxic Flare', pair: 'Burn + Poison', text: 'Applying Burn to a Poisoned target ignites the Poison for half its value as damage. Once per turn.' },
   cauterise: { name: 'Cauterise', pair: 'Burn + Bleed', text: 'Bleed is seared away and Burn doubles.' },
-  hemorrhage: { name: 'Hemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
+  hemorrhage: { name: 'Haemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
   broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'The target takes 50% more damage until the end of their next turn.' },
   blight: { name: 'Blight', pair: 'Poison + Leech', text: 'Leech drains double.' },
   hastened: { name: 'Hastened Doom', pair: 'Doom + 2 other effects', text: 'Doom lands a turn sooner.' },
@@ -1594,12 +1913,13 @@ const REACTIONS = {
 
 // ---------- After a fight ----------
 function resolveFight(run, f, meta, rng) {
-  const msgs = [], won = f.winner === 'A', spec = f.spec;
+  const msgs = [], won = f.winner === 'A', spec = f.spec, lr = stream(run, 'loot', rng);
   bindMeta(meta);
   run.hp = Math.max(0, f.A.hp);
   if (f.usedBreath) run.usedBreath = true;
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
+  if (spec.kind === 'rival' && won) meta.archive.beat[spec.id] = true;
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
   const res = { won, gold: 0, xp: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
@@ -1615,7 +1935,7 @@ function resolveFight(run, f, meta, rng) {
     if (ok) {
       const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0);
       run.gold += pay; run.wagersWon = (run.wagersWon || 0) + 1;
-      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, rng);
+      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, lr);
       if (run.wagersWon >= 3) earnTitle(run, 'high_roller', msgs);
     }
     else msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.]` });
@@ -1640,15 +1960,16 @@ function resolveFight(run, f, meta, rng) {
   if (T.reactions >= 3) earnTitle(run, 'alchemist', msgs);
   if (T.bigHit >= 60) earnTitle(run, 'executioner', msgs);
   questEvent(run, 'fight', { f, won, spec }, msgs);
+  if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
     run.wins++;
     res.gold = 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
-    run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF));
-    if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
-    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, rng) });
-    if (spec.hard) { run.bonusSlot = rollPiece(run, rng, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
-    if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), rng); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
+    run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
+    if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
+    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr) });
+    if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
       run.eliteWins++;
       if (run.eliteIdx >= run.eliteBracket.length - 1) { res.eliteOver = true; res.eliteCleared = true; }
@@ -1660,25 +1981,38 @@ function resolveFight(run, f, meta, rng) {
     else {
       const cost = heartCost(run, spec);
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
-      if (run.hearts <= 0) { run.hearts = 0; res.death = true; run.cause = f.B.name; }
-      else {
+      if (run.hearts <= 0) {
+        run.hearts = 0; res.death = true; run.cause = f.B.name;
+        // At 0 Hearts every entry left goes, then the world's name
+        res.erased = eraseRecord(run, REC_MAX, msgs);
+        if (run.record) msgs.push({ t: 'loss', text: `[World: ${'█'.repeat(run.world.name.length)}. Status: erased.]` });
+      } else {
         run.hp = Math.max(run.hp, Math.round(maxHp(run) * 0.5));
         msgs.push({ t: 'loss', text: `[Defeat. A piece of ${run.world.name} is erased. −${cost} Heart${cost > 1 ? 's' : ''}, ${run.hearts} left.]` });
+        res.erased = eraseRecord(run, cost, msgs);
         if (spec.kind === 'final') msgs.push({ t: 'loss', text: '[The Final Champion waits. You must win to spare your world.]' });
         else run.round++;
       }
     }
   }
-  if (won && spec.snap && spec.snap.owner) res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
+  if (won && spec.snap && spec.snap.owner) res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
+  // A shared champion that beats you earns its owner's champion RP (see champWin)
+  if (!won && spec.snap && spec.snap.owner) res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
   if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
   return res;
 }
 function startElite(run, meta, rng) {
   run.elite = true; run.eliteIdx = 0;
-  const champs = meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
+  const champs = run.seed ? [] : meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
   const first = champs.length ? { kind: 'champion', snap: pick(champs, rng) } : { kind: 'legend', id: 'legend' };
   run.eliteBracket = [first, { kind: 'legend', id: 'undefeated' }];
+  // From A-rank the bracket gets a middle fight: another spared champion, or Varn when there isn't one
+  if (!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A')) {
+    const rest = champs.filter(c => !first.snap || c.at !== first.snap.at);
+    const mid = rest.length ? { kind: 'champion', snap: pick(rest, rng) } : first.kind === 'legend' ? null : { kind: 'legend', id: 'legend' };
+    if (mid) run.eliteBracket.splice(1, 0, mid);
+  }
   run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * 0.3));
   enterChoose(run, meta, rng);
 }
@@ -1689,22 +2023,212 @@ function echoesFor(run, outcome) {
   return e;
 }
 function endRun(run, meta, outcome) {
+  if (outcome === 'erased') { run.hearts = 0; eraseRecord(run, REC_MAX); } // an abandoned world goes all at once
   const snap = snapshot(run);
+  if (meta.rank && !run.practice) Object.assign(snap, { rank: meta.rank.letter, rp: 0, kills: 0 });
   if (outcome === 'erased') { meta.erased.unshift(snap); meta.erased = meta.erased.slice(0, 20); }
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
+  const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
-  return { echoes: e, snap };
+  return { echoes: e, snap, rp: rk.rp, trial: rk.trial };
+}
+
+// ---------- Entrant Rank ----------
+// A permanent grade from F to S, with SS and SSS hidden above. RP opens a Rank Trial; only passing it promotes. Rank never goes down.
+const RANK_LADDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
+const RANK_RP = { E: 80, D: 300, C: 700, B: 1400, A: 2600, S: 4500, SS: 7000, SSS: 10000 }; // SS and SSS are placeholders
+const TRIAL_ROUND = { E: 3, D: 3, C: 4, B: 4, A: 5, S: 6, SS: 6, SSS: 6 };
+const TRIAL_CONDS = ['fast', 'react', 'stop', 'healthy']; // never "without healing": Zealot and Leech builds can't meet it
+const PERKS = {
+  stipend: { name: "Sponsor's Stipend", desc: '+1 starting gold.', flavour: 'A god has started sending pocket money.' },
+  kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start." },
+  steeped: { name: 'Steeped Blades', desc: 'Poison you apply +1.', flavour: 'Your edges never quite dry.' },
+  whetted: { name: 'Whetted Edge', desc: 'Bleed you apply +1.', flavour: 'Sharper than it needs to be.' },
+  guard: { name: 'Drilled Guard', desc: 'Start each fight with 5 Block.', flavour: 'Your shield is up before the bell.' },
+  frame: { name: 'Seasoned Frame', desc: '+8 max HP.', flavour: 'Scar tissue counts.' },
+  keen: { name: 'Keen Eye', desc: '+4% critical chance.', flavour: 'You see the gap a moment sooner.' },
+  light: { name: 'Light Feet', desc: '+3% dodge.', flavour: 'Harder to pin down than you used to be.' },
+  dressing: { name: 'Field Dressing', desc: 'Heal 6 more after each won fight.', flavour: 'You patch yourself up between bouts.' },
+  redraft: { name: 'Second Draft', desc: 'One extra opening draft reroll.', flavour: 'The System lets you look twice.' },
+  patron: { name: "Patron's Ear", desc: 'Start with +1 Favour with your Patron.', flavour: 'Your god remembers your name.' },
+  ledger: { name: 'Ledger Sense', desc: 'Interest cap +1.', flavour: 'You count your gold the way the Official does.' },
+};
+const TRIAL_TEXT = {
+  E: ['[Promotion match: prove you are not an accident.{c}]', '[Promoted to E-rank. The System is mildly surprised.]', '[Trial failed. F-rank retained. Try again next world.]'],
+  D: ['[Promotion match: defeat a D-rank Proctor.{c}]', '[Promoted to D-rank. Your file has been upgraded to paper.]', '[Trial failed. The Proctor will wait.]'],
+  C: ['[Promotion match: defeat a C-rank Proctor.{c}]', '[Promoted to C-rank. Rivals have been informed.]', '[Trial failed. D-rank retained.]'],
+  B: ['[Promotion match: defeat a B-rank Proctor.{c} The gods are watching.]', '[Promoted to B-rank. The gods have adjusted their odds.]', '[Trial failed. The gods have collected their bets.]'],
+  A: ['[Promotion match: defeat an A-rank Proctor.{c} Few pass.]', '[Promoted to A-rank. Final Champions have been notified.]', '[Trial failed. Few pass. You remain few-adjacent.]'],
+  S: ['[Final promotion match: defeat an S-rank Proctor.{c} There is no rank above S.]', '[Promoted to S-rank. There is no rank above S.]', '[Trial failed. A-rank retained. S-rank remains theoretical.]'],
+  SS: ['[Promotion match: ███-rank Proctor. Rank not found.{c}]', '[Promoted to SS-rank. Record updated. Record should not exist.]', '[Trial failed. Record not created.]'],
+  SSS: ["[Promotion match. The Proctor has no rank. The Proctor has never lost.{c}]", '[Promoted to SSS-rank. The System has run out of letters.]', "[Trial failed. The Proctor's record remains unbroken.]"],
+};
+const COND_TEXT = { fast: 'Win within 6 turns.', react: 'Trigger 2 reactions.', stop: "Stun or Interrupt the Proctor's big move.", healthy: 'Win with more than half your HP.' };
+function newRank() { return { letter: 'F', rp: 0, trial: null, history: [], perks: [] }; }
+function rankIdx(l) { return RANK_LADDER.indexOf(l); }
+function nextRank(l) { return RANK_LADDER[rankIdx(l) + 1] || null; }
+function hasPerk(run, k) { return !!(run.perks && run.perks.includes(k)); }
+// World offers go up to one rank above yours: F and E see E and D worlds, C opens B worlds, A opens S worlds
+// A meta without a rank (the balance tools) is not gated.
+function worldCap(meta) { const r = meta && meta.rank; return r ? Math.min(5, Math.max(1, rankIdx(r.letter))) : null; }
+// Saves from before Entrant Rank start at F with RP from their Halls, so a returning player's first trials come quickly
+function sanitizeRank(r, m) {
+  const out = newRank();
+  if (r && typeof r === 'object') {
+    if (rankIdx(r.letter) >= 0) out.letter = r.letter;
+    out.rp = Math.max(0, Math.floor(+r.rp || 0));
+    out.trial = r.trial && rankIdx(r.trial) === rankIdx(out.letter) + 1 ? r.trial : null;
+    out.history = Array.isArray(r.history) ? r.history.filter(h => h && rankIdx(h.to) > 0).slice(-12) : [];
+    out.perks = Array.isArray(r.perks) ? r.perks.filter(k => PERKS[k]).filter((k, i, a) => a.indexOf(k) === i) : [];
+    return out;
+  }
+  const pay = (x, spared) => 10 * (x.wins || 0) + Math.max(0, x.hearts || 0) + (spared ? 20 : 0);
+  out.rp = (m.erased || []).reduce((a, x) => a + pay(x, false), 0) + (m.champions || []).reduce((a, x) => a + pay(x, true), 0);
+  if (out.rp >= RANK_RP.E) out.trial = 'E';
+  return out;
+}
+// RP for a finished run: 10 a win, 1 a Heart left, 20 for a spared world, times the world's rank (E ×1 up to S ×2)
+function rpFor(run, outcome) {
+  const spared = outcome !== 'erased';
+  return Math.round((10 * (run.wins || 0) + Math.max(0, run.hearts) + (spared ? 20 : 0)) * (1 + 0.2 * run.world.rank));
+}
+function awardRank(run, meta, outcome) {
+  if (run.practice || !meta.rank) return { rp: 0, trial: null };
+  const R = meta.rank, rp = rpFor(run, outcome); R.rp += rp;
+  const left = run.pending.find(p => p.type === 'perk'); if (left) choosePerk(run, meta, left.offers[0]); // a run that ends before the choice keeps the first perk
+  if (run.promoted) R.history.push({ to: run.promoted, world: run.world.name, outcome, lost: run.record ? run.record.ids.length - recLeft(run.record) : 0, at: Date.now() });
+  R.history = R.history.slice(-12);
+  return { rp, trial: openTrial(R) };
+}
+function openTrial(R) { const nx = nextRank(R.letter); if (R.trial || !nx || R.rp < RANK_RP[nx]) return null; R.trial = nx; return nx; }
+// Elite wins come after the spared world is filed, so they pay their RP when the run closes
+function eliteRank(run, meta) {
+  if (run.practice || !meta.rank || !run.eliteWins) return { rp: 0, trial: null };
+  const rp = Math.round(10 * run.eliteWins * (1 + 0.2 * run.world.rank)); meta.rank.rp += rp;
+  run.rpEarned = (run.rpEarned || 0) + rp; run.trialOpened = run.trialOpened || openTrial(meta.rank);
+  return { rp, trial: run.trialOpened };
+}
+function trialSpec(run, rng) {
+  const to = run.trial.to, early = rankIdx(to) <= rankIdx('D');
+  const conds = TRIAL_CONDS.filter(k => k !== 'stop' || canStop(run));
+  return { kind: 'trial', id: 'proctor', to, hard: !early, cond: early ? null : pick(conds, rng) };
+}
+// The Proctor fights at the world rank of the grade it examines: E-rank at E worlds up to S-rank (and beyond) at S
+function trialMul(run, spec) { const w = Math.min(5, rankIdx(spec.to) - 1); return (0.92 + 0.05 * w) / (0.92 + 0.05 * run.world.rank); }
+function trialLine(to, i, cond) { return TRIAL_TEXT[to][i].replace('{c}', cond ? ' ' + COND_TEXT[cond] : ''); }
+function perkOffers(meta, rng) { return shuffle(Object.keys(PERKS).filter(k => !meta.rank.perks.includes(k)), rng).slice(0, 2); }
+// A lost fight costs the round's normal Hearts as usual. A won fight that misses the condition costs nothing. Either way the trial waits for the next run.
+function settleTrial(run, f, won, meta, msgs, rng) {
+  const spec = f.spec, ok = won && (!spec.cond || WAGERS[spec.cond].check(f));
+  run.trial.done = true;
+  if (!ok) { msgs.push({ t: 'loss', text: trialLine(spec.to, 2) }); return { ok, to: spec.to }; }
+  const R = meta.rank; R.letter = spec.to; R.trial = null; run.promoted = spec.to;
+  msgs.push({ t: 'class', text: trialLine(spec.to, 1) });
+  const offers = perkOffers(meta, rng);
+  if (offers.length) run.pending.push({ type: 'perk', offers, to: spec.to });
+  return { ok, to: spec.to };
+}
+// Lines from the lore thread (entrant-rank.md). {champ} is the champion's name.
+const RANK_ADDRESS = {
+  F: ['[F-rank Entrant. Your world has been noted.]', '[F-rank. Expectations have been set accordingly.]'],
+  E: ['[E-rank Entrant. You are now slightly harder to forget.]', '[E-rank. The System has learned your number.]'],
+  D: ['[D-rank Entrant. The crowd has started betting on you. Small amounts.]', '[D-rank. Your file has been moved to a thicker folder.]'],
+  C: ['[C-rank Entrant. Rivals have begun to read your record.]', '[C-rank. Competent. The System does not say this often.]'],
+  B: ['[B-rank Entrant. The gods have stopped laughing during your fights.]', '[B-rank. Your worlds are judged with some reluctance.]'],
+  A: ['[A-rank Entrant. Final Champions have been informed.]', '[A-rank. The System is watching more closely. For your benefit.]'],
+  S: ['[S-rank Entrant {champ}. The tournament knows your name.]', '[S-rank. There is no higher rank. Records indicate otherwise.]'],
+  SS: ['[SS-rank. This rank was not supposed to be reachable.]', '[SS-rank Entrant. Several records have been unsealed for you.]'],
+  SSS: ['[SSS-rank. The Undefeated has been notified.]', '[SSS-rank Entrant {champ}. The System has no further grades. It is making one up.]'],
+};
+// below: you're below them; level; above: you outrank them; grudge: you've beaten them before
+const RIVAL_LINES = {
+  grukk: { below: 'Little rank. Grukk go easy. Grukk not know how, but try.', level: 'Same letter as Grukk! Good. Fair fight. Grukk still win.', above: 'Big letter. Grukk lose to big letters lots. Grukk not mind.', grudge: 'You beat Grukk before. Grukk remember. Grukk get up again.' },
+  calder: { below: "A lower rank. I'll observe the rules all the same.", level: 'An equal. Salute, and we begin properly.', above: 'Outranked. Then it will be an honour to lose correctly.', grudge: "You beat me last time. I've filed a complaint. Shall we?" },
+  seraphine: { below: "You're new. Shield up. I won't hold back, but I'll pray for you after.", level: 'A worthy rank. My faith against yours, then.', above: "So high already. Remember who you're fighting for.", grudge: "You beat me once. I've been praying about that." },
+  lyss: { below: "A low rank. You won't even notice the poison.", level: "Same grade. Then I'll have to actually try. How dull.", above: 'Ooh, a high rank. Did you drink your water today?', grudge: "You again. I've switched to a stronger poison." },
+  kaito: { below: "Your rank is low. Your habits are lower. I've seen them before.", level: "We're equals. That's never happened in this tournament.", above: "You outrank me. Then you've seen what I've seen. Be careful.", grudge: "You beat me. I've studied that fight. Show me something new." },
+};
+const FINAL_GREET = {
+  leviathan: '{champ}. Even the deep has heard of you. It will still take you.',
+  kharros: '{champ}. At last, an enemy worth a war. I will not insult you with mercy.',
+  bone_saint: '{champ}. I have prayed for you. Lie down, and let me finish the prayer.',
+  thorn_mother: '{champ}. The forest has been saving a place for you.',
+  archmage: "{champ}. Ah. You're the first thing I've had to look up at in centuries.",
+  forge_king: '{champ}. I had the gates reinforced when I heard you were coming.',
+};
+function rankAddress(meta, champ, n) { const L = RANK_ADDRESS[meta.rank.letter]; return L[(n || 0) % L.length].replace('{champ}', champ || 'Entrant'); }
+// The fight intro, rank against rank. Returns the lines to show after "[X enters the arena.]"; the System's own lines are bracketed.
+function rankIntro(run, meta, spec, foeName) {
+  if (!meta.rank || run.practice) return [];
+  const me = meta.rank.letter, champ = run.name, out = [];
+  if (spec.id === 'undefeated') return rankIdx(me) >= rankIdx('SS') ? [{ t: 'loss', text: `[Entrant record for the Undefeated: ERROR. Entrant record for ${champ}: ERROR.]`, replaces: 'sealed' }] : [];
+  const foe = specRank(spec, meta);
+  if (foe) {
+    const gap = rankIdx(me) - rankIdx(foe);
+    const tail = gap <= -2 ? 'Mismatch logged. The System accepts no complaints.' : gap >= 2 ? 'Mismatch logged. Please try not to embarrass them.' : gap < 0 ? 'The odds have been adjusted against you.' : gap > 0 ? 'The crowd expects a short fight.' : 'An even match, on paper.';
+    out.push({ t: 'sys', text: `[${me}-rank Entrant vs ${foe}-rank ${spec.kind === 'trial' ? 'Proctor' : foeName}. ${tail}]` });
+    const R = spec.kind === 'rival' && RIVAL_LINES[spec.id];
+    if (R) out.push({ t: 'foe', text: `"${meta.archive.beat[spec.id] ? R.grudge : gap < 0 ? R.below : gap > 0 ? R.above : R.level}"` });
+    if (spec.id === 'masked') out.push(meta.archive.beat.masked ? { t: 'loss', text: '[The Masked Entrant has copied your record. Including the loss.]' } : { t: 'sys', text: `[Entrant rank: ${me}. Entrant rank: ${me}.]` });
+  }
+  if (spec.kind === 'final' && rankIdx(me) >= rankIdx('S') && FINAL_GREET[spec.id]) out.push({ t: 'foe', text: `"${FINAL_GREET[spec.id].replace('{champ}', champ)}"` });
+  if (spec.kind === 'trial') out.unshift({ t: 'class', text: trialLine(spec.to, 0, spec.cond) });
+  return out;
+}
+// The Halls' rank history, one line per promotion
+function historyLine(h) {
+  if (h.daily) return `[Promoted to ${h.to}-rank in the Pending World.]`;
+  if (h.outcome === 'erased') return `[Promoted to ${h.to}-rank. ${h.world} was erased on the way.]`;
+  return h.lost ? `[Promoted to ${h.to}-rank. ${h.world} was spared, missing ${h.lost} entr${h.lost === 1 ? 'y' : 'ies'}.]` : `[Promoted to ${h.to}-rank. ${h.world} was spared without a scratch.]`;
+}
+// Champion rank: a filed champion keeps its Entrant's rank, earns 10 RP for each win in another Entrant's tournament,
+// and climbs a letter every 30 RP, up to S. Returns the System's line for the owner, or null.
+const CHAMP_STEP = 30;
+function champWin(snap, spared) {
+  snap.kills = (snap.kills || 0) + 1; snap.rp = (snap.rp || 0) + 10;
+  let up = false;
+  while (snap.rp >= CHAMP_STEP && rankIdx(snap.rank || 'F') < rankIdx('S')) { snap.rp -= CHAMP_STEP; snap.rank = nextRank(snap.rank || 'F'); up = true; }
+  const who = snap.champ, n = snap.kills;
+  if (spared) return up ? `[Your champion ${who}, now ${snap.rank}-rank, has defended the elite bracket ${n} time${n === 1 ? '' : 's'}.]` : null;
+  if (up) return `[Your erased champion ${who}, now ${snap.rank}-rank, has erased ${n} world${n === 1 ? '' : 's'}.]`;
+  return n === 1 ? `[Your erased champion ${who} has erased a world in another Entrant's tournament.]` : null;
+}
+// Pending World seasons: one week, Monday to Monday on the game-day clock. Each daily top-10 place pays points,
+// and every posted score pays 1. The week's top Entrant is the Prime Entrant until the next season closes.
+const SEASON_PTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const SEASON_TITLE = 'Prime Entrant';
+function weekOf(date) { const d = Date.parse(date + 'T00:00:00Z'), back = (new Date(d).getUTCDay() + 6) % 7; return new Date(d - back * 864e5).toISOString().slice(0, 10); }
+function weekDates(start) { const d = Date.parse(start + 'T00:00:00Z'); return Array.from({ length: 7 }, (_, i) => new Date(d + i * 864e5).toISOString().slice(0, 10)); }
+// days: one list per game day, each sorted best first (the day's top 20). Later days set the name, sigil and rank shown.
+function seasonTable(days) {
+  const by = {};
+  days.forEach(rows => (rows || []).forEach((r, i) => {
+    const e = by[r.uid] = by[r.uid] || { uid: r.uid, pts: 0, days: 0, best: 0 };
+    e.pts += (SEASON_PTS[i] || 0) + 1; e.days++; e.best = Math.max(e.best, r.score || 0);
+    Object.assign(e, { name: r.name, sigil: r.sigil, color: r.color, rank: r.rank || null });
+  }));
+  return Object.values(by).sort((a, b) => b.pts - a.pts || b.best - a.best || (a.uid < b.uid ? -1 : 1));
+}
+function choosePerk(run, meta, k, msgs) {
+  const i = run.pending.findIndex(p => p.type === 'perk'); if (i < 0) return false;
+  const p = run.pending[i]; if (!p.offers.includes(k) || meta.rank.perks.includes(k)) return false;
+  run.pending.splice(i, 1); meta.rank.perks.push(k);
+  msgs && msgs.push({ t: 'class', text: `[Class advancement: ${PERKS[k].name}. Active from your next world.]` });
+  return true;
 }
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
+  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
+  mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
-  makeChoices, specName, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, resolveEvent, prefixTargets, applyPrefix,
+  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower,
