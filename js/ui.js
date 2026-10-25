@@ -905,12 +905,21 @@ async function cloudInit() {
     await checkRests();
     if (cloud.status === 'syncing') cloud.status = 'synced';
     render();
-  } catch (e) { cloud.status = 'local'; }
+  } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }
+}
+// Cloud errors: always logged; the player sees one notice per kind per session, so friends can report it
+const CLOUD_FAIL_TEXT = { sync: 'Cloud save failed. Your progress is kept on this device.', share: 'Shared champions could not be reached.' };
+function cloudFail(kind, where, e) {
+  const code = (e && e.code) || 'unknown';
+  console.warn(`[cloud] ${where} failed:`, code, e);
+  if (code === 'unavailable') return; // network drop: expected, saves retry and stay on the device
+  cloud.failShown = cloud.failShown || {}; if (cloud.failShown[kind]) return;
+  cloud.failShown[kind] = true; toast(`[${CLOUD_FAIL_TEXT[kind]} (${code})]`, 'loss');
 }
 function progressDoc() { return cloud.db.doc('data/users/' + cloud.uid + '/progress'); }
 async function pullProgress() {
   let snap;
-  try { snap = await progressDoc().get(); } catch (e) { cloud.syncOff = true; cloud.status = 'local'; return; }
+  try { snap = await progressDoc().get(); } catch (e) { cloud.syncOff = true; cloud.status = 'local'; cloudFail('sync', 'load progress', e); return; }
   const r = snap.exists ? snap.data() : null;
   let changed = false;
   if (r && r.meta && (r.meta.savedAt || 0) > (meta.savedAt || 0) && !realMeta) {
@@ -937,13 +946,14 @@ async function pushProgress() {
   } catch (e) {
     if (e && (e.code === 'invalid_argument' || e.code === 'revoked' || e.code === 'not_granted')) { cloud.syncOff = true; cloud.status = 'local'; }
     else if (e && e.code === 'unavailable') setTimeout(schedulePush, 4000 + Math.random() * 3000);
+    cloudFail('sync', 'save progress', e);
   }
   cloud.pushing = false;
   if (cloud.again) { cloud.again = false; schedulePush(); }
 }
 async function resolveNames(ids) {
   ids = ids.filter(id => id && !(id in cloud.names)); if (!ids.length || !cloud.user) return;
-  try { const ps = await cloud.user.profiles(ids); ids.forEach(id => cloud.names[id] = (ps[id] && ps[id].name) || ''); } catch (e) { }
+  try { const ps = await cloud.user.profiles(ids); ids.forEach(id => cloud.names[id] = (ps[id] && ps[id].name) || ''); } catch (e) { console.warn('[cloud] names failed:', e && e.code, e); }
 }
 function ownerName(id) { return cloud.names[id] || 'another entrant'; }
 async function loadShared() {
@@ -960,7 +970,7 @@ async function loadShared() {
     });
     setShared(erased, spared); cloud.shared = all;
     await resolveNames(all.map(x => x.snap.owner));
-  } catch (e) { }
+  } catch (e) { cloudFail('share', 'load shared champions', e); }
 }
 async function shareChampion(snap, kind) {
   if (!cloud.on || cloud.shareOff) return false;
@@ -972,7 +982,7 @@ async function shareChampion(snap, kind) {
     await ref.set({ list: list.slice(0, 12) });
     meta.shared = meta.shared || {}; meta.shared[snap.at] = true; saveMeta();
     return true;
-  } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; return false; }
+  } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; cloudFail('share', 'share champion', e); return false; }
 }
 async function recordRest(r) {
   if (!cloud.on || cloud.shareOff) return;
@@ -982,7 +992,7 @@ async function recordRest(r) {
     const list = cur.exists && Array.isArray(cur.data().list) ? cur.data().list.slice() : [];
     list.unshift({ to: r.owner, champ: String(r.champ).slice(0, 60), at: r.at, t: Date.now() });
     await ref.set({ list: list.slice(0, 40) });
-  } catch (e) { }
+  } catch (e) { cloudFail('share', 'record rest', e); }
 }
 async function checkRests() {
   if (!cloud.on) return;
@@ -994,7 +1004,7 @@ async function checkRests() {
     await resolveNames(notes.map(n => n.by));
     notes.sort((a, b) => a.t - b.t).forEach(n => { meta.echoes += 3; logToast(`[${n.champ} was laid to rest by ${ownerName(n.by)}. +3 Echoes.]`); });
     meta.restSeen = Math.max(...notes.map(n => n.t)); saveMeta();
-  } catch (e) { }
+  } catch (e) { cloudFail('share', 'check rests', e); }
 }
 function logToast(text) { toast(text, 'broadcast'); }
 // Web version: Firebase sign-in state
