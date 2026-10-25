@@ -72,12 +72,13 @@ p { margin: 0; }
 /* Mid-run, the title holds Continue, Abandon and the Pending World note, so the pitch gives way */
 .title.resume .lede { display: none; }
 @media (max-height: 820px) { .title:not(.end) { padding-block: 20px 14px; } }
-@media (max-height: 700px) { .title:not(.end) { padding-block: 16px 12px; } .title:not(.end) .lede { display: none; } .title:not(.end) .t-top { gap: 10px; } .title:not(.end) .stack { gap: 7px; } .title:not(.end) .t-stats div { padding: 6px 8px; } }
+@media (max-height: 700px) { .title:not(.end) { padding-block: 16px 12px; } .title:not(.end) .lede { display: none; } .title:not(.end) .t-top { gap: 10px; } .title:not(.end) .stack { gap: 7px; } .title:not(.end) .t-stats > * { padding: 6px 8px; } }
 .logo .brk { -webkit-text-fill-color: var(--sys); color: var(--sys); text-shadow: 0 0 18px rgba(114,208,255,.35); }
 .title h1 { font-size: clamp(44px, 13vw, 64px); line-height: .95; letter-spacing: .03em; text-transform: uppercase; background: linear-gradient(180deg, #fff3dc 20%, var(--bronze) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .lede { color: var(--muted); font-size: 16px; }
-.t-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.t-stats div { border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: grid; gap: 2px; background: var(--panel); }
+.t-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.t-stats button { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.t-stats > * { border: 1px solid var(--line); border-radius: 6px; padding: 10px; display: grid; gap: 2px; background: var(--panel); }
 .t-stats b { font-family: var(--f-d); font-size: 22px; font-weight: 400; color: var(--bronze); overflow-wrap: anywhere; }
 .t-stats span { font-size: 12px; color: var(--muted); }
 
@@ -443,7 +444,7 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .rc-l { font-size: 13px; color: var(--muted); } .rc-l span { font-family: var(--f-m); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-right: 8px; }
 .cards { display: grid; gap: 8px; }
 .end .t-top { gap: 12px; } .center { text-align: center; }
-@media (max-height: 700px) { .end { padding-block: 14px 12px; gap: 10px; } .end h1 { font-size: 40px; } .end .sysbox p + p { display: none; } .end .t-stats div { padding: 6px 8px; } .end .t-stats b { font-size: 18px; } .end .rc-l:nth-of-type(n+5) { display: none; } }
+@media (max-height: 700px) { .end { padding-block: 14px 12px; gap: 10px; } .end h1 { font-size: 40px; } .end .sysbox p + p { display: none; } .end .t-stats > * { padding: 6px 8px; } .end .t-stats b { font-size: 18px; } .end .rc-l:nth-of-type(n+5) { display: none; } }
 .toast.t-broadcast { color: #1a1208; background: linear-gradient(180deg, #ffe39a, #d6a04f); border-color: #ffe39a; font-weight: 500; box-shadow: 0 0 24px rgba(214,160,79,.5); }
 .msgs li.t-broadcast { color: var(--bronze); font-family: var(--f-m); font-size: 13px; }
 .log p.t-broadcast { color: var(--bronze); }
@@ -568,3 +569,7 @@ button.brow:active { background: var(--panel); }
 .cmp h4 { margin: 0 0 4px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmp ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .cmp li { font-size: 12.5px; line-height: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Entrant Rank */
+.crest.k-trial { border-color: var(--sys); color: var(--sys); }
+.rank-hist { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 3px; font-family: var(--f-m); font-size: 12px; color: var(--sys); }
