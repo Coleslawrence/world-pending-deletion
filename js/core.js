@@ -21,7 +21,7 @@ const ARCH = {
   bastion: { name: 'Bastion', stat: 'VIT', theme: 'Block and Thorns', path: 'Bulwark', b: ['Keep 25% of your Block between turns.', 'Always have 4 Thorns.', 'Gaining Block also deals half of it as damage.'] },
   arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown. Your other skills: 1 turn shorter for every 8 INT (minimum 1).', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
   zealot: { name: 'Zealot', stat: 'VIT', theme: 'Healing and Regen', path: 'Saint', b: ['Healing +10%.', 'Heal 2 at the start of each of your turns (grows with level).', 'Overhealing becomes Block.'] },
-  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Reaper', b: ['+25% damage to opponents below half HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
+  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Reaper', b: ['Opponents below half HP take 25% more damage from you, and your hits ignore their Block. The first time you hit an opponent below half HP, heal 15% of your max HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
   storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 12 damage plus your STR and shatter the opponent\'s Block. Stopping a big attack Empowers you for 2 turns.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
 };
 const ARCH_KEYS = Object.keys(ARCH);
@@ -997,7 +997,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (t('bastion') >= 1) add('blockKeep', 0.25); if (t('bastion') >= 2) add('thornsAlways', Math.round(4 * lm)); if (t('bastion') >= 3) set('blockStrike', 0.5);
   if (t('arcanist') >= 1) { add('quickCd', 1); set('arcCd', 8); } if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
   if (t('zealot') >= 1) add('healPct', 0.1); if (t('zealot') >= 2) add('regen', Math.round(2 * lm)); if (t('zealot') >= 3) set('overhealBlock', 1);
-  if (t('reaper') >= 1) add('vsHalf', 0.25); if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
+  if (t('reaper') >= 1) { add('vsHalf', 0.25); set('reapPierce', 1); set('reapBlood', 0.15); } if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
   if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
   gearPieces.filter(Boolean).forEach(g => Object.entries(gearPas(g.id, g.star)).forEach(([k, v]) => { if (k === 'firstCrit' || k === 'firstStun' || k === 'firstEvade') set(k, 1); else add(k, k === 'stunDmg' || k === 'thornsAlways' || k === 'regen' || k === 'startBlock' ? Math.round(v * lm) : v); }));
   // Hidden Path
@@ -1446,6 +1446,7 @@ function hit(f, X, Y, raw, o = {}) {
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   const rest = d - absorbed;
   Y.hp -= rest;
+  if (X.P.reapBlood && !Y.bloodied && Y.hp > 0 && half(Y)) { Y.bloodied = true; heal(f, X, X.maxHp * X.P.reapBlood); say(f, '[Reaper: first blood. You feed on it.]', 'class'); } // Reaper: heal on bringing a foe below half
   if (Y.isPlayer) { f.tally.blocked += absorbed; f.tally.taken += rest; if (o.src) f.tally.hurtBy[o.src] = (f.tally.hurtBy[o.src] || 0) + rest; }
   if (X.isPlayer) { f.tally.bigHit = Math.max(f.tally.bigHit, d); if (o.src) f.dealt[o.src] = (f.dealt[o.src] || 0) + rest; if (Y.hp <= 0) f.tally.overkill = Math.max(f.tally.overkill, -Y.hp); }
   if (Y.lastWords && Y.hp > 0 && Y.hp < Y.maxHp * 0.25 && !Y.lwUsed) { Y.lwUsed = true; const b = Math.round(Y.maxHp * Y.lastWords); Y.block += b; say(f, `[Last Words: +${b} Block.]`, 'class'); }
@@ -1593,7 +1594,7 @@ function useSkill(f, X, s, opt) {
     if (fx.execute && Y.hp / Y.maxHp <= fx.execute) base *= fx.execMult;
     const hits = fx.hits || 1;
     for (let i = 0; i < hits && Y.hp > 0; i++) {
-      dealt += hit(f, X, Y, base * m, { pierce: fx.pierce, critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
+      dealt += hit(f, X, Y, base * m, { pierce: fx.pierce || (X.P.reapPierce && half(Y)), critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
       if (fx.perHit) applyStatus(f, X, Y, fx, p);
       if (hits >= 2 && X.P.hitBurn) addStatus(f, X, Y, 'burn', X.P.hitBurn);
     }
