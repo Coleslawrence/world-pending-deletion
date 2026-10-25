@@ -17,11 +17,11 @@ const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 const ARCH = {
   pyre: { name: 'Pyre', stat: 'INT', theme: 'Burn', path: 'Pyromancer', b: ['Burn on the opponent fades half as fast.', 'Burn you apply +4.', 'Burn on the opponent never fades.'] },
   venom: { name: 'Venom', stat: 'AGI', theme: 'Poison and drain', path: 'Plaguebringer', b: ['Poison you apply +1.', 'Poison you apply +1 more.', 'Poison deals 50% more damage.'] },
-  blade: { name: 'Bladedancer', stat: 'AGI', theme: 'Bleed and multi-hit', path: 'Bladedancer', b: ['Multi-hit skills hit once more.', 'Bleed you apply +2.', 'Bleed deals double damage.'] },
+  blade: { name: 'Bladedancer', stat: 'AGI', theme: 'Bleed and multi-hit', path: 'Bladesinger', b: ['Multi-hit skills hit once more.', 'Bleed you apply +2.', 'Bleed deals double damage.'] },
   bastion: { name: 'Bastion', stat: 'VIT', theme: 'Block and Thorns', path: 'Bulwark', b: ['Keep 25% of your Block between turns.', 'Always have 4 Thorns.', 'Gaining Block also deals half of it as damage.'] },
   arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown. Your other skills: 1 turn shorter for every 8 INT (minimum 1).', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
   zealot: { name: 'Zealot', stat: 'VIT', theme: 'Healing and Regen', path: 'Saint', b: ['Healing +10%.', 'Heal 2 at the start of each of your turns (grows with level).', 'Overhealing becomes Block.'] },
-  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Reaper', b: ['+25% damage to opponents below half HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
+  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Deathbringer', b: ['+25% damage to opponents below half HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
   storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 12 damage plus your STR and shatter the opponent\'s Block. Stopping a big attack Empowers you for 2 turns.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
 };
 const ARCH_KEYS = Object.keys(ARCH);
@@ -459,7 +459,7 @@ const GIFTS = {
   swordsaint: { name: 'Sword Saint', cat: 'cheat', cost: 5, desc: 'Your basic Attack becomes S-rank: far stronger, and it ignores Block.', lock: 'giant_slayer' },
   gacha: { name: 'Gacha Luck', cat: 'cheat', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo' },
   fastlearner: { name: 'Fast Learner', cat: 'growth', cost: 3, desc: '+50% XP.' },
-  merger: { name: 'Prodigy', cat: 'growth', cost: 3, desc: 'Your first 3 merges need only 2 copies.' },
+  merger: { name: 'Quick Study', cat: 'growth', cost: 3, desc: 'Your first 3 merges need only 2 copies.' },
   veteran: { name: 'Tournament Veteran', cat: 'growth', cost: 2, desc: 'Start with 6 more gold and an extra draft reroll.' },
   latebloomer: { name: 'Late Bloomer', cat: 'growth', cost: 2, desc: 'Every stat starts 1 lower, but each level gives 3 stat points instead of 2.', lock: 'echo' },
   affinity: { name: 'Skill Affinity', cat: 'growth', cost: 2, desc: "Your world's home archetype pieces cost 1 less (minimum 1).", lock: 'echo' },
@@ -590,9 +590,9 @@ const HIDDEN_PATHS = {
   'blade+zealot': { name: 'Blood Saint', desc: 'Heal 3 whenever you apply Bleed.', fx: { healOnBleed: 3 } },
   'arcanist+bastion': { name: 'Spellshield', desc: 'Quick skills also give 5 Block.', fx: { quickBlock: 5 } },
   'pyre+reaper': { name: 'Funeral Pyre', desc: '+25% damage to Burning opponents below half HP.', fx: { burnExec: 0.25 } },
-  'pyre+storm': { name: 'Firestorm', desc: 'Your Stuns and Interrupts also apply 5 Burn.', fx: { stunBurn: 5 } },
+  'pyre+storm': { name: 'Wildstorm', desc: 'Your Stuns and Interrupts also apply 5 Burn.', fx: { stunBurn: 5 } },
   'bastion+venom': { name: 'Thornbark', desc: 'Thorns also apply 2 Poison.', fx: { thornPoison: 2 } },
-  'arcanist+venom': { name: 'Alchemist', desc: 'Quick skills apply 2 Poison.', fx: { quickPoison: 2 } },
+  'arcanist+venom': { name: 'Apothecary', desc: 'Quick skills apply 2 Poison.', fx: { quickPoison: 2 } },
   'venom+zealot': { name: 'Plague Saint', desc: 'Each skill that heals you also applies 3 Poison.', fx: { healPoison: 3 } },
   'arcanist+zealot': { name: 'Chronomancer', desc: 'Quick skills heal you 4.', fx: { quickHeal: 4 } },
   'arcanist+reaper': { name: 'Soul Weaver', desc: 'Doom and Leech you apply are 40% stronger.', fx: { doomLeech: 0.4 } },
@@ -622,7 +622,7 @@ const ENEMIES = {
   kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rank: 'A', rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
   calder: { name: 'Ser Calder', style: 'A knight who fights by the book', tier: 2, rank: 'C', rival: true, hp: 76, skills: [{ n: 'Lance', fx: { dmg: 14 } }, { n: 'Shield Wall', fx: { block: 10 } }, { n: 'Disgrace', fx: { dmg: 6, weaken: 2 } }], script: [0, 1, 0, 2] },
   leviathan: { name: 'The Leviathan Queen', style: 'Floods the arena every 3rd turn, Weakening whoever has less Block', tier: 3, rank: 'A', final: true, hp: 165, flood: true, skills: [{ n: 'Tidal Lash', fx: { dmg: 22 } }, { n: 'Coral Armour', fx: { block: 16 } }, { n: 'Crushing Depths', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2] },
-  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, rank: 'A', final: true, hp: 112, aura: 0.7, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Pyre', fx: { burn: 3 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
+  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, rank: 'A', final: true, hp: 112, aura: 0.7, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Ashen Pyre', fx: { burn: 3 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
   bone_saint: { name: 'The Bone Saint', style: 'Poisons, drains, and rises once at 30% HP', tier: 3, rank: 'A', final: true, hp: 135, revive: 0.3, skills: [{ n: 'Bone Lance', fx: { dmg: 10 } }, { n: 'Plague Hymn', fx: { poison: 3 } }, { n: 'Marrow Feast', fx: { dmg: 7, lifesteal: 0.5 } }], script: [1, 0, 2, 0] },
   thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, rank: 'A', final: true, hp: 92, briar: 1, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
   archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, rank: 'A', final: true, hp: 85, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
@@ -970,7 +970,7 @@ const MILESTONES = {
   STR: { name: 'Mighty Frame', desc: 'Reaper and Stormcaller skills deal 10% more.' },
   AGI: { name: 'Afterimage', desc: 'Evade the first attack each fight.' },
   INT: { name: 'Arcane Mind', desc: 'Your first damaging skill each fight deals 30% more.' },
-  VIT: { name: 'Unbreakable', desc: '+1 max Heart.' },
+  VIT: { name: 'Iron Constitution', desc: '+1 max Heart.' },
   LUK: { name: "Fortune's Favourite", desc: 'One free reroll every round.' },
 };
 function checkMilestones(run, msgs) {
@@ -1160,7 +1160,9 @@ function rollDistricts(run, rng) {
 function infirmary(run) { const f = run.world.mod === 'famine' ? 0.25 : 0.5; const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
 function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); restoreRecord(run, run.hearts - b, msgs); return run.hearts - b; }
 // Events. Chains set flags that later events check: they come back on their own a round or two later.
-// opts: { label, desc, can(run), go(run, meta, rng, msgs) }
+// opts: { label, desc, can(run), go(run, meta, rng, msgs), reveal }
+// In chains, desc is a hint and the reward stays hidden: reveal (a string or fn(run)) is shown after choosing
+// when go() adds no message of its own. Costs always stay visible in the label or desc.
 const EVENTS = {
   merchant: { title: 'Hooded merchant', text: () => 'A merchant in the tunnels sells forbidden techniques. The price is a little of your life.', opts: [
     { label: 'Pay 10% of your max HP', desc: 'A random C or B-rank piece from your pool', go: (run, meta, rng, msgs) => { run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * 0.1)); const pool = poolIds(run).filter(x => ['C', 'B'].includes(pieceDef(x).rank)); const id = pick(pool, rng); if (id) { msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } } },
@@ -1170,31 +1172,31 @@ const EVENTS = {
     { label: 'Wave and rest', desc: 'Heal 10 HP', go: run => { run.hp = Math.min(maxHp(run), run.hp + 10); } }] },
   // --- The Official ---
   official_1: { chain: 'official', title: 'A quiet word', text: () => 'A tournament official offers to "adjust" your next match. He smiles too much.', opts: [
-    { label: 'Pay 6 gold', desc: 'Your next opponent starts with 20% less HP', can: run => run.gold >= 6, need: run => `Need 6 gold (you have ${run.gold})`, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
-    { label: 'Refuse', desc: '+2 Favour with the God of War', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
+    { label: 'Pay 6 gold', desc: 'He will "adjust" your next match.', reveal: '[Your next opponent starts with 20% less HP.]', can: run => run.gold >= 6, need: run => `Need 6 gold (you have ${run.gold})`, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
+    { label: 'Refuse', desc: 'Someone up there might respect that.', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
   official_bribed: { chain: 'official', title: 'Blackmail', text: () => 'The official is back. He has a ledger with your name in it, and the System would love to read it.', opts: [
     { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, need: run => `Need 8 gold (you have ${run.gold})`, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
     { label: 'Let him talk', desc: 'The scandal costs your world 1 Heart', go: (run, meta, rng, msgs) => { if (run.hearts > 1) { run.hearts--; eraseRecord(run, 1, msgs); } run.chains.official = 'done'; } }] },
   official_refused: { chain: 'official', title: 'The honest official', text: () => 'The official you refused finds you after a match. "Nobody turns me down. I respect that." He slips you a folded page: notes on how the Final Champion fights.', opts: [
-    { label: 'Take the notes', desc: "In the final, you'll see the champion's next 2 moves", go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: '[Final Champion notes acquired.]' }); } }] },
+    { label: 'Take the notes', desc: 'A folded page about the final.', go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: "[Final Champion notes acquired. In the final, you'll see their next 2 moves.]" }); } }] },
   // --- The Poisoner ---
   poisoner_1: { chain: 'poisoner', title: 'Tampered water', text: () => 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
-    { label: 'Drink it anyway', desc: '+2 VIT, but start the next fight with 4 Poison', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
+    { label: 'Drink it anyway', desc: 'Start the next fight Poisoned. It might be worth it.', reveal: '[+2 VIT. You start the next fight with 4 Poison.]', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
     { label: 'Investigate (3 gold)', desc: 'Find out who did it', can: run => run.gold >= 3, need: run => `Need 3 gold (you have ${run.gold})`, go: (run, meta, rng) => { run.gold -= 3; const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; } },
     { label: 'Pour it out', desc: 'Nothing happens', go: run => { run.chains.poisoner = 'done'; } }] },
   poisoner_found: { chain: 'poisoner', title: 'The poisoner', text: run => `A stable boy talks for a coin: it was ${ENEMIES[run.chains.poisoner.who].name}'s people who tampered with your water.`, opts: [
-    { label: 'Expose them to the crowd', desc: '+3 Favour with the Trickster', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
-    { label: 'Return the favour', desc: 'They will appear among your next rival choices, Weakened for 3 turns and with 15% less HP', go: run => { run.sabotage = run.chains.poisoner.who; run.chains.poisoner = 'done'; } }] },
+    { label: 'Expose them to the crowd', desc: 'Let the crowd judge them. Someone will enjoy it.', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
+    { label: 'Return the favour', desc: 'A taste of their own medicine.', reveal: run => `[${ENEMIES[run.sabotage].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]`, go: run => { run.sabotage = run.chains.poisoner.who; run.chains.poisoner = 'done'; } }] },
   // --- The Letter ---
   letter_1: { chain: 'letter', title: 'A letter from the Erased', text: () => 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
-    { label: 'Read it', desc: '+1 to a random stat, and follow the map', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
+    { label: 'Read it', desc: 'Follow the map.', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
     { label: 'Sell it', desc: '+5 gold', go: run => { run.gold += 5; run.chains.letter = 'done'; } }] },
   letter_map: { chain: 'letter', title: 'The old quarter', text: () => "The letter's map leads to a rusted grate in the old quarter. A bored sentry leans on it.", opts: [
     { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, need: run => `Need 5 gold (you have ${run.gold})`, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
     { label: 'Sneak past', desc: 'Lose 15% of your max HP, go through', go: run => { run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * 0.15)); run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { label: 'Give up', desc: 'The chain ends', go: run => { run.chains.letter = 'done'; } }] },
+    { label: 'Give up', desc: 'Turn back. The map is lost.', go: run => { run.chains.letter = 'done'; } }] },
   letter_cache: { chain: 'letter', title: 'The cache', text: () => "Behind the grate: a box with the Erased champion's last possession, and a note. [I lost. Make sure it meant something.]", opts: [
-    { label: 'Take it', desc: 'Gain the hidden Gift Last Words for this run, and unlock it in the library', go: (run, meta, rng, msgs) => {
+    { label: 'Take it', desc: 'Whatever it is, it was theirs.', go: (run, meta, rng, msgs) => {
       run.chains.letter = 'done';
       if (meta) { meta.found = meta.found || {}; meta.found.lastwords = true; }
       if (!hasGift(run, 'lastwords')) { run.gifts.push('lastwords'); msgs.push({ t: 'class', text: '[Hidden Gift acquired: Last Words.]' }); } else { run.gold += 10; msgs.push({ t: 'loot', text: '[+10 gold]' }); }
@@ -1214,7 +1216,9 @@ function dueChainEvents(run) {
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const E = EVENTS[key], o = E && E.opts[idx];
   if (!o || (o.can && !o.can(run))) return false;
-  o.go(run, meta, stream(run, 'event', rng), msgs || []);
+  msgs = msgs || []; const before = msgs.length;
+  o.go(run, meta, stream(run, 'event', rng), msgs);
+  if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
   return true;
 }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -1510,7 +1514,7 @@ function react(f, X, Y, kind) {
     reactName(f, X, Y, 'cauterise', 'Cauterise', 'Bleed is seared away and Burn doubles.');
     if (X.P.reactHeal) heal(f, X, X.P.reactHeal);
   }
-  if (Y.bleed > 0 && Y.marked > 0 && !Y.hemo) { Y.hemo = true; reactName(f, X, Y, 'hemorrhage', 'Hemorrhage', 'Bleed deals double while Marked.'); }
+  if (Y.bleed > 0 && Y.marked > 0 && !Y.hemo) { Y.hemo = true; reactName(f, X, Y, 'hemorrhage', 'Haemorrhage', 'Bleed deals double while Marked.'); }
   if (Y.stun > 0 && Y.weaken > 0 && Y.brokenT <= 0) { Y.brokenT = 2; reactName(f, X, Y, 'broken', 'Broken', `${Y.isPlayer ? 'You take' : Y.name + ' takes'} 50% more damage.`); }
   if (Y.poison > 0 && Y.leechT > 0 && !Y.blight) { Y.blight = true; reactName(f, X, Y, 'blight', 'Blight', 'Leech drains double.'); }
   if (Y.doomT > 1 && !Y.doomHastened && effectCount(Y) >= 2) { Y.doomHastened = true; Y.doomT--; reactName(f, X, Y, 'hastened', 'Hastened Doom', 'Doom lands a turn sooner.'); }
@@ -1872,7 +1876,7 @@ function describe(def, p = 1) {
 const REACTIONS = {
   flare: { name: 'Toxic Flare', pair: 'Burn + Poison', text: 'Applying Burn to a Poisoned target ignites the Poison for half its value as damage. Once per turn.' },
   cauterise: { name: 'Cauterise', pair: 'Burn + Bleed', text: 'Bleed is seared away and Burn doubles.' },
-  hemorrhage: { name: 'Hemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
+  hemorrhage: { name: 'Haemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
   broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'The target takes 50% more damage until the end of their next turn.' },
   blight: { name: 'Blight', pair: 'Poison + Leech', text: 'Leech drains double.' },
   hastened: { name: 'Hastened Doom', pair: 'Doom + 2 other effects', text: 'Doom lands a turn sooner.' },
