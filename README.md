@@ -42,6 +42,9 @@ then open http://localhost:8000. Opening `index.html` directly also works, witho
 
 ```
 node tools/stats.js 1000      # 1,000 bot runs: win rate, losses per round, per Final Champion and archetype
+node tools/stats.js 1000 --batches 5 --seed 1 --json out.json   # repeatable, 5 batches with min-max spread, saved as JSON
+node tools/stats.js 1000 --main reaper --rounds                 # bot builds around one archetype; loss by round per archetype
+node tools/stats.js 1000 --world sky --unlock arch_storm        # force a world type; unlock items in every meta ("all" for all)
 node tools/bot.js v 1         # one verbose run
 ```
 
