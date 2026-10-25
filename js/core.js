@@ -896,17 +896,17 @@ const EVENTS = {
     { label: 'Wave and rest', desc: 'Heal 10 HP', go: run => { run.hp = Math.min(maxHp(run), run.hp + 10); } }] },
   // --- The Official ---
   official_1: { chain: 'official', title: 'A quiet word', text: () => 'A tournament official offers to "adjust" your next match. He smiles too much.', opts: [
-    { label: 'Pay 6 gold', desc: 'Your next opponent starts with 20% less HP', can: run => run.gold >= 6, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
+    { label: 'Pay 6 gold', desc: 'Your next opponent starts with 20% less HP', can: run => run.gold >= 6, need: run => `Need 6 gold (you have ${run.gold})`, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
     { label: 'Refuse', desc: '+2 Favour with the God of War', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
   official_bribed: { chain: 'official', title: 'Blackmail', text: () => 'The official is back. He has a ledger with your name in it, and the System would love to read it.', opts: [
-    { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
+    { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, need: run => `Need 8 gold (you have ${run.gold})`, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
     { label: 'Let him talk', desc: 'The scandal costs your world 1 Heart', go: run => { run.hearts = Math.max(1, run.hearts - 1); run.chains.official = 'done'; } }] },
   official_refused: { chain: 'official', title: 'The honest official', text: () => 'The official you refused finds you after a match. "Nobody turns me down. I respect that." He slips you a folded page: notes on how the Final Champion fights.', opts: [
     { label: 'Take the notes', desc: "In the final, you'll see the champion's next 2 moves", go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: '[Final Champion notes acquired.]' }); } }] },
   // --- The Poisoner ---
   poisoner_1: { chain: 'poisoner', title: 'Tampered water', text: () => 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
     { label: 'Drink it anyway', desc: '+2 VIT, but start the next fight with 4 Poison', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
-    { label: 'Investigate (3 gold)', desc: 'Find out who did it', can: run => run.gold >= 3, go: (run, meta, rng) => { run.gold -= 3; const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; } },
+    { label: 'Investigate (3 gold)', desc: 'Find out who did it', can: run => run.gold >= 3, need: run => `Need 3 gold (you have ${run.gold})`, go: (run, meta, rng) => { run.gold -= 3; const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; } },
     { label: 'Pour it out', desc: 'Nothing happens', go: run => { run.chains.poisoner = 'done'; } }] },
   poisoner_found: { chain: 'poisoner', title: 'The poisoner', text: run => `A stable boy talks for a coin: it was ${ENEMIES[run.chains.poisoner.who].name}'s people who tampered with your water.`, opts: [
     { label: 'Expose them to the crowd', desc: '+3 Favour with the Trickster', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
@@ -916,7 +916,7 @@ const EVENTS = {
     { label: 'Read it', desc: '+1 to a random stat, and follow the map', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
     { label: 'Sell it', desc: '+5 gold', go: run => { run.gold += 5; run.chains.letter = 'done'; } }] },
   letter_map: { chain: 'letter', title: 'The old quarter', text: () => "The letter's map leads to a rusted grate in the old quarter. A bored sentry leans on it.", opts: [
-    { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
+    { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, need: run => `Need 5 gold (you have ${run.gold})`, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
     { label: 'Sneak past', desc: 'Lose 15% of your max HP, go through', go: run => { run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * 0.15)); run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
     { label: 'Give up', desc: 'The chain ends', go: run => { run.chains.letter = 'done'; } }] },
   letter_cache: { chain: 'letter', title: 'The cache', text: () => "Behind the grate: a box with the Erased champion's last possession, and a note. [I lost. Make sure it meant something.]", opts: [
