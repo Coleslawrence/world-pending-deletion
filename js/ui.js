@@ -39,9 +39,9 @@ function pushMsgs(msgs, logged) { if (!logged) msgs.forEach(m => logRun(m.text, 
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial' };
 function initials(name) { const w = name.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(x => x && !['the', 'of'].includes(x.toLowerCase())); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
-function crest(name, kind, big, sig) {
+function crest(name, kind, big, sig, rank) {
   const inner = sig ? `<span class="sig" style="color:${SIGIL_COLS[sig.color] || '#fff'}">${SIGILS[sig.sigil] || '✦'}</span>` : `<span>${esc(initials(name))}</span>`;
-  return `<div class="crest k-${kind}${big ? ' big' : ''}" aria-hidden="true">${inner}</div>`;
+  return `<div class="crest k-${kind}${big ? ' big' : ''}" aria-hidden="true">${inner}${rank ? `<b class="crest-rk">${esc(rank)}</b>` : ''}</div>`;
 }
 function styleOf(spec) {
   if (spec.kind === 'trial') return spec.cond ? 'Condition: ' + COND_TEXT[spec.cond] : 'No condition. Win to be promoted.';
@@ -49,7 +49,7 @@ function styleOf(spec) {
   return specStyle(spec);
 }
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · ${r}-rank` : ''; }
-function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null); }
+function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
 function rankChip(r) { return `<span class="rank r${r}">${WORLD_RANKS[r]}</span>`; }
 function rk(r) { return `<span class="srank rk-${r}">${r}</span>`; }
 function stars(n) { return n > 1 ? `<span class="stars">${'★'.repeat(n)}</span>` : ''; }
@@ -163,7 +163,7 @@ function finishDaily(spared) {
   if (!run || !run.daily) return null;
   const sc = dailyScore(run);
   if (run.ranked && meta.daily && meta.daily.date === run.daily && !meta.daily.result) {
-    meta.daily.result = Object.assign(sc, { spared: !!spared, name: run.name, sigil: run.sigil, color: run.color, path: run.path || null, rec: run.record ? { ids: run.record.ids.slice(), lost: run.record.lost, partial: run.record.partial, bio: Object.assign({}, run.record.bio) } : null, w: run.world.type });
+    meta.daily.result = Object.assign(sc, { rank: meta.rank ? meta.rank.letter : null, spared: !!spared, name: run.name, sigil: run.sigil, color: run.color, path: run.path || null, rec: run.record ? { ids: run.record.ids.slice(), lost: run.record.lost, partial: run.record.partial, bio: Object.assign({}, run.record.bio) } : null, w: run.world.type });
     saveMeta(); postDaily();
   }
   return run.ranked ? `[Observation recorded. ${run.world.name} was ${spared ? 'spared' : 'erased'} for you. Other outcomes vary.]` : `[Replay observed. ${run.world.name} was ${spared ? 'spared' : 'erased'}. Unranked.]`;
@@ -174,6 +174,7 @@ function untilTomorrow() { const now = Date.now(), next = Date.parse(dailyDate(n
 const dailyCol = date => cloud.db.collection(`daily/${date}/scores`);
 function scoreDoc(r) {
   const d = { name: String(r.name || 'Entrant').slice(0, 24), sigil: Number.isInteger(r.sigil) ? r.sigil : 0, color: Number.isInteger(r.color) ? r.color : 0, wins: r.wins, hearts: r.hearts, turns: r.turns, score: r.score, path: r.path || null, at: Date.now() };
+  if (r.rank) d.rank = r.rank;
   if (r.rec) d.rec = { ids: r.rec.ids.slice(), lost: r.rec.lost, partial: r.rec.partial, bio: Object.assign({}, r.rec.bio) };
   return d;
 }
@@ -182,7 +183,7 @@ function cleanScore(uid, d, date) {
   if (!d || typeof d !== 'object') return null;
   const int = (v, hi) => Number.isInteger(v) ? Math.max(0, Math.min(hi, v)) : 0, type = dailyWorld(date).type;
   const r = { uid, name: String(d.name || 'Entrant').slice(0, 24), sigil: int(d.sigil, SIGILS.length - 1), color: int(d.color, SIGIL_COLS.length - 1), wins: int(d.wins, 12), hearts: int(d.hearts, 20), turns: int(d.turns, 999) };
-  r.score = 100000 * r.wins + 1000 * r.hearts + (999 - r.turns); r.spared = r.wins >= 8;
+  r.score = 100000 * r.wins + 1000 * r.hearts + (999 - r.turns); r.spared = r.wins >= 8; r.rank = rankIdx(d.rank) >= 0 ? d.rank : null;
   r.rec = d.rec ? sanitizeRec(Object.assign({}, d.rec, { w: type }), type) : null;
   return r;
 }
@@ -192,7 +193,9 @@ async function postDaily() {
   if (!cloud.on || !cloud.db || !cloud.uid || !r || D.posted || D.date !== dailyDate() || ui.posting) return;
   ui.posting = true;
   const ref = cloud.db.doc(`daily/${D.date}/scores/${cloud.uid}`);
-  try { await ref.set(scoreDoc(r)); D.posted = true; saveMeta(); }
+  // Rules from before Entrant Rank refuse the rank field, so a refused post is retried without it
+  const plain = d => { const o = Object.assign({}, d); delete o.rank; return o; };
+  try { await ref.set(scoreDoc(r)).catch(e => { if (r.rank && e && e.code === 'invalid_argument') return ref.set(plain(scoreDoc(r))); throw e; }); D.posted = true; saveMeta(); }
   catch (e) {
     // Already there (posted from another device): the rules refuse a second write, so stop trying
     let there = false; try { there = (await ref.get()).exists; } catch (e2) { }
@@ -227,11 +230,13 @@ function countObservers(D) {
   const col = dailyCol(D.date);
   if (col.count) col.count().then(n => { D.count = n; }).catch(e => console.warn('[cloud] count failed:', e && e.code, e));
 }
+// The name cell: rank letter, name, and a star for the Prime Entrant
+function nameCell(r) { const P = ui.prime; return `${r.rank ? `<i class="br-l">${r.rank}</i>` : ''}${esc(r.name || 'Entrant')}${P && P.uid && r.uid === P.uid ? ' <i class="br-pe" title="Prime Entrant" aria-label="Prime Entrant">★</i>' : ''}`; }
 // Rank, sigil, name, round reached, Hearts left, entries kept
 function reached(r) { return r.wins > 8 ? `Elite ${r.wins - 8}` : r.wins === 8 ? 'Spared' : `Round ${r.wins + 1}`; }
 function resultRow(r, rank, me, i) {
   const w = r.rec ? `${recLeft(r.rec)}/${r.rec.ids.length}` : '–';
-  const inner = `<span class="br-n">${rank || '–'}</span><span class="sig" style="color:${SIGIL_COLS[r.color] || '#fff'}">${SIGILS[r.sigil] || '✦'}</span><span class="br-name">${esc(r.name || 'Entrant')}</span><span class="br-r">${reached(r)}</span><span class="br-h">♥${r.hearts}</span><span class="br-k">${w}</span>`;
+  const inner = `<span class="br-n">${rank || '–'}</span><span class="sig" style="color:${SIGIL_COLS[r.color] || '#fff'}">${SIGILS[r.sigil] || '✦'}</span><span class="br-name">${nameCell(r)}</span><span class="br-r">${reached(r)}</span><span class="br-h">♥${r.hearts}</span><span class="br-k">${w}</span>`;
   return i != null && r.rec ? `<button class="brow ${me ? 'mine' : ''}" data-act="board-row" data-i="${i}">${inner}</button>` : `<div class="brow ${me ? 'mine' : ''}">${inner}</div>`;
 }
 function dailySheet() {
@@ -256,7 +261,61 @@ function dailySheet() {
     <div class="board"><div class="brow head"><span class="br-n">#</span><span></span><span class="br-name">Entrant</span><span class="br-r">Reached</span><span class="br-h" aria-label="Hearts">♥</span><span class="br-k">Kept</span></div>${rows}</div>
     ${note ? `<p class="sh-p fine">${note}</p>` : ''}${!cloud.on && FIREBASE ? cloudSignInHTML(true) : ''}
     ${cloud.on && B && B.rows && B.rows.some(x => x.rec) ? '<p class="sh-p fine">Tap a row to compare records.</p>' : ''}`;
-  return sheetWrap("Today's outcomes", body, `<button class="btn ghost" data-act="close">Close</button><button class="btn" data-act="daily" ${busy ? 'disabled' : ''}>Play again (unranked)</button>`, 'sys board-sheet');
+  return sheetWrap("Today's outcomes", body, `${cloud.on ? '<button class="btn ghost" data-act="board-week">This week</button>' : '<button class="btn ghost" data-act="close">Close</button>'}<button class="btn" data-act="daily" ${busy ? 'disabled' : ''}>Play again (unranked)</button>`, 'sys board-sheet');
+}
+// ---------- Seasons ----------
+// A day's top 20, trimmed for the season table. Past days are final, so they're kept on the device; today is re-read after an hour.
+const DAY_KEY = 'wpd-day-', thin = r => ({ uid: r.uid, name: r.name, sigil: r.sigil, color: r.color, rank: r.rank, score: r.score });
+async function dayTop(date) {
+  const today = dailyDate(), C = ui.dayCache = ui.dayCache || {};
+  if (date < today) { const k = lsGet(DAY_KEY + date); if (Array.isArray(k)) return k; }
+  else if (C[date] && Date.now() - C[date].t < 3600e3) return C[date].rows;
+  const col = dailyCol(date);
+  const docs = col.query ? (await col.query({ orderBy: ['score', 'desc'], limit: 20 })).docs : (await col.get()).docs;
+  const rows = docs.map(x => cleanScore(x.id, x.data(), date)).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 20).map(thin);
+  if (date < today) { lsSet(DAY_KEY + date, rows); pruneDays(); } else C[date] = { t: Date.now(), rows };
+  return rows;
+}
+function pruneDays() { try { const old = new Date(Date.now() - 21 * 864e5).toISOString().slice(0, 10); Object.keys(localStorage).forEach(k => { if (k.startsWith(DAY_KEY) && k.slice(DAY_KEY.length) < old) localStorage.removeItem(k); }); } catch (e) { } }
+// This week's standings (up to 7 reads of 20) and last week's winner, the current Prime Entrant (7 more, read once and kept)
+async function loadSeason() {
+  if (!cloud.on || !cloud.db || ui.seasonBusy) return;
+  ui.seasonBusy = true;
+  try {
+    const today = dailyDate(), wk = weekOf(today), last = weekOf(new Date(Date.parse(wk + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10));
+    const days = await Promise.all(weekDates(wk).filter(d => d <= today).map(dayTop));
+    const prev = await Promise.all(weekDates(last).map(dayTop));
+    const top = seasonTable(prev)[0] || null;
+    ui.season = { week: wk, table: seasonTable(days).slice(0, 20), t: Date.now() };
+    ui.prime = top ? { uid: top.uid, name: top.name, week: last } : { week: last };
+    announcePrime(top, last);
+  } catch (e) { cloudFail('board', 'load season', e); }
+  ui.seasonBusy = false;
+  if (ui.sheet && (ui.sheet.type === 'daily' || ui.sheet.type === 'dailyweek')) render();
+}
+// Once per season: the new Prime Entrant hears it, and so does the one it passed from
+function announcePrime(top, week) {
+  if (meta.primeSeen === week) return;
+  const mine = top && top.uid === cloud.uid;
+  if (mine) logToast(`[Season closed. ${top.name} is the ${SEASON_TITLE}.]`);
+  else if (meta.prime) logToast(`[Season closed. A new ${SEASON_TITLE} has been recorded.]`);
+  meta.prime = mine ? week : null; meta.primeSeen = week; saveMeta();
+}
+function seasonRow(e, i) {
+  return `<div class="brow ${e.uid === cloud.uid ? 'mine' : ''}"><span class="br-n">${i + 1}</span><span class="sig" style="color:${SIGIL_COLS[e.color] || '#fff'}">${SIGILS[e.sigil] || '✦'}</span><span class="br-name">${nameCell(e)}</span><span class="br-r">${e.pts} pts</span><span class="br-h"></span><span class="br-k">${e.days}/7</span></div>`;
+}
+function seasonBody() {
+  const S = ui.season, P = ui.prime, today = dailyDate(), wk = weekOf(today);
+  const head = `<p class="sh-p sysl">[Season: week of ${wk.slice(5).replace('-', '/')}. Closes in ${Math.ceil((Date.parse(wk + 'T00:00:00Z') + 7 * 864e5 - Date.parse(today + 'T00:00:00Z')) / 864e5)} d.]</p>`;
+  const prime = P && P.name ? `${SEASON_TITLE} · ${esc(P.name)}. ` : '';
+  if (!S || S.week !== wk) return head + '<p class="sh-p fine">[Retrieving the season…]</p>';
+  const rows = S.table.length ? S.table.map(seasonRow).join('') : '<p class="sh-p fine">No outcomes recorded this week.</p>';
+  return `${head}<div class="board"><div class="brow head"><span class="br-n">#</span><span></span><span class="br-name">Entrant</span><span class="br-r">Points</span><span class="br-h"></span><span class="br-k">Days</span></div>${rows}</div>
+    <p class="sh-p fine">${prime}Daily places 1 to 10 pay 25 down to 1, and every posted score pays 1. The week's winner is the next ${SEASON_TITLE}.</p>`;
+}
+function weekSheet() {
+  const busy = lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended;
+  return sheetWrap('This week', seasonBody(), `<button class="btn ghost" data-act="daily-board">Today</button><button class="btn" data-act="daily" ${busy ? 'disabled' : ''}>Play again (unranked)</button>`, 'sys board-sheet');
 }
 // Another player's record next to yours: the same world, erased differently
 function compareSheet() {
@@ -609,6 +668,7 @@ function finishFight() {
   ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
   if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes. ${ownerName(res.rested.owner)} will hear of it.]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
+  if (res.fell) recordWin(res.fell);
   if (res.death) { const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; lsDel(RUN_KEY); }
   else if (res.spared) { const out = endRun(run, meta, 'spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
   else if (res.eliteOver) { ui.end = { kind: res.eliteCleared ? 'elite-clear' : 'elite-fall', echoes: 8 * run.eliteWins }; }
@@ -713,7 +773,7 @@ function runCard(s, opts) {
   const strip = H.length ? `<div class="hstrip">${H.map(h => `<span class="hc ${h.won ? 'w' : 'l'}" title="${esc(h.name)}">${label(h)}${h.won ? '' : h.hl ? ` −${h.hl}♥` : ''}</span>`).join('')}</div>` : '';
   const best = H.filter(h => h.won).sort((a, b) => a.turns - b.turns || b.dealt - a.dealt)[0];
   const lost = H.reduce((a, h) => a + (h.hl || 0), 0);
-  return `<div class="runcard ${opts.erased ? 'erased' : ''}"><div class="rc-h">${crest(s.champ, opts.erased ? 'erased' : 'champion', !!opts.big, { sigil: s.sigil, color: s.color })}<div><div class="ch-name">${esc(s.champ)}</div><div class="ch-sub">${s.entrant ? 'Entrant ' + s.entrant + ' · ' : ''}${s.path ? esc(ARCH[s.path].path) + ' · ' : ''}Lv ${s.level}${s.title && TITLES[s.title] ? ' · ' + esc(TITLES[s.title].name) : ''}</div></div></div>
+  return `<div class="runcard ${opts.erased ? 'erased' : ''}"><div class="rc-h">${crest(s.champ, opts.erased ? 'erased' : 'champion', !!opts.big, { sigil: s.sigil, color: s.color }, s.rank)}<div><div class="ch-name">${esc(s.champ)}</div><div class="ch-sub">${s.entrant ? 'Entrant ' + s.entrant + ' · ' : ''}${s.path ? esc(ARCH[s.path].path) + ' · ' : ''}Lv ${s.level}${s.title && TITLES[s.title] ? ' · ' + esc(TITLES[s.title].name) : ''}</div></div></div>
     ${strip}
     ${s.rec ? `<p class="rc-bio">${bioHTML(s.rec, s.worldType, s.worldName, s.name || s.champ)}</p><button class="rc-l rc-rec" data-act="rec-snap" data-at="${s.at}"><span>Record</span>${recLeft(s.rec)} of ${s.rec.ids.length} entries survive ›</button>` : ''}
     <div class="rc-l"><span>Skills</span>${s.bar.map(x => esc(SKILLS[x.id] ? SKILLS[x.id].name : x.id) + (x.star > 1 ? ' ★' + x.star : '')).join(' · ') || '–'}</div>
@@ -889,7 +949,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
@@ -909,7 +969,8 @@ function onAct(el) {
   switch (a) {
     case 'new': lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
-    case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); return render();
+    case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
+    case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-row': ui.sheet = { type: 'dailycmp', i: +d.i }; return render();
     case 'resume': run = lsGet(RUN_KEY); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
     case 'back-title': return go('title');
@@ -1256,8 +1317,28 @@ async function shareChampion(snap, kind) {
 async function recordRest(r) {
   if (!cloud.on || cloud.shareOff || !r.owner || r.owner === cloud.uid) return;
   const t = Date.now();
-  try { await cloud.db.doc(`inbox/${r.owner}/notes/${cloud.uid}_${t}`).set({ by: cloud.uid, champ: String(r.champ).slice(0, 60), t }); }
+  const note = { by: cloud.uid, champ: String(r.champ).slice(0, 60), t };
+  if (r.at) note.at = r.at; if (r.rank) note.rank = r.rank;
+  const ref = cloud.db.doc(`inbox/${r.owner}/notes/${cloud.uid}_${t}`);
+  try { await ref.set(note).catch(e => { if (note.at && e && e.code === 'invalid_argument') return ref.set({ by: note.by, champ: note.champ, t }); throw e; }); }
   catch (e) { cloudFail('share', 'record rest', e); }
+}
+// The other half of champion rank: tell the owner their shared champion beat you
+async function recordWin(r) {
+  if (!cloud.on || cloud.shareOff || !r.owner || r.owner === cloud.uid || !r.at) return;
+  const t = Date.now();
+  try { await cloud.db.doc(`inbox/${r.owner}/notes/${cloud.uid}_${t}`).set({ by: cloud.uid, champ: String(r.champ).slice(0, 60), t, at: r.at, won: true }); }
+  catch (e) { cloudFail('share', 'record win', e); }
+}
+// After a champion ranks up, its shared copy is updated so other Entrants see the new letter
+async function reshare(snaps) {
+  if (!cloud.on || cloud.shareOff || !snaps.length) return;
+  const ref = cloud.db.doc('champions/' + cloud.uid);
+  try {
+    const cur = await ref.get(); if (!cur.exists || !Array.isArray(cur.data().list)) return;
+    const list = cur.data().list.map(e => { const s = e.snap && snaps.find(x => x.at === e.snap.at); return s ? Object.assign({}, e, { snap: jsonSafe(s) }) : e; });
+    await ref.set({ list, r: typeof cur.data().r === 'number' ? cur.data().r : Math.random() });
+  } catch (e) { cloudFail('share', 'update shared champion', e); }
 }
 async function checkRests() {
   if (!cloud.on) return;
@@ -1265,10 +1346,20 @@ async function checkRests() {
     const seen = meta.restSeen || 0, col = cloud.db.collection(`inbox/${cloud.uid}/notes`);
     const qs = col.query ? await col.query({ where: ['t', '>', seen], orderBy: 't', limit: 30 }) : await col.get();
     const notes = [];
-    qs.docs.forEach(d => { const e = d.data() || {}; if (e.by && e.by !== cloud.uid && Number(e.t) > seen) notes.push({ by: e.by, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t) }); });
+    qs.docs.forEach(d => { const e = d.data() || {}; if (e.by && e.by !== cloud.uid && Number(e.t) > seen) notes.push({ by: e.by, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t), at: Number(e.at) || 0, won: e.won === true, rank: rankIdx(e.rank) >= 0 ? e.rank : null }); });
     if (!notes.length) return;
-    await resolveNames(notes.map(n => n.by));
-    notes.sort((a, b) => a.t - b.t).forEach(n => { meta.echoes += 3; logToast(`[${n.champ} was laid to rest by ${ownerName(n.by)}. +3 Echoes.]`); });
+    await resolveNames(notes.filter(n => !n.won).map(n => n.by));
+    const ranked = [];
+    notes.sort((a, b) => a.t - b.t).forEach(n => {
+      if (n.won) {
+        const sp = meta.champions.find(s => s.at === n.at), s = sp || meta.erased.find(x => x.at === n.at); if (!s) return;
+        const before = s.rank, line = champWin(s, !!sp); if (line) logToast(line);
+        if (s.rank !== before && meta.shared && meta.shared[s.at] && !ranked.includes(s)) ranked.push(s);
+        return;
+      }
+      meta.echoes += 3; logToast(`[${n.champ} was laid to rest by ${ownerName(n.by)}.${n.rank ? ` Final rank: ${n.rank}.` : ''} +3 Echoes.]`);
+    });
+    reshare(ranked);
     meta.restSeen = Math.max(...notes.map(n => n.t)); saveMeta();
   } catch (e) { cloudFail('share', 'check rests', e); }
 }

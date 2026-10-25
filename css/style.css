@@ -578,3 +578,8 @@ button.brow:active { background: var(--panel); }
 .news-sheet h4 { margin: 0 0 6px; }
 .news-sheet .sh-f .btn { flex: 1; }
 .news-sheet .news li { font-family: var(--f-m); font-size: 12.5px; color: var(--sys); }
+/* Champion rank and seasons */
+.crest-rk { position: absolute; right: -4px; bottom: -4px; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: var(--panel); border: 1px solid var(--sys); color: var(--sys); font: 700 10px/14px var(--f-m); text-align: center; }
+.br-l { font-style: normal; font-family: var(--f-m); font-size: 10.5px; color: var(--sys); margin-right: 4px; }
+.br-pe { font-style: normal; color: var(--bronze); font-size: 11px; line-height: 1; }
+.br-l { line-height: 1; }
