@@ -35,6 +35,16 @@ await check('signed-in players read any score', assertSucceeds(getDoc(ref(bob, '
 await check('signed out reads are refused', assertFails(getDoc(ref(anon, 'alice'))));
 await check('the top-20 query is allowed', assertSucceeds(getDocs(query(collection(bob, `daily/${day}/scores`), orderBy('score', 'desc'), limit(20)))));
 await check('count() is allowed', assertSucceeds(getCountFromServer(collection(bob, `daily/${day}/scores`))));
+const carol = env.authenticatedContext('carol').firestore();
+await check('a score with a rank letter is fine', assertSucceeds(setDoc(ref(carol, 'carol'), score({ rank: 'C' }))));
+await check('a long rank is refused', assertFails(setDoc(ref(carol, 'carol', '2026-10-27'), score({ rank: 'SSSS' }))));
+const note = (o = {}) => Object.assign({ by: 'bob', champ: 'Linden of Velmere', t: 1 }, o);
+await check('a laid-to-rest note with rank is fine', assertSucceeds(setDoc(doc(bob, 'inbox/alice/notes/bob_1'), note({ at: 123, rank: 'B' }))));
+await check('a champion-win note is fine', assertSucceeds(setDoc(doc(bob, 'inbox/alice/notes/bob_2'), note({ t: 2, at: 123, won: true }))));
+await check('won must be a boolean', assertFails(setDoc(doc(bob, 'inbox/alice/notes/bob_3'), note({ t: 3, won: 'yes' }))));
+await check('notes still refuse extra fields', assertFails(setDoc(doc(bob, 'inbox/alice/notes/bob_4'), note({ t: 4, rp: 99 }))));
+await check('notes must be signed by the sender', assertFails(setDoc(doc(bob, 'inbox/alice/notes/bob_5'), note({ t: 5, by: 'carol' }))));
+await check('only the owner reads the inbox', assertFails(getDoc(doc(bob, 'inbox/alice/notes/bob_1'))));
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);
