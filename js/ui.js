@@ -34,7 +34,7 @@ function toast(text, t = 'sys') {
 function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
-function pushMsgs(msgs) { msgs.forEach(m => logRun(m.text, m.t)); msgs.slice().sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
+function pushMsgs(msgs) { msgs.forEach(m => logRun(m.text, m.t)); msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
 
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion' };
@@ -64,7 +64,7 @@ function bracketDots() {
   return h + '</div>';
 }
 function topBar(title, extra) {
-  return `<header class="bar"><div class="bar-l"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}<span class="hcount" title="Hearts">♥${run.hearts}</span><span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+  return `<header class="bar"><div class="bar-l"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
 }
 function archChips(counts, small) {
   return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span>${ARCH[k].name}</span><small>/${next}</small></button>`; }).join('')}</div>`;
@@ -72,7 +72,77 @@ function archChips(counts, small) {
 function playerPower(p) { const def = moddedDef(p.id, p.mods); return skillPower(def, effStats(run), p.star) * def.powerMult; }
 function champLine() {
   const mh = maxHp(run);
-  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level} <span class="xp"><i style="width:${run.level >= 9 ? 100 : run.xp / xpNeed(run.level) * 100}%"></i></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div></div></section>`;
+  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level} <span class="xp"><i style="width:${run.level >= 9 ? 100 : run.xp / xpNeed(run.level) * 100}%"></i></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}${run.record ? `<button class="ch-hearts" data-act="sheet" data-s="record" aria-label="Open the world record">${hearts(run.hearts, run.maxHearts)}</button>` : `<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div>`}</div></section>`;
+}
+
+// ---------- World Record ----------
+// A lost entry is a black bar the width of the words it hides
+function redact(text) { return `<span class="redact" role="img" aria-label="erased entry"><span aria-hidden="true">${esc(text)}</span></span>`; }
+function bioHTML(rec, type, worldName, champ) { return bioParts(rec, type, worldName, champ).map(p => p.gone ? redact(p.t) : esc(p.t)).join(''); }
+function recLine(e) { return e.line.map(w => w.gone ? redact(w.t) : esc(w.t)).join(' '); }
+// The record sheet: from the current run, or from a Halls card (third person)
+function recordSheet() {
+  const S = ui.sheet, snap = S.at != null ? findSnap(S.at) : null;
+  const rec = snap ? snap.rec : run && run.record;
+  if (!rec) { ui.sheet = null; return ''; }
+  const type = snap ? snap.worldType : run.world.type, wname = snap ? snap.worldName : run.world.name;
+  const list = recEntries(rec, type, !!snap), left = recLeft(rec), grid = list.length > 11;
+  const row = e => e.lost ? `<li class="lost"><b>${redact(e.name)}</b></li>` : `<li class="${e.partial ? 'partial' : ''}"><b>${esc(e.name)}</b> <span>${recLine(e)}</span></li>`;
+  const cell = e => `<button class="rg ${e.lost ? 'lost' : ''} ${ui.recOpen === e.pos ? 'on' : ''}" data-act="rec-open" data-p="${e.pos}" ${e.lost ? 'disabled' : ''}>${e.lost ? redact(e.name) : esc(e.name)}</button>`;
+  const open = grid && list[ui.recOpen] && !list[ui.recOpen].lost ? `<p class="rec-open">${recLine(list[ui.recOpen])}</p>` : '';
+  const body = `<p class="sh-p bio">${bioHTML(rec, type, wname, snap ? snap.name || snap.champ : null)}</p>
+    ${grid ? `<div class="recgrid">${list.map(cell).join('')}</div>${open || '<p class="sh-p fine">Tap an entry to read it.</p>'}` : `<ul class="rec">${list.map(row).join('')}</ul>`}
+    <p class="sh-p fine">[${left} of ${list.length} entr${list.length === 1 ? 'y' : 'ies'} survive.]</p>`;
+  return sheetWrap(recWorldGone(rec) ? 'World record: erased' : `World record: ${wname}`, body, `<button class="btn primary" data-act="rec-close">Close</button>`, 'sys rec-sheet');
+}
+function findSnap(at) { at = String(at); return meta.erased.concat(meta.champions, cloud.shared.map(x => x.snap)).find(s => String(s.at) === at) || (ui.end && ui.end.snap && String(ui.end.snap.at) === at ? ui.end.snap : null); }
+// The deletion moment: one row per erased entry. The player taps through them; each glitches, then becomes a bar.
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function eraseSteps(r) {
+  const R = run && run.record; if (!R || !r.erased || !r.erased.length) return [];
+  const E = LORE[run.world.type].entries;
+  const out = r.erased.map(p => ({ name: E[R.ids[p]].name, line: `[Erasing: ${loreName(E[R.ids[p]])}… done.]` }));
+  if (r.death) out.push({ name: run.world.name, line: `[World: ${'█'.repeat(run.world.name.length)}. Status: erased.]`, world: true });
+  return out;
+}
+function eraseRows(steps) {
+  if (!steps.length) return '';
+  const d = ui.erDone || 0;
+  return `<div class="erase" aria-live="polite">${steps.map((s, k) => `<div class="er ${k < d ? 'gone' : k === d && ui.erBusy ? 'glitch' : k === d ? 'next' : ''} ${s.world ? 'world' : ''}"><b>${k < d ? redact(s.name) : esc(s.name)}</b>${k < d ? `<small>${esc(s.line)}</small>` : ''}</div>`).join('')}</div>`;
+}
+// Until every row is erased, the footer button erases the next one; then it becomes the usual button
+function eraseFoot(steps, done) {
+  const d = ui.erDone || 0; ui.erFinal = done;
+  return d < steps.length ? `<button class="btn primary danger-b" data-act="erase-next" ${ui.erBusy ? 'disabled' : ''}>${steps[d].world ? `Erase ${esc(run.world.name)}` : `Erase entry ${d + 1} of ${steps.length - (steps[steps.length - 1].world ? 1 : 0)}`}</button>` : done;
+}
+// Redraw only the rows and the button, so the sheet doesn't slide in again on every tap
+function eraseRefresh() {
+  const steps = eraseSteps(ui.result), box = app.querySelector('.erase'), foot = app.querySelector('.sh-f');
+  if (!box || !foot) return render();
+  box.outerHTML = eraseRows(steps); foot.innerHTML = eraseFoot(steps, ui.erFinal);
+}
+function eraseNext() {
+  if (ui.erBusy) return;
+  ui.erBusy = true; eraseRefresh();
+  setTimeout(() => { ui.erBusy = false; ui.erDone = (ui.erDone || 0) + 1; eraseRefresh(); }, REDUCED ? 0 : 600);
+}
+// The skyline: one silhouette per place in the record, drawn behind the fight log. A lost place leaves a dotted gap.
+const SKY_W = 40;
+const SKYLINE = {
+  drowned: ['M16 48L18 16H22L24 48ZM15 16H25V12H15ZM17 12L20 6L23 12Z', 'M13 48V18L20 10L27 18V48Z', 'M10 30L20 22L30 30ZM12 30H28V38H12ZM13 38H14.5V48H13ZM25.5 38H27V48H25.5ZM19 38H20.5V48H19Z', 'M6 40H34L30 48H10ZM19 22V40H20.5V22ZM20.5 24L28.5 36H20.5Z', 'M8 48V30Q20 18 32 30V48H27V32Q20 26 13 32V48Z', 'M19 48V34L13 26V18H15V25L19 30V14H21V30L25 25V18H27V26L21 34V48Z'],
+  burning: ['M6 48V20H34V48H25V32Q20 25 15 32V48ZM6 16H10V20H6ZM14 16H18V20H14ZM22 16H26V20H22ZM30 16H34V20H30Z', 'M15 48V18H25V48ZM14 18H26V15H14ZM20 15V4H21V15ZM21 4L29 7L21 10Z', 'M16 48L17 14L20 8L23 14L24 48Z', 'M4 48V32L20 24L36 32V48Z', 'M8 48V34H26V48ZM26 48V14H32V48ZM26 9A3 3 0 1 0 32 9A3 3 0 1 0 26 9Z', 'M6 48L11 30L15 48ZM14 48L20 22L26 48ZM25 48L30 34L34 48Z'],
+  hollow: ['M10 48V30L18 24L26 30V48ZM24 48V14L27 8L30 14V48Z', 'M19 48V36H21V48ZM20 8C8 14 6 32 12 38H28C34 32 32 14 20 8Z', 'M2 48Q20 26 38 48Z', 'M10 14H30V16H10ZM11 16H13V48H11ZM27 16H29V48H27ZM15 34Q15 22 20 20Q25 22 25 34L27 36H13Z', 'M18 48V20H12V16H18V10H22V16H28V20H22V48Z', 'M10 48V30H30V48ZM10 30Q20 16 30 30Z'],
+  verdant: ['M18 48V32H22V48ZM20 10C6 10 4 30 14 32H26C36 30 34 10 20 10Z', 'M12 48V26L20 20L28 26V48ZM24 30A6 6 0 1 0 36 30A6 6 0 1 0 24 30Z', 'M8 48L9 28L14 26L15 48ZM18 48V22L23 20L24 48ZM28 48V30L32 29L33 48Z', 'M2 48C8 30 32 30 38 48Z', 'M19 48V16H21V48ZM16 16H24V24H16ZM17 14L20 10L23 14Z', 'M10 48V40H4L10 28H6L12 16L18 28H14L20 40H14V48ZM28 48V42H23L28 32H25L30 22L35 32H32L37 42H32V48Z'],
+  sky: ['M8 30H32L20 44ZM16 30V14H24V30ZM15 14L20 8L25 14Z', 'M17 48L18 16L20 4L22 16L23 48Z', 'M2 20Q20 34 38 20V22Q20 36 2 22Z', 'M4 36H36V39H4ZM8 39H10V48H8ZM30 39H32V48H30ZM14 24H26L24 30H16Z', 'M8 40A6 6 0 0 1 14 32A8 8 0 0 1 28 34A5 5 0 0 1 32 40Z', 'M6 20A14 6 0 1 0 34 20A14 6 0 1 0 6 20ZM16 28H24V32H16Z'],
+  iron: ['M6 48V18H34V48ZM6 14H11V18H6ZM17 14H23V18H17ZM29 14H34V18H29Z', 'M8 30H32L28 35H24V41H30V48H10V41H16V35H12Z', 'M0 48L14 18L20 26L26 14L40 48Z', 'M8 48V20H14V48ZM17 48V12H23V48ZM26 48V24H32V48Z', 'M4 48L12 28H28L36 48Z', 'M14 48V14H26V48ZM12 10H28V14H12Z'],
+};
+function skylineSVG() {
+  const R = run && run.record; if (!R || !SKYLINE[run.world.type]) return '';
+  const E = LORE[run.world.type].entries, places = E.map((e, i) => i).filter(i => E[i].k === 'place');
+  const slots = recEntries(R, run.world.type).filter(e => e.k === 'place');
+  if (!slots.length) return '';
+  const paths = slots.map((e, k) => { const d = SKYLINE[run.world.type][places.indexOf(e.i) % 6]; return `<path transform="translate(${k * SKY_W} 0)" d="${d}" class="${e.lost ? 'gone' : ''}"/>`; }).join('');
+  return `<svg class="skyline" viewBox="0 0 ${slots.length * SKY_W} 48" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${paths}</svg>`;
 }
 
 // ---------- Title / worlds ----------
@@ -111,7 +181,7 @@ function worldsHTML() {
 }
 
 // ---------- Awakening ----------
-function newAw(w) { return { tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world', offer: makeOffer(w, meta), title: null }; }
+function newAw(w) { return { record: buildRecord(w.type), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world', offer: makeOffer(w, meta), title: null }; }
 function giftRow(k, a, w) {
   const g = GIFTS[k], on = a.gifts.includes(k), unlocked = giftUnlocked(k, meta);
   const cost = giftCost(k, a.offer), disc = cost !== g.cost;
@@ -129,7 +199,8 @@ function awakenHTML() {
     body = `<label class="fld"><span>Champion's name</span><input id="aw-name" maxlength="18" value="${esc(a.name)}" autocomplete="off"></label>
       <div class="fld"><span>Sigil</span><div class="sigrow">${SIGILS.map((g, i) => `<button class="sigb ${a.sigil === i ? 'on' : ''}" data-act="aw-sigil" data-i="${i}" style="color:${SIGIL_COLS[a.color]}" aria-label="Sigil ${i + 1}">${g}</button>`).join('')}</div></div>
       <div class="fld"><span>Colour</span><div class="sigrow">${SIGIL_COLS.map((c, i) => `<button class="colb ${a.color === i ? 'on' : ''}" data-act="aw-color" data-i="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('')}</div></div>
-      <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>`;
+      <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>
+      ${a.practice ? '' : `<p class="sh-p bio">${bioHTML(a.record, w.type, w.name)}</p><p class="sh-p sysl">[Filing world record: ${esc(w.name)}. ${a.record.ids.length} entries.]</p>`}`;
   } else if (a.tab === 'stats') {
     body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button><span class="st-v">${a.stats[k]}</span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button></div>`).join('');
   } else if (a.tab === 'gifts') {
@@ -313,7 +384,7 @@ function updateFight() {
     else { const i = intentInfo(f); it.className = 'intent k-' + i.kind; it.innerHTML = `<span class="in-l">Next</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>`; }
   }
   const lg = document.getElementById('log');
-  if (lg) lg.innerHTML = f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('');
+  if (lg) lg.innerHTML = skylineSVG() + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('');
   const sk = document.getElementById('skills');
   if (sk) {
     const can = f.phase === 'player' && !ui.busy && !f.over;
@@ -370,7 +441,7 @@ function startFightUI() {
   const f = ui.fight;
   say2(f, `[${f.B.name} enters the arena.]`, 'sys');
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
-  if (f.spec.kind === 'erased') say2(f, '[The System has returned a champion of an erased world. They remember you.]', 'loss');
+  if (f.spec.kind === 'erased') say2(f, f.spec.snap.rec ? `[The System has returned a champion of an erased world. They remember: "${recFragment(f.spec.snap.rec, f.spec.snap.worldType)}."]` : '[The System has returned a champion of an erased world. They remember you.]', 'loss');
   if (f.spec.kind === 'final') say2(f, `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated') say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
   render(); playEvents(f); updateFight();
@@ -403,7 +474,7 @@ function finishFight() {
   const f = ui.fight;
   const res = resolveFight(run, f, run.practice ? META : meta);
   pushMsgs(res.msgs);
-  ui.result = res;
+  ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
   if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes. ${ownerName(res.rested.owner)} will hear of it.]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.death) { const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res }; lsDel(RUN_KEY); }
@@ -509,6 +580,7 @@ function runCard(s, opts) {
   const lost = H.reduce((a, h) => a + (h.hl || 0), 0);
   return `<div class="runcard ${opts.erased ? 'erased' : ''}"><div class="rc-h">${crest(s.champ, opts.erased ? 'erased' : 'champion', !!opts.big, { sigil: s.sigil, color: s.color })}<div><div class="ch-name">${esc(s.champ)}</div><div class="ch-sub">${s.entrant ? 'Entrant ' + s.entrant + ' · ' : ''}${s.path ? esc(ARCH[s.path].path) + ' · ' : ''}Lv ${s.level}${s.title && TITLES[s.title] ? ' · ' + esc(TITLES[s.title].name) : ''}</div></div></div>
     ${strip}
+    ${s.rec ? `<p class="rc-bio">${bioHTML(s.rec, s.worldType, s.worldName, s.name || s.champ)}</p><button class="rc-l rc-rec" data-act="rec-snap" data-at="${s.at}"><span>Record</span>${recLeft(s.rec)} of ${s.rec.ids.length} entries survive ›</button>` : ''}
     <div class="rc-l"><span>Skills</span>${s.bar.map(x => esc(SKILLS[x.id] ? SKILLS[x.id].name : x.id) + (x.star > 1 ? ' ★' + x.star : '')).join(' · ') || '–'}</div>
     <div class="rc-l"><span>Gear</span>${(s.gear || []).map(x => esc(GEAR[x.id] ? GEAR[x.id].name : x.id) + (x.star > 1 ? ' ★' + x.star : '')).join(' · ') || '–'}</div>
     ${s.hiddenPath && HIDDEN_PATHS[s.hiddenPath] ? `<div class="rc-l"><span>Path</span>${esc(HIDDEN_PATHS[s.hiddenPath].name)} (hidden)</div>` : ''}
@@ -520,12 +592,15 @@ function resultSheet() {
   if (r.rewind) return sheetWrap('[Return by Death]', `<p class="sh-p big">${esc(r.enemy)} kills you. Then the world blinks.</p><p class="sh-p">The fight begins again. Nobody else remembers. Your cheat skill is spent.</p>`, `<button class="btn primary" data-act="rewind">Try again</button>`, 'sys', true);
   if (e && e.kind === 'spared') return sheetWrap(`[${run.world.name} is spared]`, `<p class="sh-p big">You beat the Final Champion. ${esc(run.world.name)} survives the tournament, and ${esc(run.champ)} joins the Hall of Champions.</p>${recapHTML(r)}<p class="sh-p">The System offers the <b>elite bracket</b>: 2 more matches against past winners and the Undefeated. Your world is safe either way. Each elite win earns extra Echoes.</p><p class="sh-p fine">+${e.echoes} Echoes earned.</p>`, `<button class="btn ghost" data-act="end-run">End as champion</button><button class="btn primary" data-act="enter-elite">Enter the elite bracket</button>`, 'win', true);
   if (e && (e.kind === 'elite-clear' || e.kind === 'elite-fall')) return sheetWrap(e.kind === 'elite-clear' ? '[The Undefeated has fallen]' : '[Elite bracket over]', `<p class="sh-p big">${e.kind === 'elite-clear' ? 'Impossible. The System will need a new record.' : 'You fall in the elite bracket. Your world remains spared.'}</p><p class="sh-p fine">Elite wins: ${run.eliteWins}. +${8 * run.eliteWins} Echoes.</p>`, `<button class="btn primary" data-act="end-run">Finish</button>`, e.kind === 'elite-clear' ? 'win' : '', true);
-  if (e && e.kind === 'erased') return sheetWrap('[Eliminated]', `<p class="sh-p big">${esc(r.enemy)} wins. ${esc(e.snap.worldName)} has no Hearts left.</p>${lastTurnsHTML()}${recapHTML(r)}<p class="sh-p">${esc(e.snap.worldName)} will be erased, and ${esc(e.snap.champ)} will join the Hall of the Erased. They may return to face you.</p>`, `<button class="btn primary" data-act="result-ok">Accept</button>`, 'lose', true);
+  const steps = eraseSteps(r);
+  if (e && e.kind === 'erased') return sheetWrap('[Eliminated]', `<p class="sh-p big">${esc(r.enemy)} wins. ${esc(e.snap.worldName)} has no Hearts left.</p>${eraseRows(steps)}${steps.length ? '' : lastTurnsHTML() + recapHTML(r)}<p class="sh-p">${esc(e.snap.worldName)} will be erased, and ${esc(e.snap.champ)} will join the Hall of the Erased. They may return to face you.</p>`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Accept</button>`), 'lose', true);
   const lines = [];
   if (r.won) lines.push(`+${r.gold} gold · healed 30%`);
   if (!r.won && !run.elite) lines.push(`A piece of ${esc(run.world.name)} is erased: −${r.heartsLost} Heart${r.heartsLost > 1 ? 's' : ''}. ${run.hearts} left. ${ui.fight && ui.fight.spec.kind === 'final' ? 'You must face the Final Champion again.' : 'The tournament moves on.'}`);
-  const msgs = r.msgs.length ? `<ul class="msgs">${r.msgs.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
-  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p><p class="sh-p">${lines.join(' ')}</p>${r.won ? '' : lastTurnsHTML()}${recapHTML(r)}${msgs}`, `<button class="btn primary" data-act="result-ok">Continue</button>`, r.won ? 'win' : 'lose', true);
+  // erase lines become rows, and the defeat lines repeat the summary above
+  const shown = r.msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text));
+  const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p><p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
 function statsSheet() {
   const s = effStats(run), p = buildPlayer(run);
@@ -655,7 +730,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
@@ -692,12 +767,16 @@ function onAct(el) {
     case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, meta) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
       const A = ui.aw;
-      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : { name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, title: A.title }, A.practice ? META : meta);
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : { name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, title: A.title, record: A.record }, A.practice ? META : meta);
       if (run.practice) run.gold = 2;
       pushMsgs(run.log.slice());
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
     }
     case 'close': ui.sheet = null; ui.confirmAbandon = false; ui.enchantSel = null; return render();
+    case 'rec-snap': ui.recOpen = null; ui.sheet = { type: 'record', at: d.at, back: ui.sheet && ui.sheet.type }; return render();
+    case 'rec-open': ui.recOpen = +d.p; return render();
+    case 'rec-close': ui.recOpen = null; ui.sheet = ui.sheet && ui.sheet.back ? { type: ui.sheet.back } : null; return render();
+    case 'erase-next': return eraseNext();
     case 'sheet': ui.sheet = { type: d.s }; return render();
     case 'menu': ui.sheet = { type: 'menu' }; return render();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
