@@ -22,7 +22,7 @@ const ARCH = {
   arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown.', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
   zealot: { name: 'Zealot', stat: 'VIT', theme: 'Healing and Regen', path: 'Saint', b: ['Healing +10%.', 'Heal 2 at the start of each of your turns (grows with level).', 'Overhealing becomes Block.'] },
   reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Reaper', b: ['+25% damage to opponents below half HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
-  storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 8 damage.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
+  storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 12 damage plus your STR and shatter the opponent\'s Block. Stopping a big attack Empowers you for 2 turns.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
 };
 const ARCH_KEYS = Object.keys(ARCH);
 const START_ARCH = ['pyre', 'venom', 'blade', 'bastion', 'zealot', 'reaper'];
@@ -131,7 +131,7 @@ const GEAR = {
   tower_shield: { name: 'Tower Shield', slot: 'armour', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockKeep: 0.3 }, text: v => `Keep ${pct(v.blockKeep)} of your Block between turns.` },
   shadow_leathers: { name: 'Shadow Leathers', slot: 'armour', tags: ['blade', 'arcanist'], rank: 'D', stats: { AGI: 2 }, pas: { dodge: 0.06 }, fix: { firstEvade: 1 }, text: v => `+${pct(v.dodge)} dodge. Evade the first attack each fight.` },
   cinder_robe: { name: 'Cinder Robe', slot: 'armour', tags: ['pyre', 'zealot'], rank: 'D', stats: { INT: 1, VIT: 1 }, pas: { burnHeal: 0.3 }, text: v => `Heal ${pct(v.burnHeal)} of the Burn damage your opponent takes.` },
-  conductive_mail: { name: 'Conductive Mail', slot: 'armour', tags: ['storm', 'bastion'], rank: 'D', stats: { VIT: 2 }, pas: { stunBlock: 10 }, text: v => `Gain ${v.stunBlock} Block whenever you Stun or Interrupt.` },
+  conductive_mail: { name: 'Conductive Mail', slot: 'armour', tags: ['storm', 'bastion'], rank: 'D', stats: { VIT: 2 }, pas: { stunEmpower: 1 }, text: v => `Whenever you Stun or Interrupt, you are Empowered for ${v.stunEmpower} turn${v.stunEmpower > 1 ? 's' : ''}.` },
   templar_plate: { name: 'Templar Plate', slot: 'armour', tags: ['zealot', 'bastion'], rank: 'C', stats: { VIT: 3 }, pas: { healBlock: 0.3 }, text: v => `Healing also gives Block equal to ${pct(v.healBlock)} of it.` },
   grave_shroud: { name: 'Grave Shroud', slot: 'armour', tags: ['venom', 'reaper'], rank: 'C', stats: { VIT: 2 }, pas: { poisonHeal: 0.2 }, text: v => `Heal ${pct(Math.min(POISON_HEAL_CAP, v.poisonHeal))} of Poison damage dealt (max 30% from all sources).` },
   prayer_beads: { name: 'Prayer Beads', slot: 'accessory', tags: ['zealot'], rank: 'E', stats: { VIT: 1 }, pas: { regen: 3 }, text: v => `Heal ${v.regen} at the start of each of your turns.` },
@@ -998,7 +998,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (t('arcanist') >= 1) add('quickCd', 1); if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
   if (t('zealot') >= 1) add('healPct', 0.1); if (t('zealot') >= 2) add('regen', Math.round(2 * lm)); if (t('zealot') >= 3) set('overhealBlock', 1);
   if (t('reaper') >= 1) add('vsHalf', 0.25); if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
-  if (t('storm') >= 1) add('stunDmg', Math.round(8 * lm)); if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
+  if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
   gearPieces.filter(Boolean).forEach(g => Object.entries(gearPas(g.id, g.star)).forEach(([k, v]) => { if (k === 'firstCrit' || k === 'firstStun' || k === 'firstEvade') set(k, 1); else add(k, k === 'stunDmg' || k === 'thornsAlways' || k === 'regen' || k === 'startBlock' ? Math.round(v * lm) : v); }));
   // Hidden Path
   const hp = hiddenPathOf(c);
@@ -1328,6 +1328,7 @@ function fighterSkills(barPieces, s, P) {
 function blankFighter(o) { return Object.assign({ block: 0, burn: 0, poison: 0, bleed: 0, weaken: 0, empower: 0, stun: 0, evade: 0, thorns: 0, critNext: false, marked: 0, brokenT: 0, P: {}, uses: 0 }, o); }
 function buildPlayer(run) {
   const s = effStats(run), P = runP(run), mh = maxHp(run);
+  if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, P,
     crit: 0.05 + 0.015 * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, 0.01 * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
@@ -1525,12 +1526,16 @@ function isBig(f, Y) {
 function interrupt(f, X, Y, stunned) {
   if (Y.isPlayer || !Y.intent || Y.interrupted) return;
   const s = Y.intent;
-  if (X.isPlayer && isBig(f, Y)) f.tally.bigStopped++;
+  if (X.isPlayer && isBig(f, Y)) {
+    f.tally.bigStopped++;
+    if (X.P.stormBreak) { X.empower = Math.max(X.empower, 3); say(f, '[Stormcaller: big attack broken. Empowered for 2 turns.]', 'skill'); }
+  }
   s.cd = Math.max(s.cd, 2); Y.interrupted = s.def.name;
   say(f, `[${s.def.name} interrupted! It goes on cooldown.]`, 'skill'); ev(f, { k: 'interrupt', side: Y.side, name: s.def.name });
   if (X.isPlayer) f.tally.stuns++;
   if (X.P.stunDmg) hit(f, X, Y, X.P.stunDmg, { noCrit: 1, noDodge: 1, isThorns: true, src: 'Static' });
-  if (X.P.stunBlock) X.block += X.P.stunBlock;
+  if (X.P.stunEmpower) X.empower = Math.max(X.empower, X.P.stunEmpower + 1);
+  if (X.P.stormBreak && Y.block > 0) { say(f, `[Stormcaller: ${Math.round(Y.block)} Block shattered.]`, 'skill'); Y.block = 0; }
   if (X.P.stunBurn) addStatus(f, X, Y, 'burn', X.P.stunBurn);
   if (X.P.stunHeal) heal(f, X, X.P.stunHeal);
   if (!stunned) planIntent(f, Y);
