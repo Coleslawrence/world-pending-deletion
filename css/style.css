@@ -538,3 +538,13 @@ button.ch-hearts { background: none; border: 0; padding: 2px 0; cursor: pointer;
 .rc-bio { font-size: 13px; color: var(--muted); line-height: 1.4; }
 .rc-rec { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .er.glitch b { animation: none; } }
+
+/* Pending World */
+.btn.daily { border-color: var(--sys); color: var(--sys); font-family: var(--f-m); font-size: 14px; letter-spacing: .02em; }
+.board { display: grid; gap: 4px; }
+.brow { display: grid; grid-template-columns: 20px 16px 1fr 58px 46px 40px; gap: 6px; align-items: center; font-size: 13.5px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel2); text-align: left; width: 100%; }
+.brow.head { background: none; border: 0; padding-block: 0; font-family: var(--f-m); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.brow.head span { color: var(--dim); font-size: 10px; }
+.brow.me { border-color: var(--sys); }
+.brow .br-n { font-family: var(--f-m); color: var(--muted); } .brow .br-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .br-r, .brow .br-k { font-family: var(--f-m); font-size: 12px; color: var(--muted); } .brow .br-h { font-family: var(--f-m); font-size: 12px; color: var(--foe); }
