@@ -71,7 +71,8 @@ function shop(run, meta, opts) {
     G.SHOP_KINDS.forEach(k => run.shop[k].forEach((it, i) => { if (it) items.push({ it, k, i }); }));
     if (run.bonusSlot) items.push({ it: run.bonusSlot, k: 'bonus', i: 0 });
     items.sort((a, b) => score(b.it) - score(a.it));
-    function score(it) { const have = G.allPieces(run).filter(p => p.id === it.id).length; return pieceScore(run, it.id, 1, tg) + have * 4; }
+    // an empty gear slot is worth filling even with low-rank gear, which otherwise scores under the buy threshold
+    function score(it) { const have = G.allPieces(run).filter(p => p.id === it.id).length, open = G.isGear(it.id) && !run.gear[G.GEAR[it.id].slot] && !run.bench.some(p => G.isGear(p.id) && G.GEAR[p.id].slot === G.GEAR[it.id].slot); return pieceScore(run, it.id, 1, tg) + have * 4 + (open ? 3 : 0); }
     for (const x of items) {
       const sc = score(x.it), pr = G.price(run, x.it);
       if (sc < (opts.picky || 5)) continue;
