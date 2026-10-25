@@ -47,6 +47,28 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Pending World scores: one document per player per game day. Created once, never updated, so a first score
+    // can't be overwritten. Scores are worked out on the player's device: fine for friends, not for a public board.
+    match /daily/{date}/scores/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && request.resource.data.keys().hasOnly(['name', 'sigil', 'color', 'wins', 'hearts', 'turns', 'score', 'path', 'rec', 'at'])
+        && request.resource.data.keys().hasAll(['name', 'wins', 'hearts', 'turns', 'score'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 24
+        && request.resource.data.wins is int && request.resource.data.wins >= 0 && request.resource.data.wins <= 12
+        && request.resource.data.hearts is int && request.resource.data.hearts >= 0 && request.resource.data.hearts <= 20
+        && request.resource.data.turns is int && request.resource.data.turns >= 0 && request.resource.data.turns <= 999
+        && request.resource.data.score == 100000 * request.resource.data.wins + 1000 * request.resource.data.hearts + 999 - request.resource.data.turns
+        && (!('sigil' in request.resource.data) || (request.resource.data.sigil is int && request.resource.data.sigil >= 0 && request.resource.data.sigil < 64))
+        && (!('color' in request.resource.data) || (request.resource.data.color is int && request.resource.data.color >= 0 && request.resource.data.color < 64))
+        && (!('path' in request.resource.data) || request.resource.data.path == null || (request.resource.data.path is string && request.resource.data.path.size() <= 16))
+        && (!('at' in request.resource.data) || request.resource.data.at is number)
+        && (!('rec' in request.resource.data) || (request.resource.data.rec is map
+          && request.resource.data.rec.keys().hasOnly(['ids', 'lost', 'partial', 'bio'])
+          && request.resource.data.rec.ids is list && request.resource.data.rec.ids.size() <= 20));
+    }
+
     // Everything else is closed
     match /{document=**} {
       allow read, write: if false;
