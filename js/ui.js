@@ -26,9 +26,11 @@ function stageScreen() { return { draft: 'draft', choose: 'choose', shop: 'shop'
 // ---------- Toasts ----------
 function toast(text, t = 'sys') {
   const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text;
-  toastsEl.appendChild(el); while (toastsEl.children.length > 3) toastsEl.firstChild.remove();
+  placeToasts(); toastsEl.appendChild(el); while (toastsEl.children.length > (ui.screen === 'fight' ? 2 : 3)) toastsEl.firstChild.remove();
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350); }, t === 'broadcast' ? 4200 : t === 'class' ? 3400 : 2600);
 }
+// In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
+function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 function pushMsgs(msgs) { msgs.forEach(m => logRun(m.text, m.t)); msgs.slice().sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
@@ -242,9 +244,11 @@ function shopHTML() {
 
 // ---------- District ----------
 const DIST_GLYPH = { infirmary: '+', sanctum: '♥', undercity: '!', scout: '?', enchanter: 'E' };
+// Infirmary at full HP would do nothing; block it unless it's the only district left
+function distFull(k) { return k === 'infirmary' && run.hp >= maxHp(run) && run.districts.length > 1; }
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage === 'ready';
-  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
+  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done || distFull(k) ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : distFull(k) ? 'Already at full HP' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done && !distFull(k) ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
   return `<main class="screen district">${topBar(roundLabel() + ' · District')}${champLine()}
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     <div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
@@ -361,6 +365,7 @@ function summarize(f, side) {
 function startFightUI() {
   ui.fight = newFight(run);
   ui.busy = false; ui.screen = 'fight'; ui.sheet = null;
+  toastsEl.replaceChildren(); // shop toasts don't carry into the fight
   const f = ui.fight;
   say2(f, `[${f.B.name} enters the arena.]`, 'sys');
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
@@ -658,6 +663,7 @@ function render() {
   app.innerHTML = h + sh + coachHTML();
   coachHighlight();
   if (scr === 'fight') updateFight();
+  placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 
@@ -728,7 +734,7 @@ function onAct(el) {
     case 'shop-done': leaveShop(run, null, msgs); pushMsgs(msgs); ui.distDone = null; saveRun(); return go('district');
     case 'back-shop': run.stage = 'shop'; saveRun(); return go('shop');
     case 'district': {
-      const k = d.k; if (!useDistrict(run, k)) return; ui.distDone = k;
+      const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
       if (k === 'sanctum') toast(`[The world mends. +${sanctum(run)} Hearts]`, 'loot');
       if (k === 'scout') ui.sheet = { type: 'scout' };
