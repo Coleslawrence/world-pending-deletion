@@ -9,6 +9,23 @@ function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch
 function lsDel(k) { try { localStorage.removeItem(k); } catch (e) { } if (k === 'le-run-1' && typeof schedulePush === 'function') schedulePush(); }
 const RUN_KEY = 'le-run-1', META_KEY = 'le-meta-1';
 
+// ---------- Screen fit ----------
+// Some iOS versions size a home screen app shorter than the screen by the status bar while still drawing it under
+// the status bar: the top is hidden and a dead band is left at the bottom. Stretch to the real screen in that case.
+function screenInfo() {
+  const pr = document.createElement('div'); pr.className = 'sa-probe'; document.body.appendChild(pr); const cs = getComputedStyle(pr), top = parseFloat(cs.paddingTop) || 0, bottom = parseFloat(cs.paddingBottom) || 0; pr.remove();
+  const portrait = innerHeight >= innerWidth, sh = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+  const vh = Math.min(innerHeight, document.documentElement.clientHeight);
+  return { top, bottom, sh, vh, standalone: !!navigator.standalone || matchMedia('(display-mode: standalone)').matches };
+}
+function fitScreen() {
+  const root = document.documentElement; root.style.removeProperty('--app-h');
+  const s = screenInfo(), short = s.sh - s.vh;
+  if (navigator.standalone && s.top > 0 && short > 0 && Math.abs(short - s.top) <= 2) root.style.setProperty('--app-h', s.sh + 'px');
+}
+fitScreen();
+addEventListener('resize', () => setTimeout(fitScreen, 60));
+
 const hot = window.claude && window.claude.hot;
 let meta = migrateMeta(lsGet(META_KEY));
 bindMeta(meta);
@@ -842,9 +859,11 @@ function scoutSheet() {
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
+// Shown in the Menu so a layout report can include what the device told the game
+function screenLine() { const s = screenInfo(); return `[Display: ${innerWidth}×${s.vh} of ${s.sh} · insets ${Math.round(s.top)}/${Math.round(s.bottom)}${s.standalone ? ' · app' : ''}${document.documentElement.style.getPropertyValue('--app-h') ? ' · stretched' : ''}]`; }
 function menuSheet() {
   const cs = !cloud.on ? (FIREBASE ? '' : 'Progress is saved on this device only.') : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
-  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
+  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}<br><span class="scr-info">${screenLine()}</span></p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
     ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
 }
