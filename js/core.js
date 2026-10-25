@@ -944,6 +944,7 @@ function sanitizeSnap(x, owner) {
     bar, gear, history, cause: str(x.cause, 60) || null, hearts: num(x.hearts, 0, 20, 0), maxHearts: num(x.maxHearts, 1, 20, 10), wins: num(x.wins, 0, 20, 0), elite: num(x.elite, 0, 4, 0), entrant: num(x.entrant, 0, 99999, 0),
     hiddenPath: HIDDEN_PATHS[x.hiddenPath] ? x.hiddenPath : null, at: num(x.at, 0, 1e15, 0), owner: owner || null, shared: !!owner,
     rec: sanitizeRec(x.rec, x.worldType),
+    rank: rankIdx(x.rank) >= 0 ? x.rank : null, rp: num(x.rp, 0, 1e6, 0), kills: num(x.kills, 0, 9999, 0),
   };
 }
 function earnTitle(run, id, msgs) {
@@ -1994,7 +1995,9 @@ function resolveFight(run, f, meta, rng) {
       }
     }
   }
-  if (won && spec.snap && spec.snap.owner) res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
+  if (won && spec.snap && spec.snap.owner) res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
+  // A shared champion that beats you earns its owner's champion RP (see champWin)
+  if (!won && spec.snap && spec.snap.owner) res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
   if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
   return res;
@@ -2022,6 +2025,7 @@ function echoesFor(run, outcome) {
 function endRun(run, meta, outcome) {
   if (outcome === 'erased') { run.hearts = 0; eraseRecord(run, REC_MAX); } // an abandoned world goes all at once
   const snap = snapshot(run);
+  if (meta.rank && !run.practice) Object.assign(snap, { rank: meta.rank.letter, rp: 0, kills: 0 });
   if (outcome === 'erased') { meta.erased.unshift(snap); meta.erased = meta.erased.slice(0, 20); }
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
   meta.runs++;
@@ -2179,6 +2183,34 @@ function historyLine(h) {
   if (h.outcome === 'erased') return `[Promoted to ${h.to}-rank. ${h.world} was erased on the way.]`;
   return h.lost ? `[Promoted to ${h.to}-rank. ${h.world} was spared, missing ${h.lost} entr${h.lost === 1 ? 'y' : 'ies'}.]` : `[Promoted to ${h.to}-rank. ${h.world} was spared without a scratch.]`;
 }
+// Champion rank: a filed champion keeps its Entrant's rank, earns 10 RP for each win in another Entrant's tournament,
+// and climbs a letter every 30 RP, up to S. Returns the System's line for the owner, or null.
+const CHAMP_STEP = 30;
+function champWin(snap, spared) {
+  snap.kills = (snap.kills || 0) + 1; snap.rp = (snap.rp || 0) + 10;
+  let up = false;
+  while (snap.rp >= CHAMP_STEP && rankIdx(snap.rank || 'F') < rankIdx('S')) { snap.rp -= CHAMP_STEP; snap.rank = nextRank(snap.rank || 'F'); up = true; }
+  const who = snap.champ, n = snap.kills;
+  if (spared) return up ? `[Your champion ${who}, now ${snap.rank}-rank, has defended the elite bracket ${n} time${n === 1 ? '' : 's'}.]` : null;
+  if (up) return `[Your erased champion ${who}, now ${snap.rank}-rank, has erased ${n} world${n === 1 ? '' : 's'}.]`;
+  return n === 1 ? `[Your erased champion ${who} has erased a world in another Entrant's tournament.]` : null;
+}
+// Pending World seasons: one week, Monday to Monday on the game-day clock. Each daily top-10 place pays points,
+// and every posted score pays 1. The week's top Entrant is the Prime Entrant until the next season closes.
+const SEASON_PTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const SEASON_TITLE = 'Prime Entrant';
+function weekOf(date) { const d = Date.parse(date + 'T00:00:00Z'), back = (new Date(d).getUTCDay() + 6) % 7; return new Date(d - back * 864e5).toISOString().slice(0, 10); }
+function weekDates(start) { const d = Date.parse(start + 'T00:00:00Z'); return Array.from({ length: 7 }, (_, i) => new Date(d + i * 864e5).toISOString().slice(0, 10)); }
+// days: one list per game day, each sorted best first (the day's top 20). Later days set the name, sigil and rank shown.
+function seasonTable(days) {
+  const by = {};
+  days.forEach(rows => (rows || []).forEach((r, i) => {
+    const e = by[r.uid] = by[r.uid] || { uid: r.uid, pts: 0, days: 0, best: 0 };
+    e.pts += (SEASON_PTS[i] || 0) + 1; e.days++; e.best = Math.max(e.best, r.score || 0);
+    Object.assign(e, { name: r.name, sigil: r.sigil, color: r.color, rank: r.rank || null });
+  }));
+  return Object.values(by).sort((a, b) => b.pts - a.pts || b.best - a.best || (a.uid < b.uid ? -1 : 1));
+}
 function choosePerk(run, meta, k, msgs) {
   const i = run.pending.findIndex(p => p.type === 'perk'); if (i < 0) return false;
   const p = run.pending[i]; if (!p.offers.includes(k) || meta.rank.perks.includes(k)) return false;
@@ -2191,7 +2223,7 @@ if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
-  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
+  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,

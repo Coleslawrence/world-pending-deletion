@@ -68,6 +68,25 @@ const er = G.newRun(w, { name: 'E', stats: { STR: 3, AGI: 3, INT: 3, VIT: 3, LUK
 G.startElite(er, em); ok(er.eliteBracket.length === 3 && er.eliteBracket[2].id === 'undefeated' && er.eliteBracket[0].snap.at !== er.eliteBracket[1].snap.at, 'A-rank Elite has 3 fights');
 er.eliteIdx = 2; const c2 = G.curRound(er); er.eliteIdx = 1; ok(c2 === G.curRound(er), 'Elite scaling capped at fight 2');
 em.rank.letter = 'B'; const br = G.newRun(w, { name: 'E', stats: { STR: 3, AGI: 3, INT: 3, VIT: 3, LUK: 3 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, em); G.startElite(br, em); ok(br.eliteBracket.length === 2, 'B-rank Elite has 2 fights');
+// Champion rank: the filed champion keeps its Entrant's rank and climbs a letter every 3 wins elsewhere
+const cm = G.newMeta(); cm.rank.letter = 'C';
+const cr = G.newRun(w, { name: 'L', stats: { STR: 3, AGI: 3, INT: 3, VIT: 3, LUK: 3 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, cm);
+const cs = G.endRun(cr, cm, 'erased').snap;
+ok(cs.rank === 'C' && cs.rp === 0 && cs.kills === 0, 'snapshot carries rank');
+const l1 = G.champWin(cs, false), l2 = G.champWin(cs, false), l3 = G.champWin(cs, false);
+ok(/has erased a world in another/.test(l1) && l2 === null && /now B-rank, has erased 3 worlds/.test(l3) && cs.rank === 'B' && cs.rp === 0, 'champion lines ' + [l1, l2, l3].join(' | '));
+const top = { champ: 'Z', rank: 'S', rp: 20 }; G.champWin(top, true); ok(top.rank === 'S' && top.rp === 30, 'champion rank stops at S');
+const sp2 = { champ: 'Q', rank: 'A', rp: 20 }; ok(/Your champion Q, now S-rank, has defended the elite bracket 1 time\./.test(G.champWin(sp2, true)), 'spared champion line');
+const san = G.sanitizeSnap(Object.assign({}, cs, { rank: 'Q', rp: -4, kills: 'x' }), 'u'); ok(san.rank === null && san.rp === 0 && san.kills === 0, 'shared rank sanitised');
+ok(G.sanitizeSnap(cs, 'u').rank === 'B', 'shared rank kept');
+// Seasons
+ok(G.weekOf('2026-10-25') === '2026-10-19' && G.weekOf('2026-10-26') === '2026-10-26' && G.weekOf('2026-11-01') === '2026-10-26', 'weeks run Monday to Sunday');
+ok(G.weekDates('2026-10-26').length === 7 && G.weekDates('2026-10-26')[6] === '2026-11-01', 'week dates');
+const day = k => Array.from({ length: k }, (_, i) => ({ uid: 'u' + i, name: 'N' + i, score: 1000 - i }));
+const tbl = G.seasonTable([day(12), day(3), [{ uid: 'u11', name: 'Late', score: 5000, rank: 'B' }]]);
+ok(tbl[0].uid === 'u0' && tbl[0].pts === 52 && tbl[0].days === 2, 'first place twice: 52 points');
+const u11 = tbl.find(e => e.uid === 'u11'); ok(u11.pts === 1 + 26 && u11.name === 'Late' && u11.rank === 'B', 'outside top 10 pays 1, latest name and rank win');
+ok(G.seasonTable([]).length === 0, 'empty week');
 console.log(`rank: ${n - bad} of ${n} checks passed`);
 
 // Career sim
