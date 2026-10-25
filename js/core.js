@@ -124,6 +124,8 @@ const GEAR = {
   pilgrim_mace: { name: 'Pilgrim Mace', slot: 'weapon', tags: ['zealot'], rank: 'E', stats: { VIT: 1, STR: 1 }, pas: { hitHeal: 2 }, text: v => `Heal ${v.hitHeal} whenever a skill of yours deals damage.` },
   duelist_rapier: { name: "Duelist's Rapier", slot: 'weapon', tags: ['blade'], rank: 'D', stats: { AGI: 2 }, pas: { critBonus: 0.1 }, fix: { firstCrit: 1 }, text: v => `+${pct(v.critBonus)} critical chance. Your first hit each fight is critical.` },
   executioner_axe: { name: "Executioner's Axe", slot: 'weapon', tags: ['reaper'], rank: 'D', stats: { STR: 2 }, pas: { execBonus: 0.4 }, text: v => `+${pct(v.execBonus)} damage to opponents below 30% HP.` },
+  spiked_buckler: { name: 'Spiked Buckler', slot: 'weapon', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockThorns: 0.3 }, text: v => `Gaining Block also gives Thorns equal to ${pct(v.blockThorns)} of it.` },
+  blight_kris: { name: 'Blight Kris', slot: 'weapon', tags: ['venom'], rank: 'E', stats: { AGI: 2 }, pas: { startPoison: 3 }, text: v => `Your opponent starts each fight with ${v.startPoison} Poison.` },
   thunder_maul: { name: 'Thunder Maul', slot: 'weapon', tags: ['storm'], rank: 'C', stats: { STR: 2 }, pas: { stunDmg: 6 }, fix: { firstStun: 1 }, text: v => `Your first damaging skill each fight Stuns. Your Stuns deal ${v.stunDmg} damage.` },
   chain_mail: { name: 'Chain Mail', slot: 'armour', tags: ['bastion'], rank: 'E', stats: { VIT: 2 }, pas: { startBlock: 8 }, text: v => `Start each fight with ${v.startBlock} Block.` },
   tower_shield: { name: 'Tower Shield', slot: 'armour', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockKeep: 0.3 }, text: v => `Keep ${pct(v.blockKeep)} of your Block between turns.` },
@@ -1124,6 +1126,7 @@ function newFight(run, rng) {
     X.block += (P.startBlock || 0) + Math.round((P.startBlockPct || 0) * X.maxHp);
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
+    if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
   planIntent(f, B);
@@ -1202,6 +1205,7 @@ function heal(f, X, v) {
 function gainBlock(f, X, v) {
   v = Math.round(v); if (v <= 0) return;
   X.block += v;
+  if (X.P.blockThorns) X.thorns += v * X.P.blockThorns;
   if (X.P.blockStrike) { const Y = opp(f, X); if (Y.hp > 0) hit(f, X, Y, v * X.P.blockStrike, { noCrit: 1, noDodge: 1, isThorns: true, src: 'Bastion' }); }
 }
 // --- statuses and reactions ---
@@ -1330,7 +1334,7 @@ function useSkill(f, X, s, opt) {
   if (fx.empower) X.empower = Math.max(X.empower, fx.empower + 1);
   if (fx.evade) X.evade += fx.evade;
   if (fx.nextCrit) X.critNext = true;
-  if (fx.thorns) X.thorns = fx.thorns * p;
+  if (fx.thorns) X.thorns = Math.max(X.thorns, fx.thorns * p);
   if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); X.burn = 0; X.poison = 0; X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
   if (ls && dealt > 0) heal(f, X, dealt * ls);
