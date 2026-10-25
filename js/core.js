@@ -19,7 +19,7 @@ const ARCH = {
   venom: { name: 'Venom', stat: 'AGI', theme: 'Poison and drain', path: 'Plaguebringer', b: ['Poison you apply +1.', 'Poison you apply +1 more.', 'Poison deals 50% more damage.'] },
   blade: { name: 'Bladedancer', stat: 'AGI', theme: 'Bleed and multi-hit', path: 'Bladedancer', b: ['Multi-hit skills hit once more.', 'Bleed you apply +2.', 'Bleed deals double damage.'] },
   bastion: { name: 'Bastion', stat: 'VIT', theme: 'Block and Thorns', path: 'Bulwark', b: ['Keep 25% of your Block between turns.', 'Always have 4 Thorns.', 'Gaining Block also deals half of it as damage.'] },
-  arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown.', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
+  arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown. Your other skills: 1 turn shorter for every 8 INT (minimum 1).', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
   zealot: { name: 'Zealot', stat: 'VIT', theme: 'Healing and Regen', path: 'Saint', b: ['Healing +10%.', 'Heal 2 at the start of each of your turns (grows with level).', 'Overhealing becomes Block.'] },
   reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Reaper', b: ['+25% damage to opponents below half HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
   storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 12 damage plus your STR and shatter the opponent\'s Block. Stopping a big attack Empowers you for 2 turns.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
@@ -995,7 +995,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (t('venom') >= 1) add('poisonPlus', 1); if (t('venom') >= 2) add('poisonPlus', 1); if (t('venom') >= 3) set('poisonMult', 1.5);
   if (t('blade') >= 1) set('extraHit', 1); if (t('blade') >= 2) add('bleedPlus', 2); if (t('blade') >= 3) set('bleedMult', 2);
   if (t('bastion') >= 1) add('blockKeep', 0.25); if (t('bastion') >= 2) add('thornsAlways', Math.round(4 * lm)); if (t('bastion') >= 3) set('blockStrike', 0.5);
-  if (t('arcanist') >= 1) add('quickCd', 1); if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
+  if (t('arcanist') >= 1) { add('quickCd', 1); set('arcCd', 8); } if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
   if (t('zealot') >= 1) add('healPct', 0.1); if (t('zealot') >= 2) add('regen', Math.round(2 * lm)); if (t('zealot') >= 3) set('overhealBlock', 1);
   if (t('reaper') >= 1) add('vsHalf', 0.25); if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
   if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
@@ -1328,6 +1328,7 @@ function fighterSkills(barPieces, s, P) {
     const def = moddedDef(p.id, p.mods);
     if (P.extraHit && (def.fx.hits || 1) >= 2) def.fx.hits = def.fx.hits + 1;
     if (def.quick && P.quickCd) def.cd = Math.max(1, def.cd - P.quickCd);
+    if (!def.quick && P.arcCd && def.cd > 1) def.cd = Math.max(1, def.cd - Math.floor(s.INT / P.arcCd)); // Arcanist: INT shortens cooldowns
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
     out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0 });
   });
