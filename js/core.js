@@ -653,6 +653,35 @@ function shuffle(a, rng) { a = a.slice(); for (let i = a.length - 1; i > 0; i--)
 function wpick(items, weights, rng) { let t = 0; weights.forEach(w => t += w); let x = rnd(rng) * t; for (let i = 0; i < items.length; i++) { x -= weights[i]; if (x <= 0) return items[i]; } return items[items.length - 1]; }
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
+// ---------- Seeded runs (Pending World) ----------
+// A run with run.seed draws from named streams instead of Math.random, so everyone playing the same seed gets the same world,
+// record, draft, shops, opponents and events. Each call gets a fresh generator keyed by purpose, round and how many times that
+// purpose has drawn this round, so a shop reroll never shifts the opponents, and a reloaded save carries on where it left off.
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function seedRng(str) { return mulberry32(hashStr(str)); }
+function runRng(run, purpose) {
+  run.rngN = run.rngN || {};
+  const r = curRound(run), k = purpose + ':' + r, n = run.rngN[k] = (run.rngN[k] || 0) + 1;
+  return seedRng(run.seed + ':' + purpose + ':' + r + ':' + n);
+}
+// The rng to use: the one passed in, else the run's stream for this purpose, else Math.random for a normal run
+function stream(run, purpose, rng) { return rng || (run && run.seed ? runRng(run, purpose) : undefined); }
+// The game day: the date at UTC+9:30 (a fixed offset, no daylight saving), so each day starts at 14:30 UTC
+const DAY_OFFSET = 9.5 * 3600 * 1000;
+function dailyDate(now) { return new Date((now == null ? Date.now() : now) + DAY_OFFSET).toISOString().slice(0, 10); }
+function dailySeed(date) { return 'wpd:' + date; }
+function dailyWorld(date) { return genWorld(seedRng(dailySeed(date) + ':world')); }
+function dailyRecord(date, type) { return buildRecord(type, seedRng(dailySeed(date) + ':record')); }
+// Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
+function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {} }); }
+// Leaderboard score: round reached, then Hearts left, then fewest turns, in one sortable number
+function dailyScore(run) {
+  const turns = (run.history || []).reduce((a, h) => a + (h.turns || 0), 0);
+  const wins = Math.min(12, run.wins || 0), hearts = Math.min(20, Math.max(0, run.hearts)), t = Math.min(999, turns);
+  return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
+}
+
 function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0 }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
@@ -675,35 +704,37 @@ function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, out = [
 // setup: { name, sigil, color, stats, gifts:[], patron: 'war'|'trick'|'ruin'|'none' }
 function newRun(world, setup, meta, rng) {
   bindMeta(meta);
+  const U = setup.seed ? {} : meta.unlocks, rs = rng || (setup.seed ? seedRng(setup.seed + ':setup') : undefined);
   const home = WORLD_TYPES[world.type].home;
-  const pool = unlockedArch(meta).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
-  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rng).concat(shuffle(pool.filter(k => !allies.includes(k)), rng)).slice(0, 3);
+  const pool = unlockedArch({ unlocks: U }).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
+  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer);
   const G = setup.gifts;
   const run = {
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
     stats: Object.assign({}, setup.stats), statPts: 0, level: 1, xp: 0,
-    gold: Math.max(0, chk.left) * 3 + (meta.unlocks.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
+    gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
     favour: { war: 0, trick: 0, ruin: 0 }, gifted: { war: 0, trick: 0, ruin: 0 },
     slots: setup.gifts.includes('prodigy') ? 5 : 4, bar: [], gear: { weapon: null, armour: null, accessory: null }, bench: [], uid: 0,
     shop: null, locks: null, bonusSlot: null, merges: setup.gifts.includes('merger') ? 3 : 0,
     round: 1, losses: 0, elite: false, eliteIdx: 0, wins: 0, eliteWins: 0, hearts: 10, maxHearts: 10,
-    pending: [], log: [], hp: 0, ended: false, stage: 'draft', rerolls: 1 + (meta.unlocks.reroll ? 1 : 0) + (G.includes('veteran') ? 1 : 0), draft: [],
+    pending: [], log: [], hp: 0, ended: false, stage: 'draft', rerolls: 1 + (U.reroll ? 1 : 0) + (G.includes('veteran') ? 1 : 0), draft: [],
     met: [], choices: null, chosen: null, wager: null, wagerOn: false, districts: [], scouted: false, nextFlags: {}, usedRewind: false, usedBreath: false, path: null, history: [],
     title: setup.title && meta.titles[setup.title] ? setup.title : null, hiddenPath: null, milestones: {}, chains: {}, quests: [], wagersWon: 0, freeRerolls: 0, haggle: false,
-    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rng) * 7), extraGiven: false, earned: [],
+    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, earned: [],
   };
+  if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // System quests: two visible, every hidden one quietly active
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden), rng).slice(0, 2);
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden), rs).slice(0, 2);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
   else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
-  run.draft = rollDraft(run, rng);
-  ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, rng); });
+  run.draft = rollDraft(run, stream(run, 'draft', rng));
+  ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
   run.hp = maxHp(run);
   return run;
 }
@@ -776,7 +807,7 @@ function refreshShop(run, rng, kind) {
   });
 }
 function rerollCost(run) { return run.freeRerolls > 0 ? 0 : hasGift(run, 'f_unlucky') ? 3 : 2; }
-function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, rng, kind || 'skill'); return true; }
+function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
 function interestCap(run) { return hasGift(run, 'golden') ? 5 : 3; }
@@ -948,7 +979,7 @@ function checkMilestones(run, msgs) {
     if (s[k] >= 10 && !run.milestones[k]) {
       run.milestones[k] = true;
       msgs && msgs.push({ t: 'level', text: `[Stat milestone: ${k} 10. ${MILESTONES[k].name}: ${MILESTONES[k].desc}]` });
-      if (k === 'VIT') { run.maxHearts++; run.hearts++; amendRecord(run, msgs); }
+      if (k === 'VIT') { run.maxHearts++; run.hearts++; amendRecord(run, msgs, stream(run, 'record')); }
       if (k === 'LUK') run.freeRerolls++;
     }
   });
@@ -1045,7 +1076,8 @@ function makeChoices(run, meta, rng) {
   if (!early && run.sabotage && !run.met.includes(run.sabotage)) { easy.id = run.sabotage; easy.sabotaged = true; if (pool[1] === run.sabotage) pool[1] = pool[0]; }
   let hard = { kind: early ? 'monster' : 'rival', id: pool[1] || pool[0], hard: true };
   const chance = run.world.mod === 'restless' ? 0.6 : 0.3;
-  const erased = meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
+  // Pending World never draws other champions, so every player faces the same fights
+  const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 3 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
   return [easy, hard];
 }
@@ -1173,7 +1205,7 @@ function dueChainEvents(run) {
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const E = EVENTS[key], o = E && E.opts[idx];
   if (!o || (o.can && !o.can(run))) return false;
-  o.go(run, meta, rng, msgs || []);
+  o.go(run, meta, stream(run, 'event', rng), msgs || []);
   return true;
 }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -1213,17 +1245,18 @@ function completeQuest(run, q, msgs) {
   if (META) META.archive.quests[q.id] = true;
   msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${QUEST_REWARD[Q.reward]}.]` });
   const r = Q.reward;
-  if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3) });
+  if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(run, 'loot')) });
   if (r === 'gold5') run.gold += 5; if (r === 'gold6') run.gold += 6; if (r === 'gold8') run.gold += 8;
-  if (r === 'heart') { run.maxHearts++; run.hearts++; amendRecord(run, msgs); }
+  if (r === 'heart') { run.maxHearts++; run.hearts++; amendRecord(run, msgs, stream(run, 'record')); }
   if (r === 'favour') addFavour(run, 'war', 2, META, msgs);
-  if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
+  if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool, stream(run, 'loot')); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
 }
 // ---------- Additional Gift (after round 4) ----------
 function extraGiftOffers(run, rng) {
   const c = runCounts(run);
   const top = Object.keys(c).filter(k => run.arch.includes(k)).sort((a, b) => c[b] - c[a])[0] || run.arch[0];
-  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, META) && !['latebloomer', 'veteran'].includes(k));
+  const M = run.seed && META ? levelMeta(META) : META;
+  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
   return ['aff_' + top].concat(shuffle(pool, rng).slice(0, 2));
 }
 function applyGift(run, k, msgs) {
@@ -1247,32 +1280,32 @@ function rollDraft(run, rng) {
   while (out.length < 6 && g++ < 200) { const id = pick(pool, rng); if (!out.includes(id)) out.push(id); }
   return shuffle(out, rng);
 }
-function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, rng); return true; }
+function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); return true; }
 function confirmDraft(run, ids, meta, rng) {
   ids.forEach(id => addPiece(run, id, []));
   run.draft = [];
-  run.shop = null; run.locks = null; refreshShop(run, rng);
+  run.shop = null; run.locks = null; refreshShop(run, stream(run, 'shop', rng));
   enterChoose(run, meta, rng);
 }
 function enterChoose(run, meta, rng, msgs) {
   run.scouted = false; run.wagerOn = false; run.chosen = null;
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
-  if (run.visit > 1) { gainXp(run, 2, msgs); refreshShop(run, rng); }
+  if (run.visit > 1) { gainXp(run, 2, msgs); refreshShop(run, stream(run, 'shop', rng)); }
   run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
-  if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, rng) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
+  if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) run.pending.push({ type: 'event', key: k }); });
   if (run.elite) { run.wager = null; run.stage = 'shop'; return; }
-  run.choices = makeChoices(run, meta, rng);
-  run.wager = makeWager(run, rng);
+  run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
+  run.wager = makeWager(run, stream(run, 'opps', rng));
   run.stage = 'choose';
 }
-function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'district'; if (!run.districts || !run.districts.length) run.districts = rollDistricts(run, rng); }
-function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') run.scouted = true; if (k === 'undercity') run.pending.push({ type: 'event', key: undercityEvent(run, rng) }); return true; }
+function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'district'; if (!run.districts || !run.districts.length) run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
+function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') run.scouted = true; if (k === 'undercity') run.pending.push({ type: 'event', key: undercityEvent(run, stream(run, 'event', rng)) }); return true; }
 
 // ---------- Fighters ----------
 function skillStat(def) { return def.basic ? null : ARCH[def.tags[0]].stat; }
@@ -1342,7 +1375,7 @@ function newFight(run, rng) {
   const spec = currentSpec(run);
   const A = buildPlayer(run), B = buildEnemy(run, spec);
   const f = {
-    rng: rng || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
+    rng: stream(run, 'fight', rng) || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
     tally: { burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && run.chains && run.chains.official === 'tip'),
@@ -1831,7 +1864,7 @@ const REACTIONS = {
 
 // ---------- After a fight ----------
 function resolveFight(run, f, meta, rng) {
-  const msgs = [], won = f.winner === 'A', spec = f.spec;
+  const msgs = [], won = f.winner === 'A', spec = f.spec, lr = stream(run, 'loot', rng);
   bindMeta(meta);
   run.hp = Math.max(0, f.A.hp);
   if (f.usedBreath) run.usedBreath = true;
@@ -1852,7 +1885,7 @@ function resolveFight(run, f, meta, rng) {
     if (ok) {
       const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0);
       run.gold += pay; run.wagersWon = (run.wagersWon || 0) + 1;
-      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, rng);
+      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, lr);
       if (run.wagersWon >= 3) earnTitle(run, 'high_roller', msgs);
     }
     else msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.]` });
@@ -1883,9 +1916,9 @@ function resolveFight(run, f, meta, rng) {
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
-    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, rng) });
-    if (spec.hard) { run.bonusSlot = rollPiece(run, rng, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
-    if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), rng); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
+    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr) });
+    if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
       run.eliteWins++;
       if (run.eliteIdx >= run.eliteBracket.length - 1) { res.eliteOver = true; res.eliteCleared = true; }
@@ -1918,7 +1951,7 @@ function resolveFight(run, f, meta, rng) {
 }
 function startElite(run, meta, rng) {
   run.elite = true; run.eliteIdx = 0;
-  const champs = meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
+  const champs = run.seed ? [] : meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
   const first = champs.length ? { kind: 'champion', snap: pick(champs, rng) } : { kind: 'legend', id: 'legend' };
   run.eliteBracket = [first, { kind: 'legend', id: 'undefeated' }];
   run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * 0.3));
@@ -1931,7 +1964,7 @@ function echoesFor(run, outcome) {
   return e;
 }
 function endRun(run, meta, outcome) {
-  if (outcome === 'erased') eraseRecord(run, REC_MAX); // an abandoned world goes all at once
+  if (outcome === 'erased') { run.hearts = 0; eraseRecord(run, REC_MAX); } // an abandoned world goes all at once
   const snap = snapshot(run);
   if (outcome === 'erased') { meta.erased.unshift(snap); meta.erased = meta.erased.slice(0, 20); }
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
@@ -1945,6 +1978,7 @@ if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
+  mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
