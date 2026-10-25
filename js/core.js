@@ -609,26 +609,26 @@ function hiddenPathOf(counts) {
 
 // ---------- Enemies ----------
 const ENEMIES = {
-  goblin: { name: 'Goblin Pit-Fighter', style: 'Fast, dirty fighter', tier: 1, hp: 40, skills: [{ n: 'Shiv', fx: { dmg: 6 } }, { n: 'Dirty Trick', fx: { dmg: 3, weaken: 1 } }], script: [0, 0, 1] },
-  golem: { name: 'Shield Golem', style: 'Walls up, hits hard', tier: 1, hp: 52, skills: [{ n: 'Slam', fx: { dmg: 9 } }, { n: 'Stone Wall', fx: { block: 10 } }], script: [1, 0] },
-  drake: { name: 'Venom Drake', style: 'Poisons, then waits', tier: 1, hp: 44, skills: [{ n: 'Bite', fx: { dmg: 5 } }, { n: 'Venom Spit', fx: { poison: 4 } }], script: [1, 0, 0] },
-  ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, hp: 42, skills: [{ n: 'Claw', fx: { dmg: 3, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 5, lifesteal: 1 } }], script: [0, 0, 1] },
-  imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 4, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
-  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 18 } }, { n: 'Shove', fx: { dmg: 6 } }], script: [2, 0, 1] },
-  seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, rival: true, hp: 64, skills: [{ n: 'Shield of Faith', fx: { block: 12 } }, { n: 'Judgement', fx: { dmg: 3, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 10 } }], script: [0, 1, 2, 0, 1] },
-  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rival: true, hp: 74, enrage: 0.5, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
-  lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, rival: true, hp: 60, dodge: 0.1, skills: [{ n: 'Needle', fx: { dmg: 4, poison: 2 } }, { n: 'Thousand Needles', fx: { poison: 4, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
+  goblin: { name: 'Goblin Pit-Fighter', style: 'Fast, dirty fighter', tier: 1, rank: 'E', hp: 40, skills: [{ n: 'Shiv', fx: { dmg: 6 } }, { n: 'Dirty Trick', fx: { dmg: 3, weaken: 1 } }], script: [0, 0, 1] },
+  golem: { name: 'Shield Golem', style: 'Walls up, hits hard', tier: 1, rank: 'E', hp: 52, skills: [{ n: 'Slam', fx: { dmg: 9 } }, { n: 'Stone Wall', fx: { block: 10 } }], script: [1, 0] },
+  drake: { name: 'Venom Drake', style: 'Poisons, then waits', tier: 1, rank: 'E', hp: 44, skills: [{ n: 'Bite', fx: { dmg: 5 } }, { n: 'Venom Spit', fx: { poison: 4 } }], script: [1, 0, 0] },
+  ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, rank: 'E', hp: 42, skills: [{ n: 'Claw', fx: { dmg: 3, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 5, lifesteal: 1 } }], script: [0, 0, 1] },
+  imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, rank: 'E', hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 4, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
+  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 18 } }, { n: 'Shove', fx: { dmg: 6 } }], script: [2, 0, 1] },
+  seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, rank: 'B', rival: true, hp: 80, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 16, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
+  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rank: 'D', rival: true, hp: 56, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
+  lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 4, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
   masked: { name: 'The Masked Entrant', style: 'Copies your last skill', tier: 2, rival: true, hp: 62, skills: [{ n: 'Strike', fx: { dmg: 8 } }, { n: 'Mirror Form', fx: { mirror: 1 }, label: 'Copying your last skill' }], script: [0, 1] },
-  kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
-  calder: { name: 'Ser Calder', style: 'A knight who fights by the book', tier: 2, rival: true, hp: 68, skills: [{ n: 'Lance', fx: { dmg: 10 } }, { n: 'Shield Wall', fx: { block: 10 } }, { n: 'Disgrace', fx: { dmg: 4, weaken: 2 } }], script: [0, 1, 2] },
-  leviathan: { name: 'The Leviathan Queen', style: 'Floods the arena every 3rd turn, Weakening whoever has less Block', tier: 3, final: true, hp: 165, flood: true, skills: [{ n: 'Tidal Lash', fx: { dmg: 22 } }, { n: 'Coral Armour', fx: { block: 16 } }, { n: 'Crushing Depths', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2] },
-  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, final: true, hp: 112, aura: 0.7, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Pyre', fx: { burn: 3 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
-  bone_saint: { name: 'The Bone Saint', style: 'Poisons, drains, and rises once at 30% HP', tier: 3, final: true, hp: 135, revive: 0.3, skills: [{ n: 'Bone Lance', fx: { dmg: 10 } }, { n: 'Plague Hymn', fx: { poison: 3 } }, { n: 'Marrow Feast', fx: { dmg: 7, lifesteal: 0.5 } }], script: [1, 0, 2, 0] },
-  thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, final: true, hp: 92, briar: 1, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
-  archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, final: true, hp: 85, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
-  forge_king: { name: 'The Forge King', style: 'His Block never fades and grows every turn', tier: 3, final: true, hp: 120, forge: 3, skills: [{ n: 'Molten Hammer', fx: { dmg: 6, blockDmg: 0.4 } }, { n: 'Anvil Guard', fx: { block: 10 } }, { n: 'Quench', fx: { dmg: 13 } }], script: [0, 1, 2, 0] },
-  legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
-  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
+  kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rank: 'A', rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
+  calder: { name: 'Ser Calder', style: 'A knight who fights by the book', tier: 2, rank: 'C', rival: true, hp: 76, skills: [{ n: 'Lance', fx: { dmg: 14 } }, { n: 'Shield Wall', fx: { block: 10 } }, { n: 'Disgrace', fx: { dmg: 6, weaken: 2 } }], script: [0, 1, 0, 2] },
+  leviathan: { name: 'The Leviathan Queen', style: 'Floods the arena every 3rd turn, Weakening whoever has less Block', tier: 3, rank: 'A', final: true, hp: 165, flood: true, skills: [{ n: 'Tidal Lash', fx: { dmg: 22 } }, { n: 'Coral Armour', fx: { block: 16 } }, { n: 'Crushing Depths', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2] },
+  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, rank: 'A', final: true, hp: 112, aura: 0.7, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Pyre', fx: { burn: 3 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
+  bone_saint: { name: 'The Bone Saint', style: 'Poisons, drains, and rises once at 30% HP', tier: 3, rank: 'A', final: true, hp: 135, revive: 0.3, skills: [{ n: 'Bone Lance', fx: { dmg: 10 } }, { n: 'Plague Hymn', fx: { poison: 3 } }, { n: 'Marrow Feast', fx: { dmg: 7, lifesteal: 0.5 } }], script: [1, 0, 2, 0] },
+  thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, rank: 'A', final: true, hp: 92, briar: 1, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
+  archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, rank: 'A', final: true, hp: 85, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
+  forge_king: { name: 'The Forge King', style: 'His Block never fades and grows every turn', tier: 3, rank: 'A', final: true, hp: 120, forge: 3, skills: [{ n: 'Molten Hammer', fx: { dmg: 6, blockDmg: 0.4 } }, { n: 'Anvil Guard', fx: { block: 10 } }, { n: 'Quench', fx: { dmg: 13 } }], script: [0, 1, 2, 0] },
+  legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
+  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
 };
 const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute'];
 const RIVALS = ['seraphine', 'grukk', 'lyss', 'masked', 'kaito', 'calder'];
@@ -1060,7 +1060,7 @@ function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = 
 function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones }); }
 
 // ---------- Opponents: choice of two each round ----------
-const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95 };
+const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 function curRound(run) { return run.elite ? ROUNDS + run.eliteIdx : run.round; }
@@ -1071,14 +1071,16 @@ function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
   if (run.round >= ROUNDS) return [{ kind: 'final', id: WORLD_TYPES[run.world.type].final }];
   const early = run.round <= 3;
-  const pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
+  let pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
+  // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
+  if (!early) { const want = RANKS.indexOf('D') + run.round - 4, gap = id => ENEMIES[id].rank ? Math.abs(RANKS.indexOf(ENEMIES[id].rank) - want) : 0.5; pool = pool.map(id => ({ id, k: gap(id) + rnd(rng) * 1.5 })).sort((x, y) => x.k - y.k).map(x => x.id); }
   const easy = { kind: early ? 'monster' : 'rival', id: pool[0] };
   if (!early && run.sabotage && !run.met.includes(run.sabotage)) { easy.id = run.sabotage; easy.sabotaged = true; if (pool[1] === run.sabotage) pool[1] = pool[0]; }
   let hard = { kind: early ? 'monster' : 'rival', id: pool[1] || pool[0], hard: true };
   const chance = run.world.mod === 'restless' ? 0.6 : 0.3;
   // Pending World never draws other champions, so every player faces the same fights
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
-  if (run.round >= 3 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
+  if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -1087,6 +1089,13 @@ function specName(spec) {
   const n = ENEMIES[spec.id].name;
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
   return n;
+}
+// The rank letter an opponent fights at: Alphas are a rank above other monsters, and the Masked Entrant copies yours
+function specRank(spec, meta) {
+  if (spec.snap) return spec.snap.rank || null;
+  const t = ENEMIES[spec.id]; if (!t) return null;
+  if (spec.id === 'masked') return meta && meta.rank ? meta.rank.letter : null;
+  return spec.hard && spec.kind === 'monster' ? 'D' : t.rank || null;
 }
 function specStyle(spec) {
   if (spec.kind === 'erased') return `Erased. Fell in round ${spec.snap.round} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
@@ -1338,7 +1347,8 @@ function buildPlayer(run) {
 function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
-  const p = enemyPower(run) * (spec.hard ? TUNE.hard : 1), hm = enemyHpMul(run) * (spec.hard ? TUNE.hardHp : 1);
+  const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
+  const p = enemyPower(run) * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * (spec.hard ? TUNE.hardHp : 1) * alpha;
   if (spec.kind === 'erased' || spec.kind === 'champion') return buildSnapEnemy(spec.snap, p, hm, run);
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3;
@@ -1987,7 +1997,7 @@ if (typeof module !== 'undefined') module.exports = {
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
-  makeChoices, specName, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, resolveEvent, prefixTargets, applyPrefix,
+  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower,
