@@ -283,7 +283,7 @@ function titleHTML() {
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
-      <button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button>
+      <div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button></div>
       ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(window.WPD_CLOUD.displayName())} · cloud save on · <button class="link" data-act="signout">Sign out</button></p>` : ''}
     </div></main>`;
 }
@@ -789,6 +789,21 @@ function menuSheet() {
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
 }
 function syslogSheet() { return sheetWrap('System log', `<ul class="msgs">${run.log.slice().reverse().map(l => `<li class="t-${l.t}">${esc(l.text)}</li>`).join('') || '<li class="unk">Nothing yet.</li>'}</ul>`, `<button class="btn primary" data-act="close">Close</button>`); }
+// ---------- What's new ----------
+// Update notes from js/notes.js, one page per screen. Opening them marks the latest notes as seen.
+function newsUnseen() { return typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length && meta.notesSeen !== PATCH_NOTES[0].id; }
+function openNews() { ui.sheet = { type: 'news', p: 0 }; if (newsUnseen()) { meta.notesSeen = PATCH_NOTES[0].id; saveMeta(); } }
+function newsSheet() {
+  const N = PATCH_NOTES[0], n = N.pages.length, i = Math.min(ui.sheet.p || 0, n - 1), pg = N.pages[i];
+  const body = `<p class="sh-p fine">${esc(N.title)} · ${i + 1} of ${n}</p><p class="sh-p sysline">${esc(pg.sys)}</p><h4>${esc(pg.h)}</h4><ul class="msgs plain news">${pg.items.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`;
+  const foot = `<button class="btn ghost" data-act="news-page" data-p="${i - 1}" ${i ? '' : 'disabled'}>‹ Back</button>` + (i < n - 1 ? `<button class="btn primary" data-act="news-page" data-p="${i + 1}">Next ›</button>` : `<button class="btn primary" data-act="close">Done</button>`);
+  return sheetWrap("What's new", body, foot, 'sys news-sheet');
+}
+// Returning players see new notes once on the title screen; new players start with them marked seen
+function maybeShowNews() {
+  if (!newsUnseen() || ui.screen !== 'title' || ui.sheet) return;
+  if (meta.runs || meta.tutorialDone) { openNews(); render(); } else { meta.notesSeen = PATCH_NOTES[0].id; saveMeta(); }
+}
 function howtoSheet() {
   return sheetWrap('How to play', `<ul class="msgs plain">
     <li><b>Each round:</b> choose your opponent, shop, visit one district, then fight.</li>
@@ -874,7 +889,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { daily: dailySheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
@@ -920,6 +935,8 @@ function onAct(el) {
       pushMsgs(run.log.slice(), true);
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
     }
+    case 'news': openNews(); return render();
+    case 'news-page': ui.sheet = { type: 'news', p: Math.max(0, +d.p) }; return render();
     case 'close': ui.sheet = null; ui.confirmAbandon = false; ui.enchantSel = null; return render();
     case 'rec-snap': ui.recOpen = null; ui.sheet = { type: 'record', at: d.at, back: ui.sheet && ui.sheet.type }; return render();
     case 'rec-open': ui.recOpen = +d.p; return render();
@@ -1277,4 +1294,5 @@ document.addEventListener('keydown', e => {
   if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }
 });
 render();
+maybeShowNews();
 cloudInit();

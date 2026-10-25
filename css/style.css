@@ -573,3 +573,8 @@ button.brow:active { background: var(--panel); }
 /* Entrant Rank */
 .crest.k-trial { border-color: var(--sys); color: var(--sys); }
 .rank-hist { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 3px; font-family: var(--f-m); font-size: 12px; color: var(--sys); }
+/* What's new: one page of update notes per screen */
+.news-sheet .sysline { font-family: var(--f-m); font-size: 13px; color: var(--sys); margin: 2px 0 8px; }
+.news-sheet h4 { margin: 0 0 6px; }
+.news-sheet .sh-f .btn { flex: 1; }
+.news-sheet .news li { font-family: var(--f-m); font-size: 12.5px; color: var(--sys); }
