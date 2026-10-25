@@ -16,6 +16,7 @@ let run = (hot && hot.data && hot.data.run) || lsGet(RUN_KEY);
 if (run && run.v !== VERSION) run = null;
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
+ensureRecord(run);
 const ui = { screen: 'title', worlds: null, world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
 if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
@@ -673,7 +674,7 @@ function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
     case 'new': lsDel(RUN_KEY); run = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
-    case 'resume': run = lsGet(RUN_KEY); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
+    case 'resume': run = lsGet(RUN_KEY); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
     case 'pick-world': ui.world = +d.i; return render();
@@ -736,7 +737,7 @@ function onAct(el) {
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
-      if (k === 'sanctum') toast(`[The world mends. +${sanctum(run)} Hearts]`, 'loot');
+      if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
       if (k === 'enchanter') { ui.enchantMods = rollPrefixes(3); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }

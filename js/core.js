@@ -219,6 +219,195 @@ const MODIFIERS = {
   restless: { name: 'Restless Dead', desc: 'Erased champions appear more often.' },
 };
 
+// ---------- World Record ----------
+// Each run files 10 entries about its world, one per Heart, plus a bio for the champion. Losing Hearts erases entries.
+// Runs and snapshots store pool indexes, never text, so pool order is fixed once shipped: add new entries at the end, never reorder or delete.
+// k: place | person | custom. tier sets deletion order: far, then city, then home. near is the bio phrase for a home place; rel is a person's relation.
+const LORE = {
+  drowned: {
+    roles: ['lamplighter', 'pearl diver', 'tide priest', 'net mender', 'harbour runner'],
+    promises: ['bring back dry land', 'ring the bells again', 'come home before the tide'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Sunken Archive', text: 'Every book the isles ever wrote, now read only by eels.' },
+      { k: 'place', tier: 'far', name: 'The First Shore', text: 'Where the first settlers landed. It went under two hundred years ago.' },
+      { k: 'place', tier: 'far', name: 'The Coral Library', text: 'Scholars grow their records in coral. A page takes a century.' },
+      { k: 'custom', tier: 'far', name: 'The Saltwar', text: 'The last war between the isles. Both sides lost the island they fought over.' },
+      { k: 'custom', tier: 'city', name: 'The Bell Vigil', text: 'When an island sinks, its bell is rung until the water reaches it.' },
+      { k: 'place', tier: 'city', name: 'The bells of Cor Aven', text: 'Seven bells, rung every dusk to count the islands still above water.' },
+      { k: 'custom', tier: 'city', name: 'The Tide Council', text: 'Nine elders who vote each year on which island to abandon next.' },
+      { k: 'person', tier: 'city', name: 'Harbourmaster Thel', text: 'Has evacuated eleven islands. Keeps a key to each one.' },
+      { k: 'place', tier: 'city', name: 'The Floating Market', text: 'Lashed-together boats that move whenever the coast does.' },
+      { k: 'custom', tier: 'city', name: 'Drowning Day', text: 'Once a year, everyone wades into the sea to remember what it took.' },
+      { k: 'place', tier: 'home', name: 'The Drowned Lighthouse', text: 'Still lit, though its base has been underwater for a generation.', near: 'in the shadow of the Drowned Lighthouse' },
+      { k: 'place', tier: 'home', name: 'The stilt house on Marrow Reef', text: 'Your family has raised it four times.', near: 'in a stilt house on Marrow Reef' },
+      { k: 'person', tier: 'home', name: 'Your sister Ilsa', text: 'Mends nets, and swears she can smell land on the wind.', rel: 'sister' },
+      { k: 'person', tier: 'home', name: 'Old Corwen', text: 'Taught you to swim before you could walk. Says the sea owes him one.', rel: 'teacher' },
+    ],
+  },
+  burning: {
+    roles: ['legionnaire', "smith's apprentice", 'standard-bearer', 'field medic', 'courier'],
+    promises: ['bring the legion home', 'end the war', 'light the Ember Gate again'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Ashen Frontier', text: 'A border that has moved forty times. Nobody remembers who started it.' },
+      { k: 'custom', tier: 'far', name: 'The Thousand-Year Campaign', text: 'The war the empire was founded to win. It is in its thousand and twelfth year.' },
+      { k: 'place', tier: 'far', name: 'The Glass Desert', text: 'A battlefield burned so hot the sand turned to glass. Soldiers still find their reflections there.' },
+      { k: 'place', tier: 'far', name: 'The Treaty Stone', text: "Carved for a peace that lasted nine days. It is the empire's most visited monument." },
+      { k: 'place', tier: 'city', name: 'The Ember Gate', text: "The capital's great gate. It has been rebuilt after every siege, always a little taller." },
+      { k: 'place', tier: 'city', name: 'The Legion Rolls', text: "Every soldier's name, burned into iron plates that cover a whole street." },
+      { k: 'custom', tier: 'city', name: 'The Night of Cinders', text: 'Once a year the city puts out every fire and sits in the dark, to remember the cold.' },
+      { k: 'person', tier: 'city', name: 'Quartermaster Vossa', text: 'Has fed three armies on half rations. Never once lost a ledger.' },
+      { k: 'custom', tier: 'city', name: 'The Smoke Choir', text: 'Widows who sing the names of the fallen from the city walls at dusk.' },
+      { k: 'custom', tier: 'city', name: "Founders' Feast", text: 'The one day a year when nobody is allowed to draw a blade. Mostly.' },
+      { k: 'place', tier: 'home', name: 'The barracks on Kiln Street', text: 'Four generations of your family slept in the same bunk.', near: 'in the barracks on Kiln Street' },
+      { k: 'place', tier: 'home', name: 'The forge where you were born', text: 'Your mother refused to stop working, even for that.', near: 'beside the forge where you were born' },
+      { k: 'person', tier: 'home', name: 'Your brother Cass', text: 'Lost a hand at the frontier. Writes to you with the other one every week.', rel: 'brother' },
+      { k: 'person', tier: 'home', name: 'Sergeant Halla', text: 'Trained you with a wooden sword until you broke it. Then she gave you a real one.', rel: 'sergeant' },
+    ],
+  },
+  hollow: {
+    roles: ['lantern warden', 'gravedigger', 'candle-maker', 'bone-setter', 'chapel keeper'],
+    promises: ['let the dead rest', 'bring Ada peace', 'keep the lanterns lit'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Unquiet Fields', text: 'Farmland where the old dead still work the soil at night. The harvests are excellent.' },
+      { k: 'custom', tier: 'far', name: 'The Last Funeral', text: 'Three hundred years ago, the kingdom buried someone and they stayed buried. Nobody knows how.' },
+      { k: 'place', tier: 'far', name: 'The Barrow Kings', text: 'Seven kings in seven hills. They still send tax demands.' },
+      { k: 'place', tier: 'far', name: 'The Ossuary Road', text: 'A highway paved with the bones of volunteers. It never needs repair.' },
+      { k: 'custom', tier: 'city', name: 'The Lantern Wardens', text: 'Keepers who walk the streets at night, reminding the dead which house is theirs.' },
+      { k: 'place', tier: 'city', name: 'The Grave Market', text: 'Where the living buy back things the dead took with them.' },
+      { k: 'custom', tier: 'city', name: "Mourners' Week", text: 'A week of feasting where every family sets one extra place, and it gets used.' },
+      { k: 'person', tier: 'city', name: 'Mother Rook', text: "The city's oldest gravedigger. Has buried the same man nine times." },
+      { k: 'place', tier: 'city', name: 'The Quiet Bell', text: 'A bell with no clapper. When it rings anyway, everyone goes indoors.' },
+      { k: 'custom', tier: 'city', name: 'The Salt Line', text: 'A ring of salt around the city, renewed every dawn by children.' },
+      { k: 'place', tier: 'home', name: 'The cottage by the yew', text: 'The yew is older than the kingdom, and its roots hold your ancestors.', near: 'in a cottage by the old yew' },
+      { k: 'place', tier: 'home', name: 'The chapel of St. Ves', text: 'Small, cold and always full. Not all the congregation breathes.', near: 'in the bell tower of St. Ves' },
+      { k: 'person', tier: 'home', name: 'Your grandmother Ada', text: 'Died when you were six. Still tucks you in when you visit.', rel: 'grandmother' },
+      { k: 'person', tier: 'home', name: 'Your friend Tobin', text: "A gravedigger's son who dared you into every crypt in the kingdom.", rel: 'friend' },
+    ],
+  },
+  verdant: {
+    roles: ['woodcutter', 'lantern-keeper', "hedge witch's apprentice", 'trapper', 'miller'],
+    promises: ['keep the lanterns burning', "bring Briar's voice back", 'walk home through the wood'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Hungry Wood', text: 'The deepest forest. Maps of it are always missing the person who drew them.' },
+      { k: 'place', tier: 'far', name: 'The Court Under the Hill', text: 'Where the fey hold their feasts. Guests arrive for a night and leave a century later.' },
+      { k: 'custom', tier: 'far', name: 'The Treaty of Briars', text: 'The old pact: the forest leaves the villages alone, and the villages never count the trees.' },
+      { k: 'place', tier: 'far', name: 'The Moonmere', text: 'A lake that shows you as you will be. Most people stop looking after one visit.' },
+      { k: 'custom', tier: 'city', name: 'The Ring of Lanterns', text: "A circle of lights around every village. Step outside it after dark and you are the forest's." },
+      { k: 'place', tier: 'city', name: 'The Bargain Stone', text: 'Where deals are struck with the fey. Read every word twice.' },
+      { k: 'custom', tier: 'city', name: 'Name Day', text: 'Children are given a true name in secret and a false one for the forest to hear.' },
+      { k: 'person', tier: 'city', name: 'Warden Ash', text: "Has walked the Hungry Wood and come back. Twice. Won't say what she gave for it." },
+      { k: 'place', tier: 'city', name: 'The Thornwall', text: 'A living hedge around the town, fed every spring with a little blood.' },
+      { k: 'custom', tier: 'city', name: 'The Antler Fair', text: 'Once a year, the fey trade openly in the market. Everyone counts their children afterwards.' },
+      { k: 'place', tier: 'home', name: 'The house in the great oak', text: 'Your family lives inside a tree that agreed to it. Mostly.', near: 'inside the great oak' },
+      { k: 'place', tier: 'home', name: 'The mill at Wyn Ford', text: "Its wheel turns even when the river doesn't.", near: 'by the mill at Wyn Ford' },
+      { k: 'person', tier: 'home', name: 'Your sister Briar', text: 'Was taken by the fey for a year and came back speaking only in riddles.', rel: 'sister' },
+      { k: 'person', tier: 'home', name: 'Old Hob', text: 'A hedge-wizard who taught you which mushrooms to eat and which to apologise to.', rel: 'teacher' },
+    ],
+  },
+  sky: {
+    roles: ['spell-mechanic', 'chain-walker', 'academy student', 'skyship deckhand', 'cartographer'],
+    promises: ['keep the city in the sky', 'see the ground one day', 'finish your duel'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Ground', text: 'Nobody has been down there in four hundred years. It is taught as a myth.' },
+      { k: 'place', tier: 'far', name: 'The Fallen City', text: 'One of the old floating cities lost its spell. Its wreckage is somewhere below the clouds.' },
+      { k: 'custom', tier: 'far', name: 'The First Ascent', text: 'The night the mages lifted the cities into the sky. The reasons were never written down.' },
+      { k: 'place', tier: 'far', name: 'The Storm Wall', text: 'A barrier of lightning around the Reaches. It keeps something out. Or in.' },
+      { k: 'place', tier: 'city', name: 'The Anchor Chains', text: 'Iron chains that tie the cities together. Children dare each other to walk them.' },
+      { k: 'place', tier: 'city', name: 'The Academy Spire', text: 'The highest tower in the Reaches. Every student who graduates moves one floor up.' },
+      { k: 'custom', tier: 'city', name: 'The Lift Toll', text: 'Everyone pays a little mana each morning to keep the city in the air.' },
+      { k: 'person', tier: 'city', name: 'Chancellor Vey', text: 'Rules the council of mages. Has not touched solid stone in sixty years.' },
+      { k: 'custom', tier: 'city', name: 'Windfall Day', text: 'Once a year, the cities drift close enough to step between them.' },
+      { k: 'place', tier: 'city', name: 'The Cloud Docks', text: 'Where skyships tie up, rattling in the wind like nervous horses.' },
+      { k: 'place', tier: 'home', name: 'The rooftop garden', text: 'Your family grows the only real soil in the district, in pots, very carefully.', near: 'in a rooftop garden above the Cloud Docks' },
+      { k: 'place', tier: 'home', name: 'The lower ring', text: 'The poorest part of the city, closest to the edge. You could always see the clouds.', near: 'on the lower ring, near the edge' },
+      { k: 'person', tier: 'home', name: 'Your father Oren', text: "A spell-mechanic who keeps the city's oldest engine running with his bare hands.", rel: 'father' },
+      { k: 'person', tier: 'home', name: 'Your rival Selis', text: 'Beat you at every exam. You still owe each other a duel.', rel: 'rival' },
+    ],
+  },
+  iron: {
+    roles: ['smith', 'miner', 'gate guard', 'tunnel runner', 'rune carver'],
+    promises: ['open the gates', 'keep the forge lit', 'see the sky above the mountain'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Deep Roads', text: 'Tunnels running under the whole mountain range. The far ends were sealed for a reason.' },
+      { k: 'place', tier: 'far', name: 'The First Anvil', text: 'Struck by the founder of the Hold. It still rings if you touch it.' },
+      { k: 'custom', tier: 'far', name: 'The Long Siege', text: 'The army at the gates has been there for eighty years. Some of them were born there.' },
+      { k: 'place', tier: 'far', name: 'The Collapsed Mine', text: 'Three hundred miners were lost. Their hammers can still be heard on quiet nights.' },
+      { k: 'place', tier: 'city', name: 'The Great Gate', text: 'Twenty feet of steel. It has not opened in a lifetime.' },
+      { k: 'place', tier: 'city', name: 'The Ration Hall', text: 'Where everyone eats together, at long tables, in shifts, under strict rules.' },
+      { k: 'custom', tier: 'city', name: 'The Hearth Oath', text: 'Every child swears at twelve to keep a fire burning in the Hold.' },
+      { k: 'person', tier: 'city', name: 'Gatewarden Brekka', text: 'Has never left her post. Her family brings her meals.' },
+      { k: 'custom', tier: 'city', name: 'The Song of Seams', text: 'Miners sing to find weak rock. Every tunnel has its own verse.' },
+      { k: 'custom', tier: 'city', name: 'Stonefall Night', text: 'When the mountain shifts, everyone holds hands in the dark until it stops.' },
+      { k: 'place', tier: 'home', name: 'The forge on the third deep', text: "Your family's forge, hot for six generations.", near: 'at the forge on the third deep' },
+      { k: 'place', tier: 'home', name: 'The vent-house', text: 'A cramped home by an air shaft. You learned to sleep through the wind.', near: 'in a vent-house by the air shafts' },
+      { k: 'person', tier: 'home', name: 'Your mother Hild', text: 'A smith who makes a new blade every time the siege takes someone.', rel: 'mother' },
+      { k: 'person', tier: 'home', name: 'Your friend Pell', text: 'A runner who knows every tunnel. Taught you to find your way in the dark.', rel: 'friend' },
+    ],
+  },
+};
+const REC_SIZE = 10, REC_MAX = 20, TIER_ORDER = { far: 0, city: 1, home: 2 };
+const loreName = e => e.name.replace(/^(The|Your) /, m => m.toLowerCase()); // mid-sentence: "the Drowned Lighthouse", "your sister Ilsa"
+const loreWho = e => e.name.replace(/^Your \S+ /, ''); // a person in the Halls: "Ilsa"
+// Pick 10 entries: at least 3 places, 2 people and 2 customs, always including the bio's home place and person.
+// ids is in deletion order (far, city, home, with the bio's person last); lost and partial are bitmasks over ids.
+function buildRecord(type, rng) {
+  const L = LORE[type], E = L.entries, all = E.map((_, i) => i);
+  const of = (k, tier) => all.filter(i => E[i].k === k && E[i].tier === tier);
+  const home = pick(of('place', 'home'), rng), person = pick(of('person', 'home'), rng);
+  const ids = [home, person], need = { place: 3, person: 2, custom: 2 };
+  shuffle(all, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
+  shuffle(all, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
+  const key = i => i === person ? 9 : TIER_ORDER[E[i].tier];
+  const bio = { role: Math.floor(rnd(rng) * L.roles.length), home, person, promise: Math.floor(rnd(rng) * L.promises.length) };
+  return { ids: shuffle(ids, rng).sort((a, b) => key(a) - key(b)), lost: 0, partial: 0, bio };
+}
+// Saves from before the record get one that matches the Hearts they have left
+function ensureRecord(run, rng) {
+  if (!run || run.record || run.practice || !LORE[run.world.type]) return;
+  run.record = buildRecord(run.world.type, rng);
+  run.record.lost = (1 << Math.max(0, Math.min(REC_SIZE, run.maxHearts - run.hearts))) - 1;
+}
+// Erase the next n entries that are still standing. Returns their positions in ids.
+function eraseRecord(run, n, msgs) {
+  const R = run.record, out = []; if (!R) return out;
+  const E = LORE[run.world.type].entries;
+  for (let i = 0; i < R.ids.length && out.length < n; i++) if (!(R.lost & 1 << i)) {
+    R.lost |= 1 << i; R.partial &= ~(1 << i); out.push(i);
+    msgs && msgs.push({ t: 'loss', text: `[Erasing: ${loreName(E[R.ids[i]])}… done.]` });
+  }
+  return out;
+}
+// Restored Hearts bring back the most recently erased entries, not cleanly: each comes back partial
+function restoreRecord(run, n, msgs) {
+  const R = run.record; let k = 0; if (!R) return 0;
+  for (let i = R.ids.length - 1; i >= 0 && k < n; i--) if (R.lost & 1 << i) { R.lost &= ~(1 << i); R.partial |= 1 << i; k++; }
+  if (k && msgs) msgs.push({ t: 'sys', text: `[Restoring from backup… ${k} record${k > 1 ? 's' : ''} recovered. Partial.]` });
+  return k;
+}
+// An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Past 14 entries, extra Hearts go unrecorded.
+function amendRecord(run, msgs, rng) {
+  const R = run.record; if (!R || R.ids.length >= REC_MAX) return false;
+  const E = LORE[run.world.type].entries, unused = E.map((_, i) => i).filter(i => !R.ids.includes(i));
+  if (!unused.length) return false;
+  const low = Math.min(...unused.map(i => TIER_ORDER[E[i].tier]));
+  const id = pick(unused.filter(i => TIER_ORDER[E[i].tier] === low), rng);
+  let at = 0; while (at < R.ids.length && R.lost & 1 << at) at++;
+  const ins = m => (m & ((1 << at) - 1)) | ((m >> at) << (at + 1));
+  R.ids.splice(at, 0, id); R.lost = ins(R.lost); R.partial = ins(R.partial);
+  msgs && msgs.push({ t: 'sys', text: '[Record amended: 1 entry added.]' });
+  return true;
+}
+// Shared records are untrusted: indexes must exist in the pool, masks must fit, and the bio must point into ids
+function sanitizeRec(r, type) {
+  const L = LORE[type]; if (!L || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
+  const ids = r.ids.slice(0, REC_MAX), n = L.entries.length, b = r.bio || {};
+  const idx = (v, len) => Number.isInteger(v) && v >= 0 && v < len;
+  const mask = v => Number.isInteger(v) && v >= 0 && v < 1 << ids.length;
+  if (!ids.length || !ids.every(i => idx(i, n)) || new Set(ids).size !== ids.length || !mask(r.lost) || !mask(r.partial)) return null;
+  if (!idx(b.role, L.roles.length) || !idx(b.promise, L.promises.length) || !ids.includes(b.home) || !ids.includes(b.person)) return null;
+  return { w: type, ids, lost: r.lost, partial: r.partial, bio: { role: b.role, home: b.home, person: b.person, promise: b.promise } };
+}
+
 // ---------- Gifts ----------
 // cat: world | cheat (max 1) | growth | combat | fortune | divine | bloodline | flaw (max 2)
 // lock: a Title id that unlocks it, 'echo' (bought with Echoes) or 'chain' (found in an event chain)
@@ -477,6 +666,7 @@ function newRun(world, setup, meta, rng) {
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
+  else { run.record = buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
   run.draft = rollDraft(run, rng);
   ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, rng); });
@@ -676,6 +866,7 @@ function sanitizeSnap(x, owner) {
     path: ARCH[x.path] ? x.path : null, stats, level: num(x.level, 1, 9, 1), maxHp: num(x.maxHp, 20, 700, 80), round: num(x.round, 1, 8, 1), gifts, title: TITLES[x.title] ? x.title : null, milestones: ms,
     bar, gear, history, cause: str(x.cause, 60) || null, hearts: num(x.hearts, 0, 20, 0), maxHearts: num(x.maxHearts, 1, 20, 10), wins: num(x.wins, 0, 20, 0), elite: num(x.elite, 0, 4, 0), entrant: num(x.entrant, 0, 99999, 0),
     hiddenPath: HIDDEN_PATHS[x.hiddenPath] ? x.hiddenPath : null, at: num(x.at, 0, 1e15, 0), owner: owner || null, shared: !!owner,
+    rec: sanitizeRec(x.rec, x.worldType),
   };
 }
 function earnTitle(run, id, msgs) {
@@ -723,7 +914,7 @@ function checkMilestones(run, msgs) {
     if (s[k] >= 10 && !run.milestones[k]) {
       run.milestones[k] = true;
       msgs && msgs.push({ t: 'level', text: `[Stat milestone: ${k} 10. ${MILESTONES[k].name}: ${MILESTONES[k].desc}]` });
-      if (k === 'VIT') { run.maxHearts++; run.hearts++; }
+      if (k === 'VIT') { run.maxHearts++; run.hearts++; amendRecord(run, msgs); }
       if (k === 'LUK') run.freeRerolls++;
     }
   });
@@ -892,7 +1083,7 @@ function rollDistricts(run, rng) {
   return out;
 }
 function infirmary(run) { const f = run.world.mod === 'famine' ? 0.25 : 0.5; const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
-function sanctum(run) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); return run.hearts - b; }
+function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); restoreRecord(run, run.hearts - b, msgs); return run.hearts - b; }
 // Events. Chains set flags that later events check: they come back on their own a round or two later.
 // opts: { label, desc, can(run), go(run, meta, rng, msgs) }
 const EVENTS = {
@@ -908,7 +1099,7 @@ const EVENTS = {
     { label: 'Refuse', desc: '+2 Favour with the God of War', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
   official_bribed: { chain: 'official', title: 'Blackmail', text: () => 'The official is back. He has a ledger with your name in it, and the System would love to read it.', opts: [
     { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, need: run => `Need 8 gold (you have ${run.gold})`, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
-    { label: 'Let him talk', desc: 'The scandal costs your world 1 Heart', go: run => { run.hearts = Math.max(1, run.hearts - 1); run.chains.official = 'done'; } }] },
+    { label: 'Let him talk', desc: 'The scandal costs your world 1 Heart', go: (run, meta, rng, msgs) => { if (run.hearts > 1) { run.hearts--; eraseRecord(run, 1, msgs); } run.chains.official = 'done'; } }] },
   official_refused: { chain: 'official', title: 'The honest official', text: () => 'The official you refused finds you after a match. "Nobody turns me down. I respect that." He slips you a folded page: notes on how the Final Champion fights.', opts: [
     { label: 'Take the notes', desc: "In the final, you'll see the champion's next 2 moves", go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: '[Final Champion notes acquired.]' }); } }] },
   // --- The Poisoner ---
@@ -990,7 +1181,7 @@ function completeQuest(run, q, msgs) {
   const r = Q.reward;
   if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3) });
   if (r === 'gold5') run.gold += 5; if (r === 'gold6') run.gold += 6; if (r === 'gold8') run.gold += 8;
-  if (r === 'heart') { run.maxHearts++; run.hearts++; }
+  if (r === 'heart') { run.maxHearts++; run.hearts++; amendRecord(run, msgs); }
   if (r === 'favour') addFavour(run, 'war', 2, META, msgs);
   if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
 }
@@ -1093,13 +1284,15 @@ function buildEnemy(run, spec) {
   });
 }
 function snapshot(run) {
-  const s = effStats(run);
-  return {
+  const s = effStats(run), R = run.record;
+  const snap = {
     champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, path: run.path,
     stats: s, level: run.level, maxHp: maxHp(run), round: run.round, gifts: run.gifts.filter(k => GIFTS[k].cat !== 'flaw' && k !== 'copycat'), title: run.title, milestones: run.milestones,
     history: (run.history || []).slice(), cause: run.cause || null, hearts: run.hearts, maxHearts: run.maxHearts, wins: run.wins, elite: run.eliteWins || 0, entrant: run.entrant, hiddenPath: run.hiddenPath,
     bar: run.bar.filter(Boolean).map(p => ({ id: p.id, star: p.star, mods: p.mods.slice() })), gear: GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean).map(p => ({ id: p.id, star: p.star })), at: Date.now() + Math.floor(Math.random() * 1000),
   };
+  if (R) snap.rec = { w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) };
+  return snap;
 }
 function buildSnapEnemy(snap, p, hm, run) {
   const scale = Math.max(1, p / roundPower(snap.round || 1));
@@ -1655,7 +1848,7 @@ function resolveFight(run, f, meta, rng) {
     res.gold = 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF));
-    if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
+    if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, rng) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, rng, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), rng); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
@@ -1670,10 +1863,15 @@ function resolveFight(run, f, meta, rng) {
     else {
       const cost = heartCost(run, spec);
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
-      if (run.hearts <= 0) { run.hearts = 0; res.death = true; run.cause = f.B.name; }
-      else {
+      if (run.hearts <= 0) {
+        run.hearts = 0; res.death = true; run.cause = f.B.name;
+        // At 0 Hearts every entry left goes, then the world's name
+        res.erased = eraseRecord(run, REC_MAX, msgs);
+        if (run.record) msgs.push({ t: 'loss', text: `[World: ${'█'.repeat(run.world.name.length)}. Status: erased.]` });
+      } else {
         run.hp = Math.max(run.hp, Math.round(maxHp(run) * 0.5));
         msgs.push({ t: 'loss', text: `[Defeat. A piece of ${run.world.name} is erased. −${cost} Heart${cost > 1 ? 's' : ''}, ${run.hearts} left.]` });
+        res.erased = eraseRecord(run, cost, msgs);
         if (spec.kind === 'final') msgs.push({ t: 'loss', text: '[The Final Champion waits. You must win to spare your world.]' });
         else run.round++;
       }
@@ -1699,6 +1897,7 @@ function echoesFor(run, outcome) {
   return e;
 }
 function endRun(run, meta, outcome) {
+  if (outcome === 'erased') eraseRecord(run, REC_MAX); // an abandoned world goes all at once
   const snap = snapshot(run);
   if (outcome === 'erased') { meta.erased.unshift(snap); meta.erased = meta.erased.slice(0, 20); }
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
@@ -1712,6 +1911,7 @@ if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, resolveEvent, prefixTargets, applyPrefix,
