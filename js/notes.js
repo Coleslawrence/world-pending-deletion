@@ -1,35 +1,35 @@
 // [World Pending Deletion] player-facing update notes, newest first.
 // Shown once after an update (meta.notesSeen) and from "What's new" on the title screen.
-// Each page must fit one 360×640 screen: a System line and up to 4 short bullets.
-// Wording comes from /release/patch-notes-draft.md in the project files; copy it as is.
+// Each page must fit one 360×640 screen: a System line and up to 4 short lines.
+// Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
-    id: '2026-10-25', title: 'The Pending Update', pages: [
-      { h: 'World Record', sys: '[Your world has been filed for review.]', items: [
-        'Each run now keeps a record of 10 places, people and customs from your world.',
-        'Losing Hearts erases entries. Your home goes last.',
-        'The Sanctum restores lost entries, but only in part. Extra Hearts add new ones.',
-        "Tap your Hearts to read your world's record."] },
-      { h: 'Pending World', sys: '[One world. Every Entrant. Once a day.]', items: [
-        'A new daily run on the title screen. Everyone gets the same world.',
-        "Echo unlocks don't apply, so everyone starts on a level field.",
-        'Your first attempt is ranked. Tap a leaderboard row to compare records.',
-        'A new world arrives every day at 14:30 UTC.'] },
-      { h: 'Entrant Rank', sys: '[Entrants will now be ranked. Try to look surprised.]', items: [
-        'Every run earns Rank Points. Reach a threshold to face a Proctor in a Rank Trial.',
-        'Pass a trial to rank up and pick one of two permanent perks.',
-        'Higher ranks unlock tougher worlds. Your rank never drops.',
-        'Existing players start with points earned from their Halls.'] },
-      { h: 'Classes and opponents', sys: '[Archetype review complete. Some of you were underperforming.]', items: [
-        'Stormcaller breaks Block, Arcanist cuts cooldowns, and Reaper finishes weakened foes.',
-        'Venom heals less from Poison. Runs start with your class and its two allies.',
-        'Every opponent shows a rank letter, and rivals now come in rank order.',
-        'Qualifiers ramp up more smoothly, and the Final Champions are more even.'] },
-      { h: 'Fixes', sys: '[Minor faults corrected. The System regrets nothing.]', items: [
-        "Choices you can't afford now say why. Messages no longer cover the enemy.",
-        "The Infirmary can't be picked at full HP.",
-        'Event chains keep their rewards hidden until you choose.',
-        'New weapons: Spiked Buckler and Blight Kris. Some names changed to avoid clashes.'] },
+    id: '2026-10-25', title: "[System Notice: Tournament Update]", pages: [
+      { h: "World Record", sys: "[Your world has been filed for review.]", items: [
+        "[Each run, 10 places, people and customs from your world are now kept on record.]",
+        "[Lost Hearts erase entries. Your home is erased last. As a courtesy.]",
+        "[The Sanctum restores lost entries, in part. Extra Hearts add new ones.]",
+        "[Tap your Hearts to view your world's record while it lasts.]"] },
+      { h: "Pending World", sys: "[One world. Every Entrant. Once a day.]", items: [
+        "[A daily world is now on offer from the title screen. All Entrants receive the same one.]",
+        "[Echo unlocks are suspended there. Fairness has been mandated.]",
+        "[Only your first attempt is ranked. Results are posted for all to compare.]",
+        "[A new world is selected daily at 14:30 UTC. The previous one is archived.]"] },
+      { h: "Entrant Rank", sys: "[Entrants will now be ranked. Try to look surprised.]", items: [
+        "[Every run earns Rank Points. Reach a threshold and a Proctor will test you.]",
+        "[Pass the Rank Trial to be promoted. Choose 1 of 2 permanent perks.]",
+        "[Higher ranks are offered harder worlds. Rank is never revoked.]",
+        "[Existing Entrants have been assessed from their Halls. Ranks assigned.]"] },
+      { h: "Classes and opponents", sys: "[Archetype review complete. Some of you were underperforming.]", items: [
+        "[Stormcaller now breaks Block. Arcanist cuts cooldowns. Reaper finishes the weak.]",
+        "[Venom heals less from Poison. Runs now start with your class and its 2 allies.]",
+        "[All opponents now display a rank letter. Rivals arrive in rank order.]",
+        "[Qualifiers escalate more evenly. Final Champions have been recalibrated.]"] },
+      { h: "Corrections", sys: "[Minor faults corrected. The System regrets nothing.]", items: [
+        "[Unaffordable choices now state why. Notices no longer obstruct the enemy.]",
+        "[The Infirmary is closed to Entrants at full HP. It was a waste of everyone's time.]",
+        "[Event chain rewards are now withheld until you choose. Spoilers are discouraged.]",
+        "[New weapons issued. Duplicate names corrected. Previous names: ERROR. Record sealed.]"] },
     ],
   },
 ];
