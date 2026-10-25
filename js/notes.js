@@ -30,6 +30,11 @@ const PATCH_NOTES = [
         "[The Infirmary is closed to Entrants at full HP. It was a waste of everyone's time.]",
         "[Event chain rewards are now withheld until you choose. Spoilers are discouraged.]",
         "[New weapons issued. Duplicate names corrected. Previous names: ERROR. Record sealed.]"] },
+      { h: "Seasons and champions", sys: "[Seasons have begun. Glory now expires weekly.]", items: [
+        "[Each week, daily top-10 finishes earn points. Every posted score earns 1.]",
+        "[Last week's leader is named Prime Entrant. It will be announced. Once.]",
+        "[Filed champions now carry their Entrant's rank. It is shown on their crest.]",
+        "[Champions that defeat other Entrants climb in rank. Their owners are notified.]"] },
     ],
   },
 ];
