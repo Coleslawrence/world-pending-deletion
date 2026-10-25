@@ -149,42 +149,129 @@ function skylineSVG() {
 // ---------- Pending World ----------
 // One seeded world a day for everyone. The first attempt is ranked, finished or not; replays are unranked.
 function dailyPlayed(date) { return !!(meta.daily && meta.daily.date === date && meta.daily.started); }
-function pendingLine(name) { return `[Pending World: ${name}. Outcome: pending.]`; }
+function pendingLine(name, count) { return `[Pending World: ${name}.${count != null ? ` Entrants observing: ${count}.` : ''} Outcome: pending.]`; }
 function dailyButton(saved) {
   const date = dailyDate(), w = dailyWorld(date), label = `Pending World: ${esc(w.name)} · ${WORLD_RANKS[w.rank]}`;
   if (saved && saved.daily === date) return '';
   if (dailyPlayed(date)) return `<button class="btn" data-act="daily-board">Today's outcomes</button>`;
-  if (saved) return `<button class="btn" disabled>${label} <small class="fine">· finish your run first</small></button>`;
+  if (saved) return `<p class="sh-p fine center daily-wait">Pending World opens when this run ends.</p>`;
   return `<button class="btn daily" data-act="daily">${label}</button>`;
 }
-// Called when a Pending World run ends. Records the ranked result once and returns the System's closing line.
+// Called when a Pending World run ends. Records the ranked result once, posts it, and returns the System's closing line.
 function finishDaily(spared) {
   if (!run || !run.daily) return null;
   const sc = dailyScore(run);
   if (run.ranked && meta.daily && meta.daily.date === run.daily && !meta.daily.result) {
     meta.daily.result = Object.assign(sc, { spared: !!spared, name: run.name, sigil: run.sigil, color: run.color, path: run.path || null, rec: run.record ? { ids: run.record.ids.slice(), lost: run.record.lost, partial: run.record.partial, bio: Object.assign({}, run.record.bio) } : null, w: run.world.type });
-    saveMeta();
+    saveMeta(); postDaily();
   }
   return run.ranked ? `[Observation recorded. ${run.world.name} was ${spared ? 'spared' : 'erased'} for you. Other outcomes vary.]` : `[Replay observed. ${run.world.name} was ${spared ? 'spared' : 'erased'}. Unranked.]`;
 }
 function untilTomorrow() { const now = Date.now(), next = Date.parse(dailyDate(now) + 'T00:00:00Z') + 864e5 - 9.5 * 3600e3, m = Math.max(1, Math.round((next - now) / 6e4)); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} m` : `${m} m`; }
-function resultRow(r, rank, me) {
+
+// Scores live at daily/{date}/scores/{uid}: one create per player per game day (see firestore.rules)
+const dailyCol = date => cloud.db.collection(`daily/${date}/scores`);
+function scoreDoc(r) {
+  const d = { name: String(r.name || 'Entrant').slice(0, 24), sigil: Number.isInteger(r.sigil) ? r.sigil : 0, color: Number.isInteger(r.color) ? r.color : 0, wins: r.wins, hearts: r.hearts, turns: r.turns, score: r.score, path: r.path || null, at: Date.now() };
+  if (r.rec) d.rec = { ids: r.rec.ids.slice(), lost: r.rec.lost, partial: r.rec.partial, bio: Object.assign({}, r.rec.bio) };
+  return d;
+}
+// Another player's score is untrusted: clamp the numbers and check the record against today's pool
+function cleanScore(uid, d, date) {
+  if (!d || typeof d !== 'object') return null;
+  const int = (v, hi) => Number.isInteger(v) ? Math.max(0, Math.min(hi, v)) : 0, type = dailyWorld(date).type;
+  const r = { uid, name: String(d.name || 'Entrant').slice(0, 24), sigil: int(d.sigil, SIGILS.length - 1), color: int(d.color, SIGIL_COLS.length - 1), wins: int(d.wins, 12), hearts: int(d.hearts, 20), turns: int(d.turns, 999) };
+  r.score = 100000 * r.wins + 1000 * r.hearts + (999 - r.turns); r.spared = r.wins >= 8;
+  r.rec = d.rec ? sanitizeRec(Object.assign({}, d.rec, { w: type }), type) : null;
+  return r;
+}
+// Posts today's ranked result once. A score made offline posts at the next sync, as long as it's still the same game day.
+async function postDaily() {
+  const D = meta.daily, r = D && D.result;
+  if (!cloud.on || !cloud.db || !cloud.uid || !r || D.posted || D.date !== dailyDate() || ui.posting) return;
+  ui.posting = true;
+  const ref = cloud.db.doc(`daily/${D.date}/scores/${cloud.uid}`);
+  try { await ref.set(scoreDoc(r)); D.posted = true; saveMeta(); }
+  catch (e) {
+    // Already there (posted from another device): the rules refuse a second write, so stop trying
+    let there = false; try { there = (await ref.get()).exists; } catch (e2) { }
+    if (there) { D.posted = true; saveMeta(); } else cloudFail('board', 'post score', e);
+  }
+  ui.posting = false;
+  if (ui.board) ui.board.t = 0;
+  if (ui.sheet && ui.sheet.type === 'daily') loadBoard();
+}
+// The board: today's top 20, plus your own score pinned with its rank when you're outside them. About 21 reads.
+async function loadBoard() {
+  const date = dailyDate(), B = ui.board;
+  if (!cloud.on || !cloud.db) return;
+  if (B && B.date === date && (B.loading || Date.now() - B.t < 60e3)) return;
+  ui.board = { date, rows: B && B.date === date ? B.rows : null, mine: B && B.date === date ? B.mine : null, loading: true, t: Date.now() };
+  const col = dailyCol(date), own = cloud.uid;
+  try {
+    const docs = col.query ? (await col.query({ orderBy: ['score', 'desc'], limit: 20 })).docs : (await col.get()).docs;
+    const rows = docs.map(x => cleanScore(x.id, x.data(), date)).filter(Boolean).sort((a, b) => b.score - a.score).slice(0, 20);
+    let mine = null;
+    if (!rows.some(x => x.uid === own)) {
+      const snap = await cloud.db.doc(`daily/${date}/scores/${own}`).get();
+      if (snap.exists) { mine = cleanScore(own, snap.data(), date); mine.rank = col.count ? 1 + await col.count({ where: ['score', '>', mine.score] }) : null; }
+    }
+    Object.assign(ui.board, { rows, mine, loading: false, t: Date.now(), error: null });
+  } catch (e) { Object.assign(ui.board, { loading: false, error: true, t: Date.now() }); cloudFail('board', 'load scores', e); }
+  if (ui.sheet && (ui.sheet.type === 'daily' || ui.sheet.type === 'dailycmp')) render();
+}
+// "Entrants observing: N" on entering: one count() on today's scores, read while the Awakening is open. Offline, the clause is dropped.
+function countObservers(D) {
+  if (!cloud.on || !cloud.db) return;
+  const col = dailyCol(D.date);
+  if (col.count) col.count().then(n => { D.count = n; }).catch(e => console.warn('[cloud] count failed:', e && e.code, e));
+}
+// Rank, sigil, name, round reached, Hearts left, entries kept
+function reached(r) { return r.wins > 8 ? `Elite ${r.wins - 8}` : r.wins === 8 ? 'Spared' : `Round ${r.wins + 1}`; }
+function resultRow(r, rank, me, i) {
   const w = r.rec ? `${recLeft(r.rec)}/${r.rec.ids.length}` : '–';
-  return `<div class="brow ${me ? 'me' : ''}"><span class="br-n">${rank || '–'}</span><span class="sig" style="color:${SIGIL_COLS[r.color] || '#fff'}">${SIGILS[r.sigil] || '✦'}</span><span class="br-name">${esc(r.name || 'Entrant')}</span><span class="br-r">${r.spared ? 'Spared' : r.wins + ' win' + (r.wins === 1 ? '' : 's')}</span><span class="br-h">♥${r.hearts}</span><span class="br-k">${w}</span></div>`;
+  const inner = `<span class="br-n">${rank || '–'}</span><span class="sig" style="color:${SIGIL_COLS[r.color] || '#fff'}">${SIGILS[r.sigil] || '✦'}</span><span class="br-name">${esc(r.name || 'Entrant')}</span><span class="br-r">${reached(r)}</span><span class="br-h">♥${r.hearts}</span><span class="br-k">${w}</span>`;
+  return i != null && r.rec ? `<button class="brow ${me ? 'mine' : ''}" data-act="board-row" data-i="${i}">${inner}</button>` : `<div class="brow ${me ? 'mine' : ''}">${inner}</div>`;
 }
 function dailySheet() {
   const date = dailyDate(), w = dailyWorld(date), r = meta.daily && meta.daily.date === date ? meta.daily.result : null, busy = lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended;
-  const body = `<p class="sh-p sysl">[Pending World: ${esc(w.name)}. ${esc(WORLD_TYPES[w.type].name)}, rank ${WORLD_RANKS[w.rank]}.]</p>
-    <div class="board"><div class="brow head"><span class="br-n">#</span><span></span><span class="br-name">Entrant</span><span class="br-r">Reached</span><span class="br-h">Hearts</span><span class="br-k">Kept</span></div>
-    ${r ? resultRow(r, null, true) : '<p class="sh-p fine">Your ranked attempt is still in progress.</p>'}</div>
-    <p class="sh-p fine">Next world in ${untilTomorrow()}. Replays are unranked.</p>`;
-  return sheetWrap("Today's outcomes", body, `<button class="btn ghost" data-act="close">Close</button><button class="btn" data-act="daily" ${busy ? 'disabled' : ''}>Play again (unranked)</button>`, 'sys');
+  const B = ui.board && ui.board.date === date ? ui.board : null, own = cloud.uid;
+  let rows = '', note = '';
+  if (cloud.on && B && B.rows) {
+    ui.boardList = B.rows.concat(B.mine ? [B.mine] : []);
+    rows = B.rows.map((x, i) => resultRow(x, i + 1, x.uid === own, i)).join('');
+    if (!B.rows.length) rows = '<p class="sh-p fine">No outcomes recorded yet today.</p>';
+    if (B.mine) rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(B.mine, B.mine.rank, true, B.rows.length);
+    else if (r && !meta.daily.posted && !B.rows.some(x => x.uid === own)) { rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(r, null, true); note = 'Your score posts at the next sync today.'; }
+  } else if (cloud.on) {
+    rows = B && B.error ? '<p class="sh-p fine">[Observations unavailable. Try again later.]</p>' : '<p class="sh-p fine">[Retrieving observations…]</p>';
+  } else {
+    ui.boardList = r && r.rec ? [Object.assign({ uid: own }, r)] : [];
+    rows = r ? resultRow(r, null, true, 0) : '';
+    note = FIREBASE ? 'Sign in to post your score.' : 'Scores stay on this device.';
+  }
+  if (!r) note = 'Your ranked attempt is still in progress.';
+  const body = `<p class="sh-p sysl">[${esc(w.name)}, rank ${WORLD_RANKS[w.rank]}. Next world in ${untilTomorrow()}.]</p>
+    <div class="board"><div class="brow head"><span class="br-n">#</span><span></span><span class="br-name">Entrant</span><span class="br-r">Reached</span><span class="br-h" aria-label="Hearts">♥</span><span class="br-k">Kept</span></div>${rows}</div>
+    ${note ? `<p class="sh-p fine">${note}</p>` : ''}${!cloud.on && FIREBASE ? cloudSignInHTML(true) : ''}
+    ${cloud.on && B && B.rows && B.rows.some(x => x.rec) ? '<p class="sh-p fine">Tap a row to compare records.</p>' : ''}`;
+  return sheetWrap("Today's outcomes", body, `<button class="btn ghost" data-act="close">Close</button><button class="btn" data-act="daily" ${busy ? 'disabled' : ''}>Play again (unranked)</button>`, 'sys board-sheet');
+}
+// Another player's record next to yours: the same world, erased differently
+function compareSheet() {
+  const date = dailyDate(), w = dailyWorld(date), them = (ui.boardList || [])[ui.sheet.i];
+  if (!them || !them.rec) { ui.sheet = { type: 'daily' }; return dailySheet(); }
+  const r = meta.daily && meta.daily.date === date ? meta.daily.result : null, me = them.uid !== cloud.uid && r && r.rec ? r : null;
+  const col = (x, label) => { const list = recEntries(x.rec, w.type, true); return `<div class="cmp-col"><h4>${esc(label)}</h4><ul>${list.map(e => `<li class="${e.lost ? 'lost' : ''}">${e.lost ? redact(e.name) : esc(e.name)}</li>`).join('')}</ul><p class="sh-p fine">${recLeft(x.rec)} of ${list.length} survive.</p></div>`; };
+  const body = `<p class="sh-p sysl">[${esc(w.name)}, as ${esc(them.name)} left it.${me ? ' Yours beside it.' : ''}]</p>
+    <div class="cmp ${me ? '' : 'one'}">${col(them, them.name)}${me ? col(me, 'You') : ''}</div>`;
+  return sheetWrap(recWorldGone(them.rec) ? 'World record: erased' : `World record: ${w.name}`, body, `<button class="btn primary" data-act="daily-board">Back</button>`, 'sys rec-sheet');
 }
 
 // ---------- Title / worlds ----------
 function titleHTML() {
   const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
-  return `<main class="screen title">
+  return `<main class="screen title ${canResume ? 'resume' : ''}">
     <div class="t-top"><div class="eyebrow">[System notice] · Prototype v5.2</div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
     <div class="sysbox"><p>[The Grand Tournament has begun.]</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
@@ -751,7 +838,7 @@ function endHTML() {
     ${runCard(s, { erased, big: true })}</div>
     <div class="t-stats"><div><b>${s.round}</b><span>round reached</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div></div>
     ${shareBlock(s, erased)}
-    <div class="stack"><button class="btn primary" data-act="new">Choose a new world</button><div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div></div></main>`;
+    <div class="stack">${e.observed ? `<div class="row2 even"><button class="btn" data-act="daily-board">Today's outcomes</button><button class="btn primary" data-act="new">New world</button></div>` : '<button class="btn primary" data-act="new">Choose a new world</button>'}<div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div></div></main>`;
 }
 
 // ---------- Render ----------
@@ -772,7 +859,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { daily: dailySheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { daily: dailySheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
@@ -791,8 +878,9 @@ function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
     case 'new': lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
-    case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.daily = { date, ranked: !dailyPlayed(date) }; ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
-    case 'daily-board': ui.sheet = { type: 'daily' }; return render();
+    case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
+    case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); return render();
+    case 'board-row': ui.sheet = { type: 'dailycmp', i: +d.i }; return render();
     case 'resume': run = lsGet(RUN_KEY); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
@@ -812,7 +900,7 @@ function onAct(el) {
     case 'aw-ok': {
       const A = ui.aw;
       run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
-      if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name) }); }
+      if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       pushMsgs(run.log.slice(), true);
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
@@ -1029,12 +1117,13 @@ async function cloudInit() {
     await pullProgress();
     await loadShared();
     await checkRests();
+    postDaily();
     if (cloud.status === 'syncing') cloud.status = 'synced';
     render();
   } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }
 }
 // Cloud errors: always logged; the player sees one notice per kind per session, so friends can report it
-const CLOUD_FAIL_TEXT = { sync: 'Cloud save failed. Your progress is kept on this device.', share: 'Shared champions could not be reached.' };
+const CLOUD_FAIL_TEXT = { sync: 'Cloud save failed. Your progress is kept on this device.', share: 'Shared champions could not be reached.', board: 'Pending World scores could not be reached.' };
 function cloudFail(kind, where, e) {
   const code = (e && e.code) || 'unknown';
   console.warn(`[cloud] ${where} failed:`, code, e);
@@ -1154,7 +1243,7 @@ function logToast(text) { toast(text, 'broadcast'); }
 // Web version: Firebase sign-in state
 window.addEventListener('wpd-auth', e => {
   if (e.detail && e.detail.signedIn) { if (!cloud.on) cloudInit(); }
-  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, shared: [], status: 'local' }); setShared([], []); render(); }
+  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, shared: [], status: 'local' }); ui.board = null; setShared([], []); render(); }
 });
 function cloudSignInHTML(compact) {
   const provs = (window.FIREBASE_PROVIDERS || ['google', 'github']).filter(k => k === 'google' || k === 'github');
