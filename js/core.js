@@ -128,7 +128,7 @@ const GEAR = {
   cinder_robe: { name: 'Cinder Robe', slot: 'armour', tags: ['pyre', 'zealot'], rank: 'D', stats: { INT: 1, VIT: 1 }, pas: { burnHeal: 0.3 }, text: v => `Heal ${pct(v.burnHeal)} of the Burn damage your opponent takes.` },
   conductive_mail: { name: 'Conductive Mail', slot: 'armour', tags: ['storm', 'bastion'], rank: 'D', stats: { VIT: 2 }, pas: { stunBlock: 10 }, text: v => `Gain ${v.stunBlock} Block whenever you Stun or Interrupt.` },
   templar_plate: { name: 'Templar Plate', slot: 'armour', tags: ['zealot', 'bastion'], rank: 'C', stats: { VIT: 3 }, pas: { healBlock: 0.3 }, text: v => `Healing also gives Block equal to ${pct(v.healBlock)} of it.` },
-  grave_shroud: { name: 'Grave Shroud', slot: 'armour', tags: ['venom', 'reaper'], rank: 'C', stats: { VIT: 2 }, pas: { poisonHeal: 0.2 }, text: v => `Heal ${pct(v.poisonHeal)} of the Poison damage your opponent takes.` },
+  grave_shroud: { name: 'Grave Shroud', slot: 'armour', tags: ['venom', 'reaper'], rank: 'C', stats: { VIT: 2 }, pas: { poisonHeal: 0.2 }, text: v => `Heal ${pct(Math.min(POISON_HEAL_CAP, v.poisonHeal))} of Poison damage dealt (max 30% from all sources).` },
   prayer_beads: { name: 'Prayer Beads', slot: 'accessory', tags: ['zealot'], rank: 'E', stats: { VIT: 1 }, pas: { regen: 3 }, text: v => `Heal ${v.regen} at the start of each of your turns.` },
   bloodstone_amulet: { name: 'Bloodstone Amulet', slot: 'accessory', tags: ['blade', 'zealot'], rank: 'C', stats: { VIT: 1 }, pas: { healOnBleed: 3 }, text: v => `Heal ${v.healOnBleed} whenever you apply Bleed.` },
   crown_of_thorns: { name: 'Crown of Thorns', slot: 'accessory', tags: ['bastion'], rank: 'C', stats: { VIT: 1 }, pas: { thornsAlways: 3 }, text: v => `Always have ${v.thornsAlways} Thorns, doubled below half HP.` },
@@ -139,6 +139,8 @@ const GEAR = {
 };
 const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
 function pct(v) { return Math.round(v * 100) + '%'; }
+// Healing from Poison damage (Grave Warden, Grave Shroud, Plague Doctor) adds up to at most this share
+const POISON_HEAL_CAP = 0.3;
 const STAR_MULT = [0, 1, 1.5, 1.6];
 const GEAR_STAR = [0, 1, 1.5, 2], GEAR_STAR_PCT = [0, 1, 1.4, 1.8];
 function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); return Object.assign(o, g.fix || {}); }
@@ -218,7 +220,7 @@ const MODIFIERS = {
 const GIFTS = {
   tidecaller: { name: 'Tidecaller', cat: 'world', cost: 1, desc: 'Heal 2 at the start of each of your turns.' },
   deserter: { name: 'Legion Deserter', cat: 'world', cost: 1, desc: 'Start each fight with 15 Block.' },
-  warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of the Poison damage your opponent takes.' },
+  warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of Poison damage dealt (max 30% from all sources).' },
   hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Burn fades slower and Poison deals 25% more.' },
   prodigy: { name: 'Arcane Prodigy', cat: 'world', cost: 1, desc: 'A 5th skill slot, but 10% less max HP.' },
   runesmith: { name: 'Runesmith', cat: 'world', cost: 1, desc: 'Your gear merges at 2 copies instead of 3.' },
@@ -347,7 +349,7 @@ const HIDDEN_PATHS = {
   'reaper+zealot': { name: 'Last Rites', desc: 'Your healing also deals 30% of it as damage to the opponent.', fx: { healDmg: 0.3 } },
   'blade+pyre': { name: 'Cinderblade', desc: 'Multi-hit skills apply 1 Burn per hit.', fx: { hitBurn: 1 } },
   'blade+venom': { name: 'Viper Dance', desc: 'Every Bleed you apply also applies 2 Poison.', fx: { bleedPoison: 2 } },
-  'reaper+venom': { name: 'Plague Doctor', desc: 'Heal 25% of the Poison damage your opponent takes.', fx: { poisonHeal: 0.25 } },
+  'reaper+venom': { name: 'Plague Doctor', desc: 'Heal 25% of Poison damage dealt (max 30% from all sources).', fx: { poisonHeal: 0.25 } },
   'bastion+zealot': { name: 'Paladin', desc: 'Healing also gives Block equal to half of it.', fx: { healBlock: 0.5 } },
   'arcanist+storm': { name: 'Tempest Mage', desc: 'Damaging Quick skills have a 25% chance to Stun.', fx: { quickStun: 0.25 } },
   'reaper+storm': { name: 'Warlord', desc: '+25% damage to Stunned or Weakened opponents.', fx: { vsDisabled: 0.25 } },
@@ -1387,7 +1389,7 @@ function startTurn(f, X, first) {
     const v = Math.round(X.poison * (Y.P.poisonMult || 1));
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
-    if (Y.P.poisonHeal) heal(f, Y, v * Y.P.poisonHeal);
+    if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
   }
   checkRevive(f, X);
   if (X.hp <= 0) return false;
