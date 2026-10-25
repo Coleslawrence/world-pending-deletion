@@ -26,9 +26,11 @@ function stageScreen() { return { draft: 'draft', choose: 'choose', shop: 'shop'
 // ---------- Toasts ----------
 function toast(text, t = 'sys') {
   const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text;
-  toastsEl.appendChild(el); while (toastsEl.children.length > 3) toastsEl.firstChild.remove();
+  placeToasts(); toastsEl.appendChild(el); while (toastsEl.children.length > (ui.screen === 'fight' ? 2 : 3)) toastsEl.firstChild.remove();
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350); }, t === 'broadcast' ? 4200 : t === 'class' ? 3400 : 2600);
 }
+// In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
+function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 function pushMsgs(msgs) { msgs.forEach(m => logRun(m.text, m.t)); msgs.slice().sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
@@ -242,9 +244,11 @@ function shopHTML() {
 
 // ---------- District ----------
 const DIST_GLYPH = { infirmary: '+', sanctum: '♥', undercity: '!', scout: '?', enchanter: 'E' };
+// Infirmary at full HP would do nothing; block it unless it's the only district left
+function distFull(k) { return k === 'infirmary' && run.hp >= maxHp(run) && run.districts.length > 1; }
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage === 'ready';
-  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
+  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done || distFull(k) ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : distFull(k) ? 'Already at full HP' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done && !distFull(k) ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
   return `<main class="screen district">${topBar(roundLabel() + ' · District')}${champLine()}
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     <div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
@@ -361,6 +365,7 @@ function summarize(f, side) {
 function startFightUI() {
   ui.fight = newFight(run);
   ui.busy = false; ui.screen = 'fight'; ui.sheet = null;
+  toastsEl.replaceChildren(); // shop toasts don't carry into the fight
   const f = ui.fight;
   say2(f, `[${f.B.name} enters the arena.]`, 'sys');
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
@@ -459,7 +464,7 @@ function pendingSheet() {
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
     const chainTag = E.chain ? `<p class="sh-p fine">[Event chain: ${{ official: 'The Official', poisoner: 'The Poisoner', letter: 'The Letter' }[E.chain]}]</p>` : '';
-    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((o, i) => { const can = !o.can || o.can(run); return `<button class="choice" data-act="event" data-i="${i}" ${can ? '' : 'disabled'}><div class="sr-h"><span class="sr-name">${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>`; }).join(''), false, E.chain ? 'sys' : '');
+    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((o, i) => { const can = !o.can || o.can(run); return `<button class="choice" data-act="event" data-i="${i}" ${can ? '' : 'disabled'}><div class="sr-h"><span class="sr-name">${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div>${!can && o.need ? `<div class="sr-need">${esc(o.need(run))}</div>` : ''}</button>`; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
@@ -658,6 +663,7 @@ function render() {
   app.innerHTML = h + sh + coachHTML();
   coachHighlight();
   if (scr === 'fight') updateFight();
+  placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
 }
 
@@ -728,7 +734,7 @@ function onAct(el) {
     case 'shop-done': leaveShop(run, null, msgs); pushMsgs(msgs); ui.distDone = null; saveRun(); return go('district');
     case 'back-shop': run.stage = 'shop'; saveRun(); return go('shop');
     case 'district': {
-      const k = d.k; if (!useDistrict(run, k)) return; ui.distDone = k;
+      const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
       if (k === 'sanctum') toast(`[The world mends. +${sanctum(run)} Hearts]`, 'loot');
       if (k === 'scout') ui.sheet = { type: 'scout' };
@@ -899,12 +905,21 @@ async function cloudInit() {
     await checkRests();
     if (cloud.status === 'syncing') cloud.status = 'synced';
     render();
-  } catch (e) { cloud.status = 'local'; }
+  } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }
+}
+// Cloud errors: always logged; the player sees one notice per kind per session, so friends can report it
+const CLOUD_FAIL_TEXT = { sync: 'Cloud save failed. Your progress is kept on this device.', share: 'Shared champions could not be reached.' };
+function cloudFail(kind, where, e) {
+  const code = (e && e.code) || 'unknown';
+  console.warn(`[cloud] ${where} failed:`, code, e);
+  if (code === 'unavailable') return; // network drop: expected, saves retry and stay on the device
+  cloud.failShown = cloud.failShown || {}; if (cloud.failShown[kind]) return;
+  cloud.failShown[kind] = true; toast(`[${CLOUD_FAIL_TEXT[kind]} (${code})]`, 'loss');
 }
 function progressDoc() { return cloud.db.doc('data/users/' + cloud.uid + '/progress'); }
 async function pullProgress() {
   let snap;
-  try { snap = await progressDoc().get(); } catch (e) { cloud.syncOff = true; cloud.status = 'local'; return; }
+  try { snap = await progressDoc().get(); } catch (e) { cloud.syncOff = true; cloud.status = 'local'; cloudFail('sync', 'load progress', e); return; }
   const r = snap.exists ? snap.data() : null;
   let changed = false;
   if (r && r.meta && (r.meta.savedAt || 0) > (meta.savedAt || 0) && !realMeta) {
@@ -931,13 +946,14 @@ async function pushProgress() {
   } catch (e) {
     if (e && (e.code === 'invalid_argument' || e.code === 'revoked' || e.code === 'not_granted')) { cloud.syncOff = true; cloud.status = 'local'; }
     else if (e && e.code === 'unavailable') setTimeout(schedulePush, 4000 + Math.random() * 3000);
+    cloudFail('sync', 'save progress', e);
   }
   cloud.pushing = false;
   if (cloud.again) { cloud.again = false; schedulePush(); }
 }
 async function resolveNames(ids) {
   ids = ids.filter(id => id && !(id in cloud.names)); if (!ids.length || !cloud.user) return;
-  try { const ps = await cloud.user.profiles(ids); ids.forEach(id => cloud.names[id] = (ps[id] && ps[id].name) || ''); } catch (e) { }
+  try { const ps = await cloud.user.profiles(ids); ids.forEach(id => cloud.names[id] = (ps[id] && ps[id].name) || ''); } catch (e) { console.warn('[cloud] names failed:', e && e.code, e); }
 }
 function ownerName(id) { return cloud.names[id] || 'another entrant'; }
 async function loadShared() {
@@ -954,7 +970,7 @@ async function loadShared() {
     });
     setShared(erased, spared); cloud.shared = all;
     await resolveNames(all.map(x => x.snap.owner));
-  } catch (e) { }
+  } catch (e) { cloudFail('share', 'load shared champions', e); }
 }
 async function shareChampion(snap, kind) {
   if (!cloud.on || cloud.shareOff) return false;
@@ -966,7 +982,7 @@ async function shareChampion(snap, kind) {
     await ref.set({ list: list.slice(0, 12) });
     meta.shared = meta.shared || {}; meta.shared[snap.at] = true; saveMeta();
     return true;
-  } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; return false; }
+  } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; cloudFail('share', 'share champion', e); return false; }
 }
 async function recordRest(r) {
   if (!cloud.on || cloud.shareOff) return;
@@ -976,7 +992,7 @@ async function recordRest(r) {
     const list = cur.exists && Array.isArray(cur.data().list) ? cur.data().list.slice() : [];
     list.unshift({ to: r.owner, champ: String(r.champ).slice(0, 60), at: r.at, t: Date.now() });
     await ref.set({ list: list.slice(0, 40) });
-  } catch (e) { }
+  } catch (e) { cloudFail('share', 'record rest', e); }
 }
 async function checkRests() {
   if (!cloud.on) return;
@@ -988,7 +1004,7 @@ async function checkRests() {
     await resolveNames(notes.map(n => n.by));
     notes.sort((a, b) => a.t - b.t).forEach(n => { meta.echoes += 3; logToast(`[${n.champ} was laid to rest by ${ownerName(n.by)}. +3 Echoes.]`); });
     meta.restSeen = Math.max(...notes.map(n => n.t)); saveMeta();
-  } catch (e) { }
+  } catch (e) { cloudFail('share', 'check rests', e); }
 }
 function logToast(text) { toast(text, 'broadcast'); }
 // Web version: Firebase sign-in state
