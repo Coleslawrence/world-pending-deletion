@@ -616,7 +616,7 @@ const ENEMIES = {
   imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, rank: 'E', hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 4, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
   brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 18 } }, { n: 'Shove', fx: { dmg: 6 } }], script: [2, 0, 1] },
   seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, rank: 'B', rival: true, hp: 80, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 16, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
-  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rank: 'D', rival: true, hp: 62, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
+  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rank: 'D', rival: true, hp: 56, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
   lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 4, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
   masked: { name: 'The Masked Entrant', style: 'Copies your last skill', tier: 2, rival: true, hp: 62, skills: [{ n: 'Strike', fx: { dmg: 8 } }, { n: 'Mirror Form', fx: { mirror: 1 }, label: 'Copying your last skill' }], script: [0, 1] },
   kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rank: 'A', rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
@@ -1060,7 +1060,7 @@ function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = 
 function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones }); }
 
 // ---------- Opponents: choice of two each round ----------
-const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1 };
+const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 function curRound(run) { return run.elite ? ROUNDS + run.eliteIdx : run.round; }
@@ -1347,7 +1347,7 @@ function buildPlayer(run) {
 function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
-  const alpha = spec.hard && spec.kind === 'monster' ? TUNE.alpha : 1;
+  const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const p = enemyPower(run) * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * (spec.hard ? TUNE.hardHp : 1) * alpha;
   if (spec.kind === 'erased' || spec.kind === 'champion') return buildSnapEnemy(spec.snap, p, hm, run);
   const t = ENEMIES[spec.id];
