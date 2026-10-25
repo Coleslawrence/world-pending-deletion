@@ -1214,6 +1214,26 @@ onAct = function (el) {
 const cloud = { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, names: {}, timer: null, pushing: false, again: false, shared: [], status: 'local' };
 const jsonSafe = x => JSON.parse(JSON.stringify(x));
 const FIREBASE = !!window.FIREBASE_CONFIG;
+// The name other players see on shared champions and laid-to-rest notes. It is chosen in game (by default the
+// latest champion's name), never taken from the sign-in account, so no real name or email reaches other players.
+function publicName() {
+  const last = meta.champions.concat(meta.erased).sort((a, b) => b.at - a.at)[0];
+  return String(meta.handle || (last && last.name) || 'Entrant').trim().slice(0, 18) || 'Entrant';
+}
+// Keeps the shared documents on the current public name. Also replaces names written by older versions,
+// which used the first word of the Google account name. Reads only when the name has changed.
+async function syncPublicName() {
+  if (!meta.handle && (meta.champions.length || meta.erased.length)) { meta.handle = publicName(); saveMeta(); }
+  const name = publicName(); if (window.WPD_CLOUD) window.WPD_CLOUD.handle = name;
+  if (!FIREBASE || !cloud.on || meta.pubName === name) return;
+  try {
+    for (const path of ['champions/' + cloud.uid, 'rests/' + cloud.uid]) {
+      const ref = cloud.db.doc(path), cur = await ref.get();
+      if (cur.exists) { const d = Object.assign({}, cur.data()); delete d.name; await ref.set(d); }
+    }
+    meta.pubName = name; saveMeta();
+  } catch (e) { cloudFail('share', 'update public name', e); }
+}
 async function cloudInit() {
   try {
     let db, user;
@@ -1228,6 +1248,7 @@ async function cloudInit() {
     const uid = await user.id(); if (!uid) return;
     Object.assign(cloud, { db, user, uid, on: true, status: 'syncing' });
     await pullProgress();
+    await syncPublicName();
     await loadShared();
     await checkRests();
     postDaily();
@@ -1393,12 +1414,13 @@ function cloudSignInHTML(compact) {
   if (!FIREBASE) return '';
   const C = window.WPD_CLOUD;
   if (C && C.error) return compact ? '' : '<p class="sh-p fine">Cloud saves are unavailable right now (offline?). Progress is saved on this device.</p>';
-  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><p class="sh-p fine">Champions you share appear under this name to other players.</p><button class="btn small ghost" data-act="signout">Sign out</button></div>`;
+  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p><button class="btn small ghost" data-act="signout">Sign out</button></div>`;
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
 app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
+app.addEventListener('change', e => { if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && ui.sheet && !['result'].includes(ui.sheet.type)) { ui.sheet = null; render(); }
   if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }
