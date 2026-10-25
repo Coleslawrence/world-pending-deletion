@@ -397,6 +397,40 @@ function amendRecord(run, msgs, rng) {
   msgs && msgs.push({ t: 'sys', text: '[Record amended: 1 entry added.]' });
   return true;
 }
+// Reading a record. halls: third person for the Halls, which name people without "your".
+function recLeft(rec) { let n = 0; rec.ids.forEach((_, p) => { if (!(rec.lost & 1 << p)) n++; }); return n; }
+function recWorldGone(rec) { return recLeft(rec) === 0; }
+// A partial entry has one or two words of its line barred, picked from the entry index so every device shows the same ones
+function partialWords(i, n) { const a = (i * 7 + 3) % n; return n > 6 ? [a, (a + 3) % n] : [a]; }
+function recEntries(rec, type, halls) {
+  const E = LORE[type].entries;
+  return rec.ids.map((i, p) => {
+    const e = E[i], lost = !!(rec.lost & 1 << p), partial = !lost && !!(rec.partial & 1 << p);
+    const words = e.text.split(' '), bar = partial ? partialWords(i, words.length) : [];
+    return { pos: p, i, k: e.k, lost, partial, name: halls && e.k === 'person' ? loreWho(e) : e.name, line: words.map((w, j) => ({ t: w, gone: bar.includes(j) })) };
+  });
+}
+// The bio as text pieces; erased pieces have gone set. champ gives the third-person Halls voice.
+function bioParts(rec, type, worldName, champ) {
+  const L = LORE[type], E = L.entries, b = rec.bio;
+  const gone = i => !!(rec.lost & 1 << rec.ids.indexOf(i));
+  const home = E[b.home], who = E[b.person], wgone = recWorldGone(rec);
+  const key = home.name.replace(/^The /, '').toLowerCase(), at = home.near.toLowerCase().indexOf(key);
+  const cut = at > 0 ? at : home.near.indexOf(' ') + 1; // bar the landmark, keep "in the shadow of"
+  const near = [{ t: home.near.slice(0, cut) }, { t: home.near.slice(cut), gone: gone(b.home) }];
+  const person = { t: champ ? loreWho(who) : /^Your /.test(who.name) ? loreName(who) : who.name, gone: gone(b.person) };
+  const world = { t: worldName, gone: wgone }, role = L.roles[b.role], promise = L.promises[b.promise];
+  return champ
+    ? [{ t: `${champ} was a ${role} of ` }, world, { t: ', raised ' }, ...near, { t: `. ${champ} swore to ` }, person, { t: ` to ${promise}.` }]
+    : [{ t: `You were a ${role} of ` }, world, { t: '. You grew up ' }, ...near, { t: '. You promised ' }, person, { t: ` you would ${promise}.` }];
+}
+// What a returning Erased champion remembers: the last entry still standing, or else the last one to go
+function recFragment(rec, type) {
+  const E = LORE[type].entries; let p = -1;
+  rec.ids.forEach((_, j) => { if (!(rec.lost & 1 << j)) p = j; });
+  if (p < 0) p = rec.ids.length - 1;
+  const e = E[rec.ids[p]]; return e.k === 'person' ? loreWho(e) : loreName(e);
+}
 // Shared records are untrusted: indexes must exist in the pool, masks must fit, and the bio must point into ids
 function sanitizeRec(r, type) {
   const L = LORE[type]; if (!L || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
@@ -666,7 +700,7 @@ function newRun(world, setup, meta, rng) {
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
-  else { run.record = buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
+  else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
   run.draft = rollDraft(run, rng);
   ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, rng); });
@@ -1911,7 +1945,7 @@ if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
-  LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, resolveEvent, prefixTargets, applyPrefix,

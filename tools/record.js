@@ -82,4 +82,16 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   Math.random = real;
   ok(erased > 0, 'some bot runs were erased');
 }
+{
+  // reading a record: bio voices, bars and the returning champion's fragment
+  const R = { ids: [0, 3, 5, 7, 9, 4, 8, 11, 10, 12], lost: 0, partial: 0, bio: { role: 0, home: 10, person: 12, promise: 0 } };
+  const txt = parts => parts.map(p => p.gone ? '#' : p.t).join('');
+  ok(txt(G.bioParts(R, 'drowned', 'Velmere')) === 'You were a lamplighter of Velmere. You grew up in the shadow of the Drowned Lighthouse. You promised your sister Ilsa you would bring back dry land.', 'run bio');
+  ok(txt(G.bioParts(R, 'drowned', 'Velmere', 'Maren')) === 'Maren was a lamplighter of Velmere, raised in the shadow of the Drowned Lighthouse. Maren swore to Ilsa to bring back dry land.', 'Halls bio');
+  R.lost = (1 << 9) - 1; ok(txt(G.bioParts(R, 'drowned', 'Velmere')) === 'You were a lamplighter of Velmere. You grew up in the shadow of the #. You promised your sister Ilsa you would bring back dry land.', 'home erased');
+  ok(G.recFragment(R, 'drowned') === 'Ilsa', 'fragment: the last entry standing');
+  R.lost = (1 << 10) - 1; ok(txt(G.bioParts(R, 'drowned', 'Velmere', 'Maren')) === 'Maren was a lamplighter of #, raised in the shadow of the #. Maren swore to # to bring back dry land.', 'erased world bio');
+  ok(G.recFragment(R, 'drowned') === 'Ilsa', 'fragment: the last entry to go');
+  R.lost = 0; R.partial = 1; const e = G.recEntries(R, 'drowned')[0]; ok(e.partial && e.line.filter(w => w.gone).length === 2, 'partial entry bars two words');
+}
 console.log(`record: ${checks} checks passed`);
