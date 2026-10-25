@@ -26,6 +26,9 @@ const ARCH = {
 };
 const ARCH_KEYS = Object.keys(ARCH);
 const START_ARCH = ['pyre', 'venom', 'blade', 'bastion', 'zealot', 'reaper'];
+// The class wheel: neighbours are allies, opposites are enemies. A run is dealt its home archetype's allies first.
+const WHEEL = ['zealot', 'bastion', 'storm', 'arcanist', 'pyre', 'reaper', 'venom', 'blade'];
+function alliesOf(k) { const i = WHEEL.indexOf(k); return [WHEEL[(i + 7) % 8], WHEEL[(i + 1) % 8]]; }
 function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 
 // ---------- Skills ----------
@@ -448,7 +451,8 @@ function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, out = [
 function newRun(world, setup, meta, rng) {
   bindMeta(meta);
   const home = WORLD_TYPES[world.type].home;
-  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(unlockedArch(meta).filter(k => k !== home), rng).slice(0, 3);
+  const pool = unlockedArch(meta).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
+  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rng).concat(shuffle(pool.filter(k => !allies.includes(k)), rng)).slice(0, 3);
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer);
   const G = setup.gifts;
   const run = {
