@@ -252,7 +252,7 @@ const GIFTS = {
   treasure: { name: 'Treasure Sense', cat: 'fortune', cost: 2, desc: 'Beating a hard opponent also pays 5 gold.', lock: 'underdog' },
   chosen_war: { name: 'Chosen of War', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the God of War: their gift arrives at once.' },
   chosen_trick: { name: 'Chosen of the Trickster', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Trickster: their gift arrives at once.' },
-  chosen_ruin: { name: 'Chosen of Ruin', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Goddess of Ruin: her gift arrives at once.' },
+  chosen_ruin: { name: 'Chosen of Ruin', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Goddess of Ruin: their gift arrives at once.' },
   ironwill: { name: 'Iron Will', cat: 'bloodline', cost: 3, desc: 'Lose 1 fewer Heart per defeat (minimum 1).' },
   dragon: { name: 'Dragon Blood', cat: 'bloodline', cost: 4, desc: '+15% max HP. Toxic Flare and Cauterise heal you 5.', lock: 'emberfall' },
   elf: { name: 'Elf-touched', cat: 'bloodline', cost: 3, desc: '+10% dodge, and Bleed you apply +1.', lock: 'thornbane' },
