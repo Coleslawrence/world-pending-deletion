@@ -97,6 +97,7 @@ function pending(run, meta) {
     if (p.type === 'rune') { for (const m of p.mods) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     if (p.type === 'event') { const E = G.EVENTS[p.key]; for (let i = 0; i < E.opts.length; i++) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; }
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
+    if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
     if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
   }
 }
@@ -124,7 +125,8 @@ function playRun(meta, verbose, opts = {}) {
   while (guard++ < 40) {
     pending(run, meta);
     if (run.stage === 'choose') {
-      const hard = run.choices.length > 1 && run.hp > G.maxHp(run) * 0.75 && run.hearts > 5 && Math.random() < (opts.hardRate != null ? opts.hardRate : 0.35);
+      const trial = run.choices[1] && run.choices[1].kind === 'trial';
+      const hard = trial || run.choices.length > 1 && run.hp > G.maxHp(run) * 0.75 && run.hearts > 5 && Math.random() < (opts.hardRate != null ? opts.hardRate : 0.35);
       G.chooseOpponent(run, hard ? 1 : 0, run.gold >= 15);
     }
     stats(run);
