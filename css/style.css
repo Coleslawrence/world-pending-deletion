@@ -372,7 +372,9 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .barrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; } .barrow.c5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .gearrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
 .barrow .tile, .gearrow .tile { min-height: 50px; }
-.bench { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.bench { display: grid; grid-template-columns: repeat(var(--bench-cols, 4), minmax(0, 1fr)); gap: 5px; }
+.bench.over .tile.sm { padding-inline: 4px; } .bench.over .tile.sm .tl-n { font-size: 10.5px; }
+.foot-hint.bad { color: var(--bad); }
 .tile.sm { min-height: 42px; padding: 3px 6px 4px; } .tile.sm .tl-n { font-size: 11.5px; -webkit-line-clamp: 1; }
 /* district */
 .district { gap: 8px; }

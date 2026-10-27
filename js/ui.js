@@ -548,6 +548,8 @@ function shopHTML() {
   const bar = run.bar.map((p, i) => p ? pieceTile(p, 'own', '', inShop) : `<div class="tile empty">Skill ${i + 1}</div>`).join('');
   const gear = GEAR_SLOTS.map(sl => run.gear[sl] ? pieceTile(run.gear[sl], 'own', '', inShop) : `<div class="tile empty gear">${sl}</div>`).join('');
   const bench = run.bench.map(p => pieceTile(p, 'own', 'sm', inShop)).join('') + '<div class="tile empty sm"></div>'.repeat(Math.max(0, 8 - run.bench.length));
+  // Loot can overfill the bench. It then squeezes into two rows so Fight stays on screen, and Fight waits until it's back to 8.
+  const over = benchOver(), cols = over ? Math.ceil(run.bench.length / 2) : 4;
   const rc = rerollCost(run);
   return `<main class="screen shop">${topBar(roundLabel() + ' · Shop')}
     ${archChips(counts)}
@@ -556,9 +558,12 @@ function shopHTML() {
     <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="buy-xp" ${run.gold < 4 || run.level >= 9 ? 'disabled' : ''}>XP +4 · 4g</button>` : ''}<span class="interest">Interest +${Math.min(interestCap(run), Math.floor(run.gold / 10))}g</span></div>
     <div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
     <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
-    <div class="sec-h"><span>Bench ${run.bench.length}/8</span><span class="fine">Tap a piece to equip, swap or sell</span></div>
-    <div class="bench">${bench}</div>
-    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary fight" data-act="shop-done">Fight ›</button></footer></main>`;
+    <div class="sec-h"><span${over ? ' class="bad"' : ''}>Bench ${run.bench.length}/8</span><span class="fine">Tap a piece to equip, swap or sell</span></div>
+    <div class="bench${over ? ' over' : ''}" style="--bench-cols: ${cols}">${bench}</div>
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button>${over ? `<span class="foot-hint bad">Sell ${over} to continue</span>` : '<button class="btn primary fight" data-act="shop-done">Fight ›</button>'}</footer></main>`;
+}
+// Pieces over the bench's 8, from loot that arrived while it was full
+function benchOver() { return Math.max(0, run.bench.length - 8);
 }
 
 // ---------- District ----------
@@ -1123,7 +1128,7 @@ function onAct(el) {
       if (!ok) toast('[Not possible: your bench may be full.]', 'loss');
       ui.sheet = null; pushMsgs(msgs); saveRun(); saveMeta(); return render();
     }
-    case 'shop-done': { if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
+    case 'shop-done': { if (benchOver()) return render(); if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
