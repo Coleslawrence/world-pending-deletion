@@ -204,6 +204,7 @@ const dailyCol = date => cloud.db.collection(`daily/${date}/scores`);
 function scoreDoc(r) {
   const d = { name: String(r.name || 'Entrant').slice(0, 24), sigil: Number.isInteger(r.sigil) ? r.sigil : 0, color: Number.isInteger(r.color) ? r.color : 0, wins: r.wins, hearts: r.hearts, turns: r.turns, score: r.score, path: r.path || null, at: Date.now() };
   if (r.rank) d.rank = r.rank;
+  if (cloud.on) d.player = publicName();
   if (r.rec) d.rec = { ids: r.rec.ids.slice(), lost: r.rec.lost, partial: r.rec.partial, bio: Object.assign({}, r.rec.bio) };
   return d;
 }
@@ -213,6 +214,7 @@ function cleanScore(uid, d, date) {
   const int = (v, hi) => Number.isInteger(v) ? Math.max(0, Math.min(hi, v)) : 0, type = dailyWorld(date).type;
   const r = { uid, name: String(d.name || 'Entrant').slice(0, 24), sigil: int(d.sigil, SIGILS.length - 1), color: int(d.color, SIGIL_COLS.length - 1), wins: int(d.wins, 12), hearts: int(d.hearts, 20), turns: int(d.turns, 999) };
   r.score = 100000 * r.wins + 1000 * r.hearts + (999 - r.turns); r.spared = r.wins >= 8; r.rank = rankIdx(d.rank) >= 0 ? d.rank : null;
+  r.player = typeof d.player === 'string' ? d.player.slice(0, 24) : '';
   r.rec = d.rec ? sanitizeRec(Object.assign({}, d.rec, { w: type }), type) : null;
   return r;
 }
@@ -222,9 +224,9 @@ async function postDaily() {
   if (!cloud.on || !cloud.db || !cloud.uid || !r || D.posted || D.date !== dailyDate() || ui.posting) return;
   ui.posting = true;
   const ref = cloud.db.doc(`daily/${D.date}/scores/${cloud.uid}`);
-  // Rules from before Entrant Rank refuse the rank field, so a refused post is retried without it
-  const plain = d => { const o = Object.assign({}, d); delete o.rank; return o; };
-  try { await ref.set(scoreDoc(r)).catch(e => { if (r.rank && e && e.code === 'invalid_argument') return ref.set(plain(scoreDoc(r))); throw e; }); D.posted = true; saveMeta(); }
+  // Older published rules refuse the rank and player fields, so a refused post is retried without them
+  const plain = d => { const o = Object.assign({}, d); delete o.rank; delete o.player; return o; };
+  try { await ref.set(scoreDoc(r)).catch(e => { if (e && e.code === 'invalid_argument') return ref.set(plain(scoreDoc(r))); throw e; }); D.posted = true; saveMeta(); }
   catch (e) {
     // Already there (posted from another device): the rules refuse a second write, so stop trying
     let there = false; try { there = (await ref.get()).exists; } catch (e2) { }
@@ -260,7 +262,7 @@ function countObservers(D) {
   if (col.count) col.count().then(n => { D.count = n; }).catch(e => console.warn('[cloud] count failed:', e && e.code, e));
 }
 // The name cell: rank letter, name, and a star for the Prime Entrant
-function nameCell(r) { const P = ui.prime; return `${r.rank ? `<i class="br-l">${r.rank}</i>` : ''}${esc(r.name || 'Entrant')}${P && P.uid && r.uid === P.uid ? ' <i class="br-pe" title="Prime Entrant" aria-label="Prime Entrant">★</i>' : ''}`; }
+function nameCell(r) { const P = ui.prime; return `${r.rank ? `<i class="br-l">${r.rank}</i>` : ''}${esc(r.name || 'Entrant')}${r.player ? `<i class="br-p"> · ${esc(r.player)}</i>` : ''}${P && P.uid && r.uid === P.uid ? ' <i class="br-pe" title="Prime Entrant" aria-label="Prime Entrant">★</i>' : ''}`; }
 // Rank, sigil, name, round reached, Hearts left, entries kept
 function reached(r) { return r.wins > 8 ? `Elite ${r.wins - 8}` : r.wins === 8 ? 'Spared' : `Round ${r.wins + 1}`; }
 function resultRow(r, rank, me, i) {
@@ -294,7 +296,7 @@ function dailySheet() {
 }
 // ---------- Seasons ----------
 // A day's top 20, trimmed for the season table. Past days are final, so they're kept on the device; today is re-read after an hour.
-const DAY_KEY = 'wpd-day-', thin = r => ({ uid: r.uid, name: r.name, sigil: r.sigil, color: r.color, rank: r.rank, score: r.score });
+const DAY_KEY = 'wpd-day-', thin = r => ({ uid: r.uid, name: r.name, player: r.player, sigil: r.sigil, color: r.color, rank: r.rank, score: r.score });
 async function dayTop(date) {
   const today = dailyDate(), C = ui.dayCache = ui.dayCache || {};
   if (date < today) { const k = lsGet(DAY_KEY + date); if (Array.isArray(k)) return k; }
