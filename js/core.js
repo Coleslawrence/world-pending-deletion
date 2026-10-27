@@ -512,18 +512,29 @@ function makeOffer(world, meta, rng) {
   return o;
 }
 function giftCost(k, offer) { return GIFTS[k].cost - ((offer && offer[k]) || 0); }
-function giftCheck(world, sel, patron, offer) {
+// bonus: Gift Points the System adds while you keep its picks
+function giftCheck(world, sel, patron, offer, bonus) {
   const spent = sel.reduce((a, k) => a + giftCost(k, offer), 0);
-  const budget = giftBudget(world) + (patron === 'none' ? 2 : 0);
+  const budget = giftBudget(world) + (patron === 'none' ? 2 : 0) + (bonus || 0);
   const cheats = sel.filter(k => GIFTS[k].cat === 'cheat').length, flaws = sel.filter(k => GIFTS[k].cat === 'flaw').length;
   return { spent, budget, left: budget - spent, ok: spent <= budget && cheats <= 1 && flaws <= 2, cheats, flaws };
 }
-function randomGifts(world, meta, patron, offer, rng) {
+function randomGifts(world, meta, patron, offer, rng, bonus) {
   // "Let the System decide": the world's Gift, maybe a cheat, then fill the budget
   let sel = [WORLD_TYPES[world.type].gift];
   const pool = giftsAllowed(world).filter(k => giftUnlocked(k, meta) && !['world', 'flaw'].includes(GIFTS[k].cat));
-  for (const k of shuffle(pool, rng)) { const t = sel.concat(k); if (giftCheck(world, t, patron, offer).ok) sel = t; }
+  for (const k of shuffle(pool, rng)) { const t = sel.concat(k); if (giftCheck(world, t, patron, offer, bonus).ok) sel = t; }
   return sel;
+}
+// Letting the System decide pays: SYS_BONUS extra Gift Points while you keep its picks
+const SYS_BONUS = 2;
+// The stat roll: ROLL_PTS points instead of the usual 4, one stat favoured with 3 of them. Once per Awakening.
+const ROLL_PTS = 6;
+function rollStats(rng) {
+  const s = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 };
+  s[pick(STATS, rng)] += 3;
+  for (let i = 3; i < ROLL_PTS; i++) s[pick(STATS, rng)]++;
+  return s;
 }
 
 // ---------- Titles ----------
@@ -712,7 +723,7 @@ function newRun(world, setup, meta, rng) {
   const home = WORLD_TYPES[world.type].home;
   const pool = unlockedArch({ unlocks: U }).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
   const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
-  const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer);
+  const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer, setup.sysBonus);
   const G = setup.gifts;
   const run = {
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
@@ -2297,7 +2308,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck,
+  PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
