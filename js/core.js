@@ -2200,6 +2200,22 @@ const RANK_ADDRESS = {
   SS: ['[SS-rank. This rank was not supposed to be reachable.]', '[SS-rank Entrant. Several records have been unsealed for you.]'],
   SSS: ['[SSS-rank. The Undefeated has been notified.]', '[SSS-rank Entrant {champ}. The System has no further grades. It is making one up.]'],
 };
+// Rival replies, Mass Effect style: before your first move against a named rival, up to 2 lines you qualify for (same checks
+// as event stat lines). Optional: using a skill moves on without one. The result is told after the tap.
+const RIVAL_REPLIES = [
+  { check: { stat: 'STR', hard: true }, label: 'Stare them down', go: f => { f.B.weaken += 1; return `[${f.B.name} blinks first. Weakened.]`; } },
+  { check: { stat: 'INT', hard: true }, label: 'Read their stance', go: f => { f.foresight = true; return `[You can read ${f.B.name} now. Their next 2 moves are shown.]`; } },
+  { check: { stat: 'AGI', hard: true }, label: 'Feint', go: f => { f.A.evade += 1; return `[${f.B.name} bites on the feint. You will evade their next attack.]`; } },
+  { check: { stat: 'VIT', hard: true }, label: '"Hit me, then."', go: f => { const b = Math.round(f.A.maxHp * 0.1); f.A.block += b; return `[You plant your feet. +${b} Block.]`; } },
+  { check: { favour: 'war' }, label: '"War is watching."', go: f => { f.A.empower = Math.max(f.A.empower, 2); return '[War agrees. You are Empowered.]'; } },
+  { check: { favour: 'trick' }, label: '"Your laces are undone."', go: f => { f.A.critNext = true; return `[${f.B.name} looks down. Your next hit is a critical.]`; } },
+  { check: { favour: 'ruin' }, label: '"Your world is next."', go: f => { const b = Math.max(5, Math.round(f.B.maxHp * 0.04)); f.B.burn += b; return `[Ruin hears you. ${f.B.name} burns: ${b} Burn.]`; } },
+];
+function rivalReplies(run, f) {
+  if (!f || f.spec.kind !== 'rival' || f.replied || f.turn > 1 || f.phase !== 'player' || run.practice) return [];
+  return RIVAL_REPLIES.map((r, i) => i).filter(i => checkMet(run, null, RIVAL_REPLIES[i].check)).slice(0, 2);
+}
+function rivalReply(run, f, i) { if (!rivalReplies(run, f).includes(i)) return null; f.replied = true; return RIVAL_REPLIES[i].go(f); }
 // below: you're below them; level; above: you outrank them; grudge: you've beaten them before
 const RIVAL_LINES = {
   grukk: { below: 'Little rank. Grukk go easy. Grukk not know how, but try.', level: 'Same letter as Grukk! Good. Fair fight. Grukk still win.', above: 'Big letter. Grukk lose to big letters lots. Grukk not mind.', grudge: 'You beat Grukk before. Grukk remember. Grukk get up again.' },
@@ -2286,7 +2302,7 @@ if (typeof module !== 'undefined') module.exports = {
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
-  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
+  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower,
