@@ -111,14 +111,15 @@ function playRun(meta, verbose, opts = {}) {
   let w = G.offerWorlds(meta)[0], tries = 0;
   while (opts.world && w.type !== opts.world && tries++ < 200) w = G.offerWorlds(meta).find(x => x.type === opts.world) || w;
   const home = G.WORLD_TYPES[w.type].home, main = opts.main || home, hs = G.ARCH[main].stat;
-  const st = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; st[hs] += 2; st.VIT += 2;
+  // opts.roll: the Awakening's stat roll; opts.sys: keep the System's Gift picks for its bonus points
+  const st = opts.roll ? G.rollStats() : { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; if (!opts.roll) { st[hs] += 2; st.VIT += 2; }
   const patron = G.pick(['war', 'trick', 'ruin']);
   G.bindMeta(meta);
   const offer = G.makeOffer(w, meta);
-  const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer);
+  const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer, null, opts.sys ? G.SYS_BONUS : 0);
   const titles = Object.keys(meta.titles);
   const arch = opts.main && opts.main !== home ? [opts.main].concat(G.shuffle(G.unlockedArch(meta).filter(k => k !== home && k !== opts.main))) : undefined;
-  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, arch, title: titles.length ? G.pick(titles) : null }, meta);
+  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, sysBonus: opts.sys ? G.SYS_BONUS : 0, arch, title: titles.length ? G.pick(titles) : null }, meta);
   if (opts.main) run.botMain = opts.main;
   const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(main) ? 1 : 0) - (G.SKILLS[a].tags.includes(main) ? 1 : 0)).slice(0, 3);
   G.confirmDraft(run, ids, meta);
