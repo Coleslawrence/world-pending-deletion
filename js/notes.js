@@ -4,6 +4,35 @@
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
+    id: '2026-10-27', title: "[System Notice: Procedural Update]", pages: [
+      { h: "Corrections", sys: "[Display faults corrected. The System apologises to no one.]", items: [
+        "[The System no longer hides its header behind your notch.]",
+        "[Fight speed is now on the fight screen. The System will remember your impatience.]",
+        "[The game now opens from storage at once. Updates install in the background.]",
+        "[Only choices you can take are offered. Consequences are disclosed afterwards.]"] },
+      { h: "Attribute dialogue", sys: "[Your build has opinions now. The System has agreed to listen.]", items: [
+        "[High stats open new options in events, marked with the stat. They always work.]",
+        "[Gods with 4 Favour may speak through you. Results are disclosed afterwards.]",
+        "[Luck occasionally finds a way. The System does not explain Luck.]",
+        "[Named rivals may now be answered before your first move. Optional.]"] },
+      { h: "Procedure", sys: "[The tournament has been streamlined. Delays were not authorised.]", items: [
+        "[Districts now come before the shop. The shop's exit is the arena.]",
+        "[Tap an opponent to face them. The System assumes you meant it.]",
+        "[Lost entries are erased together, one after another. Watch.]",
+        "[Victories no longer require a meeting. Your reward is noted on the way.]"] },
+      { h: "Awakening and shop", sys: "[Indecision has been monetised.]", items: [
+        "[Let the System choose your Gifts. It pays 2 points for your trust.]",
+        "[Overrule the System and the points are withdrawn. It keeps records.]",
+        "[Stats may be rolled once: 6 points, placed at random. No re-rolls.]",
+        "[Copies of what you own can be bought in one tap. The System trusts you there.]"] },
+      { h: "Access", sys: "[Entrant records have been tidied. Some doors are now staffed.]", items: [
+        "[Other Entrants now see a name you choose. Never your account name.]",
+        "[Shared boards are for approved Entrants. Others will be asked to wait.]",
+        "[Districts answer to your stats too. VIT, AGI and INT improve three of them.]",
+        "[An overfilled bench must be cleared before the arena. The System stores no clutter.]"] },
+    ],
+  },
+  {
     id: '2026-10-25', title: "[System Notice: Tournament Update]", pages: [
       { h: "World Record", sys: "[Your world has been filed for review.]", items: [
         "[Each run, 10 places, people and customs from your world are now kept on record.]",
