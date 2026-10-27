@@ -525,9 +525,15 @@ function shopHTML() {
 const DIST_GLYPH = { infirmary: '+', sanctum: '♥', undercity: '!', scout: '?', enchanter: 'E' };
 // Infirmary at full HP would do nothing. Core no longer offers it; this hides it in runs saved before, unless it's the only district left
 function distFull(k) { return k === 'infirmary' && run.hp >= maxHp(run) && run.districts.length > 1; }
+// A district your stats upgrade says so with the stat's tag; what the upgrade does is told after the visit, except where it is the visit itself
+function districtDesc(k) {
+  if (!districtUp(run, k)) return DISTRICTS[k].desc;
+  const tag = `[${DISTRICT_STAT[k]} ${STAT_EASY}] `;
+  return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: 'Carve a prefix into one of your skills, from 4.' }[k] || DISTRICTS[k].desc);
+}
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage === 'ready';
-  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
+  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
   return `<main class="screen district">${topBar(roundLabel() + ' · District')}${champLine()}
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     <div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
@@ -741,12 +747,17 @@ function pieceSheet() {
   return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
     canSell ? `<button class="btn ghost danger-t" data-act="sell" data-u="${p.u}">Sell · ${sellValue(p)}g</button><button class="btn primary" data-act="close">Done</button>` : `<button class="btn primary" data-act="close">Done</button>`);
 }
+// The first time a stat line is offered, the System says so once
+function statLinesNotice() {
+  const p = run.pending[0]; if (meta.statLines || run.practice || !p || p.type !== 'event' || !eventOpts(run, p.key).some(i => EVENTS[p.key].opts[i].check)) return;
+  meta.statLines = true; saveMeta(); setTimeout(() => toast('[Attribute dialogue unlocked. Your build has opinions now.]', 'class'), 300);
+}
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
     const chainTag = E.chain && CHAIN_STARTERS[E.chain] !== p.key ? `<p class="sh-p fine">[Event chain: ${{ official: 'The Official', poisoner: 'The Poisoner', letter: 'The Letter' }[E.chain]}]</p>` : '';
-    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
+    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check ? `<span class="chk-tag">${esc(checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
@@ -857,6 +868,7 @@ function scoutSheet() {
   let body = '';
   if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
   else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>`; }
+  if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
@@ -972,7 +984,7 @@ function render() {
     const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
-  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
+  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
   if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
   app.innerHTML = h + sh + coachHTML();
@@ -1066,7 +1078,7 @@ function onAct(el) {
       if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
-      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(3, null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
+      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(districtUp(run, 'enchanter') ? 4 : 3, null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
       saveRun(); return render();
     }
     case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i); if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }

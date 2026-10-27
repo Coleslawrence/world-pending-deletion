@@ -95,7 +95,7 @@ function pending(run, meta) {
   while (run.pending.length) {
     const p = run.pending.shift();
     if (p.type === 'rune') { for (const m of p.mods) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
-    if (p.type === 'event') { const E = G.EVENTS[p.key]; for (let i = 0; i < E.opts.length; i++) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; }
+    if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
     if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
     if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
@@ -139,7 +139,7 @@ function playRun(meta, verbose, opts = {}) {
     pending(run, meta);
     if (k === 'infirmary') G.infirmary(run);
     if (k === 'sanctum') G.sanctum(run);
-    if (k === 'enchanter') { const ms = G.rollPrefixes(3, null, null, run); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    if (k === 'enchanter') { const ms = G.rollPrefixes(G.districtUp(run, 'enchanter') ? 4 : 3, null, null, run); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     const spec = G.currentSpec(run);
     const f = fight(run);
     const r = G.resolveFight(run, f, meta);
