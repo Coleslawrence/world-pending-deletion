@@ -221,7 +221,7 @@ function cleanScore(uid, d, date) {
 // Posts today's ranked result once. A score made offline posts at the next sync, as long as it's still the same game day.
 async function postDaily() {
   const D = meta.daily, r = D && D.result;
-  if (!cloud.on || !cloud.db || !cloud.uid || !r || D.posted || D.date !== dailyDate() || ui.posting) return;
+  if (!cloud.on || !cloud.db || !cloud.uid || !r || D.posted || D.date !== dailyDate() || ui.posting || cloud.tester === false) return;
   ui.posting = true;
   const ref = cloud.db.doc(`daily/${D.date}/scores/${cloud.uid}`);
   // Older published rules refuse the rank and player fields, so a refused post is retried without them
@@ -279,7 +279,7 @@ function dailySheet() {
     rows = B.rows.map((x, i) => resultRow(x, i + 1, x.uid === own, i)).join('');
     if (!B.rows.length) rows = '<p class="sh-p fine">No outcomes recorded yet today.</p>';
     if (B.mine) rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(B.mine, B.mine.rank, true, B.rows.length);
-    else if (r && !meta.daily.posted && !B.rows.some(x => x.uid === own)) { rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(r, null, true); note = 'Your score posts at the next sync today.'; }
+    else if (r && !meta.daily.posted && !B.rows.some(x => x.uid === own)) { rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(r, null, true); note = cloud.tester === false ? `${PENDING} Your score stays on this device until you are approved.` : 'Your score posts at the next sync today.'; }
   } else if (cloud.on) {
     rows = B && B.error ? '<p class="sh-p fine">[Observations unavailable. Try again later.]</p>' : '<p class="sh-p fine">[Retrieving observations…]</p>';
   } else {
@@ -374,7 +374,7 @@ function titleHTML() {
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
       <div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button></div>
-      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(window.WPD_CLOUD.displayName())} · cloud save on · <button class="link" data-act="signout">Sign out</button></p>` : ''}
+      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(window.WPD_CLOUD.displayName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
     </div></main>`;
 }
 function worldsHTML() {
@@ -716,7 +716,7 @@ function finishFight() {
   pushMsgs(res.msgs);
   ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
-  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes. ${ownerName(res.rested.owner)} will hear of it.]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
+  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.fell) recordWin(res.fell);
   if (res.death) { const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; lsDel(RUN_KEY); }
   else if (res.spared) { const out = endRun(run, meta, 'spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
@@ -967,9 +967,9 @@ function rankHTML() {
     <ul class="rank-hist"><li>[Entrant registered. F-rank.]</li>${R.history.map(h => `<li>${esc(historyLine(h))}</li>`).join('')}</ul>`;
 }
 function hallsSheet() {
-  const row = (s, erased) => runCard(s, { erased }) + (cloud.on && !cloud.shareOff ? (meta.shared && meta.shared[s.at] ? '<p class="sh-p fine">Shared with other entrants.</p>' : `<button class="btn small ghost" data-act="share-hall" data-k="${erased ? 'erased' : 'spared'}" data-at="${s.at}">Share with other entrants</button>`) : '');
+  const row = (s, erased) => runCard(s, { erased }) + (canShare() ? (meta.shared && meta.shared[s.at] ? '<p class="sh-p fine">Shared with other entrants.</p>' : `<button class="btn small ghost" data-act="share-hall" data-k="${erased ? 'erased' : 'spared'}" data-at="${s.at}">Share with other entrants</button>`) : '');
   const others = cloud.shared.length ? `<h4>Other entrants' champions</h4><p class="sh-p fine">Shared by people who play this game with you. They can appear in your tournaments.</p><div class="cards">${cloud.shared.map(x => `<p class="sh-p fine">${x.kind === 'spared' ? 'Champion of' : 'Erased in'} ${esc(ownerName(x.snap.owner))}'s tournament</p>` + runCard(x.snap, { erased: x.kind === 'erased' })).join('')}</div>` : (cloud.on ? '<h4>Other entrants\' champions</h4><p class="sh-p fine">None shared yet. When people you share this game with share their champions, they appear here and in your brackets.</p>' : '');
-  return sheetWrap('The Halls', `${rankHTML()}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div><h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
+  return sheetWrap('The Halls', `${rankHTML()}${cloud.on && cloud.tester === false ? `<p class="sh-p fine">${PENDING} Sharing champions opens once you are approved.</p>` : ''}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div><h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function echoesSheet() {
   const list = Object.entries(UNLOCKS).map(([k, u]) => `<div class="choice static"><div class="sr-h"><span class="sr-name">${esc(u.name)}</span><span class="price">${u.cost} Echoes</span></div><div class="sr-desc">${esc(u.desc)}</div>${meta.unlocks[k] ? '<span class="tag">Unlocked</span>' : `<button class="btn small" data-act="unlock" data-k="${k}" ${meta.echoes < u.cost ? 'disabled' : ''}>Unlock</button>`}</div>`).join('');
@@ -977,7 +977,8 @@ function echoesSheet() {
 }
 function shareBlock(s, erased) {
   if (FIREBASE && !cloud.on && s) return `<p class="sh-p fine center">Sign in from the menu to share champions with other players.</p>`;
-  if (!cloud.on || cloud.shareOff || !s) return '';
+  if (cloud.on && cloud.tester === false && s) return `<p class="sh-p fine center">${PENDING}</p>`;
+  if (!canShare() || !s) return '';
   if (meta.shared && meta.shared[s.at]) return `<p class="sh-p fine center">[${esc(s.champ)} is shared with other entrants.]</p>`;
   return `<button class="btn" data-act="share" data-k="${erased ? 'erased' : 'spared'}">Share ${esc(s.name || s.champ)} with other entrants</button>`;
 }
@@ -1255,7 +1256,7 @@ onAct = function (el) {
 
 // ---------- Cloud: synced progress and shared champions ----------
 // Everything here is optional: without a signed-in viewer the game runs on local storage alone.
-const cloud = { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, names: {}, timer: null, pushing: false, again: false, shared: [], status: 'local' };
+const cloud = { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, tester: null, names: {}, timer: null, pushing: false, again: false, shared: [], status: 'local' };
 const jsonSafe = x => JSON.parse(JSON.stringify(x));
 const FIREBASE = !!window.FIREBASE_CONFIG;
 // The name other players see on shared champions and laid-to-rest notes. It is chosen in game (by default the
@@ -1270,6 +1271,7 @@ async function syncPublicName() {
   if (!meta.handle && (meta.champions.length || meta.erased.length)) { meta.handle = publicName(); saveMeta(); }
   const name = publicName(); if (window.WPD_CLOUD) window.WPD_CLOUD.handle = name;
   if (!FIREBASE || !cloud.on || meta.pubName === name) return;
+  if (cloud.tester === false) return requestAccess();
   try {
     for (const path of ['champions/' + cloud.uid, 'rests/' + cloud.uid]) {
       const ref = cloud.db.doc(path), cur = await ref.get();
@@ -1277,6 +1279,25 @@ async function syncPublicName() {
     }
     meta.pubName = name; saveMeta();
   } catch (e) { cloudFail('share', 'update public name', e); }
+}
+// Approved playtesters write to shared data (scores, shared champions, laid-to-rest notes); everyone else still plays
+// and keeps their own cloud save. tester is null when it can't be checked (rules from before the list), and then
+// writes go ahead and the rules decide. A tester is a testers/{uid} document added in the Firebase console.
+const PENDING = '[Entry pending approval.]';
+const canShare = () => cloud.on && !cloud.shareOff && cloud.tester !== false;
+async function checkTester() {
+  if (!FIREBASE) return;
+  try { cloud.tester = (await cloud.db.doc('testers/' + cloud.uid).get()).exists; } catch (e) { cloud.tester = null; return; }
+  if (cloud.tester) return;
+  await requestAccess();
+  if (!meta.pendingTold) { meta.pendingTold = true; saveMeta(); toast('[Entry pending approval. Your progress still saves to your account.]', 'sys'); }
+}
+// The request carries the UID (its document name) and the in-game name only. Only the player and the console read it.
+async function requestAccess() {
+  if (!cloud.on || cloud.tester !== false) return;
+  const ref = cloud.db.doc('requests/' + cloud.uid), name = publicName();
+  try { const cur = await ref.get(); if (!cur.exists || cur.data().name !== name) await ref.set({ name, at: Date.now() }); }
+  catch (e) { console.warn('[cloud] access request failed:', e && e.code, e); }
 }
 async function cloudInit() {
   try {
@@ -1292,6 +1313,7 @@ async function cloudInit() {
     const uid = await user.id(); if (!uid) return;
     Object.assign(cloud, { db, user, uid, on: true, status: 'syncing' });
     await pullProgress();
+    await checkTester();
     await syncPublicName();
     await loadShared();
     await checkRests();
@@ -1370,7 +1392,7 @@ async function ensureChampionKey() {
 async function loadShared() {
   if (!cloud.on) return;
   try {
-    if (cloud.db.collection('champions').query) await ensureChampionKey();
+    if (cloud.db.collection('champions').query && canShare()) await ensureChampionKey();
     const docs = await sampleChampions();
     const erased = [], spared = [], all = [];
     docs.forEach(d => {
@@ -1385,7 +1407,7 @@ async function loadShared() {
   } catch (e) { cloudFail('share', 'load shared champions', e); }
 }
 async function shareChampion(snap, kind) {
-  if (!cloud.on || cloud.shareOff) return false;
+  if (!canShare()) return false;
   const ref = cloud.db.doc('champions/' + cloud.uid);
   try {
     const cur = await ref.get();
@@ -1399,7 +1421,7 @@ async function shareChampion(snap, kind) {
 }
 // "Laid to rest" notes go straight into the champion owner's inbox, so each player reads only notes addressed to them
 async function recordRest(r) {
-  if (!cloud.on || cloud.shareOff || !r.owner || r.owner === cloud.uid) return;
+  if (!canShare() || !r.owner || r.owner === cloud.uid) return;
   const t = Date.now();
   const note = { by: cloud.uid, champ: String(r.champ).slice(0, 60), t };
   if (r.at) note.at = r.at; if (r.rank) note.rank = r.rank;
@@ -1409,14 +1431,14 @@ async function recordRest(r) {
 }
 // The other half of champion rank: tell the owner their shared champion beat you
 async function recordWin(r) {
-  if (!cloud.on || cloud.shareOff || !r.owner || r.owner === cloud.uid || !r.at) return;
+  if (!canShare() || !r.owner || r.owner === cloud.uid || !r.at) return;
   const t = Date.now();
   try { await cloud.db.doc(`inbox/${r.owner}/notes/${cloud.uid}_${t}`).set({ by: cloud.uid, champ: String(r.champ).slice(0, 60), t, at: r.at, won: true }); }
   catch (e) { cloudFail('share', 'record win', e); }
 }
 // After a champion ranks up, its shared copy is updated so other Entrants see the new letter
 async function reshare(snaps) {
-  if (!cloud.on || cloud.shareOff || !snaps.length) return;
+  if (!canShare() || !snaps.length) return;
   const ref = cloud.db.doc('champions/' + cloud.uid);
   try {
     const cur = await ref.get(); if (!cur.exists || !Array.isArray(cur.data().list)) return;
@@ -1451,14 +1473,14 @@ function logToast(text) { toast(text, 'broadcast'); }
 // Web version: Firebase sign-in state
 window.addEventListener('wpd-auth', e => {
   if (e.detail && e.detail.signedIn) { if (!cloud.on) cloudInit(); }
-  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, shared: [], status: 'local' }); ui.board = null; setShared([], []); render(); }
+  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, tester: null, shared: [], status: 'local' }); ui.board = null; setShared([], []); render(); }
 });
 function cloudSignInHTML(compact) {
   const provs = (window.FIREBASE_PROVIDERS || ['google', 'github']).filter(k => k === 'google' || k === 'github');
   if (!FIREBASE) return '';
   const C = window.WPD_CLOUD;
   if (C && C.error) return compact ? '' : '<p class="sh-p fine">Cloud saves are unavailable right now (offline?). Progress is saved on this device.</p>';
-  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p><button class="btn small ghost" data-act="signout">Sign out</button></div>`;
+  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p>${cloud.tester === false ? `<p class="sh-p sysl">${PENDING}</p><p class="sh-p fine">Your request is filed under this name. Daily scores and shared champions open once you are approved.</p>` : ''}<button class="btn small ghost" data-act="signout">Sign out</button></div>`;
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 

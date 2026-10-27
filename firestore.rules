@@ -4,6 +4,26 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Approved playtesters: one document per approved account, named by its auth UID. Added and removed by hand in
+    // the Firebase console. Anyone can play and keep their own cloud save; only testers write to shared data.
+    function isTester() {
+      return request.auth != null && exists(/databases/$(database)/documents/testers/$(request.auth.uid));
+    }
+    match /testers/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Access requests: a signed-in player who isn't a tester files one, keyed by their UID, with the name they chose
+    // in game (never their account name or email). Only the player and the console can read it.
+    match /requests/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'at'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 24
+        && request.resource.data.at is number;
+    }
+
     // Each player's private progress: data/users/{uid}/progress
     match /data/users/{uid}/{docId} {
       allow read: if request.auth != null && request.auth.uid == uid;
@@ -12,11 +32,11 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['meta', 'run', 'savedAt']);
     }
 
-    // Shared champions: every signed-in player reads them, each player writes only their own document.
+    // Shared champions: every signed-in player reads them, each tester writes only their own document.
     // r is a random key in [0, 1) so the game can read a random handful instead of the whole collection.
     match /champions/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid
+      allow write: if isTester() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['list', 'name', 'r'])
         && (!('r' in request.resource.data) || (request.resource.data.r is number && request.resource.data.r >= 0 && request.resource.data.r < 1))
         && request.resource.data.list is list && request.resource.data.list.size() <= 12
@@ -25,11 +45,11 @@ service cloud.firestore {
     }
 
     // "Laid to rest" notes, one per document in the champion owner's inbox. Only the owner reads them;
-    // any other signed-in player can add a note signed with their own id, never edit one.
+    // any other tester can add a note signed with their own id, never edit one.
     // won: true means the owner's shared champion beat the sender (champion rank); at names the champion.
     match /inbox/{owner}/notes/{noteId} {
       allow read, delete: if request.auth != null && request.auth.uid == owner;
-      allow create: if request.auth != null && request.auth.uid != owner
+      allow create: if isTester() && request.auth.uid != owner
         && noteId.matches(request.auth.uid + '_[0-9]+')
         && request.resource.data.keys().hasOnly(['by', 'champ', 't', 'name', 'at', 'won', 'rank'])
         && request.resource.data.by == request.auth.uid
@@ -44,18 +64,18 @@ service cloud.firestore {
     // Old "laid to rest" lists, kept so copies of the game from before the inbox still work until they update
     match /rests/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid
+      allow write: if isTester() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['list', 'name'])
         && request.resource.data.list is list && request.resource.data.list.size() <= 40
         && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 24));
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Pending World scores: one document per player per game day. Created once, never updated, so a first score
+    // Pending World scores: one document per tester per game day. Created once, never updated, so a first score
     // can't be overwritten. Scores are worked out on the player's device: fine for friends, not for a public board.
     match /daily/{date}/scores/{uid} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == uid
+      allow create: if isTester() && request.auth.uid == uid
         && date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
         && request.resource.data.keys().hasOnly(['name', 'player', 'sigil', 'color', 'wins', 'hearts', 'turns', 'score', 'path', 'rec', 'at', 'rank'])
         && request.resource.data.keys().hasAll(['name', 'wins', 'hearts', 'turns', 'score'])
