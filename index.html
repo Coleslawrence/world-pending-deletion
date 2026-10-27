@@ -32,6 +32,9 @@
   // Installable web app: cache the game for offline play (only when served over http/https)
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    // The game opens from the cache, so a new version takes effect on the next launch; say so once it has installed
+    const hadSW = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSW && typeof toast === 'function') toast('[Update installed. It applies the next time you open the game.]', 'sys'); });
   }
 </script>
 </body>
