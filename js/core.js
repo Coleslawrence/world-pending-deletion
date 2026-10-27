@@ -1184,27 +1184,35 @@ function rollDistricts(run, rng) {
   if (run.hp < maxHp(run) * 0.45 && !out.includes('infirmary')) out[2] = 'infirmary';
   return out;
 }
-function infirmary(run) { const f = run.world.mod === 'famine' ? 0.25 : 0.5; const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
+function infirmary(run) { const f = (run.world.mod === 'famine' ? 0.25 : 0.5) + (districtUp(run, 'infirmary') ? 0.15 : 0); const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
 function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); restoreRecord(run, run.hearts - b, msgs); return run.hearts - b; }
 // Events. Chains set flags that later events check: they come back on their own a round or two later.
-// opts: { label, desc, can(run), go(run, meta, rng, msgs), reveal }
+// opts: { label, desc, can(run), check, go(run, meta, rng, msgs), reveal }
 // label is an action the player can take and desc a hint. Costs show only when paying is the action itself (Pay 6 gold);
 // any other consequence is revealed after the choice. An option whose can() fails is left out, never shown greyed out
 // In chains, desc is a hint and the reward stays hidden: reveal (a string or fn(run)) is shown after choosing
 // when go() adds no message of its own. Costs always stay visible in the label or desc.
 const EVENTS = {
   merchant: { title: 'Hooded merchant', text: () => 'A merchant in the tunnels sells forbidden techniques. The price is a little of your life.', opts: [
-    { label: 'Buy a technique', desc: 'Whatever he has under the hood.', go: (run, meta, rng, msgs) => { lose(run, 0.1, msgs, 'The price is paid in blood.'); const pool = poolIds(run).filter(x => ['C', 'B'].includes(pieceDef(x).rank)); const id = pick(pool, rng); if (id) { msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } } },
+    { label: 'Buy a technique', desc: 'Whatever he has under the hood.', go: (run, meta, rng, msgs) => { lose(run, 0.1, msgs, 'The price is paid in blood.'); merchantPiece(run, rng, msgs, 1); } },
+    { check: { stat: 'INT', hard: true }, label: 'Inspect his stock', desc: 'Half of these scrolls are fakes.', go: (run, meta, rng, msgs) => { lose(run, 0.1, msgs, 'You picked the real one. The price is still blood.'); merchantPiece(run, rng, msgs, 2); } },
+    { check: { luck: true }, label: 'Rummage through the crates', desc: 'He is not watching them.', go: (run, meta, rng, msgs) => { msgs.push({ t: 'sys', text: '[Nobody saw. No price was paid.]' }); merchantPiece(run, rng, msgs, 1); } },
     { label: 'Walk away', desc: 'Nothing happens', go: () => { } }] },
   crowd: { title: 'The crowd chants', text: () => 'The crowd is chanting your name. The gods are listening.', opts: [
     { label: 'Show off', desc: 'Give the gods something to watch.', go: (run, meta, rng, msgs) => { const b = run.hp; run.hp = Math.max(1, run.hp - 8); msgs.push({ t: 'loss', text: `[You overdid it. −${b - run.hp} HP.]` }); addFavour(run, pick(Object.keys(GODS), rng), 2, meta, msgs, rng); } },
+    { check: { stat: 'STR' }, label: 'Lift the arena gate one-handed', desc: 'Give them a show they can feel.', go: (run, meta, rng, msgs) => addFavour(run, 'war', 2, meta, msgs, rng) },
+    { check: { stat: 'AGI' }, label: 'Run the arena wall', desc: 'Upside down, if possible.', go: (run, meta, rng, msgs) => addFavour(run, 'trick', 2, meta, msgs, rng) },
     { label: 'Wave and rest', desc: 'Let them chant. You sit down.', go: (run, meta, rng, msgs) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + 10); msgs.push({ t: 'loot', text: `[Rested. +${run.hp - b} HP.]` }); } }] },
   // --- The Official ---
   official_1: { chain: 'official', title: 'A quiet word', text: () => 'A tournament official offers to "adjust" your next match. He smiles too much.', opts: [
     { label: 'Pay 6 gold', desc: 'He will "adjust" your next match.', reveal: '[Your next opponent starts with 20% less HP.]', can: run => run.gold >= 6, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
+    { check: { stat: 'INT', hard: true }, label: 'Quote the rules back at him', desc: 'Section 9, on officials.', reveal: '[He adjusts your match for free, and forgets your name. Your next opponent starts with 20% less HP.]', go: run => { run.nextFlags.bribe = true; run.chains.official = 'done'; } },
+    { check: { favour: 'war' }, label: '"Adjust it, or be adjusted."', desc: 'Say it the way War would.', go: (run, meta, rng, msgs) => { msgs.push({ t: 'sys', text: '[He adjusts it. Your next opponent starts with 20% less HP.]' }); run.nextFlags.bribe = true; run.chains.official = 'done'; addFavour(run, 'war', 1, meta, msgs, rng); } },
     { label: 'Refuse', desc: 'Someone up there might respect that.', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
   official_bribed: { chain: 'official', title: 'Blackmail', text: () => 'The official is back. He has a ledger with your name in it, and the System would love to read it.', opts: [
     { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
+    { check: { stat: 'STR' }, label: 'Remind him how matches end', desc: 'Up close.', reveal: '[He remembers somewhere else to be. The ledger goes with him.]', go: run => { run.chains.official = 'done'; } },
+    { check: { stat: 'INT', hard: true }, label: 'Produce his own ledger', desc: 'You kept notes too.', reveal: '[He pays for your silence. +8 gold.]', go: run => { run.gold += 8; run.chains.official = 'done'; } },
     { label: 'Let him talk', desc: 'Let the System read his ledger.', go: (run, meta, rng, msgs) => { msgs.push({ t: 'loss', text: '[Scandal recorded. Your world pays for it.]' }); if (run.hearts > 1) { run.hearts--; eraseRecord(run, 1, msgs); } run.chains.official = 'done'; } }] },
   official_refused: { chain: 'official', title: 'The honest official', text: () => 'The official you refused finds you after a match. "Nobody turns me down. I respect that." He slips you a folded page: notes on how the Final Champion fights.', opts: [
     { label: 'Take the notes', desc: 'A folded page about the final.', go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: "[Final Champion notes acquired. In the final, you'll see their next 2 moves.]" }); } }] },
@@ -1212,17 +1220,26 @@ const EVENTS = {
   poisoner_1: { chain: 'poisoner', title: 'Tampered water', text: () => 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
     { label: 'Drink it anyway', desc: 'It might be worth it.', reveal: '[+2 VIT. You start the next fight with 4 Poison.]', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
     { label: 'Investigate', desc: 'Find out who did it.', reveal: '[Inquiries made. A name will surface.]', go: (run, meta, rng) => poisonerFound(run, rng) },
+    { check: { stat: 'VIT' }, label: "Drink it. You've had worse", desc: 'Your stomach has survived the tournament food.', reveal: '[+2 VIT. The poison found nothing to work with.]', go: run => { run.stats.VIT += 2; run.chains.poisoner = 'done'; } },
+    { check: { stat: 'INT', hard: true }, label: 'Identify the herb', desc: 'You know this smell.', reveal: '[Nightroot. You coat your blade with it. Your next opponent starts with 6 Poison.]', go: run => { run.nextFlags.foePoison = 6; run.chains.poisoner = 'done'; } },
+    { check: { favour: 'ruin' }, label: 'Curse whoever did it', desc: 'Ruin knows their name already.', go: (run, meta, rng, msgs) => { const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.sabotage = who; run.chains.poisoner = 'done'; msgs.push({ t: 'sys', text: `[${ENEMIES[who].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]` }); addFavour(run, 'ruin', 1, meta, msgs, rng); } },
     { label: 'Pour it out', desc: 'Nothing happens', go: run => { run.chains.poisoner = 'done'; } }] },
   poisoner_found: { chain: 'poisoner', title: 'The poisoner', text: run => `A stable boy talks for a coin: it was ${ENEMIES[run.chains.poisoner.who].name}'s people who tampered with your water.`, opts: [
     { label: 'Expose them to the crowd', desc: 'Let the crowd judge them. Someone will enjoy it.', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
+    { check: { stat: 'AGI', hard: true }, label: 'Swap their water', desc: 'And check their tent while you are there.', reveal: run => `[${ENEMIES[run.sabotage].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP. +5 gold from their tent.]`, go: run => { run.sabotage = run.chains.poisoner.who; run.gold += 5; run.chains.poisoner = 'done'; } },
+    { check: { favour: 'trick' }, label: 'Frame another entrant', desc: 'The Trickster has a candidate.', go: (run, meta, rng, msgs) => { const who = run.chains.poisoner.who, other = pick(RIVALS.filter(r => r !== who && !run.met.includes(r)), rng) || who; run.sabotage = other; run.chains.poisoner = 'done'; msgs.push({ t: 'sys', text: `[${ENEMIES[other].name} takes the blame. They will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]` }); addFavour(run, 'trick', 3, meta, msgs, rng); } },
     { label: 'Return the favour', desc: 'A taste of their own medicine.', reveal: run => `[${ENEMIES[run.sabotage].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]`, go: run => { run.sabotage = run.chains.poisoner.who; run.chains.poisoner = 'done'; } }] },
   // --- The Letter ---
   letter_1: { chain: 'letter', title: 'A letter from the Erased', text: () => 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
     { label: 'Read it', desc: 'Follow the map.', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
+    { check: { stat: 'INT' }, label: 'Decipher the margins', desc: 'There is a second letter under the first.', go: (run, meta, rng, msgs) => { const ks = shuffle(STATS, rng).slice(0, 2); ks.forEach(k => run.stats[k]++); msgs.push({ t: 'sys', text: `[+1 ${ks[0]}, +1 ${ks[1]}. The map is yours.]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
     { label: 'Sell it', desc: 'Someone will pay for a dead world\'s secrets.', reveal: '[Sold. +5 gold.]', go: run => { run.gold += 5; run.chains.letter = 'done'; } }] },
   letter_map: { chain: 'letter', title: 'The old quarter', text: () => "The letter's map leads to a rusted grate in the old quarter. A bored sentry leans on it.", opts: [
     { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
     { label: 'Sneak past', desc: 'Wait for him to look away.', go: (run, meta, rng, msgs) => { lose(run, 0.15, msgs, 'He looked back. You got through anyway.'); run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
+    { check: { stat: 'STR' }, label: 'Force the grate', desc: 'Rust is only a suggestion.', reveal: '[The grate gives. The sentry decides he saw nothing.]', go: run => { run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
+    { check: { stat: 'AGI' }, label: 'Slip past the sentry', desc: 'Between one yawn and the next.', reveal: '[Through, unseen.]', go: run => { run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
+    { check: { luck: true }, label: "There's another way in", desc: 'A loose stone, just there.', reveal: '[Through, and someone dropped a purse on the way. +5 gold.]', go: run => { run.gold += 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
     { label: 'Give up', desc: 'Turn back. The map is lost.', go: run => { run.chains.letter = 'done'; } }] },
   letter_cache: { chain: 'letter', title: 'The cache', text: () => "Behind the grate: a box with the Erased champion's last possession, and a note. [I lost. Make sure it meant something.]", opts: [
     { label: 'Take it', desc: 'Whatever it is, it was theirs.', go: (run, meta, rng, msgs) => {
@@ -1233,6 +1250,11 @@ const EVENTS = {
 };
 // A consequence revealed after the choice: lose a share of max HP and say how much
 function lose(run, f, msgs, text) { const b = run.hp; run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * f)); msgs.push({ t: 'loss', text: `[${text} −${b - run.hp} HP.]` }); }
+function merchantPiece(run, rng, msgs, tries) {
+  const pool = poolIds(run).filter(x => ['C', 'B'].includes(pieceDef(x).rank)); if (!pool.length) return;
+  let id = pick(pool, rng); for (let k = 1; k < tries; k++) { const o = pick(pool, rng); if (pieceDef(o).rank === 'B') id = o; }
+  msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs);
+}
 function poisonerFound(run, rng) { const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; }
 const CHAIN_STARTERS = { official: 'official_1', poisoner: 'poisoner_1', letter: 'letter_1' };
 function undercityEvent(run, rng) {
@@ -1245,16 +1267,38 @@ function dueChainEvents(run) {
   Object.entries(run.chains || {}).forEach(([c, st]) => { if (st && typeof st === 'object' && st.due <= run.round) out.push(c + '_' + st.step); });
   return out.filter(k => EVENTS[k]);
 }
-// The option if the player can take it, else null (left out), so every choice shown is pickable
-function eventOpt(run, key, idx) {
-  const o = EVENTS[key] && EVENTS[key].opts[idx];
-  return o && (!o.can || o.can(run)) ? o : null;
+// Stat lines, Fallout style: an option with a check shows only when you qualify, and then always works.
+// { stat, hard } needs STAT_EASY or STAT_HARD effective points (gear counts); { favour: god } needs FAVOUR_LINE Favour;
+// { luck: true } turns up by chance, LUCK_LINE per point of LUK, rolled once when the event appears
+const STAT_EASY = 6, STAT_HARD = 10, FAVOUR_LINE = 4, LUCK_LINE = 0.08, MAX_STAT_LINES = 2;
+function checkNeed(c) { return c.hard ? STAT_HARD : STAT_EASY; }
+function checkMet(run, key, c) {
+  if (c.stat) return effStats(run)[c.stat] >= checkNeed(c);
+  if (c.favour) return run.favour[c.favour] >= FAVOUR_LINE;
+  return !!(c.luck && run.luck && run.luck[key]);
 }
+function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : '[LUK]'; }
+function pushEvent(run, key, rng) {
+  run.pending.push({ type: 'event', key });
+  if (EVENTS[key] && EVENTS[key].opts.some(o => o.check && o.check.luck)) { run.luck = run.luck || {}; run.luck[key] = rnd(stream(run, 'event', rng)) < LUCK_LINE * effStats(run).LUK; }
+}
+// The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines (hard and god lines first)
+function eventOpts(run, key) {
+  const E = EVENTS[key]; if (!E) return [];
+  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && (!o.check || checkMet(run, key, o.check)); });
+  const w = c => c.hard || c.favour ? 2 : c.luck ? 1 : 0;
+  const lines = ok.filter(i => E.opts[i].check).sort((a, b) => w(E.opts[b].check) - w(E.opts[a].check));
+  const cut = lines.slice(MAX_STAT_LINES);
+  return ok.filter(i => !cut.includes(i));
+}
+// The option if the player can see and take it, else null, so every choice shown is pickable
+function eventOpt(run, key, idx) { return eventOpts(run, key).includes(idx) ? EVENTS[key].opts[idx] : null; }
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
   msgs = msgs || []; const before = msgs.length;
   o.go(run, meta, stream(run, 'event', rng), msgs);
+  if (run.luck) delete run.luck[key];
   if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
   return true;
 }
@@ -1348,7 +1392,7 @@ function enterChoose(run, meta, rng, msgs) {
   checkMilestones(run, msgs);
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
-  dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) run.pending.push({ type: 'event', key: k }); });
+  dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   if (run.elite) { run.wager = null; run.stage = 'shop'; return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
@@ -1356,7 +1400,10 @@ function enterChoose(run, meta, rng, msgs) {
   run.stage = 'choose';
 }
 function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'district'; if (!run.districts || !run.districts.length) run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
-function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') run.scouted = true; if (k === 'undercity') run.pending.push({ type: 'event', key: undercityEvent(run, stream(run, 'event', rng)) }); return true; }
+function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
+// District upgrades from stats: the stat that improves each district, at STAT_EASY
+const DISTRICT_STAT = { infirmary: 'VIT', scout: 'AGI', enchanter: 'INT' };
+function districtUp(run, k) { return !!DISTRICT_STAT[k] && effStats(run)[DISTRICT_STAT[k]] >= STAT_EASY; }
 
 // ---------- Fighters ----------
 function skillStat(def) { return def.basic ? null : ARCH[def.tags[0]].stat; }
@@ -1393,7 +1440,7 @@ function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
   const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha;
-  if (spec.kind === 'erased' || spec.kind === 'champion') return buildSnapEnemy(spec.snap, p, hm, run);
+  if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; return e; }
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3;
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
@@ -1402,7 +1449,7 @@ function buildEnemy(run, spec) {
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: t.dodge || 0, script: t.script, scriptIdx: 0, turns: 0,
     skills: t.skills.map((x, i) => ({ key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power: p * (fin ? TUNE.finalDmg : 1), cd: 0 })),
     enrage: t.enrage || 0, enrageMult: t.enrageMult || 1.5, aura: t.aura ? t.aura * p : 0, flood: !!t.flood, revive: t.revive || 0, kaito: !!t.kaito,
-    briar: t.briar ? t.briar * p : 0, twincast: t.twincast || 0, forge: t.forge ? Math.round(t.forge * p) : 0, weaken: spec.sabotaged ? 3 : 0,
+    briar: t.briar ? t.briar * p : 0, twincast: t.twincast || 0, forge: t.forge ? Math.round(t.forge * p) : 0, weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
   });
 }
 function snapshot(run) {
@@ -2239,7 +2286,7 @@ if (typeof module !== 'undefined') module.exports = {
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
-  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, resolveEvent, prefixTargets, applyPrefix,
+  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower,
