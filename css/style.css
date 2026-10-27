@@ -565,7 +565,7 @@ button.ch-hearts { background: none; border: 0; padding: 2px 0; cursor: pointer;
 .brow.head { background: none; border: 0; padding-block: 0; font-family: var(--f-m); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 .brow.head span { color: var(--dim); font-size: 10px; }
 .brow.mine { border-color: var(--sys); }
-.brow .br-n { font-family: var(--f-m); color: var(--muted); } .brow .br-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .br-n { font-family: var(--f-m); color: var(--muted); } .brow .br-p { font-style: normal; color: var(--muted); } .brow .br-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brow .br-r, .brow .br-k { font-family: var(--f-m); font-size: 12px; color: var(--muted); } .brow .br-h { font-family: var(--f-m); font-size: 12px; color: var(--foe); }
 
 /* Leaderboard: 20 rows plus a pinned one must fit 360x640, so board rows are compact and borderless */
