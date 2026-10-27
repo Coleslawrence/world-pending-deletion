@@ -251,6 +251,8 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .srow { display: grid; gap: 3px; }
 .sr-h { display: flex; gap: 8px; align-items: baseline; }
 .sr-name { font-family: var(--f-d); font-size: 17px; margin-right: auto; }
+.chk-tag { font-family: var(--f-m); font-size: 13px; color: var(--sys); white-space: nowrap; }
+.choice.chk { border-color: var(--sys-d); }
 .sr-meta { font-size: 12px; color: var(--sc, var(--muted)); text-transform: uppercase; letter-spacing: .04em; }
 .sr-desc { font-size: 14px; color: var(--muted); }
 .sr-desc b { color: var(--text); }
