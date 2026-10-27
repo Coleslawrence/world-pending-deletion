@@ -399,18 +399,20 @@ function newAw(w, date) {
   return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
     offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta), title: null };
 }
+// Any change to the System's Gift picks withdraws its bonus points
+function sysOverruled(A) { if (!A.sysPts) return; A.sysPts = 0; toast('[You overruled the System. Its bonus Gift Points are withdrawn.]', 'loss'); }
 function awMeta() { return ui.daily ? levelMeta(meta) : meta; }
 function giftRow(k, a, w) {
   const g = GIFTS[k], on = a.gifts.includes(k), unlocked = giftUnlocked(k, awMeta());
   const cost = giftCost(k, a.offer), disc = cost !== g.cost;
   const t = on ? a.gifts.filter(x => x !== k) : a.gifts.concat(k);
-  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
+  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer, a.sysPts).ok);
   const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
   return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}</span></button>`;
 }
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
-  const chk = giftCheck(w, a.gifts, a.patron, a.offer);
+  const chk = giftCheck(w, a.gifts, a.patron, a.offer, a.sysPts);
   const tabs = [['id', 'Name'], ['stats', 'Stats' + (a.pts ? ` · ${a.pts}` : '')], ['gifts', `Gifts · ${chk.left}`], ['patron', 'Patron']];
   let body = '';
   if (a.tab === 'id') {
@@ -420,15 +422,18 @@ function awakenHTML() {
       <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>
       ${a.practice ? '' : `<p class="sh-p bio">${bioHTML(a.record, w.type, w.name)}</p><p class="sh-p sysl">[Filing world record: ${esc(w.name)}. ${a.record.ids.length} entries.]</p>`}`;
   } else if (a.tab === 'stats') {
-    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button><span class="st-v">${a.stats[k]}</span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button></div>`).join('');
+    const roll = a.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="aw-unroll">Place 4 myself</button></div>`
+      : a.rollUsed || a.practice ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="aw-roll">Roll</button></div>`;
+    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>${roll}` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${a.stats[k]}</span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
   } else if (a.tab === 'gifts') {
     const allowed = giftsAllowed(w);
     const list = allowed.filter(k => GIFTS[k].cat === a.cat).sort((x, y) => giftUnlocked(y, awMeta()) - giftUnlocked(x, awMeta())).map(k => giftRow(k, a, w)).join('');
     const presets = (meta.presets || []).map((p, i) => `<button class="btn small ghost" data-act="aw-preset" data-i="${i}">${esc(p.name)}</button>`).join('');
-    body = `<div class="pts-row"><span><b>${chk.left}</b> of ${chk.budget} Gift Points</span><span class="fine">${chk.cheats}/1 cheat · ${chk.flaws}/2 flaws</span></div>
+    body = `<div class="pts-row"><span><b>${chk.left}</b> of ${chk.budget} Gift Points${a.sysPts ? ` <em class="offer">+${a.sysPts} System</em>` : ''}</span><span class="fine">${chk.cheats}/1 cheat · ${chk.flaws}/2 flaws</span></div>
+      <div class="aw-sys"><button class="btn small" data-act="aw-random">Let the System decide</button><span>${a.sysPts ? `[Bonus active: +${a.sysPts} Gift Points. Changing a Gift withdraws it.]` : `The System picks your Gifts and adds <b>${SYS_BONUS} Gift Points</b> while you keep its picks.`}</span></div>
       <div class="cats c8">${Object.keys(GIFT_CATS).map(c => { const n = a.gifts.filter(k => GIFTS[k].cat === c).length; return `<button class="cat ${a.cat === c ? 'on' : ''}" data-act="aw-cat" data-c="${c}">${GIFT_CATS[c]}${n ? ` · ${n}` : ''}</button>`; }).join('')}</div>
       <div class="glist">${list}</div>
-      <div class="aw-tools"><button class="btn small" data-act="aw-random">Let the System decide</button><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
+      <div class="aw-tools"><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
       <p class="sh-p fine">Unspent points become 3 gold each. Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ') || 'none'}.</p>`;
   } else {
     const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
@@ -1034,17 +1039,19 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
+    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(ui.daily ? seedRng(dailySeed(ui.daily.date) + ':roll') : undefined); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
+    case 'aw-unroll': { const A = ui.aw; A.stats = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; A.pts = 4; A.rolled = false; return render(); }
+    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (A.rolled) return; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
     case 'aw-cat': ui.aw.cat = d.c; return render();
-    case 'aw-gift': { const A = ui.aw, k = d.k; if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
-    case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
+    case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
+    case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
     case 'aw-title': ui.aw.title = ui.aw.title === d.k ? null : d.k; return render();
-    case 'aw-random': { const A = ui.aw; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer); toast('[The System has chosen for you.]', 'sys'); return render(); }
+    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, ui.daily ? seedRng(dailySeed(ui.daily.date) + ':sys') : undefined, A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
     case 'aw-save': { const A = ui.aw; meta.presets = (meta.presets || []).concat({ name: 'Preset ' + ((meta.presets || []).length + 1), gifts: A.gifts.filter(k => GIFTS[k].cat !== 'world') }).slice(-3); meta.presets.forEach((p, i) => p.name = 'Preset ' + (i + 1)); saveMeta(); toast('[Preset saved.]', 'sys'); return render(); }
-    case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
+    case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
       const A = ui.aw;
-      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       pushMsgs(run.log.slice(), true);

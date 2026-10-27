@@ -438,6 +438,7 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .gcost.disc { color: var(--sys); border-color: var(--sys-d); } .gcost s { color: var(--dim); }
 .offer { font-style: normal; font-family: var(--f-m); font-size: 10px; color: var(--sys); border: 1px solid var(--sys-d); border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: 2px; }
 .aw-tools { display: flex; flex-wrap: wrap; gap: 6px; } .aw-tools .btn { flex: 1 1 auto; }
+.aw-sys, .aw-roll { display: flex; align-items: center; gap: 10px; border: 1px dashed var(--sys-d); border-radius: 6px; padding: 8px 10px; font-size: 13px; line-height: 1.35; color: var(--muted); } .aw-sys .btn, .aw-roll .btn { flex: none; order: 2; } .aw-sys span, .aw-roll span { flex: 1; } .aw-roll { margin: 8px 0; }
 .qline { display: flex; gap: 8px; align-items: baseline; text-align: left; background: transparent; border: 1px dashed var(--sys-d); border-radius: 6px; padding: 5px 9px; cursor: pointer; font-size: 13px; color: var(--muted); }
 .qline span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .qline b { font-family: var(--f-m); font-weight: 400; color: var(--sys); }
 .tlist { display: grid; gap: 6px; }
