@@ -2,7 +2,7 @@
 // numbers the stats dashboard shows, with game names filled in from core.js.
 //   node tools/run-report.js runs.json [out.json]   runs.json: an array of run documents, or an object keyed by document id
 //   node tools/run-report.js --sample N [out.json]  N bot runs instead, to try the dashboard before real data exists
-// Output goes to stdout without out.json.
+// Output goes to stdout without out.json. --split DIR instead of out.json writes one row table per file (the dashboard's sources).
 const fs = require('fs');
 const G = require('../js/core.js');
 
@@ -101,5 +101,23 @@ const out = {
   days: Object.values(dayMap).sort((a, b) => a.day < b.day ? -1 : 1),
   recent: runs.slice(-12).reverse().map(r => ({ day: r.day, world: nameOf(G.WORLD_TYPES, r.world), wrank: r.wrank, path: archLabel(r.path || 'none'), outcome: r.outcome, round: r.round, hearts: r.hearts, maxHearts: r.maxHearts, mins: r.mins })),
 };
-const json = JSON.stringify(out, null, 1);
-if (args[0]) fs.writeFileSync(args[0], json); else console.log(json);
+// --split DIR: the same numbers as flat row tables, one JSON file each, for the dashboard's datasets
+if (args[0] === '--split') {
+  const dir = args[1]; fs.mkdirSync(dir, { recursive: true });
+  const T = out.totals, rows = {
+    summary: [Object.assign({ source, generated: out.generated, from: out.range && out.range.from, to: out.range && out.range.to, minRuns: MIN }, T)],
+    breakdown: ['classes', 'worlds', 'wranks', 'patrons'].flatMap(g => out[g].map(x => ({ group: g, key: x.key, label: x.label, runs: x.runs, spared: x.spared, pct: x.pct, avgRound: x.avgRound }))),
+    rounds: out.rounds,
+    choices: [].concat(
+      out.moves.map(x => ({ section: 'moved', key: x.key, kind: x.kind, label: x.label, n: x.runs, pct: x.pct, delta: x.delta })),
+      out.events.flatMap(e => e.opts.map(o => ({ section: 'event', key: e.title + ' / ' + o.label, kind: e.title, label: o.label, n: o.n, share: o.share }))),
+      out.districts.map(x => ({ section: 'district', key: x.label, label: x.label, n: x.n, share: x.share })),
+      out.enders.map(x => ({ section: 'ender', key: x.label, label: x.label, n: x.n }))),
+    days: out.days,
+    recent: out.recent.map((r, i) => Object.assign({ i }, r)),
+  };
+  Object.entries(rows).forEach(([k, v]) => fs.writeFileSync(`${dir}/${k}.json`, JSON.stringify(v)));
+} else {
+  const json = JSON.stringify(out, null, 1);
+  if (args[0]) fs.writeFileSync(args[0], json); else console.log(json);
+}
