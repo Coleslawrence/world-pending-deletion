@@ -1495,7 +1495,6 @@ function newFight(run, rng) {
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && run.chains && run.chains.official === 'tip'),
   };
-  run.nextFlags = {};
   [A, B].forEach(X => {
     const P = X.P;
     X.block += (P.startBlock || 0) + Math.round((P.startBlockPct || 0) * X.maxHp);
@@ -1999,6 +1998,8 @@ function resolveFight(run, f, meta, rng) {
     msgs.push({ t: 'class', text: '[Return by Death. The world rewinds to the start of the fight.]' });
     return res;
   }
+  // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
+  run.nextFlags = {};
   // Wager
   if (run.wagerOn && run.wager) {
     const W = WAGERS[run.wager.key], ok = won && W.check(f);

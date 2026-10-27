@@ -454,7 +454,8 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .rc-l { font-size: 13px; color: var(--muted); } .rc-l span { font-family: var(--f-m); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-right: 8px; }
 .cards { display: grid; gap: 8px; }
 .end .t-top { gap: 12px; } .center { text-align: center; }
-@container app (max-height: 780px) { .end { padding-block: 14px 12px; gap: 10px; } .end h1 { font-size: 40px; } .end .sysbox p + p { display: none; } .end .t-stats > * { padding: 6px 8px; } .end .t-stats b { font-size: 18px; } .end .rc-l:nth-of-type(n+5) { display: none; } }
+@container app (max-height: 860px) { .end { padding-block: 14px 12px; gap: 10px; } .end h1 { font-size: 40px; } .end .sysbox p + p { display: none; } .end .t-stats > * { padding: 6px 8px; } .end .t-stats b { font-size: 18px; } .end .rc-l:nth-of-type(n+5) { display: none; } }
+@container app (max-height: 700px) { .end .rc-bio { display: none; } }
 @container app (max-height: 660px) { .end .runcard { gap: 4px; padding: 8px 10px; } .end .t-top { gap: 8px; } }
 .toast.t-broadcast { color: #1a1208; background: linear-gradient(180deg, #ffe39a, #d6a04f); border-color: #ffe39a; font-weight: 500; box-shadow: 0 0 24px rgba(214,160,79,.5); }
 .msgs li.t-broadcast { color: var(--bronze); font-family: var(--f-m); font-size: 13px; }
