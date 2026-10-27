@@ -1,12 +1,13 @@
 // [World Pending Deletion] service worker: offline play.
 // Bump VERSION whenever the game files change so players get the update.
-const VERSION = 'wpd-v4';
+const VERSION = 'wpd-v5';
 const CORE = [
   './', 'index.html', 'css/style.css', 'js/firebase-config.js', 'js/core.js', 'js/notes.js', 'js/ui.js', 'js/cloud-firebase.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.svg',
 ];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  // reload skips the browser's HTTP cache, so a new VERSION never caches the old files
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION && k !== 'wpd-fonts').map(k => caches.delete(k)))).then(() => self.clients.claim()));
@@ -21,6 +22,11 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (url.origin !== location.origin) return;
-  // Game files: network first (so updates arrive), cache as fallback (offline)
-  e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; }).catch(() => caches.match(req).then(hit => hit || caches.match('index.html'))));
+  // Game files: open from the cache at once and refresh it in the background, so launching never waits on the network.
+  // A release ships a new VERSION; the browser installs it in the background and the next launch opens it.
+  e.respondWith(caches.open(VERSION).then(c => c.match(req, { ignoreSearch: true }).then(hit => {
+    const net = fetch(req).then(res => { if (res.ok) c.put(req, res.clone()); return res; });
+    if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
+    return net.catch(() => c.match('index.html'));
+  })));
 });

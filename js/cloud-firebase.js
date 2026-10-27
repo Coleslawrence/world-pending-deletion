@@ -6,13 +6,15 @@
   const V = '10.12.2', base = 'https://www.gstatic.com/firebasejs/' + V + '/';
   const names = {};
   let me = null, api = null;
+  const publicName = () => String(C.handle || '').trim().slice(0, 24) || 'Entrant';
   const shortName = u => String((u && (u.displayName || (u.email || '').split('@')[0])) || 'Entrant').trim().split(/\s+/)[0].slice(0, 24) || 'Entrant';
   const mapErr = e => { const c = e && e.code; return { code: c === 'permission-denied' || c === 'invalid-argument' ? 'invalid_argument' : c === 'unavailable' || c === 'deadline-exceeded' ? 'unavailable' : c === 'resource-exhausted' ? 'resource_exhausted' : String(c || 'unavailable'), message: e && e.message }; };
   const wrapDoc = path => ({
     id: path.split('/').pop(), path,
     get: async () => { try { const s = await api.getDoc(api.doc(api.fs, path)); return { id: s.id, exists: s.exists(), data: () => s.data() }; } catch (e) { throw mapErr(e); } },
     set: async d => {
-      if (/^(champions|rests|inbox)\//.test(path) && me) d = Object.assign({}, d, { name: shortName(me) });
+      // Other players read this name, so it is the name the player chose in game, never one from their account
+      if (/^(champions|rests|inbox)\//.test(path) && me) d = Object.assign({}, d, { name: publicName() });
       try { await api.setDoc(api.doc(api.fs, path), d); } catch (e) { throw mapErr(e); }
     },
   });
