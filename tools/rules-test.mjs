@@ -2,6 +2,7 @@
 //   npm i --no-save firebase-tools @firebase/rules-unit-testing firebase
 //   npx firebase emulators:exec --only firestore --project demo-wpd "node tools/rules-test.mjs"
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, orderBy, limit, getDocs, getCountFromServer } from 'firebase/firestore';
 
@@ -76,6 +77,23 @@ await check('a request with an email field is refused', assertFails(setDoc(doc(e
 await check('a 25-character request name is refused', assertFails(setDoc(doc(erin, 'requests/erin'), { name: 'x'.repeat(25), at: 1 })));
 await check('a signed-out request is refused', assertFails(setDoc(doc(anon, 'requests/erin'), { name: 'Wren', at: 1 })));
 await check('a player cannot delete their request', assertFails(deleteDoc(doc(erin, 'requests/erin'))));
+// Playtest stats: a real summary from a bot run, so the rules are checked against what the game actually sends
+const runDoc = (() => { const req = createRequire(import.meta.url), G = req('../js/core.js'), B = req('./bot.js'), m = G.newMeta(); const r = B.playRun(m, false, { noElite: true }); return G.runSummary(r.run, m, r.result === 'spared' ? 'spared' : 'erased', 1700000000000); })();
+const runRef = (db, id) => doc(db, 'runs/' + id);
+await check('a tester posts a run summary', assertSucceeds(setDoc(runRef(alice, 'alice_1700000000000'), runDoc)));
+await check('an abandoned run with no foe or time is fine', assertSucceeds(setDoc(runRef(alice, 'alice_1700000000001'), Object.assign({}, runDoc, { outcome: 'abandoned', foe: null, mins: null }))));
+await check('a run summary cannot be overwritten', assertFails(setDoc(runRef(alice, 'alice_1700000000000'), runDoc)));
+await check('a run summary cannot be deleted', assertFails(deleteDoc(runRef(alice, 'alice_1700000000000'))));
+await check('nobody reads run summaries in game, not even their own', assertFails(getDoc(runRef(alice, 'alice_1700000000000'))));
+await check('nobody lists run summaries in game', assertFails(getDocs(collection(alice, 'runs'))));
+await check('an unapproved run summary is refused', assertFails(setDoc(runRef(erin, 'erin_1700000000000'), runDoc)));
+await check('a run summary under someone else\'s id is refused', assertFails(setDoc(runRef(bob, 'alice_1700000000002'), runDoc)));
+await check('a run summary with a name field is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000003'), Object.assign({}, runDoc, { name: 'Wren' }))));
+await check('an unknown outcome is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000004'), Object.assign({}, runDoc, { outcome: 'won' }))));
+await check('a round of 21 is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000005'), Object.assign({}, runDoc, { round: 21 }))));
+await check('61 picks are refused', assertFails(setDoc(runRef(alice, 'alice_1700000000006'), Object.assign({}, runDoc, { picks: Array(61).fill('d:scout') }))));
+await check('a 41-character foe is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000007'), Object.assign({}, runDoc, { foe: 'x'.repeat(41) }))));
+
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);
