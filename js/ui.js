@@ -427,7 +427,8 @@ function giftRow(k, a, w) {
   const g = GIFTS[k], on = a.gifts.includes(k), unlocked = giftUnlocked(k, awMeta());
   const cost = giftCost(k, a.offer), disc = cost !== g.cost;
   const t = on ? a.gifts.filter(x => x !== k) : a.gifts.concat(k);
-  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer, a.sysPts).ok);
+  // Adding a Gift overrules the System, so it has to fit without the System's bonus points
+  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
   const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
   return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}</span></button>`;
 }
@@ -1050,7 +1051,7 @@ function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case 'new': lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
+    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
