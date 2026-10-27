@@ -597,7 +597,9 @@ function updateFight() {
     else { const i = intentInfo(f); it.className = 'intent k-' + i.kind; it.innerHTML = `<span class="in-l">Next</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>`; }
   }
   const lg = document.getElementById('log');
-  if (lg) lg.innerHTML = skylineSVG() + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('');
+  const rr = ui.busy ? [] : rivalReplies(run, f);
+  if (lg) lg.innerHTML = skylineSVG() + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('')
+    + (rr.length ? `<div class="replies">${rr.map(i => `<button class="reply" data-act="reply" data-i="${i}"><span class="chk-tag">${esc(checkTag(RIVAL_REPLIES[i].check))}</span> ${esc(RIVAL_REPLIES[i].label)}</button>`).join('')}</div>` : '');
   const sk = document.getElementById('skills');
   if (sk) {
     const can = f.phase === 'player' && !ui.busy && !f.over;
@@ -667,7 +669,7 @@ async function onUse(i) {
   const s = f.A.skills[i];
   if (ui.info) { ui.sheet = { type: 'skillinfo', i }; return render(); }
   if (!canUse(s)) return;
-  ui.busy = true;
+  ui.busy = true; f.replied = true;
   const before = f.log.length;
   playerAct(f, i);
   const engine = f.log.splice(before); summarize(f, 'A'); engine.forEach(l => f.log.push(l)); playEvents(f);
@@ -1099,6 +1101,7 @@ function onAct(el) {
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
     case 'fight': if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI();
     case 'use': return onUse(+d.i);
+    case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
     case 'result-ok': {
