@@ -139,7 +139,7 @@ function playRun(meta, verbose, opts = {}) {
     pending(run, meta);
     if (k === 'infirmary') G.infirmary(run);
     if (k === 'sanctum') G.sanctum(run);
-    if (k === 'enchanter') { const ms = G.rollPrefixes(3); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    if (k === 'enchanter') { const ms = G.rollPrefixes(3, null, null, run); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     const spec = G.currentSpec(run);
     const f = fight(run);
     const r = G.resolveFight(run, f, meta);
