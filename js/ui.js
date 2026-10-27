@@ -39,7 +39,7 @@ if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
 function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
 function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; meta.savedAt = Date.now(); lsSet(META_KEY, meta); if (typeof schedulePush === 'function') schedulePush(); }
-function stageScreen() { return { draft: 'draft', choose: 'choose', shop: 'shop', district: 'district', ready: 'district' }[run.stage] || 'choose'; }
+function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
 // ---------- Toasts ----------
 function toast(text, t = 'sys') {
@@ -50,7 +50,7 @@ function toast(text, t = 'sys') {
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
-const TOAST_RANK = { broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
+const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 function pushMsgs(msgs, logged) { if (!logged) msgs.forEach(m => logRun(m.text, m.t)); msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
 
 // ---------- Small helpers ----------
@@ -116,7 +116,7 @@ function recordSheet() {
   return sheetWrap(recWorldGone(rec) ? 'World record: erased' : `World record: ${wname}`, body, `<button class="btn primary" data-act="rec-close">Close</button>`, 'sys rec-sheet');
 }
 function findSnap(at) { at = String(at); return meta.erased.concat(meta.champions, cloud.shared.map(x => x.snap)).find(s => String(s.at) === at) || (ui.end && ui.end.snap && String(ui.end.snap.at) === at ? ui.end.snap : null); }
-// The deletion moment: one row per erased entry. The player taps through them; each glitches, then becomes a bar.
+// The deletion moment: one row per erased entry. One tap erases them all, one after another; each glitches, then becomes a bar.
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function eraseSteps(r) {
   const R = run && run.record; if (!R || !r.erased || !r.erased.length) return [];
@@ -130,10 +130,13 @@ function eraseRows(steps) {
   const d = ui.erDone || 0;
   return `<div class="erase" aria-live="polite">${steps.map((s, k) => `<div class="er ${k < d ? 'gone' : k === d && ui.erBusy ? 'glitch' : k === d ? 'next' : ''} ${s.world ? 'world' : ''}"><b>${k < d ? redact(s.name) : esc(s.name)}</b>${k < d ? `<small>${esc(s.line)}</small>` : ''}</div>`).join('')}</div>`;
 }
-// Until every row is erased, the footer button erases the next one; then it becomes the usual button
+// Until every row is erased, the footer button erases them; then it becomes the usual button
 function eraseFoot(steps, done) {
   const d = ui.erDone || 0; ui.erFinal = done;
-  return d < steps.length ? `<button class="btn primary danger-b" data-act="erase-next" ${ui.erBusy ? 'disabled' : ''}>${steps[d].world ? `Erase ${esc(run.world.name)}` : `Erase entry ${d + 1} of ${steps.length - (steps[steps.length - 1].world ? 1 : 0)}`}</button>` : done;
+  if (d >= steps.length) return done;
+  const n = steps.filter(s => !s.world).length, w = steps.some(s => s.world) ? esc(run.world.name) : '';
+  const label = ui.erBusy ? 'Erasing…' : `Erase ${n ? (n === 1 ? '1 entry' : `${n} entries`) + (w ? ` and ${w}` : '') : w}`;
+  return `<button class="btn primary danger-b" data-act="erase-next" ${ui.erBusy ? 'disabled' : ''}>${label}</button>`;
 }
 // Redraw only the rows and the button, so the sheet doesn't slide in again on every tap
 function eraseRefresh() {
@@ -141,10 +144,18 @@ function eraseRefresh() {
   if (!box || !foot) return render();
   box.outerHTML = eraseRows(steps); foot.innerHTML = eraseFoot(steps, ui.erFinal);
 }
+// Each row glitches for a moment before it goes, so the eye follows the deletion down the list
 function eraseNext() {
   if (ui.erBusy) return;
+  const res = ui.result, n = eraseSteps(res).length;
   ui.erBusy = true; eraseRefresh();
-  setTimeout(() => { ui.erBusy = false; ui.erDone = (ui.erDone || 0) + 1; eraseRefresh(); }, REDUCED ? 0 : 600);
+  const tick = () => setTimeout(() => {
+    if (ui.result !== res) return;
+    ui.erDone = (ui.erDone || 0) + 1;
+    if (ui.erDone >= n) ui.erBusy = false; else tick();
+    eraseRefresh();
+  }, REDUCED ? 300 : 600);
+  tick();
 }
 // The skyline: one silhouette per place in the record, drawn behind the fight log. A lost place leaves a dotted gap.
 const SKY_W = 40;
@@ -451,7 +462,7 @@ function draftHTML() {
 
 // ---------- Choose opponent ----------
 function chooseHTML() {
-  const cards = run.choices.map((spec, i) => `<button class="opp ${ui.pick === i ? 'on' : ''} ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
+  const cards = run.choices.map((spec, i) => `<button class="opp ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
       ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>
       <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
@@ -460,7 +471,7 @@ function chooseHTML() {
   return `<main class="screen choose">${topBar()}${bracketDots()}${champLine()}${questLine()}
     <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">+${run.lastIncome || 0}g income</span></div>
     <div class="opps">${cards}</div>${wager}
-    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary" data-act="opp-ok" ${ui.pick != null ? '' : 'disabled'}>To the shop ›</button></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
 }
 
 // ---------- Shop ----------
@@ -518,7 +529,7 @@ function shopHTML() {
     <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
     <div class="sec-h"><span>Bench ${run.bench.length}/8</span><span class="fine">Tap a piece to equip, swap or sell</span></div>
     <div class="bench">${bench}</div>
-    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary" data-act="shop-done">Done shopping ›</button></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary fight" data-act="shop-done">Fight ›</button></footer></main>`;
 }
 
 // ---------- District ----------
@@ -532,14 +543,14 @@ function districtDesc(k) {
   return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: 'Carve a prefix into one of your skills, from 4.' }[k] || DISTRICTS[k].desc);
 }
 function districtHTML() {
-  const spec = currentSpec(run), done = run.stage === 'ready';
+  const spec = currentSpec(run), done = run.stage !== 'district';
   const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
   return `<main class="screen district">${topBar(roundLabel() + ' · District')}${champLine()}
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     <div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
     <section class="inter">${opts}</section>
     <section class="minibar c${run.slots}">${run.bar.map(p => p ? `<button class="mb ${mainTag(p.id)}" data-act="own" data-u="${p.u}"><span>${esc(SKILLS[p.id].name)}</span><small>${effRank(p.id, p.mods)}${p.star > 1 ? ' ' + '★'.repeat(p.star) : ''}${p.mods.length ? ' · ' + p.mods.map(m => PREFIXES[m].name).join(' ') : ''}</small></button>` : '<div class="mb empty"><span>Empty</span></div>').join('')}</section>
-    <footer class="foot2"><button class="btn" data-act="back-shop" ${done ? 'disabled' : ''}>‹ Shop</button><button class="btn primary fight" data-act="fight" ${done ? '' : 'disabled'}>${done ? 'Fight' : 'Pick a district'}</button></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">Pick one, then shop</span></footer></main>`;
 }
 function scoutLine(spec) {
   if (spec.snap) return `<div class="nx-scout">Skills: ${spec.snap.bar.map(s => esc(modName(s.id, s.mods)) + (s.star > 1 ? ' ' + '★'.repeat(s.star) : '')).join(', ') || 'Attack only'}</div>`;
@@ -690,6 +701,9 @@ async function onUse(i) {
 function finishFight() {
   const f = ui.fight;
   const res = resolveFight(run, f, run.practice ? META : meta);
+  // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
+  const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
   pushMsgs(res.msgs);
   ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
@@ -699,6 +713,11 @@ function finishFight() {
   else if (res.spared) { const out = endRun(run, meta, 'spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
   else if (res.eliteOver) { ui.end = { kind: res.eliteCleared ? 'elite-clear' : 'elite-fall', echoes: 8 * run.eliteWins }; }
   saveMeta(); if (!res.death) saveRun();
+  if (plain) {
+    // tutorial steps that wait on the fight screen are over once it closes
+    while (coachStep() && coachStep().scr === 'fight') coachAdvance();
+    ui.fight = null; ui.result = null; return go(stageScreen());
+  }
   ui.sheet = { type: 'result' };
   render();
 }
@@ -967,6 +986,7 @@ function endHTML() {
 
 // ---------- Render ----------
 function render() {
+  if (ui.screen === 'district' && run && run.stage === 'shop' && !ui.sheet && !run.pending.length) ui.screen = 'shop';
   const focusName = document.activeElement && document.activeElement.id === 'aw-name';
   let h = '';
   const scr = ui.screen;
@@ -1055,9 +1075,8 @@ function onAct(el) {
     case 'draft-pick': { const i = ui.draftSel.indexOf(d.id); if (i >= 0) ui.draftSel.splice(i, 1); else if (ui.draftSel.length < 3) ui.draftSel.push(d.id); return render(); }
     case 'draft-reroll': rerollDraft(run); ui.draftSel = []; saveRun(); return render();
     case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta); ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
-    case 'pick-opp': ui.pick = +d.i; return render();
+    case 'pick-opp': { chooseOpponent(run, +d.i, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; ui.distDone = null; saveRun(); return go('district'); }
     case 'wager': ui.wagerOn = !ui.wagerOn; return render();
-    case 'opp-ok': { if (ui.pick == null) return; chooseOpponent(run, ui.pick, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; saveRun(); return go('shop'); }
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
@@ -1072,8 +1091,7 @@ function onAct(el) {
       if (!ok) toast('[Not possible: your bench may be full.]', 'loss');
       ui.sheet = null; pushMsgs(msgs); saveRun(); saveMeta(); return render();
     }
-    case 'shop-done': leaveShop(run, null, msgs); pushMsgs(msgs); ui.distDone = null; saveRun(); return go('district');
-    case 'back-shop': run.stage = 'shop'; saveRun(); return go('shop');
+    case 'shop-done': { if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
@@ -1099,7 +1117,6 @@ function onAct(el) {
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
     case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs); saveRun(); } return render();
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
-    case 'fight': if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI();
     case 'use': return onUse(+d.i);
     case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
@@ -1142,24 +1159,23 @@ const COACH = [
   { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-ok' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
-  { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Pick the Goblin, then head to the shop.', wait: 'opp-ok' },
+  { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Tap the Goblin to face it.', wait: 'pick-opp' },
+  { scr: 'district', pos: 'bottom', hl: '.inter', text: "Before the shop, visit one district. Scout's Post shows what your opponent will do two moves ahead. Pick one.", wait: 'district' },
   { scr: 'shop', pos: 'bottom', hl: '.achips', text: 'Archetype counters. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap a counter any time to read them.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs', text: 'There are two shops: Skills and Gear. Each has 5 slots and its own reroll. A badge on the tab tells you when it holds copies of things you own.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Buy both Firebolts: tap a tile, then Buy.', until: () => ownsStar('firebolt', 2) },
   { scr: 'shop', pos: 'bottom', hl: '[data-act="shop-tab"][data-k="gear"]', text: 'Merged! Now open the Gear shop. Gear gives stats and one passive, and counts toward archetypes too.', wait: 'shop-tab' },
   { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Buying XP levels you up, and higher levels find rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
-  { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Done shopping.', wait: 'shop-done' },
-  { scr: 'district', pos: 'bottom', hl: '.inter', text: "Before each fight, visit one district. Scout's Post shows what your opponent will do two moves ahead. Pick one.", wait: 'district' },
-  { scr: 'district', pos: 'bottom', hl: '[data-act="fight"]', text: 'To the arena.', wait: 'fight' },
+  { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Tap a skill to use it. Numbers include your stats and stars. Used skills go on cooldown for a few turns; Attack never does.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Use Venom Blade first, then Firebolt: Burn landing on a Poisoned target triggers the reaction Toxic Flare.', until: () => ui.fight && (ui.fight.tally.reactions > 0 || ui.fight.over), skippable: true },
   { scr: 'fight', pos: 'mid', text: 'Reaction! There are six to discover. Now finish the fight, and use Iron Guard when a big hit is coming.', until: () => ui.fight && ui.fight.over, skippable: true },
-  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Round 2. Take the Hard option for a rune if you are healthy, or play it safe.', wait: 'opp-ok' },
-  { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Two Venom Blades this time. Build however you like: merge, try new archetypes, or save gold for interest.', wait: 'shop-done' },
-  { scr: 'district', pos: 'bottom', text: 'Pick a district, then fight. Watch for big hits: Block soaks them, and Stun or Interrupt cancel them.', wait: 'fight' },
-  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Last practice round: a rival. Rivals are named champions with their own tricks. Everything else is yours to try.', wait: 'opp-ok' },
+  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Round 2. Take the Hard option for a rune if you are healthy, or play it safe.', wait: 'pick-opp' },
+  { scr: 'district', pos: 'bottom', text: 'Pick a district, then shop.', wait: 'district' },
+  { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Two Venom Blades this time. Build however you like, then tap Fight. Watch for big hits: Block soaks them, and Stun or Interrupt cancel them.', wait: 'shop-done' },
+  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Last practice round: a rival. Rivals are named champions with their own tricks. Everything else is yours to try.', wait: 'pick-opp' },
 ];
 let realMeta = null;
 function startPractice() {

@@ -23,13 +23,14 @@ function play(o = {}) {
   for (let guard = 0; guard < 30; guard++) {
     if (o.saveAt && run.round === o.saveAt && !run.reloaded) { run = JSON.parse(JSON.stringify(run)); run.reloaded = true; }
     if (run.stage === 'choose') { T('choices', run.choices.map(G.specKey)); T('wager', run.wager); G.chooseOpponent(run, run.round % 2, run.round % 2 === 1); }
+    T('districts', run.districts);
+    G.useDistrict(run, run.districts.includes('undercity') ? 'undercity' : run.districts[0]);
     G.ensureShop(run); T('shop', run.shop);
     for (const k of G.SHOP_KINDS) for (let i = 0; i < 5; i++) if (run.bench.length < 6 && G.canBuy(run, run.shop[k][i])) G.buy(run, k, i, []);
     if (o.rerollAt === run.round) { G.reroll(run, null, 'skill'); G.reroll(run, null, 'gear'); }
     else if (run.round === 3) G.reroll(run, null, 'skill');
     run.bench.slice().forEach(p => G.equipBest(run, p.u));
-    G.leaveShop(run, null, []); T('districts', run.districts);
-    G.useDistrict(run, run.districts.includes('undercity') ? 'undercity' : run.districts[0]);
+    G.leaveShop(run, null, []);
     while (run.pending.length) {
       const p = run.pending[0]; T('pending', p);
       if (p.type === 'event') { const E = G.EVENTS[p.key]; for (let i = 0; i < E.opts.length; i++) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; }

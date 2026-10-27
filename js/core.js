@@ -1138,7 +1138,7 @@ function specReward(spec) {
 function chooseOpponent(run, i, wagerOn) {
   run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
   if (run.wagerOn) run.gold -= 5;
-  run.stage = 'shop';
+  toDistrict(run);
 }
 function currentSpec(run) { return run.elite ? run.eliteBracket[run.eliteIdx] : run.chosen; }
 
@@ -1393,14 +1393,16 @@ function enterChoose(run, meta, rng, msgs) {
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
-  if (run.elite) { run.wager = null; run.stage = 'shop'; return; }
+  if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
   run.wager = makeWager(run, stream(run, 'opps', rng));
   run.stage = 'choose';
 }
-function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'district'; if (!run.districts || !run.districts.length) run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
-function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'ready'; if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
+// Each round: choose an opponent, visit a district, shop, fight. The district comes first, so the shop's exit is the fight.
+function toDistrict(run, rng) { run.stage = 'district'; run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
+function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'ready'; }
+function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'shop'; if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
 // District upgrades from stats: the stat that improves each district, at STAT_EASY
 const DISTRICT_STAT = { infirmary: 'VIT', scout: 'AGI', enchanter: 'INT' };
 function districtUp(run, k) { return !!DISTRICT_STAT[k] && effStats(run)[DISTRICT_STAT[k]] >= STAT_EASY; }
