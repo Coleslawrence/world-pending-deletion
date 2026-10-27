@@ -34,12 +34,12 @@ if (run && run.v !== VERSION) run = null;
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
 ensureRecord(run);
-const ui = { screen: 'title', worlds: null, world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
+const ui = { screen: 'title', worlds: null, world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: [1, 2, 3].includes(lsGet('wpd-speed')) ? lsGet('wpd-speed') : 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
 if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
 function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
 function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; meta.savedAt = Date.now(); lsSet(META_KEY, meta); if (typeof schedulePush === 'function') schedulePush(); }
-function stageScreen() { return { draft: 'draft', choose: 'choose', shop: 'shop', district: 'district', ready: 'district' }[run.stage] || 'choose'; }
+function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
 // ---------- Toasts ----------
 function toast(text, t = 'sys') {
@@ -50,7 +50,7 @@ function toast(text, t = 'sys') {
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
-const TOAST_RANK = { broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
+const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 function pushMsgs(msgs, logged) { if (!logged) msgs.forEach(m => logRun(m.text, m.t)); msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
 
 // ---------- Small helpers ----------
@@ -82,8 +82,9 @@ function bracketDots() {
   if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<span class="dot elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></span>`; });
   return h + '</div>';
 }
-function topBar(title, extra) {
-  return `<header class="bar"><div class="bar-l"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+// The fight screen leaves out gold (nothing to spend it on mid-fight) to make room for its speed and ? buttons
+function topBar(title, extra, fight) {
+  return `<header class="bar"><div class="bar-l"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
 }
 function archChips(counts, small) {
   return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span>${ARCH[k].name}</span><small>/${next}</small></button>`; }).join('')}</div>`;
@@ -115,7 +116,7 @@ function recordSheet() {
   return sheetWrap(recWorldGone(rec) ? 'World record: erased' : `World record: ${wname}`, body, `<button class="btn primary" data-act="rec-close">Close</button>`, 'sys rec-sheet');
 }
 function findSnap(at) { at = String(at); return meta.erased.concat(meta.champions, cloud.shared.map(x => x.snap)).find(s => String(s.at) === at) || (ui.end && ui.end.snap && String(ui.end.snap.at) === at ? ui.end.snap : null); }
-// The deletion moment: one row per erased entry. The player taps through them; each glitches, then becomes a bar.
+// The deletion moment: one row per erased entry. One tap erases them all, one after another; each glitches, then becomes a bar.
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function eraseSteps(r) {
   const R = run && run.record; if (!R || !r.erased || !r.erased.length) return [];
@@ -129,10 +130,13 @@ function eraseRows(steps) {
   const d = ui.erDone || 0;
   return `<div class="erase" aria-live="polite">${steps.map((s, k) => `<div class="er ${k < d ? 'gone' : k === d && ui.erBusy ? 'glitch' : k === d ? 'next' : ''} ${s.world ? 'world' : ''}"><b>${k < d ? redact(s.name) : esc(s.name)}</b>${k < d ? `<small>${esc(s.line)}</small>` : ''}</div>`).join('')}</div>`;
 }
-// Until every row is erased, the footer button erases the next one; then it becomes the usual button
+// Until every row is erased, the footer button erases them; then it becomes the usual button
 function eraseFoot(steps, done) {
   const d = ui.erDone || 0; ui.erFinal = done;
-  return d < steps.length ? `<button class="btn primary danger-b" data-act="erase-next" ${ui.erBusy ? 'disabled' : ''}>${steps[d].world ? `Erase ${esc(run.world.name)}` : `Erase entry ${d + 1} of ${steps.length - (steps[steps.length - 1].world ? 1 : 0)}`}</button>` : done;
+  if (d >= steps.length) return done;
+  const n = steps.filter(s => !s.world).length, w = steps.some(s => s.world) ? esc(run.world.name) : '';
+  const label = ui.erBusy ? 'Erasing…' : `Erase ${n ? (n === 1 ? '1 entry' : `${n} entries`) + (w ? ` and ${w}` : '') : w}`;
+  return `<button class="btn primary danger-b" data-act="erase-next" ${ui.erBusy ? 'disabled' : ''}>${label}</button>`;
 }
 // Redraw only the rows and the button, so the sheet doesn't slide in again on every tap
 function eraseRefresh() {
@@ -140,10 +144,18 @@ function eraseRefresh() {
   if (!box || !foot) return render();
   box.outerHTML = eraseRows(steps); foot.innerHTML = eraseFoot(steps, ui.erFinal);
 }
+// Each row glitches for a moment before it goes, so the eye follows the deletion down the list
 function eraseNext() {
   if (ui.erBusy) return;
+  const res = ui.result, n = eraseSteps(res).length;
   ui.erBusy = true; eraseRefresh();
-  setTimeout(() => { ui.erBusy = false; ui.erDone = (ui.erDone || 0) + 1; eraseRefresh(); }, REDUCED ? 0 : 600);
+  const tick = () => setTimeout(() => {
+    if (ui.result !== res) return;
+    ui.erDone = (ui.erDone || 0) + 1;
+    if (ui.erDone >= n) ui.erBusy = false; else tick();
+    eraseRefresh();
+  }, REDUCED ? 300 : 600);
+  tick();
 }
 // The skyline: one silhouette per place in the record, drawn behind the fight log. A lost place leaves a dotted gap.
 const SKY_W = 40;
@@ -387,18 +399,20 @@ function newAw(w, date) {
   return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
     offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta), title: null };
 }
+// Any change to the System's Gift picks withdraws its bonus points
+function sysOverruled(A) { if (!A.sysPts) return; A.sysPts = 0; toast('[You overruled the System. Its bonus Gift Points are withdrawn.]', 'loss'); }
 function awMeta() { return ui.daily ? levelMeta(meta) : meta; }
 function giftRow(k, a, w) {
   const g = GIFTS[k], on = a.gifts.includes(k), unlocked = giftUnlocked(k, awMeta());
   const cost = giftCost(k, a.offer), disc = cost !== g.cost;
   const t = on ? a.gifts.filter(x => x !== k) : a.gifts.concat(k);
-  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
+  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer, a.sysPts).ok);
   const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
   return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}</span></button>`;
 }
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
-  const chk = giftCheck(w, a.gifts, a.patron, a.offer);
+  const chk = giftCheck(w, a.gifts, a.patron, a.offer, a.sysPts);
   const tabs = [['id', 'Name'], ['stats', 'Stats' + (a.pts ? ` · ${a.pts}` : '')], ['gifts', `Gifts · ${chk.left}`], ['patron', 'Patron']];
   let body = '';
   if (a.tab === 'id') {
@@ -408,15 +422,18 @@ function awakenHTML() {
       <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>
       ${a.practice ? '' : `<p class="sh-p bio">${bioHTML(a.record, w.type, w.name)}</p><p class="sh-p sysl">[Filing world record: ${esc(w.name)}. ${a.record.ids.length} entries.]</p>`}`;
   } else if (a.tab === 'stats') {
-    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button><span class="st-v">${a.stats[k]}</span><button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button></div>`).join('');
+    const roll = a.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="aw-unroll">Place 4 myself</button></div>`
+      : a.rollUsed || a.practice ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="aw-roll">Roll</button></div>`;
+    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>${roll}` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${a.stats[k]}</span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
   } else if (a.tab === 'gifts') {
     const allowed = giftsAllowed(w);
     const list = allowed.filter(k => GIFTS[k].cat === a.cat).sort((x, y) => giftUnlocked(y, awMeta()) - giftUnlocked(x, awMeta())).map(k => giftRow(k, a, w)).join('');
     const presets = (meta.presets || []).map((p, i) => `<button class="btn small ghost" data-act="aw-preset" data-i="${i}">${esc(p.name)}</button>`).join('');
-    body = `<div class="pts-row"><span><b>${chk.left}</b> of ${chk.budget} Gift Points</span><span class="fine">${chk.cheats}/1 cheat · ${chk.flaws}/2 flaws</span></div>
+    body = `<div class="pts-row"><span><b>${chk.left}</b> of ${chk.budget} Gift Points${a.sysPts ? ` <em class="offer">+${a.sysPts} System</em>` : ''}</span><span class="fine">${chk.cheats}/1 cheat · ${chk.flaws}/2 flaws</span></div>
+      <div class="aw-sys"><button class="btn small" data-act="aw-random">Let the System decide</button><span>${a.sysPts ? `[Bonus active: +${a.sysPts} Gift Points. Changing a Gift withdraws it.]` : `The System picks your Gifts and adds <b>${SYS_BONUS} Gift Points</b> while you keep its picks.`}</span></div>
       <div class="cats c8">${Object.keys(GIFT_CATS).map(c => { const n = a.gifts.filter(k => GIFTS[k].cat === c).length; return `<button class="cat ${a.cat === c ? 'on' : ''}" data-act="aw-cat" data-c="${c}">${GIFT_CATS[c]}${n ? ` · ${n}` : ''}</button>`; }).join('')}</div>
       <div class="glist">${list}</div>
-      <div class="aw-tools"><button class="btn small" data-act="aw-random">Let the System decide</button><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
+      <div class="aw-tools"><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
       <p class="sh-p fine">Unspent points become 3 gold each. Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ') || 'none'}.</p>`;
   } else {
     const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
@@ -450,7 +467,7 @@ function draftHTML() {
 
 // ---------- Choose opponent ----------
 function chooseHTML() {
-  const cards = run.choices.map((spec, i) => `<button class="opp ${ui.pick === i ? 'on' : ''} ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
+  const cards = run.choices.map((spec, i) => `<button class="opp ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
       ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>
       <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
@@ -459,7 +476,7 @@ function chooseHTML() {
   return `<main class="screen choose">${topBar()}${bracketDots()}${champLine()}${questLine()}
     <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">+${run.lastIncome || 0}g income</span></div>
     <div class="opps">${cards}</div>${wager}
-    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary" data-act="opp-ok" ${ui.pick != null ? '' : 'disabled'}>To the shop ›</button></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
 }
 
 // ---------- Shop ----------
@@ -482,9 +499,11 @@ function shopItemTile(it, kind, i) {
   const d = pieceDef(it.id), D = dupInfo(it.id);
   const locked = kind !== 'bonus' && run.locks[kind][i];
   const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : '';
-  return `<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}">
+  // Copies of pieces you own need no reading: they get a one-tap Buy over the price. Everything else opens its details first.
+  const quick = D.owned && canBuy(run, it) ? `<button class="qbuy" data-act="quick-buy" data-k="${kind}" data-i="${i}" aria-label="Buy ${esc(d.name)} for ${price(run, it)} gold">Buy ${price(run, it)}g</button>` : '';
+  return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}">
     ${tag}<span class="tl-h">${rk(effRank(it.id, it.mods))}<span class="price">${price(run, it)}g</span></span><span class="tl-n">${it.mods.length ? '<em class="pfx">' + esc(it.mods.map(m => PREFIXES[m].name).join(' ')) + '</em> ' : ''}${esc(d.name)}</span>
-    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span><span class="tl-f">${tagDots(it.id)}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}</span></button>`;
+    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span><span class="tl-f">${tagDots(it.id)}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}</span></button></div>`;
 }
 function shortFx(id, mods) {
   if (isGear(id)) return gearText(id, 1);
@@ -517,22 +536,28 @@ function shopHTML() {
     <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
     <div class="sec-h"><span>Bench ${run.bench.length}/8</span><span class="fine">Tap a piece to equip, swap or sell</span></div>
     <div class="bench">${bench}</div>
-    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary" data-act="shop-done">Done shopping ›</button></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><button class="btn primary fight" data-act="shop-done">Fight ›</button></footer></main>`;
 }
 
 // ---------- District ----------
 const DIST_GLYPH = { infirmary: '+', sanctum: '♥', undercity: '!', scout: '?', enchanter: 'E' };
-// Infirmary at full HP would do nothing; block it unless it's the only district left
+// Infirmary at full HP would do nothing. Core no longer offers it; this hides it in runs saved before, unless it's the only district left
 function distFull(k) { return k === 'infirmary' && run.hp >= maxHp(run) && run.districts.length > 1; }
+// A district your stats upgrade says so with the stat's tag; what the upgrade does is told after the visit, except where it is the visit itself
+function districtDesc(k) {
+  if (!districtUp(run, k)) return DISTRICTS[k].desc;
+  const tag = `[${DISTRICT_STAT[k]} ${STAT_EASY}] `;
+  return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: 'Carve a prefix into one of your skills, from 4.' }[k] || DISTRICTS[k].desc);
+}
 function districtHTML() {
-  const spec = currentSpec(run), done = run.stage === 'ready';
-  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done || distFull(k) ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : distFull(k) ? 'Already at full HP' : esc(DISTRICTS[k].desc)}${k === 'infirmary' && !done && !distFull(k) ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
+  const spec = currentSpec(run), done = run.stage !== 'district';
+  const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
   return `<main class="screen district">${topBar(roundLabel() + ' · District')}${champLine()}
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     <div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
     <section class="inter">${opts}</section>
     <section class="minibar c${run.slots}">${run.bar.map(p => p ? `<button class="mb ${mainTag(p.id)}" data-act="own" data-u="${p.u}"><span>${esc(SKILLS[p.id].name)}</span><small>${effRank(p.id, p.mods)}${p.star > 1 ? ' ' + '★'.repeat(p.star) : ''}${p.mods.length ? ' · ' + p.mods.map(m => PREFIXES[m].name).join(' ') : ''}</small></button>` : '<div class="mb empty"><span>Empty</span></div>').join('')}</section>
-    <footer class="foot2"><button class="btn" data-act="back-shop" ${done ? 'disabled' : ''}>‹ Shop</button><button class="btn primary fight" data-act="fight" ${done ? '' : 'disabled'}>${done ? 'Fight' : 'Pick a district'}</button></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">Pick one, then shop</span></footer></main>`;
 }
 function scoutLine(spec) {
   if (spec.snap) return `<div class="nx-scout">Skills: ${spec.snap.bar.map(s => esc(modName(s.id, s.mods)) + (s.star > 1 ? ' ' + '★'.repeat(s.star) : '')).join(', ') || 'Attack only'}</div>`;
@@ -543,7 +568,7 @@ function scoutLine(spec) {
 function fightHTML() {
   const f = ui.fight;
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
-  return `<main class="screen fight">${topBar(roundLabel(), `<button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
+  return `<main class="screen fight">${topBar(roundLabel(), `<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`, true)}
     <section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
@@ -590,7 +615,9 @@ function updateFight() {
     else { const i = intentInfo(f); it.className = 'intent k-' + i.kind; it.innerHTML = `<span class="in-l">Next</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>`; }
   }
   const lg = document.getElementById('log');
-  if (lg) lg.innerHTML = skylineSVG() + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('');
+  const rr = ui.busy ? [] : rivalReplies(run, f);
+  if (lg) lg.innerHTML = skylineSVG() + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('')
+    + (rr.length ? `<div class="replies">${rr.map(i => `<button class="reply" data-act="reply" data-i="${i}"><span class="chk-tag">${esc(checkTag(RIVAL_REPLIES[i].check))}</span> ${esc(RIVAL_REPLIES[i].label)}</button>`).join('')}</div>` : '');
   const sk = document.getElementById('skills');
   if (sk) {
     const can = f.phase === 'player' && !ui.busy && !f.over;
@@ -660,7 +687,7 @@ async function onUse(i) {
   const s = f.A.skills[i];
   if (ui.info) { ui.sheet = { type: 'skillinfo', i }; return render(); }
   if (!canUse(s)) return;
-  ui.busy = true;
+  ui.busy = true; f.replied = true;
   const before = f.log.length;
   playerAct(f, i);
   const engine = f.log.splice(before); summarize(f, 'A'); engine.forEach(l => f.log.push(l)); playEvents(f);
@@ -681,6 +708,9 @@ async function onUse(i) {
 function finishFight() {
   const f = ui.fight;
   const res = resolveFight(run, f, run.practice ? META : meta);
+  // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
+  const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
   pushMsgs(res.msgs);
   ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
@@ -690,6 +720,11 @@ function finishFight() {
   else if (res.spared) { const out = endRun(run, meta, 'spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
   else if (res.eliteOver) { ui.end = { kind: res.eliteCleared ? 'elite-clear' : 'elite-fall', echoes: 8 * run.eliteWins }; }
   saveMeta(); if (!res.death) saveRun();
+  if (plain) {
+    // tutorial steps that wait on the fight screen are over once it closes
+    while (coachStep() && coachStep().scr === 'fight') coachAdvance();
+    ui.fight = null; ui.result = null; return go(stageScreen());
+  }
   ui.sheet = { type: 'result' };
   render();
 }
@@ -740,12 +775,17 @@ function pieceSheet() {
   return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
     canSell ? `<button class="btn ghost danger-t" data-act="sell" data-u="${p.u}">Sell · ${sellValue(p)}g</button><button class="btn primary" data-act="close">Done</button>` : `<button class="btn primary" data-act="close">Done</button>`);
 }
+// The first time a stat line is offered, the System says so once
+function statLinesNotice() {
+  const p = run.pending[0]; if (meta.statLines || run.practice || !p || p.type !== 'event' || !eventOpts(run, p.key).some(i => EVENTS[p.key].opts[i].check)) return;
+  meta.statLines = true; saveMeta(); setTimeout(() => toast('[Attribute dialogue unlocked. Your build has opinions now.]', 'class'), 300);
+}
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
     const chainTag = E.chain && CHAIN_STARTERS[E.chain] !== p.key ? `<p class="sh-p fine">[Event chain: ${{ official: 'The Official', poisoner: 'The Poisoner', letter: 'The Letter' }[E.chain]}]</p>` : '';
-    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((o, i) => { const can = !o.can || o.can(run); return `<button class="choice" data-act="event" data-i="${i}" ${can ? '' : 'disabled'}><div class="sr-h"><span class="sr-name">${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div>${!can && o.need ? `<div class="sr-need">${esc(o.need(run))}</div>` : ''}</button>`; }).join(''), false, E.chain ? 'sys' : '');
+    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check ? `<span class="chk-tag">${esc(checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
@@ -764,7 +804,7 @@ function pendingSheet() {
 function enchantSheet(mods, from) {
   const sel = ui.enchantSel;
   if (sel == null) {
-    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => { const n = prefixTargets(run, m).length; return `<button class="choice" data-act="ench-mod" data-i="${i}" ${n ? '' : 'disabled'}><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}${n ? '' : ' (none of your skills can take it)'}</div></button>`; }).join('');
+    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('');
     return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
   }
   const m = mods[sel];
@@ -856,6 +896,7 @@ function scoutSheet() {
   let body = '';
   if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
   else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>`; }
+  if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
@@ -952,6 +993,7 @@ function endHTML() {
 
 // ---------- Render ----------
 function render() {
+  if (ui.screen === 'district' && run && run.stage === 'shop' && !ui.sheet && !run.pending.length) ui.screen = 'shop';
   const focusName = document.activeElement && document.activeElement.id === 'aw-name';
   let h = '';
   const scr = ui.screen;
@@ -971,7 +1013,7 @@ function render() {
     const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
-  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) sh = pendingSheet();
+  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
   if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
   app.innerHTML = h + sh + coachHTML();
@@ -999,17 +1041,19 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
+    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(ui.daily ? seedRng(dailySeed(ui.daily.date) + ':roll') : undefined); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
+    case 'aw-unroll': { const A = ui.aw; A.stats = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; A.pts = 4; A.rolled = false; return render(); }
+    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (A.rolled) return; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
     case 'aw-cat': ui.aw.cat = d.c; return render();
-    case 'aw-gift': { const A = ui.aw, k = d.k; if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
-    case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
+    case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
+    case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
     case 'aw-title': ui.aw.title = ui.aw.title === d.k ? null : d.k; return render();
-    case 'aw-random': { const A = ui.aw; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer); toast('[The System has chosen for you.]', 'sys'); return render(); }
+    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, ui.daily ? seedRng(dailySeed(ui.daily.date) + ':sys') : undefined, A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
     case 'aw-save': { const A = ui.aw; meta.presets = (meta.presets || []).concat({ name: 'Preset ' + ((meta.presets || []).length + 1), gifts: A.gifts.filter(k => GIFTS[k].cat !== 'world') }).slice(-3); meta.presets.forEach((p, i) => p.name = 'Preset ' + (i + 1)); saveMeta(); toast('[Preset saved.]', 'sys'); return render(); }
-    case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
+    case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
       const A = ui.aw;
-      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       pushMsgs(run.log.slice(), true);
@@ -1025,7 +1069,8 @@ function onAct(el) {
     case 'sheet': ui.sheet = { type: d.s }; return render();
     case 'menu': ui.sheet = { type: 'menu' }; return render();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
-    case 'speed': ui.speed = +d.v; return render();
+    case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
+    case 'speed-cycle': ui.speed = ui.speed >= 3 ? 1 : ui.speed + 1; lsSet('wpd-speed', ui.speed); return render();
     case 'signin': { const C = window.WPD_CLOUD; if (!C) return; C.signIn(d.k).catch(e => toast(`[Sign-in failed: ${(e && e.message) || 'unknown error'}]`, 'loss')); return; }
     case 'signout': { const C = window.WPD_CLOUD; if (C) C.signOut().then(() => toast('[Signed out. Progress stays on this device.]', 'sys')); ui.sheet = null; return render(); }
     case 'share': { const s = ui.end && ui.end.snap; if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared with other entrants.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
@@ -1039,13 +1084,12 @@ function onAct(el) {
     case 'draft-pick': { const i = ui.draftSel.indexOf(d.id); if (i >= 0) ui.draftSel.splice(i, 1); else if (ui.draftSel.length < 3) ui.draftSel.push(d.id); return render(); }
     case 'draft-reroll': rerollDraft(run); ui.draftSel = []; saveRun(); return render();
     case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta); ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
-    case 'pick-opp': ui.pick = +d.i; return render();
+    case 'pick-opp': { chooseOpponent(run, +d.i, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; ui.distDone = null; saveRun(); return go('district'); }
     case 'wager': ui.wagerOn = !ui.wagerOn; return render();
-    case 'opp-ok': { if (ui.pick == null) return; chooseOpponent(run, ui.pick, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; saveRun(); return go('shop'); }
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
-    case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
+    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
     case 'buy-xp': if (buyXp(run, msgs)) { pushMsgs(msgs); saveRun(); } return render();
@@ -1056,18 +1100,17 @@ function onAct(el) {
       if (!ok) toast('[Not possible: your bench may be full.]', 'loss');
       ui.sheet = null; pushMsgs(msgs); saveRun(); saveMeta(); return render();
     }
-    case 'shop-done': leaveShop(run, null, msgs); pushMsgs(msgs); ui.distDone = null; saveRun(); return go('district');
-    case 'back-shop': run.stage = 'shop'; saveRun(); return go('shop');
+    case 'shop-done': { if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
       if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
-      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(3); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
+      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(districtUp(run, 'enchanter') ? 4 : 3, null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
       saveRun(); return render();
     }
-    case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = EVENTS[p.key].opts[+d.i]; if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }
+    case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i); if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = +d.i; return render();
@@ -1083,8 +1126,8 @@ function onAct(el) {
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
     case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs); saveRun(); } return render();
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
-    case 'fight': if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI();
     case 'use': return onUse(+d.i);
+    case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
     case 'result-ok': {
@@ -1125,24 +1168,23 @@ const COACH = [
   { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-ok' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
-  { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Pick the Goblin, then head to the shop.', wait: 'opp-ok' },
+  { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Tap the Goblin to face it.', wait: 'pick-opp' },
+  { scr: 'district', pos: 'bottom', hl: '.inter', text: "Before the shop, visit one district. Scout's Post shows what your opponent will do two moves ahead. Pick one.", wait: 'district' },
   { scr: 'shop', pos: 'bottom', hl: '.achips', text: 'Archetype counters. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap a counter any time to read them.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs', text: 'There are two shops: Skills and Gear. Each has 5 slots and its own reroll. A badge on the tab tells you when it holds copies of things you own.', wait: 'next' },
-  { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Buy both Firebolts: tap a tile, then Buy.', until: () => ownsStar('firebolt', 2) },
+  { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Copies get a Buy button of their own. Buy both Firebolts.', until: () => ownsStar('firebolt', 2) },
   { scr: 'shop', pos: 'bottom', hl: '[data-act="shop-tab"][data-k="gear"]', text: 'Merged! Now open the Gear shop. Gear gives stats and one passive, and counts toward archetypes too.', wait: 'shop-tab' },
   { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Buying XP levels you up, and higher levels find rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
-  { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Done shopping.', wait: 'shop-done' },
-  { scr: 'district', pos: 'bottom', hl: '.inter', text: "Before each fight, visit one district. Scout's Post shows what your opponent will do two moves ahead. Pick one.", wait: 'district' },
-  { scr: 'district', pos: 'bottom', hl: '[data-act="fight"]', text: 'To the arena.', wait: 'fight' },
+  { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Tap a skill to use it. Numbers include your stats and stars. Used skills go on cooldown for a few turns; Attack never does.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Use Venom Blade first, then Firebolt: Burn landing on a Poisoned target triggers the reaction Toxic Flare.', until: () => ui.fight && (ui.fight.tally.reactions > 0 || ui.fight.over), skippable: true },
   { scr: 'fight', pos: 'mid', text: 'Reaction! There are six to discover. Now finish the fight, and use Iron Guard when a big hit is coming.', until: () => ui.fight && ui.fight.over, skippable: true },
-  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Round 2. Take the Hard option for a rune if you are healthy, or play it safe.', wait: 'opp-ok' },
-  { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Two Venom Blades this time. Build however you like: merge, try new archetypes, or save gold for interest.', wait: 'shop-done' },
-  { scr: 'district', pos: 'bottom', text: 'Pick a district, then fight. Watch for big hits: Block soaks them, and Stun or Interrupt cancel them.', wait: 'fight' },
-  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Last practice round: a rival. Rivals are named champions with their own tricks. Everything else is yours to try.', wait: 'opp-ok' },
+  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Round 2. Take the Hard option for a rune if you are healthy, or play it safe.', wait: 'pick-opp' },
+  { scr: 'district', pos: 'bottom', text: 'Pick a district, then shop.', wait: 'district' },
+  { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Two Venom Blades this time. Build however you like, then tap Fight. Watch for big hits: Block soaks them, and Stun or Interrupt cancel them.', wait: 'shop-done' },
+  { scr: 'choose', pos: 'top', hl: '.opps', text: 'Last practice round: a rival. Rivals are named champions with their own tricks. Everything else is yours to try.', wait: 'pick-opp' },
 ];
 let realMeta = null;
 function startPractice() {
