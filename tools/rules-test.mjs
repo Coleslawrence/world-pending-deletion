@@ -1,4 +1,4 @@
-// Firestore rules checks for Pending World scores, run against the local emulator (needs Java).
+// Firestore rules checks for Pending World scores, shared data and the testers list, run against the local emulator (needs Java).
 //   npm i --no-save firebase-tools @firebase/rules-unit-testing firebase
 //   npx firebase emulators:exec --only firestore --project demo-wpd "node tools/rules-test.mjs"
 import { readFileSync } from 'node:fs';
@@ -12,6 +12,9 @@ const alice = env.authenticatedContext('alice').firestore(), bob = env.authentic
 const ref = (db, uid, date = day) => doc(db, `daily/${date}/scores/${uid}`);
 let pass = 0, fail = 0;
 const check = async (name, p) => { try { await p; pass++; } catch (e) { fail++; console.log('FAIL', name, e.message); } };
+// alice, bob and carol are approved testers; erin is signed in but not approved
+await env.withSecurityRulesDisabled(async c => { for (const u of ['alice', 'bob', 'carol']) await setDoc(doc(c.firestore(), 'testers/' + u), { note: 'test' }); });
+const erin = env.authenticatedContext('erin').firestore();
 
 await check('first score is created', assertSucceeds(setDoc(ref(alice, 'alice'), score())));
 await check('second create on the same day is refused', assertFails(setDoc(ref(alice, 'alice'), score({ wins: 8, hearts: 5 }))));
@@ -47,6 +50,32 @@ await check('won must be a boolean', assertFails(setDoc(doc(bob, 'inbox/alice/no
 await check('notes still refuse extra fields', assertFails(setDoc(doc(bob, 'inbox/alice/notes/bob_4'), note({ t: 4, rp: 99 }))));
 await check('notes must be signed by the sender', assertFails(setDoc(doc(bob, 'inbox/alice/notes/bob_5'), note({ t: 5, by: 'carol' }))));
 await check('only the owner reads the inbox', assertFails(getDoc(doc(bob, 'inbox/alice/notes/bob_1'))));
+
+// The testers list and access requests
+await check('a tester reads their own tester document', assertSucceeds(getDoc(doc(alice, 'testers/alice'))));
+await check('a player can check that they are not a tester', assertSucceeds(getDoc(doc(erin, 'testers/erin'))));
+await check('nobody reads someone else\'s tester document', assertFails(getDoc(doc(erin, 'testers/alice'))));
+await check('players cannot approve themselves', assertFails(setDoc(doc(erin, 'testers/erin'), { note: 'me' })));
+await check('testers cannot approve others', assertFails(setDoc(doc(alice, 'testers/erin'), { note: 'friend' })));
+await check('nobody lists the testers', assertFails(getDocs(collection(alice, 'testers'))));
+await check('an unapproved score is refused', assertFails(setDoc(ref(erin, 'erin'), score())));
+await check('an unapproved shared champion is refused', assertFails(setDoc(doc(erin, 'champions/erin'), { list: [], name: 'Wren', r: 0.5 })));
+await check('a tester shares a champion', assertSucceeds(setDoc(doc(alice, 'champions/alice'), { list: [], name: 'Wren', r: 0.5 })));
+await check('an unapproved laid-to-rest note is refused', assertFails(setDoc(doc(erin, 'inbox/alice/notes/erin_1'), note({ by: 'erin' }))));
+await check('an unapproved rests list is refused', assertFails(setDoc(doc(erin, 'rests/erin'), { list: [] })));
+await check('unapproved players still read shared champions', assertSucceeds(getDoc(doc(erin, 'champions/alice'))));
+await check('unapproved players still read the board', assertSucceeds(getDocs(query(collection(erin, `daily/${day}/scores`), orderBy('score', 'desc'), limit(20)))));
+await check('unapproved players still keep their own cloud save', assertSucceeds(setDoc(doc(erin, 'data/users/erin/progress'), { meta: {}, run: null, savedAt: 1 })));
+await check('a player files an access request', assertSucceeds(setDoc(doc(erin, 'requests/erin'), { name: 'Wren', at: 1 })));
+await check('a player renames their request', assertSucceeds(setDoc(doc(erin, 'requests/erin'), { name: 'Kael', at: 2 })));
+await check('a player reads their own request', assertSucceeds(getDoc(doc(erin, 'requests/erin'))));
+await check('nobody reads someone else\'s request', assertFails(getDoc(doc(alice, 'requests/erin'))));
+await check('nobody lists requests', assertFails(getDocs(collection(alice, 'requests'))));
+await check('a request for someone else is refused', assertFails(setDoc(doc(alice, 'requests/erin'), { name: 'Wren', at: 1 })));
+await check('a request with an email field is refused', assertFails(setDoc(doc(erin, 'requests/erin'), { name: 'Wren', at: 1, email: 'x@y.z' })));
+await check('a 25-character request name is refused', assertFails(setDoc(doc(erin, 'requests/erin'), { name: 'x'.repeat(25), at: 1 })));
+await check('a signed-out request is refused', assertFails(setDoc(doc(anon, 'requests/erin'), { name: 'Wren', at: 1 })));
+await check('a player cannot delete their request', assertFails(deleteDoc(doc(erin, 'requests/erin'))));
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);
