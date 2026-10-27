@@ -25,6 +25,7 @@ The web version uses Firebase for sign-in, cloud saves and shared champions. Wit
 | `rests/{uid}` | Old "laid to rest" lists from earlier versions | Signed-in players | Only that player, if a tester |
 | `testers/{uid}` | One document per approved playtester | Only that player (to check) | Nobody: console only |
 | `requests/{uid}` | An access request: the name the player chose in game and when | Only that player | Only that player |
+| `runs/{uid}_{time}` | One anonymous summary per finished run, for the stats dashboard: world, class, round, Hearts, picks. No names | Nobody in game: console and exports only | Only that player, if a tester, once |
 
 Shared records are treated as untrusted by the game: unknown pieces are dropped and stats are clamped.
 
@@ -38,6 +39,17 @@ and the game files an access request for them.
 - **Approve**: in **Data**, open the `testers` collection (first time: **Start collection**, ID `testers`). **Add document**, paste the UID as the **Document ID**, add any field (for example `note` = who it is, which only you can see), **Save**. Then delete their `requests` document. They are approved the next time they open the game.
 - **Find a UID without a request**: **Authentication → Users**, copy the **User UID** column.
 - **Revoke**: delete their document in `testers`. Their new posts stop at once; what they already posted stays until you delete it.
+
+## Playtest stats (the stats dashboard)
+
+Each finished run (spared, erased or abandoned; not the tutorial) leaves one summary in `runs`. It is queued on the
+device and posts at the next sync while signed in as a tester, so runs played before the rules are published post later
+(the device keeps the last 20). Nothing in it names the player: the document ID starts with their UID only so runs can
+be counted per entrant.
+
+To refresh the dashboard: export the `runs` collection as JSON (an array of documents, or an object keyed by document
+ID), then `node tools/run-report.js runs.json stats.json` and publish `stats.json` with the dashboard page.
+`node tools/run-report.js --sample 90 stats.json` makes bot runs instead, to try the page without real data.
 
 ## Free-plan limits (Spark)
 

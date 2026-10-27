@@ -737,7 +737,7 @@ function newRun(world, setup, meta, rng) {
     pending: [], log: [], hp: 0, ended: false, stage: 'draft', rerolls: 1 + (U.reroll ? 1 : 0) + (G.includes('veteran') ? 1 : 0), draft: [],
     met: [], choices: null, chosen: null, wager: null, wagerOn: false, districts: [], scouted: false, nextFlags: {}, usedRewind: false, usedBreath: false, path: null, history: [],
     title: setup.title && meta.titles[setup.title] ? setup.title : null, hiddenPath: null, milestones: {}, chains: {}, quests: [], wagersWon: 0, freeRerolls: 0, haggle: false,
-    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, earned: [],
+    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, earned: [], picks: [], t0: Date.now(),
   };
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
@@ -1148,7 +1148,7 @@ function specReward(spec) {
 }
 function chooseOpponent(run, i, wagerOn) {
   run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
-  if (run.wagerOn) run.gold -= 5;
+  if (run.wagerOn) { run.gold -= 5; notePick(run, 'w:' + run.wager.god); }
   toDistrict(run);
 }
 function currentSpec(run) { return run.elite ? run.eliteBracket[run.eliteIdx] : run.chosen; }
@@ -1308,7 +1308,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
   msgs = msgs || []; const before = msgs.length;
-  o.go(run, meta, stream(run, 'event', rng), msgs);
+  o.go(run, meta, stream(run, 'event', rng), msgs); notePick(run, 'e:' + key + '.' + idx);
   if (run.luck) delete run.luck[key];
   if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
   return true;
@@ -1413,7 +1413,7 @@ function enterChoose(run, meta, rng, msgs) {
 // Each round: choose an opponent, visit a district, shop, fight. The district comes first, so the shop's exit is the fight.
 function toDistrict(run, rng) { run.stage = 'district'; run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
 function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'ready'; }
-function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'shop'; if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
+function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; run.districts = []; run.stage = 'shop'; notePick(run, 'd:' + k); if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
 // District upgrades from stats: the stat that improves each district, at STAT_EASY
 const DISTRICT_STAT = { infirmary: 'VIT', scout: 'AGI', enchanter: 'INT' };
 function districtUp(run, k) { return !!DISTRICT_STAT[k] && effStats(run)[DISTRICT_STAT[k]] >= STAT_EASY; }
@@ -2106,6 +2106,30 @@ function endRun(run, meta, outcome) {
   return { echoes: e, snap, rp: rk.rp, trial: rk.trial };
 }
 
+// ---------- Playtest stats ----------
+// Each finished run leaves one anonymous summary for the stats dashboard (runs/{uid}_{at} in Firestore, see firestore.rules).
+// Game keys and numbers only: no names, no account details. Picks are event options (e:key.idx), districts (d:key) and wagers (w:god).
+const PICKS_MAX = 60;
+function notePick(run, k) { if (!run.picks) run.picks = []; if (run.picks.length < PICKS_MAX) run.picks.push(k); }
+// Foes that are another player's champion keep only their kind, since their names are player-chosen
+const SNAP_KINDS = ['erased', 'champion', 'legend'];
+function runSummary(run, meta, outcome, now) {
+  now = now == null ? Date.now() : now;
+  const H = run.history || [], last = H[H.length - 1], gear = GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean);
+  return {
+    day: dailyDate(now), at: now, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
+    world: run.world.type, wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? meta.rank.letter : null, path: run.path || null, hidden: run.hiddenPath || null,
+    patron: run.patron || 'none', gifts: (run.gifts || []).slice(0, 12), title: run.title || null,
+    round: Math.min(20, curRound(run)), wins: Math.min(20, run.wins || 0), hearts: Math.max(0, Math.min(20, run.hearts)), maxHearts: Math.min(20, run.maxHearts || 10),
+    level: run.level || 1, turns: Math.min(9999, H.reduce((a, h) => a + (h.turns || 0), 0)),
+    mins: run.t0 ? Math.max(0, Math.min(1440, Math.round((now - run.t0) / 6e4))) : null,
+    fights: H.slice(0, 30).map(h => ({ r: h.round, w: !!h.won, h: !!h.hard, k: h.kind || 'monster', t: h.turns || 0 })),
+    picks: (run.picks || []).slice(0, PICKS_MAX),
+    bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)), gear: gear.map(p => baseId(p.id)),
+    foe: last && !last.won ? (SNAP_KINDS.includes(last.kind) ? '[' + last.kind + ']' : String(last.name).slice(0, 40)) : null,
+  };
+}
+
 // ---------- Entrant Rank ----------
 // A permanent grade from F to S, with SS and SSS hidden above. RP opens a Rank Trial; only passing it promotes. Rank never goes down.
 const RANK_LADDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
@@ -2318,5 +2342,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower,
+  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX,
 };

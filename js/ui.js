@@ -236,6 +236,25 @@ async function postDaily() {
   if (ui.board) ui.board.t = 0;
   if (ui.sheet && ui.sheet.type === 'daily') loadBoard();
 }
+// Playtest stats: one anonymous summary per finished run (runSummary in core.js) for the stats dashboard.
+// Queued on the device and posted to runs/{uid}_{at} when signed in as a tester; only the console reads them.
+const RUNQ_KEY = 'wpd-runq';
+function recordRunStats(outcome) {
+  if (!run || run.practice || run.statsDone) return; // once per run: a spared world's Elite bracket doesn't add another
+  run.statsDone = true;
+  const q = lsGet(RUNQ_KEY) || []; q.push(runSummary(run, meta, outcome)); lsSet(RUNQ_KEY, q.slice(-20));
+  postRuns();
+}
+async function postRuns() {
+  if (!cloud.on || !cloud.db || !cloud.uid || cloud.tester === false || ui.postingRuns) return;
+  ui.postingRuns = true;
+  // A refused post stays queued (rules not published yet): it goes at a later sync, and the queue keeps the last 20
+  for (const r of lsGet(RUNQ_KEY) || []) {
+    try { await cloud.db.doc(`runs/${cloud.uid}_${r.at}`).set(r); lsSet(RUNQ_KEY, (lsGet(RUNQ_KEY) || []).filter(x => x.at !== r.at)); }
+    catch (e) { console.warn('[cloud] post run stats failed:', e && e.code, e); break; }
+  }
+  ui.postingRuns = false;
+}
 // The board: today's top 20, plus your own score pinned with its rank when you're outside them. About 21 reads.
 async function loadBoard() {
   const date = dailyDate(), B = ui.board;
@@ -718,8 +737,8 @@ function finishFight() {
   if (res.practiceDone) { ui.practiceAfter = true; }
   if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.fell) recordWin(res.fell);
-  if (res.death) { const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; lsDel(RUN_KEY); }
-  else if (res.spared) { const out = endRun(run, meta, 'spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
+  if (res.death) { const out = endRun(run, meta, 'erased'); recordRunStats('erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; lsDel(RUN_KEY); }
+  else if (res.spared) { const out = endRun(run, meta, 'spared'); recordRunStats('spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
   else if (res.eliteOver) { ui.end = { kind: res.eliteCleared ? 'elite-clear' : 'elite-fall', echoes: 8 * run.eliteWins }; }
   saveMeta(); if (!res.death) saveRun();
   if (plain) {
@@ -1079,7 +1098,7 @@ function onAct(el) {
     case 'share': { const s = ui.end && ui.end.snap; if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared with other entrants.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
     case 'share-hall': { const list = d.k === 'erased' ? meta.erased : meta.champions; const s = list.find(x => String(x.at) === d.at); if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
     case 'abandon': ui.confirmAbandon = true; return render();
-    case 'abandon-yes': { if (run.practice) return endPractice(false); const out = endRun(run, meta, 'erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; saveMeta(); lsDel(RUN_KEY); ui.fight = null; ui.confirmAbandon = false; return go('end'); }
+    case 'abandon-yes': { if (run.practice) return endPractice(false); const out = endRun(run, meta, 'erased'); recordRunStats('abandoned'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; saveMeta(); lsDel(RUN_KEY); ui.fight = null; ui.confirmAbandon = false; return go('end'); }
   }
   if (!run) return;
   const msgs = [];
@@ -1318,6 +1337,7 @@ async function cloudInit() {
     await loadShared();
     await checkRests();
     postDaily();
+    postRuns();
     if (cloud.status === 'syncing') cloud.status = 'synced';
     render();
   } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }

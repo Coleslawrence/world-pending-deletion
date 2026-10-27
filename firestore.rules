@@ -95,6 +95,27 @@ service cloud.firestore {
           && request.resource.data.rec.ids is list && request.resource.data.rec.ids.size() <= 20));
     }
 
+    // Playtest stats: one anonymous summary per finished run, for the stats dashboard. Game keys and numbers only, never
+    // names. Each tester creates their own (runs/{uid}_{time}); nobody reads them in game, only the console and exports.
+    match /runs/{runId} {
+      allow create: if isTester() && runId.matches(request.auth.uid + '_[0-9]+')
+        && request.resource.data.keys().hasOnly(['day', 'at', 'outcome', 'mode', 'world', 'wrank', 'rank', 'path', 'hidden', 'patron', 'gifts', 'title', 'round', 'wins', 'hearts', 'maxHearts', 'level', 'turns', 'mins', 'fights', 'picks', 'bar', 'gear', 'foe'])
+        && request.resource.data.keys().hasAll(['day', 'at', 'outcome', 'world', 'round', 'wins', 'hearts'])
+        && request.resource.data.day is string && request.resource.data.day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && request.resource.data.at is number
+        && request.resource.data.outcome in ['spared', 'erased', 'abandoned']
+        && request.resource.data.world is string && request.resource.data.world.size() <= 16
+        && request.resource.data.round is int && request.resource.data.round >= 0 && request.resource.data.round <= 20
+        && request.resource.data.wins is int && request.resource.data.wins >= 0 && request.resource.data.wins <= 20
+        && request.resource.data.hearts is int && request.resource.data.hearts >= 0 && request.resource.data.hearts <= 20
+        && (!('fights' in request.resource.data) || (request.resource.data.fights is list && request.resource.data.fights.size() <= 30))
+        && (!('picks' in request.resource.data) || (request.resource.data.picks is list && request.resource.data.picks.size() <= 60))
+        && (!('gifts' in request.resource.data) || (request.resource.data.gifts is list && request.resource.data.gifts.size() <= 12))
+        && (!('bar' in request.resource.data) || (request.resource.data.bar is list && request.resource.data.bar.size() <= 8))
+        && (!('gear' in request.resource.data) || (request.resource.data.gear is list && request.resource.data.gear.size() <= 3))
+        && (!('foe' in request.resource.data) || request.resource.data.foe == null || (request.resource.data.foe is string && request.resource.data.foe.size() <= 40));
+    }
+
     // Everything else is closed
     match /{document=**} {
       allow read, write: if false;
