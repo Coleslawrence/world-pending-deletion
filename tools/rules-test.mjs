@@ -23,6 +23,8 @@ await check('turns of 1000 is refused', assertFails(setDoc(ref(bob, 'bob'), scor
 await check('a score that does not match its parts is refused', assertFails(setDoc(ref(bob, 'bob'), score({ score: 1200999 }))));
 await check('fractional wins are refused', assertFails(setDoc(ref(bob, 'bob'), score({ wins: 5.5, score: 550938 }))));
 await check('a 25-character name is refused', assertFails(setDoc(ref(bob, 'bob'), score({ name: 'x'.repeat(25) }))));
+await check('a display name is accepted', assertSucceeds(setDoc(ref(bob, 'bob', '2026-10-26'), score({ player: 'Kael' }))));
+await check('a 25-character display name is refused', assertFails(setDoc(ref(bob, 'bob', '2026-10-27'), score({ player: 'x'.repeat(25) }))));
 await check('an extra field is refused', assertFails(setDoc(ref(bob, 'bob'), score({ admin: true }))));
 await check('a 21-entry record is refused', assertFails(setDoc(ref(bob, 'bob'), score({ rec: { ids: Array.from({ length: 21 }, (_, i) => i), lost: 0, partial: 0, bio: {} } }))));
 await check('a bad date is refused', assertFails(setDoc(ref(bob, 'bob', 'today'), score())));
