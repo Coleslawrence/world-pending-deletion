@@ -30,6 +30,7 @@ function choosePlayer(f) {
 }
 function fight(run) {
   const f = G.newFight(run);
+  const rr = G.rivalReplies(run, f); if (rr.length) G.rivalReply(run, f, rr[0]); // a rival reply when one is shown
   let guard = 0;
   while (!f.over && guard++ < 300) {
     if (f.phase === 'player') G.playerAct(f, choosePlayer(f));
