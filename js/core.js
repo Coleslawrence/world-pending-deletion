@@ -1211,9 +1211,7 @@ const EVENTS = {
   // --- The Poisoner ---
   poisoner_1: { chain: 'poisoner', title: 'Tampered water', text: () => 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
     { label: 'Drink it anyway', desc: 'It might be worth it.', reveal: '[+2 VIT. You start the next fight with 4 Poison.]', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
-    { label: 'Investigate', desc: 'Find out who did it.', go: (run, meta, rng, msgs) => {
-      if (run.gold >= 3) { run.gold -= 3; msgs.push({ t: 'sys', text: '[Informants paid. −3 gold. A name will surface.]' }); } else lose(run, 0.1, msgs, 'No gold for informants. You asked the hard way. A name will surface.');
-      poisonerFound(run, rng); } },
+    { label: 'Investigate', desc: 'Find out who did it.', reveal: '[Inquiries made. A name will surface.]', go: (run, meta, rng) => poisonerFound(run, rng) },
     { label: 'Pour it out', desc: 'Nothing happens', go: run => { run.chains.poisoner = 'done'; } }] },
   poisoner_found: { chain: 'poisoner', title: 'The poisoner', text: run => `A stable boy talks for a coin: it was ${ENEMIES[run.chains.poisoner.who].name}'s people who tampered with your water.`, opts: [
     { label: 'Expose them to the crowd', desc: 'Let the crowd judge them. Someone will enjoy it.', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
