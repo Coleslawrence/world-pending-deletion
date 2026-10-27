@@ -30,6 +30,7 @@ function choosePlayer(f) {
 }
 function fight(run) {
   const f = G.newFight(run);
+  const rr = G.rivalReplies(run, f); if (rr.length) G.rivalReply(run, f, rr[0]); // a rival reply when one is shown
   let guard = 0;
   while (!f.over && guard++ < 300) {
     if (f.phase === 'player') G.playerAct(f, choosePlayer(f));
@@ -95,7 +96,7 @@ function pending(run, meta) {
   while (run.pending.length) {
     const p = run.pending.shift();
     if (p.type === 'rune') { for (const m of p.mods) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
-    if (p.type === 'event') { const E = G.EVENTS[p.key]; for (let i = 0; i < E.opts.length; i++) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; }
+    if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
     if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
     if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
@@ -110,14 +111,15 @@ function playRun(meta, verbose, opts = {}) {
   let w = G.offerWorlds(meta)[0], tries = 0;
   while (opts.world && w.type !== opts.world && tries++ < 200) w = G.offerWorlds(meta).find(x => x.type === opts.world) || w;
   const home = G.WORLD_TYPES[w.type].home, main = opts.main || home, hs = G.ARCH[main].stat;
-  const st = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; st[hs] += 2; st.VIT += 2;
+  // opts.roll: the Awakening's stat roll; opts.sys: keep the System's Gift picks for its bonus points
+  const st = opts.roll ? G.rollStats() : { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; if (!opts.roll) { st[hs] += 2; st.VIT += 2; }
   const patron = G.pick(['war', 'trick', 'ruin']);
   G.bindMeta(meta);
   const offer = G.makeOffer(w, meta);
-  const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer);
+  const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer, null, opts.sys ? G.SYS_BONUS : 0);
   const titles = Object.keys(meta.titles);
   const arch = opts.main && opts.main !== home ? [opts.main].concat(G.shuffle(G.unlockedArch(meta).filter(k => k !== home && k !== opts.main))) : undefined;
-  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, arch, title: titles.length ? G.pick(titles) : null }, meta);
+  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, sysBonus: opts.sys ? G.SYS_BONUS : 0, arch, title: titles.length ? G.pick(titles) : null }, meta);
   if (opts.main) run.botMain = opts.main;
   const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(main) ? 1 : 0) - (G.SKILLS[a].tags.includes(main) ? 1 : 0)).slice(0, 3);
   G.confirmDraft(run, ids, meta);
@@ -130,16 +132,16 @@ function playRun(meta, verbose, opts = {}) {
       G.chooseOpponent(run, hard ? 1 : 0, run.gold >= 15);
     }
     stats(run);
-    shop(run, meta, { reroll: true, xp: true, picky: opts.picky });
-    pending(run, meta); arrange(run);
-    G.leaveShop(run, null, []);
     const d = run.districts;
     const k = run.hp < G.maxHp(run) * 0.6 && d.includes('infirmary') ? 'infirmary' : d.includes('sanctum') && run.hearts <= run.maxHearts - 2 ? 'sanctum' : d.includes('enchanter') ? 'enchanter' : d.includes('infirmary') ? 'infirmary' : d[0];
     G.useDistrict(run, k);
     pending(run, meta);
     if (k === 'infirmary') G.infirmary(run);
     if (k === 'sanctum') G.sanctum(run);
-    if (k === 'enchanter') { const ms = G.rollPrefixes(3); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    if (k === 'enchanter') { const ms = G.rollPrefixes(G.districtUp(run, 'enchanter') ? 4 : 3, null, null, run); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    shop(run, meta, { reroll: true, xp: true, picky: opts.picky });
+    pending(run, meta); arrange(run);
+    G.leaveShop(run, null, []);
     const spec = G.currentSpec(run);
     const f = fight(run);
     const r = G.resolveFight(run, f, meta);

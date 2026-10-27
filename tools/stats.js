@@ -6,6 +6,8 @@
 //   --main A       make the bot build around archetype A (pyre, venom, blade, bastion, arcanist, zealot, reaper, storm)
 //   --unlock U     unlock U in every meta (arch_storm, arch_arcanist, ...; "all" for every unlock)
 //   --json FILE    also write the results as JSON, for comparing before and after a change
+//   --roll 1       the bot takes the Awakening's stat roll instead of placing its 4 points
+//   --sys 1        the bot keeps the System's Gift picks with its bonus points
 //   --rounds       add a loss-by-round table for each main archetype
 //   --rank L       give every meta Entrant Rank L (F to SSS), with its world gating, Rank Trials and Elite bracket.
 //                  Without it there is no rank at all: every world rank can come up and no trials appear.
@@ -37,7 +39,7 @@ function batch(b) {
   let meta;
   for (let i = 0; i < N; i++) {
     if (i % (+process.env.RESET || 40) === 0) meta = newMeta();
-    const r = B.playRun(meta, false, { noElite: !ELITE, world: opt.world, main: opt.main });
+    const r = B.playRun(meta, false, { noElite: !ELITE, world: opt.world, main: opt.main, roll: opt.roll, sys: opt.sys });
     const won = r.result !== 'erased';
     s.res[r.result] = (s.res[r.result] || 0) + 1;
     const c = G.runCounts(r.run); const top = Object.keys(c).sort((a, b) => c[b] - c[a])[0] || 'none';
