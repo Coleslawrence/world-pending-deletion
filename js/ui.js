@@ -48,16 +48,35 @@ function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; m
 function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
 // ---------- Toasts ----------
-function toast(text, t = 'sys') {
-  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text;
-  placeToasts(); toastsEl.appendChild(el); while (toastsEl.children.length > (ui.screen === 'fight' ? 2 : 3)) toastsEl.firstChild.remove();
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350); }, t === 'broadcast' ? 4200 : t === 'class' ? 3400 : 2600);
+// Notices wait their turn instead of pushing each other off screen: a few show at once, each stays long enough to
+// read (longer lines stay longer), and a tap clears one early so the next comes in. Missed ones are in the System log.
+const toastQ = [];
+const toastMs = (text, t) => Math.min(9000, 2400 + text.length * 45) + (t === 'broadcast' ? 1200 : 0);
+function toast(text, t = 'sys', onTap) { toastQ.push({ text, t, onTap }); pumpToasts(); }
+function pumpToasts() {
+  if (!toastQ.length || pumpToasts.gap || toastsEl.querySelectorAll('.toast:not(.out)').length >= (ui.screen === 'fight' ? 2 : 3)) return;
+  const { text, t, onTap } = toastQ.shift();
+  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text; el.onTap = onTap;
+  placeToasts(); toastsEl.appendChild(el);
+  el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
+  pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280);
 }
+function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => el.remove(), 350); pumpToasts(); }
+function clearToasts() { toastQ.length = 0; toastsEl.querySelectorAll('.toast').forEach(el => clearTimeout(el.timer)); toastsEl.replaceChildren(); }
+toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast'); if (!el) return; dropToast(el); if (el.onTap) el.onTap(); });
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
-function pushMsgs(msgs, logged) { if (!logged) msgs.forEach(m => logRun(m.text, m.t)); msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
+const TOAST_MAX = 5;
+function pushMsgs(msgs, logged) {
+  if (!logged) msgs.forEach(m => logRun(m.text, m.t));
+  const show = msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9));
+  show.slice(0, TOAST_MAX).forEach(m => toast(m.text, m.t));
+  const more = show.length - TOAST_MAX;
+  if (more > 0 && run) toast(`[${more} more in the System log. Tap to read.]`, 'sys', openLog);
+}
+function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ui.sheet.type === 'result')) return; ui.sheet = { type: 'syslog' }; render(); }
 
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial' };
@@ -90,7 +109,7 @@ function bracketDots() {
 }
 // The fight screen leaves out gold (nothing to spend it on mid-fight) to make room for its speed and ? buttons
 function topBar(title, extra, fight) {
-  return `<header class="bar"><div class="bar-l"><div class="bar-w"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}</div><span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+  return `<header class="bar"><div class="bar-l"><div class="bar-w"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}</div><span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
 }
 function archChips(counts, small) {
   return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span>${ARCH[k].name}</span><small>/${next}</small></button>`; }).join('')}</div>`;
@@ -710,7 +729,7 @@ function summarize(f, side) {
 function startFightUI() {
   ui.fight = newFight(run);
   ui.busy = false; ui.screen = 'fight'; ui.sheet = null;
-  toastsEl.replaceChildren(); // shop toasts don't carry into the fight
+  clearToasts(); // shop toasts don't carry into the fight
   const f = ui.fight;
   say2(f, `[${f.B.name} enters the arena.]`, 'sys');
   const intro = rankIntro(run, meta, f.spec, f.B.name);
