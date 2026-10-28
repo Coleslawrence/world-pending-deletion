@@ -628,6 +628,10 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .in-t small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .in-v { white-space: normal; text-align: right; }
 .me-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Short screens: a skill's prefix names give way (their effects are already in its numbers) */
+@container app (max-height: 660px) { .sk .mods { display: none; } .fight .me { gap: 4px; padding-block: 7px; } }
+/* With 5 skill slots, Attack takes the sixth cell instead of a row of its own */
+.skills.c5 .sk.wide { grid-column: auto; grid-template-columns: 1fr; align-items: start; gap: 2px; min-height: 0; }
 .log { gap: 4px; }
 .log-t { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; position: relative; z-index: 1; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.6em); mask-image: linear-gradient(to bottom, transparent, #000 1.6em); }
 @media (hover: hover) and (pointer: fine) { .sk:not(.cd):not(:disabled)::after { content: attr(data-key); position: absolute; right: 7px; bottom: 5px; font: 10px/14px var(--f-m); color: var(--dim); border: 1px solid var(--line2); border-radius: 3px; padding: 0 4px; } }
@@ -637,6 +641,7 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .tl-p { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; line-height: 1.2; }
 .mb small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shopctl { flex-wrap: wrap; row-gap: 2px; } .shopctl .fine { flex: 1 1 170px; } .interest { white-space: nowrap; }
+.shoptabs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } .stab { min-width: 0; flex-wrap: wrap; row-gap: 2px; }
 .sec-h > span:first-child { flex: none; white-space: nowrap; }
 .sec-h .fine { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
