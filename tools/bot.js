@@ -126,12 +126,14 @@ function playRun(meta, verbose, opts = {}) {
   let guard = 0;
   while (guard++ < 40) {
     pending(run, meta);
+    if (opts.snap) opts.snap('choose', run);
     if (run.stage === 'choose') {
       const trial = run.choices[1] && run.choices[1].kind === 'trial';
       const hard = trial || run.choices.length > 1 && run.hp > G.maxHp(run) * 0.75 && run.hearts > 5 && Math.random() < (opts.hardRate != null ? opts.hardRate : 0.35);
       G.chooseOpponent(run, hard ? 1 : 0, run.gold >= 15);
     }
     stats(run);
+    if (opts.snap) opts.snap('district', run);
     const d = run.districts;
     const k = run.hp < G.maxHp(run) * 0.6 && d.includes('infirmary') ? 'infirmary' : d.includes('sanctum') && run.hearts <= run.maxHearts - 2 ? 'sanctum' : d.includes('enchanter') ? 'enchanter' : d.includes('infirmary') ? 'infirmary' : d[0];
     G.useDistrict(run, k);
@@ -141,6 +143,7 @@ function playRun(meta, verbose, opts = {}) {
     if (k === 'enchanter') { const ms = G.rollPrefixes(G.districtUp(run, 'enchanter') ? 4 : 3, null, null, run); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     shop(run, meta, { reroll: true, xp: true, picky: opts.picky });
     pending(run, meta); arrange(run);
+    if (opts.snap) opts.snap('shop', run);
     G.leaveShop(run, null, []);
     const spec = G.currentSpec(run);
     const f = fight(run);
