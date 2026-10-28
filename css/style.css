@@ -152,7 +152,7 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .crest.k-final { border-color: var(--foe); color: #ffc0b8; box-shadow: 0 0 16px rgba(225,91,82,.3); }
 .crest.k-erased { border-color: var(--sys); color: var(--sys); }
 .crest.k-legend, .crest.k-champion { border-color: #ffb257; color: #ffd28a; box-shadow: 0 0 16px rgba(255,178,87,.3); }
-.inter { flex: 1; min-height: 0; display: grid; gap: 7px; align-content: start; }
+.inter { flex: 1; display: grid; gap: 7px; align-content: start; }
 .in-h { display: flex; justify-content: space-between; font-family: var(--f-m); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--sys); }
 .opt { display: flex; gap: 12px; align-items: center; text-align: left; background: var(--panel); border: 1px solid var(--line2); border-radius: 8px; padding: 9px 12px; cursor: pointer; min-height: 56px; }
 .opt:hover:not(:disabled) { border-color: var(--bronze); }
@@ -375,7 +375,7 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .bench { display: grid; grid-template-columns: repeat(var(--bench-cols, 4), minmax(0, 1fr)); gap: 5px; }
 .bench.over .tile.sm { padding-inline: 4px; } .bench.over .tile.sm .tl-n { font-size: 10.5px; }
 .foot-hint.bad { color: var(--bad); }
-.tile.sm { min-height: 42px; padding: 3px 6px 4px; } .tile.sm .tl-n { font-size: 11.5px; -webkit-line-clamp: 1; }
+.tile.sm { min-height: 42px; padding: 3px 6px 4px; } .tile.sm .tl-n { font-size: 11.5px; display: block; white-space: nowrap; text-overflow: ellipsis; }
 /* district */
 .district { gap: 8px; }
 .nx-wager { font-family: var(--f-m); font-size: 12px; color: var(--faith); }
@@ -600,3 +600,79 @@ button.brow:active { background: var(--panel); }
 .br-l { font-style: normal; font-family: var(--f-m); font-size: 10.5px; color: var(--sys); margin-right: 4px; }
 .br-pe { font-style: normal; color: var(--bronze); font-size: 11px; line-height: 1; }
 .br-l { line-height: 1; }
+
+/* ===== Adaptive layout =====
+   Screens fit any phone from 320px wide (an iPhone mini or SE with Display Zoom) up to a PC. Three rules:
+   1. Nothing may make the page wider than the screen: iOS then zooms the whole game out. Flex and grid children
+      may shrink below their text, which wraps or ends in an ellipsis.
+   2. A screen whose content is taller than the screen scrolls, with its footer pinned, instead of cutting it off.
+   3. Wide screens (tablet, landscape phone, PC, Steam Deck) get two columns; sheets become centred dialogs.
+   Check every screen at phone and desktop sizes with: node tools/layout-check.js */
+html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.screen { overflow-y: auto; overflow-x: clip; overscroll-behavior: contain; scrollbar-width: none; }
+.screen::-webkit-scrollbar { display: none; }
+.screen > footer { position: sticky; bottom: 0; z-index: 3; background: var(--bg); box-shadow: 0 -10px 10px var(--bg); }
+.col { display: contents; }
+.nw { white-space: nowrap; }
+.fo-h, .me-h, .sk-h, .tl-h, .tl-f, .sec-h, .bar-w, .op-meta, .in-t, .ot, .nx-r, .op-r, .wg-t { min-width: 0; }
+.ot b, .ot small, .nx-name, .nx-style, .sk-name { overflow-wrap: anywhere; }
+/* Top bar: world name and rank on one line, the round under them, so the name keeps its room */
+.bar-l { flex-direction: column; align-items: flex-start; gap: 0; flex: 1 1 auto; }
+.bar-w { display: flex; align-items: center; gap: 7px; max-width: 100%; }
+.wname { line-height: 1.2; }
+.rl { font-size: 12px; line-height: 1.25; max-width: 100%; }
+.bar-r { flex: none; }
+/* Fight */
+.foe { grid-template-columns: auto minmax(0, 1fr); }
+.intent { grid-template-columns: auto minmax(0, 1fr) auto; }
+.in-t small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.in-v { white-space: normal; text-align: right; }
+.me-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log { gap: 4px; }
+.log-t { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; position: relative; z-index: 1; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.6em); mask-image: linear-gradient(to bottom, transparent, #000 1.6em); }
+@media (hover: hover) and (pointer: fine) { .sk:not(.cd):not(:disabled)::after { content: attr(data-key); position: absolute; right: 7px; bottom: 5px; font: 10px/14px var(--f-m); color: var(--dim); border: 1px solid var(--line2); border-radius: 3px; padding: 0 4px; } }
+/* Tiles: a long single word breaks instead of being clipped; prefixes sit on the small line and give way first */
+.tl-n, .mb span { overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto; }
+.tl-f { overflow: hidden; }
+.tl-p { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; line-height: 1.2; }
+.mb small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shopctl { flex-wrap: wrap; row-gap: 2px; } .shopctl .fine { flex: 1 1 170px; } .interest { white-space: nowrap; }
+.sec-h > span:first-child { flex: none; white-space: nowrap; }
+.sec-h .fine { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Narrow phones: tighter padding and type, and the 5-slot skill bar shares a 4-column grid with the gear */
+@container app (max-width: 400px) {
+  .build:has(.barrow.c5) { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+  .build:has(.barrow.c5) > .barrow, .build:has(.barrow.c5) > .gearrow { display: contents; }
+}
+@container app (max-width: 350px) {
+  .screen { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+  .crest { width: 44px; height: 44px; font-size: 17px; }
+  .cline .crest { width: 34px; height: 34px; font-size: 16px; }
+  .fo-name { font-size: 16px; } .nx-name { font-size: 17px; } .me-name { font-size: 15px; }
+  .sk { padding: 7px 8px; min-height: 54px; } .sk-fx { font-size: 11px; } .sk-name { font-size: 14px; }
+  .mb { padding: 5px 5px; } .mb span { font-size: 11px; }
+  .opt { gap: 10px; padding: 8px 10px; } .og { width: 28px; height: 28px; }
+  .stab { font-size: 14px; } .shoptabs .btn { padding-inline: 8px; font-size: 13px; }
+}
+
+/* Wide screens: two columns */
+@media (min-width: 700px) { #app { max-width: 1160px; } }
+#app { zoom: var(--z, 1); height: var(--app-zh, 100%); }
+@container app (min-width: 700px) {
+  .screen.title, .screen.select { width: min(100%, 580px); margin-inline: auto; }
+  .screen.fight, .screen.shop, .screen.district, .screen.choose { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; column-gap: 22px; align-content: stretch; }
+  .screen > header.bar { grid-column: 1 / -1; }
+  .col { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; }
+  .col-a { grid-column: 1; } .col-b { grid-column: 2; }
+  .screen > footer { grid-column: 2; }
+  .screen.fight .log { flex: 0 1 300px; min-height: 120px; }
+  .screen > footer { align-self: end; }
+  .district .inter { flex: none; } .district .minibar, .shop .col-b .bench { margin-top: 0; }
+  .sgrid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+}
+@container app (min-width: 700px) and (min-height: 600px) { .foe .crest { width: 72px; height: 72px; font-size: 26px; } .fo-name { font-size: 20px; } }
+@media (min-width: 700px) and (min-height: 480px) {
+  .sheet-bg { align-items: center; padding: 24px; }
+  .sheet { max-width: 560px; max-height: min(100%, 780px); border-bottom: 1px solid var(--line2); border-radius: 14px; padding-bottom: 0; }
+}
