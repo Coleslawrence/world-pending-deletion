@@ -4,6 +4,15 @@
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
+    id: '2026-10-28', title: "[System Notice: Display Update]", pages: [
+      { h: "Display", sys: "[Display faults corrected. Small screens are no longer an excuse.]", items: [
+        "[Screens that do not fit now scroll. Nothing is cut off, and Fight stays in reach.]",
+        "[Long names no longer push the arena off the side of your screen.]",
+        "[Phones set to larger text are now accommodated. The System can read too.]",
+        "[On a computer, the arena spreads to two columns and grows with the window.]"] },
+    ],
+  },
+  {
     id: '2026-10-27', title: "[System Notice: Procedural Update]", pages: [
       { h: "Corrections", sys: "[Display faults corrected. The System apologises to no one.]", items: [
         "[The System no longer hides its header behind your notch.]",
