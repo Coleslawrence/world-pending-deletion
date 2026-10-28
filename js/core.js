@@ -2116,19 +2116,22 @@ const PICKS_MAX = 60;
 function notePick(run, k) { if (!run.picks) run.picks = []; if (run.picks.length < PICKS_MAX) run.picks.push(k); }
 // Foes that are another player's champion keep only their kind, since their names are player-chosen
 const SNAP_KINDS = ['erased', 'champion', 'legend'];
+// Every number is a whole number inside the bounds firestore.rules checks, and every key a short string or null,
+// so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue
 function runSummary(run, meta, outcome, now) {
-  now = now == null ? Date.now() : now;
+  now = Math.round(now == null ? Date.now() : now);
   const H = run.history || [], last = H[H.length - 1], gear = GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean);
+  const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0)), key = (v, n) => v ? String(v).slice(0, n) : null;
   return {
     day: dailyDate(now), at: now, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
-    world: run.world.type, wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? meta.rank.letter : null, path: run.path || null, hidden: run.hiddenPath || null,
-    patron: run.patron || 'none', gifts: (run.gifts || []).slice(0, 12), title: run.title || null,
-    round: Math.min(20, curRound(run)), wins: Math.min(20, run.wins || 0), hearts: Math.max(0, Math.min(20, run.hearts)), maxHearts: Math.min(20, run.maxHearts || 10),
-    level: run.level || 1, turns: Math.min(9999, H.reduce((a, h) => a + (h.turns || 0), 0)),
-    mins: run.t0 ? Math.max(0, Math.min(1440, Math.round((now - run.t0) / 6e4))) : null,
-    fights: H.slice(0, 30).map(h => ({ r: h.round, w: !!h.won, h: !!h.hard, k: h.kind || 'monster', t: h.turns || 0 })),
-    picks: (run.picks || []).slice(0, PICKS_MAX),
-    bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)), gear: gear.map(p => baseId(p.id)),
+    world: String(run.world.type).slice(0, 16), wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? key(meta.rank.letter, 3) : null, path: key(run.path, 16), hidden: key(run.hiddenPath, 24),
+    patron: ['war', 'trick', 'ruin'].includes(run.patron) ? run.patron : 'none', gifts: (run.gifts || []).slice(0, 12).map(k => String(k).slice(0, 24)), title: key(run.title, 24),
+    round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), maxHearts: int(run.maxHearts || 10, 0, 20),
+    level: int(run.level, 1, 9), turns: int(H.reduce((a, h) => a + (h.turns || 0), 0), 0, 9999),
+    mins: run.t0 ? int((now - run.t0) / 6e4, 0, 1440) : null,
+    fights: H.slice(0, 30).map(h => ({ r: int(h.round, 0, 20), w: !!h.won, h: !!h.hard, k: key(h.kind, 16) || 'monster', t: int(h.turns, 0, 999) })),
+    picks: (run.picks || []).slice(0, PICKS_MAX).map(k => String(k).slice(0, 40)),
+    bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)), gear: gear.slice(0, 3).map(p => baseId(p.id)),
     foe: last && !last.won ? (SNAP_KINDS.includes(last.kind) ? '[' + last.kind + ']' : String(last.name).slice(0, 40)) : null,
   };
 }
