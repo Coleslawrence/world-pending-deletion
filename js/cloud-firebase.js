@@ -7,7 +7,6 @@
   const names = {};
   let me = null, api = null;
   const publicName = () => String(C.handle || '').trim().slice(0, 24) || 'Entrant';
-  const shortName = u => String((u && (u.displayName || (u.email || '').split('@')[0])) || 'Entrant').trim().split(/\s+/)[0].slice(0, 24) || 'Entrant';
   const mapErr = e => { const c = e && e.code; return { code: c === 'permission-denied' || c === 'invalid-argument' ? 'invalid_argument' : c === 'unavailable' || c === 'deadline-exceeded' ? 'unavailable' : c === 'resource-exhausted' ? 'resource_exhausted' : String(c || 'unavailable'), message: e && e.message }; };
   const wrapDoc = path => ({
     id: path.split('/').pop(), path,
@@ -51,7 +50,6 @@
   const C = window.WPD_CLOUD = {
     provider: 'firebase', db, user, ready: false, error: null,
     get me() { return me; },
-    displayName: () => (me ? shortName(me) : ''),
     signIn: async kind => {
       if (!api) throw { code: 'unavailable', message: 'Cloud saves are offline right now.' };
       const p = kind === 'github' ? new api.GithubAuthProvider() : new api.GoogleAuthProvider();
