@@ -48,6 +48,15 @@ node tools/stats.js 1000 --world sky --unlock arch_storm        # force a world 
 node tools/bot.js v 1         # one verbose run
 ```
 
+## Layout testing
+
+```
+node tools/layout-check.js                        # every screen at phone, tablet and desktop sizes; exits 1 on a problem
+node tools/layout-check.js --size 320x693 --shots out/   # one size, with a screenshot per screen
+```
+
+It plays a bot run, restores each stage in a real browser (Playwright with Chromium) and reports anything off the side of the screen, cut off, or overlapping. 320 wide is an iPhone mini or SE with Display Zoom.
+
 ## Saves and shared champions
 
 Progress (Echoes, Titles, unlocks, the Halls and the current run) is saved in the browser. Signing in with Google or GitHub adds cloud saves across devices and lets players share champions, who can then appear in each other's tournaments. This uses Firebase; setup steps are in [docs/FIREBASE.md](docs/FIREBASE.md).
