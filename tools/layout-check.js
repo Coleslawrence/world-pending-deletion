@@ -3,6 +3,7 @@
 //   node tools/layout-check.js                 # all sizes, all screens; exits 1 if anything fails
 //   node tools/layout-check.js --shots out/    # also save a screenshot per size and screen
 //   node tools/layout-check.js --size 320x693,1280x800  # some sizes only
+//   node tools/layout-check.js --seed 3                 # another bot run (default 1)
 // Needs Playwright with Chromium (npx playwright install chromium). Serves the repo itself on a free port.
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path');
@@ -28,6 +29,8 @@ const shotDir = arg('--shots'), only = arg('--size') && arg('--size').split(',')
 
 // States: one bot run that reaches the Elite bracket, snapshotted at every stage, with long names swapped in
 function states() {
+  // Seeded, so the same states come up on every check
+  let seed = +(arg('--seed') || 1); Math.random = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const meta = G.newMeta();
   for (let seed = 0; seed < 60; seed++) {
     const snaps = [];
