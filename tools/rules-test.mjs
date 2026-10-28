@@ -80,19 +80,32 @@ await check('a player cannot delete their request', assertFails(deleteDoc(doc(er
 // Playtest stats: a real summary from a bot run, so the rules are checked against what the game actually sends
 const runDoc = (() => { const req = createRequire(import.meta.url), G = req('../js/core.js'), B = req('./bot.js'), m = G.newMeta(); const r = B.playRun(m, false, { noElite: true }); return G.runSummary(r.run, m, r.result === 'spared' ? 'spared' : 'erased', 1700000000000); })();
 const runRef = (db, id) => doc(db, 'runs/' + id);
+// Posts a summary the way the game does, at runs/{uid}_{at}
+const postRun = (db, uid, at, over = {}) => setDoc(runRef(db, uid + '_' + at), Object.assign({}, runDoc, { at }, over));
 await check('a tester posts a run summary', assertSucceeds(setDoc(runRef(alice, 'alice_1700000000000'), runDoc)));
-await check('an abandoned run with no foe or time is fine', assertSucceeds(setDoc(runRef(alice, 'alice_1700000000001'), Object.assign({}, runDoc, { outcome: 'abandoned', foe: null, mins: null }))));
+await check('an abandoned run with no foe or time is fine', assertSucceeds(postRun(alice, 'alice', 1700000000001, { outcome: 'abandoned', foe: null, mins: null })));
+await check('a run with no path, title or rank is fine', assertSucceeds(postRun(alice, 'alice', 1700000000020, { path: null, hidden: null, title: null, rank: null, wrank: null })));
 await check('a run summary cannot be overwritten', assertFails(setDoc(runRef(alice, 'alice_1700000000000'), runDoc)));
 await check('a run summary cannot be deleted', assertFails(deleteDoc(runRef(alice, 'alice_1700000000000'))));
 await check('nobody reads run summaries in game, not even their own', assertFails(getDoc(runRef(alice, 'alice_1700000000000'))));
 await check('nobody lists run summaries in game', assertFails(getDocs(collection(alice, 'runs'))));
-await check('an unapproved run summary is refused', assertFails(setDoc(runRef(erin, 'erin_1700000000000'), runDoc)));
-await check('a run summary under someone else\'s id is refused', assertFails(setDoc(runRef(bob, 'alice_1700000000002'), runDoc)));
-await check('a run summary with a name field is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000003'), Object.assign({}, runDoc, { name: 'Wren' }))));
-await check('an unknown outcome is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000004'), Object.assign({}, runDoc, { outcome: 'won' }))));
-await check('a round of 21 is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000005'), Object.assign({}, runDoc, { round: 21 }))));
-await check('61 picks are refused', assertFails(setDoc(runRef(alice, 'alice_1700000000006'), Object.assign({}, runDoc, { picks: Array(61).fill('d:scout') }))));
-await check('a 41-character foe is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000007'), Object.assign({}, runDoc, { foe: 'x'.repeat(41) }))));
+await check('an unapproved run summary is refused', assertFails(postRun(erin, 'erin', 1700000000000)));
+await check('a run summary under someone else\'s id is refused', assertFails(postRun(bob, 'alice', 1700000000002)));
+await check('a run summary whose id and time differ is refused', assertFails(setDoc(runRef(alice, 'alice_1700000000021'), runDoc)));
+await check('a run summary with a name field is refused', assertFails(postRun(alice, 'alice', 1700000000003, { name: 'Wren' })));
+await check('an unknown outcome is refused', assertFails(postRun(alice, 'alice', 1700000000004, { outcome: 'won' })));
+await check('a round of 21 is refused', assertFails(postRun(alice, 'alice', 1700000000005, { round: 21 })));
+await check('61 picks are refused', assertFails(postRun(alice, 'alice', 1700000000006, { picks: Array(61).fill('d:scout') })));
+await check('a 41-character foe is refused', assertFails(postRun(alice, 'alice', 1700000000007, { foe: 'x'.repeat(41) })));
+await check('an unknown mode is refused', assertFails(postRun(alice, 'alice', 1700000000008, { mode: 'cheat' })));
+await check('an unknown patron is refused', assertFails(postRun(alice, 'alice', 1700000000009, { patron: 'Wren' })));
+await check('a level of 10 is refused', assertFails(postRun(alice, 'alice', 1700000000010, { level: 10 })));
+await check('fractional turns are refused', assertFails(postRun(alice, 'alice', 1700000000011, { turns: 40.5 })));
+await check('hearts as text are refused', assertFails(postRun(alice, 'alice', 1700000000012, { hearts: '3' })));
+await check('a 2-day run time is refused', assertFails(postRun(alice, 'alice', 1700000000013, { mins: 2880 })));
+await check('a long title is refused', assertFails(postRun(alice, 'alice', 1700000000014, { title: 'x'.repeat(25) })));
+await check('a world rank as a number is refused', assertFails(postRun(alice, 'alice', 1700000000015, { wrank: 3 })));
+await check('maxHearts of 21 is refused', assertFails(postRun(alice, 'alice', 1700000000016, { maxHearts: 21 })));
 
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 

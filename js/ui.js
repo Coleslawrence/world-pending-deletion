@@ -40,7 +40,7 @@ if (run && run.v !== VERSION) run = null;
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
 ensureRecord(run);
-const ui = { screen: 'title', worlds: null, world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: [1, 2, 3].includes(lsGet('wpd-speed')) ? lsGet('wpd-speed') : 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
+const ui = { screen: 'title', worlds: null, seed: '', world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: [1, 2, 3].includes(lsGet('wpd-speed')) ? lsGet('wpd-speed') : 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
 if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
 function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
@@ -399,7 +399,7 @@ function titleHTML() {
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
       <div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button></div>
-      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(window.WPD_CLOUD.displayName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
+      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
     </div></main>`;
 }
 function worldsHTML() {
@@ -423,9 +423,13 @@ function worldsHTML() {
 // ---------- Awakening ----------
 // In Pending World the record and the System Offer come from the day's seed, and Echo unlocks don't count
 function newAw(w, date) {
-  return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
-    offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta), title: null };
+  return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type, awRng('record')), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
+    offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta, awRng('offer')), title: null };
 }
+// Everything the System draws at an Awakening comes from a seed: the day's in Pending World, otherwise one drawn when
+// the worlds are offered. Backing out to the worlds and returning, or asking the System again, gives the same record,
+// Offer, Gift picks and stat roll, so they can't be fished for. A fresh set of worlds brings a fresh seed.
+function awRng(tag) { return seedRng((ui.daily ? dailySeed(ui.daily.date) : 'aw:' + ui.seed + ':' + ui.world) + ':' + tag); }
 // Any change to the System's Gift picks withdraws its bonus points
 function sysOverruled(A) { if (!A.sysPts) return; A.sysPts = 0; toast('[You overruled the System. Its bonus Gift Points are withdrawn.]', 'loss'); }
 function awMeta() { return ui.daily ? levelMeta(meta) : meta; }
@@ -1065,7 +1069,7 @@ function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
+    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
@@ -1078,14 +1082,14 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(ui.daily ? seedRng(dailySeed(ui.daily.date) + ':roll') : undefined); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
+    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(awRng('roll')); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
     case 'aw-unroll': { const A = ui.aw; A.stats = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; A.pts = 4; A.rolled = false; return render(); }
     case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (A.rolled) return; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
     case 'aw-cat': ui.aw.cat = d.c; return render();
     case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
     case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
     case 'aw-title': ui.aw.title = ui.aw.title === d.k ? null : d.k; return render();
-    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, ui.daily ? seedRng(dailySeed(ui.daily.date) + ':sys') : undefined, A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
+    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, awRng('sys'), A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
     case 'aw-save': { const A = ui.aw; meta.presets = (meta.presets || []).concat({ name: 'Preset ' + ((meta.presets || []).length + 1), gifts: A.gifts.filter(k => GIFTS[k].cat !== 'world') }).slice(-3); meta.presets.forEach((p, i) => p.name = 'Preset ' + (i + 1)); saveMeta(); toast('[Preset saved.]', 'sys'); return render(); }
     case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
@@ -1515,7 +1519,7 @@ function cloudSignInHTML(compact) {
   if (!FIREBASE) return '';
   const C = window.WPD_CLOUD;
   if (C && C.error) return compact ? '' : '<p class="sh-p fine">Cloud saves are unavailable right now (offline?). Progress is saved on this device.</p>';
-  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p>${cloud.tester === false ? `<p class="sh-p sysl">${PENDING}</p><p class="sh-p fine">Your request is filed under this name. Daily scores and shared champions open once you are approved.</p>` : ''}<button class="btn small ghost" data-act="signout">Sign out</button></div>`;
+  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(publicName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p>${cloud.tester === false ? `<p class="sh-p sysl">${PENDING}</p><p class="sh-p fine">Your request is filed under this name. Daily scores and shared champions open once you are approved.</p>` : ''}<button class="btn small ghost" data-act="signout">Sign out</button></div>`;
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
