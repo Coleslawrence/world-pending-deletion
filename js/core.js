@@ -1093,7 +1093,8 @@ function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = 
 function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks }); }
 
 // ---------- Opponents: choice of two each round ----------
-const TUNE = { hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
+// late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
+const TUNE = { late: 0.03, hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
@@ -1447,7 +1448,8 @@ function buildPlayer(run) {
     breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0,
   });
 }
-function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run); }
+function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
+function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
@@ -1615,12 +1617,12 @@ function react(f, X, Y, kind) {
   }
   if (Y.bleed > 0 && Y.marked > 0 && !Y.hemo) { Y.hemo = true; reactName(f, X, Y, 'hemorrhage', 'Haemorrhage', 'Bleed deals double while Marked.'); }
   if (Y.stun > 0 && Y.weaken > 0 && Y.brokenT <= 0) { Y.brokenT = 2; reactName(f, X, Y, 'broken', 'Broken', `${Y.isPlayer ? 'You take' : Y.name + ' takes'} 50% more damage.`); }
-  if (Y.poison > 0 && Y.leechT > 0 && !Y.blight) { Y.blight = true; reactName(f, X, Y, 'blight', 'Blight', 'Leech drains double.'); }
+  if (Y.poison > 0 && Y.leechT > 0 && !Y.blight) { Y.blight = true; reactName(f, X, Y, 'blight', 'Blight', 'Leech drains double. The extra is not healed.'); }
   if (Y.doomT > 1 && !Y.doomHastened && effectCount(Y) >= 2) { Y.doomHastened = true; Y.doomT--; reactName(f, X, Y, 'hastened', 'Hastened Doom', 'Doom lands a turn sooner.'); }
 }
 function applyStatus(f, X, Y, fx, p) {
   if (fx.burn) addStatus(f, X, Y, 'burn', Math.round(fx.burn * p));
-  if (fx.poison) { const had = Y.poison > 0; addStatus(f, X, Y, 'poison', Math.round(fx.poison * p)); if (fx.doublePoison && had) Y.poison *= 2; }
+  if (fx.poison) { const had = Y.poison > 0; addStatus(f, X, Y, 'poison', Math.round(fx.poison * p)); if (fx.doublePoison && had) Y.poison = Math.round(Y.poison * 1.5); }
   if (fx.bleed) addStatus(f, X, Y, 'bleed', Math.round(fx.bleed * p));
   if (fx.weaken) { Y.weaken = Math.max(Y.weaken, fx.weaken); if (X.P.weakPoison) addStatus(f, X, Y, 'poison', X.P.weakPoison); react(f, X, Y); }
   if (fx.stun) stunTarget(f, X, Y);
@@ -1760,7 +1762,7 @@ function startTurn(f, X, first) {
   X.thorns = 0; X.riposte = 0;
   if (X.regenT > 0) { heal(f, X, X.regen); X.regenT--; }
   if (P.regen) heal(f, X, P.regen);
-  if (X.leechT > 0) { const v = Math.min(X.leech * (X.poison > 0 && X.blight ? 2 : 1), Math.max(0, X.hp)); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' }); heal(f, Y, v); X.leechT--; if (Y.isPlayer) f.dealt['Leech'] = (f.dealt['Leech'] || 0) + v; }
+  if (X.leechT > 0) { const v = Math.min(X.leech * (X.poison > 0 && X.blight ? 2 : 1), Math.max(0, X.hp)); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' }); heal(f, Y, Math.min(v, X.leech)); X.leechT--; if (Y.isPlayer) f.dealt['Leech'] = (f.dealt['Leech'] || 0) + v; }
   if (X.doomT > 0) { X.doomT--; if (X.doomT === 0) { X.hp -= X.doom; ev(f, { k: 'dot', side: X.side, amt: X.doom, kind: 'doom' }); say(f, `[Doom falls on ${X.isPlayer ? 'you' : X.name}: ${X.doom} damage.]`, 'skill'); if (Y.isPlayer) f.dealt['Doom'] = (f.dealt['Doom'] || 0) + X.doom; X.doom = 0; } }
   if (!X.isPlayer && X.aura) addStatus(f, X, Y, 'burn', Math.round(X.aura));
   if (!X.isPlayer && X.briar) addStatus(f, X, Y, 'bleed', Math.round(X.briar));
@@ -1868,7 +1870,7 @@ function intentText(f, s, B) {
   if (fx.block) { parts.push(`Block ${Math.round(fx.block * p)}`); if (kind === 'other') kind = 'defend'; }
   if (fx.heal) { parts.push(`Heal ${Math.round(fx.heal * p)}`); if (kind === 'other') kind = 'defend'; }
   if (fx.burn) { parts.push(`Burn ${Math.round(fx.burn * p)}`); if (kind === 'other') kind = 'debuff'; }
-  if (fx.poison) { parts.push(`Poison ${Math.round(fx.poison * p)}${fx.doublePoison ? ' (doubles)' : ''}`); if (kind === 'other') kind = 'debuff'; }
+  if (fx.poison) { parts.push(`Poison ${Math.round(fx.poison * p)}${fx.doublePoison ? ' (×1.5)' : ''}`); if (kind === 'other') kind = 'debuff'; }
   if (fx.bleed) parts.push('Bleed');
   if (fx.weaken) { parts.push('Weaken'); if (kind === 'other') kind = 'debuff'; }
   if (fx.stun) parts.push('Stun');
@@ -1938,7 +1940,7 @@ function describe(def, p = 1) {
   if (fx.detonate) r.push(`Deal ${fx.detonate}× the opponent's Burn as damage${fx.keep ? '' : ', then remove it'}. Ignores Block.`);
   const per = fx.perHit ? ' with each hit' : '';
   if (fx.burn) r.push(`Apply ${n(fx.burn)} Burn${per}.`);
-  if (fx.poison) r.push(`Apply ${n(fx.poison)} Poison${per}${fx.doublePoison ? ', then double their Poison if they already had some' : ''}.`);
+  if (fx.poison) r.push(`Apply ${n(fx.poison)} Poison${per}${fx.doublePoison ? ', then raise their Poison by half if they already had some' : ''}.`);
   if (fx.bleed) r.push(`Apply ${n(fx.bleed)} Bleed${per}.`);
   if (fx.weaken) r.push(`Weaken the opponent for ${fx.weaken} turn${fx.weaken > 1 ? 's' : ''}.`);
   if (fx.stun) r.push('Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown.');
@@ -1977,7 +1979,7 @@ const REACTIONS = {
   cauterise: { name: 'Cauterise', pair: 'Burn + Bleed', text: 'Bleed is seared away and Burn doubles.' },
   hemorrhage: { name: 'Haemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
   broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'The target takes 50% more damage until the end of their next turn.' },
-  blight: { name: 'Blight', pair: 'Poison + Leech', text: 'Leech drains double.' },
+  blight: { name: 'Blight', pair: 'Poison + Leech', text: 'Leech drains double, but heals only the normal amount.' },
   hastened: { name: 'Hastened Doom', pair: 'Doom + 2 other effects', text: 'Doom lands a turn sooner.' },
 };
 
@@ -2114,21 +2116,46 @@ const PICKS_MAX = 60;
 function notePick(run, k) { if (!run.picks) run.picks = []; if (run.picks.length < PICKS_MAX) run.picks.push(k); }
 // Foes that are another player's champion keep only their kind, since their names are player-chosen
 const SNAP_KINDS = ['erased', 'champion', 'legend'];
+// Every number is a whole number inside the bounds firestore.rules checks, and every key a short string or null,
+// so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue
 function runSummary(run, meta, outcome, now) {
-  now = now == null ? Date.now() : now;
+  now = Math.round(now == null ? Date.now() : now);
   const H = run.history || [], last = H[H.length - 1], gear = GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean);
+  const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0)), key = (v, n) => v ? String(v).slice(0, n) : null;
   return {
     day: dailyDate(now), at: now, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
-    world: run.world.type, wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? meta.rank.letter : null, path: run.path || null, hidden: run.hiddenPath || null,
-    patron: run.patron || 'none', gifts: (run.gifts || []).slice(0, 12), title: run.title || null,
-    round: Math.min(20, curRound(run)), wins: Math.min(20, run.wins || 0), hearts: Math.max(0, Math.min(20, run.hearts)), maxHearts: Math.min(20, run.maxHearts || 10),
-    level: run.level || 1, turns: Math.min(9999, H.reduce((a, h) => a + (h.turns || 0), 0)),
-    mins: run.t0 ? Math.max(0, Math.min(1440, Math.round((now - run.t0) / 6e4))) : null,
-    fights: H.slice(0, 30).map(h => ({ r: h.round, w: !!h.won, h: !!h.hard, k: h.kind || 'monster', t: h.turns || 0 })),
-    picks: (run.picks || []).slice(0, PICKS_MAX),
-    bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)), gear: gear.map(p => baseId(p.id)),
+    world: String(run.world.type).slice(0, 16), wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? key(meta.rank.letter, 3) : null, path: key(run.path, 16), hidden: key(run.hiddenPath, 24),
+    patron: ['war', 'trick', 'ruin'].includes(run.patron) ? run.patron : 'none', gifts: (run.gifts || []).slice(0, 12).map(k => String(k).slice(0, 24)), title: key(run.title, 24),
+    round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), maxHearts: int(run.maxHearts || 10, 0, 20),
+    level: int(run.level, 1, 9), turns: int(H.reduce((a, h) => a + (h.turns || 0), 0), 0, 9999),
+    mins: run.t0 ? int((now - run.t0) / 6e4, 0, 1440) : null,
+    fights: H.slice(0, 30).map(h => ({ r: int(h.round, 0, 20), w: !!h.won, h: !!h.hard, k: key(h.kind, 16) || 'monster', t: int(h.turns, 0, 999) })),
+    picks: (run.picks || []).slice(0, PICKS_MAX).map(k => String(k).slice(0, 40)),
+    bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)), gear: gear.slice(0, 3).map(p => baseId(p.id)),
     foe: last && !last.won ? (SNAP_KINDS.includes(last.kind) ? '[' + last.kind + ']' : String(last.name).slice(0, 40)) : null,
   };
+}
+
+// ---------- Bug reports and feedback ----------
+// The Report form in the Menu files one document per report (feedback/{uid}_{at}, see firestore.rules). Only the console
+// and the stats dashboard read them. What the player typed, plus where they were: never a name or account detail.
+const FEEDBACK_TYPES = ['bug', 'idea', 'balance', 'other'];
+const FEEDBACK_MAX = 1000;
+// env: { build, screen, w, h, app, ua } from the device. With a run, a short snapshot and the last few System messages.
+function feedbackDoc(type, text, env, run, now) {
+  now = Math.round(now == null ? Date.now() : now);
+  const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0)), str = (v, n) => String(v == null ? '' : v).slice(0, n);
+  const d = {
+    type: FEEDBACK_TYPES.includes(type) ? type : 'other', text: str(text, FEEDBACK_MAX).trim() || '(empty)', at: now,
+    build: str(env.build, 24), screen: str(env.screen, 24), w: int(env.w, 0, 9999), h: int(env.h, 0, 9999), app: !!env.app, ua: str(env.ua, 200),
+  };
+  if (run) d.run = {
+    world: str(run.world.type, 16), mode: run.practice ? 'practice' : run.daily ? (run.ranked ? 'daily' : 'replay') : 'world', stage: str(run.stage, 16),
+    round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), gold: int(run.gold, 0, 999), level: int(run.level, 1, 9),
+    path: run.path ? str(run.path, 16) : null, bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)),
+    log: (run.log || []).slice(-10).map(l => str(l.text, 160)),
+  };
+  return d;
 }
 
 // ---------- Entrant Rank ----------
@@ -2343,5 +2370,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX,
+  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

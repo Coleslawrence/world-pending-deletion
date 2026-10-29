@@ -98,23 +98,54 @@ service cloud.firestore {
     // Playtest stats: one anonymous summary per finished run, for the stats dashboard. Game keys and numbers only, never
     // names. Each tester creates their own (runs/{uid}_{time}); nobody reads them in game, only the console and exports.
     match /runs/{runId} {
-      allow create: if isTester() && runId.matches(request.auth.uid + '_[0-9]+')
+      allow create: if isTester() && runId == request.auth.uid + '_' + string(request.resource.data.at)
         && request.resource.data.keys().hasOnly(['day', 'at', 'outcome', 'mode', 'world', 'wrank', 'rank', 'path', 'hidden', 'patron', 'gifts', 'title', 'round', 'wins', 'hearts', 'maxHearts', 'level', 'turns', 'mins', 'fights', 'picks', 'bar', 'gear', 'foe'])
         && request.resource.data.keys().hasAll(['day', 'at', 'outcome', 'world', 'round', 'wins', 'hearts'])
-        && request.resource.data.day is string && request.resource.data.day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
-        && request.resource.data.at is number
-        && request.resource.data.outcome in ['spared', 'erased', 'abandoned']
-        && request.resource.data.world is string && request.resource.data.world.size() <= 16
-        && request.resource.data.round is int && request.resource.data.round >= 0 && request.resource.data.round <= 20
-        && request.resource.data.wins is int && request.resource.data.wins >= 0 && request.resource.data.wins <= 20
-        && request.resource.data.hearts is int && request.resource.data.hearts >= 0 && request.resource.data.hearts <= 20
-        && (!('fights' in request.resource.data) || (request.resource.data.fights is list && request.resource.data.fights.size() <= 30))
-        && (!('picks' in request.resource.data) || (request.resource.data.picks is list && request.resource.data.picks.size() <= 60))
-        && (!('gifts' in request.resource.data) || (request.resource.data.gifts is list && request.resource.data.gifts.size() <= 12))
-        && (!('bar' in request.resource.data) || (request.resource.data.bar is list && request.resource.data.bar.size() <= 8))
-        && (!('gear' in request.resource.data) || (request.resource.data.gear is list && request.resource.data.gear.size() <= 3))
-        && (!('foe' in request.resource.data) || request.resource.data.foe == null || (request.resource.data.foe is string && request.resource.data.foe.size() <= 40));
+        && runFields(request.resource.data);
     }
+    // Bug reports and feedback from the in-game Report form: any signed-in player, approved or not, files their own
+    // (feedback/{uid}_{time}). Never a name or account detail. Nobody reads them in game, only the console and exports.
+    match /feedback/{reportId} {
+      allow create: if request.auth != null && reportId == request.auth.uid + '_' + string(request.resource.data.at)
+        && request.resource.data.keys().hasOnly(['type', 'text', 'at', 'build', 'screen', 'w', 'h', 'app', 'ua', 'run'])
+        && request.resource.data.keys().hasAll(['type', 'text', 'at'])
+        && feedbackFields(request.resource.data);
+    }
+    function feedbackFields(d) {
+      return d.type in ['bug', 'idea', 'balance', 'other']
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 1000
+        && d.at is int && d.at > 0
+        && (!('build' in d) || runKey(d.build, 24)) && (!('screen' in d) || runKey(d.screen, 24))
+        && (!('w' in d) || runInt(d.w, 0, 9999)) && (!('h' in d) || runInt(d.h, 0, 9999))
+        && (!('app' in d) || d.app is bool) && (!('ua' in d) || runKey(d.ua, 200))
+        && (!('run' in d) || d.run == null || (d.run is map
+          && d.run.keys().hasOnly(['world', 'mode', 'stage', 'round', 'wins', 'hearts', 'gold', 'level', 'path', 'bar', 'log'])
+          && (!('bar' in d.run) || (d.run.bar is list && d.run.bar.size() <= 8))
+          && (!('log' in d.run) || (d.run.log is list && d.run.log.size() <= 10))));
+    }
+    // Every field has a type and a bound: required ones always, optional ones when present (null where the game sends null)
+    function runFields(d) {
+      return d.day is string && d.day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.at is int && d.at > 0
+        && d.outcome in ['spared', 'erased', 'abandoned']
+        && d.world is string && d.world.size() <= 16
+        && runInt(d.round, 0, 20) && runInt(d.wins, 0, 20) && runInt(d.hearts, 0, 20)
+        && (!('mode' in d) || d.mode in ['world', 'daily', 'replay'])
+        && (!('patron' in d) || d.patron in ['war', 'trick', 'ruin', 'none'])
+        && (!('wrank' in d) || runKey(d.wrank, 1)) && (!('rank' in d) || runKey(d.rank, 3))
+        && (!('path' in d) || runKey(d.path, 16)) && (!('hidden' in d) || runKey(d.hidden, 24)) && (!('title' in d) || runKey(d.title, 24))
+        && (!('maxHearts' in d) || runInt(d.maxHearts, 0, 20)) && (!('level' in d) || runInt(d.level, 1, 9))
+        && (!('turns' in d) || runInt(d.turns, 0, 9999)) && (!('mins' in d) || d.mins == null || runInt(d.mins, 0, 1440))
+        && (!('fights' in d) || (d.fights is list && d.fights.size() <= 30))
+        && (!('picks' in d) || (d.picks is list && d.picks.size() <= 60))
+        && (!('gifts' in d) || (d.gifts is list && d.gifts.size() <= 12))
+        && (!('bar' in d) || (d.bar is list && d.bar.size() <= 8))
+        && (!('gear' in d) || (d.gear is list && d.gear.size() <= 3))
+        && (!('foe' in d) || d.foe == null || (d.foe is string && d.foe.size() <= 40));
+    }
+    function runInt(v, lo, hi) { return v is int && v >= lo && v <= hi; }
+    // A game id (class, title, rank letter...) or null
+    function runKey(v, n) { return v == null || (v is string && v.size() <= n); }
 
     // Everything else is closed
     match /{document=**} {
