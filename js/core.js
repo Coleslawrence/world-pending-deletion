@@ -1,151 +1,20 @@
-// ===== [World Pending Deletion] — data + rules (no DOM) =====
+// ===== [World Pending Deletion] — rules (no DOM) =====
 'use strict';
+// Content (archetypes, skills, gear, gods, worlds, enemies, Gifts, Titles, quests, Hidden Paths) lives in js/content/.
+// The page loads those files before this one. In Node (sims and tools) this loads them the same way, in index.html's order.
+if (typeof module !== 'undefined' && typeof ARCH === 'undefined') {
+  const fs = require('fs'), path = require('path'), vm = require('vm'), root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  for (const [, f] of html.matchAll(/<script src="(js\/content\/[^"]+)"><\/script>/g)) vm.runInThisContext(fs.readFileSync(path.join(root, f), 'utf8'), { filename: path.join(root, f) });
+}
 const VERSION = 5;
-const STATS = ['STR', 'AGI', 'INT', 'VIT', 'LUK'];
-const STAT_INFO = {
-  STR: { name: 'Strength', short: 'Reaper and Stormcaller skills, some HP' },
-  AGI: { name: 'Agility', short: 'Bladedancer and Venom skills, dodge' },
-  INT: { name: 'Intelligence', short: 'Pyre and Arcanist skills' },
-  VIT: { name: 'Vitality', short: 'HP, Bastion and Zealot skills' },
-  LUK: { name: 'Luck', short: 'Critical hits' },
-};
-const RANKS = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
 const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 
 // ---------- Archetypes ----------
-// Bonuses are cumulative: tier 2 adds to tier 1, and so on.
-const ARCH = {
-  pyre: { name: 'Pyre', stat: 'INT', theme: 'Burn', path: 'Pyromancer', b: ['Burn on the opponent fades half as fast.', 'Burn you apply +4.', 'Burn on the opponent never fades.'] },
-  venom: { name: 'Venom', stat: 'AGI', theme: 'Poison and drain', path: 'Plaguebringer', b: ['Poison you apply +1.', 'Poison you apply +1 more.', 'Poison deals 50% more damage.'] },
-  blade: { name: 'Bladedancer', stat: 'AGI', theme: 'Bleed and multi-hit', path: 'Bladesinger', b: ['Multi-hit skills hit once more.', 'Bleed you apply +2.', 'Bleed deals double damage.'] },
-  bastion: { name: 'Bastion', stat: 'VIT', theme: 'Block and Thorns', path: 'Bulwark', b: ['Keep 25% of your Block between turns.', 'Always have 4 Thorns.', 'Gaining Block also deals half of it as damage.'] },
-  arcanist: { name: 'Arcanist', stat: 'INT', theme: 'Quick skills and cooldowns', path: 'Archmage', b: ['Quick skills: 1 turn shorter cooldown. Your other skills: 1 turn shorter for every 8 INT (minimum 1).', 'Your first skill each fight has no cooldown.', 'Quick skills cast twice.'] },
-  zealot: { name: 'Zealot', stat: 'VIT', theme: 'Healing and Regen', path: 'Saint', b: ['Healing +10%.', 'Heal 2 at the start of each of your turns (grows with level).', 'Overhealing becomes Block.'] },
-  reaper: { name: 'Reaper', stat: 'STR', theme: 'Execute, Doom and lifesteal', path: 'Deathbringer', b: ['Opponents below half HP take 25% more damage from you, and your hits ignore their Block. The first time you hit an opponent below half HP, heal 15% of your max HP.', 'Heal 20% of the damage you deal.', 'Doom lands a turn sooner, and each win restores 1 Heart.'] },
-  storm: { name: 'Stormcaller', stat: 'STR', theme: 'Stun and Interrupt', path: 'Stormlord', b: ['Your Stuns and Interrupts deal 12 damage plus your STR and shatter the opponent\'s Block. Stopping a big attack Empowers you for 2 turns.', 'Your Stuns also Weaken for 2 turns.', 'Every 3rd skill you use Stuns.'] },
-};
-const ARCH_KEYS = Object.keys(ARCH);
-const START_ARCH = ['pyre', 'venom', 'blade', 'bastion', 'zealot', 'reaper'];
-// The class wheel: neighbours are allies, opposites are enemies. A run is dealt its home archetype's allies first.
-const WHEEL = ['zealot', 'bastion', 'storm', 'arcanist', 'pyre', 'reaper', 'venom', 'blade'];
 function alliesOf(k) { const i = WHEEL.indexOf(k); return [WHEEL[(i + 7) % 8], WHEEL[(i + 1) % 8]]; }
 function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 
-// ---------- Skills ----------
-const SKILLS = {};
-const SHOP_SKILLS = [];
-function sk(id, name, tags, rank, cd, fx, evos, extra) {
-  const d = Object.assign({ id, name, tags, rank, cd, fx, kind: 'skill' }, extra || {});
-  SKILLS[id] = d;
-  if (!d.noShop) SHOP_SKILLS.push(id);
-  if (evos) {
-    d.evo = evos.map(e => e[0]);
-    evos.forEach(([eid, ename, efx, ecd]) => {
-      SKILLS[eid] = Object.assign({}, d, { id: eid, name: ename, fx: efx, cd: ecd != null ? ecd : d.cd, rank: RANKS[Math.min(6, RANKS.indexOf(rank) + 2)], evo: null, base: id, noShop: true });
-    });
-  }
-}
-// Pyre
-sk('firebolt', 'Firebolt', ['pyre'], 'E', 1, { dmg: 7, burn: 4 }, [['fireball', 'Fireball', { dmg: 12, burn: 6 }], ['fire_rain', 'Fire Rain', { dmg: 3, hits: 4, burn: 2, perHit: 1 }]]);
-sk('ember_ward', 'Ember Ward', ['pyre', 'bastion'], 'E', 3, { block: 8, burn: 4 }, [['fire_wall', 'Fire Wall', { block: 13, burn: 6 }], ['blazing_aegis', 'Blazing Aegis', { block: 8, burn: 3, thorns: 6 }]]);
-sk('flame_wave', 'Flame Wave', ['pyre', 'blade'], 'D', 2, { dmg: 4, hits: 2, burn: 2, perHit: 1 }, [['inferno_wave', 'Inferno Wave', { dmg: 4, hits: 3, burn: 2, perHit: 1 }], ['scorching_cut', 'Scorching Cut', { dmg: 5, hits: 2, burn: 2, bleed: 2, perHit: 1 }]]);
-sk('ignite', 'Ignite', ['pyre'], 'D', 3, { detonate: 2 }, [['combust', 'Combust', { detonate: 3 }], ['wildfire', 'Wildfire', { detonate: 2, keep: 1 }]]);
-sk('scorch', 'Scorch', ['pyre'], 'C', 2, { dmg: 5, burn: 7 }, [['blaze', 'Blaze', { dmg: 7, burn: 11 }], ['searing_brand', 'Searing Brand', { dmg: 5, burn: 7, weaken: 1 }]]);
-sk('inferno', 'Inferno', ['pyre'], 'B', 4, { dmg: 10, burn: 11 }, [['hellfire', 'Hellfire', { dmg: 14, burn: 16 }], ['firestorm', 'Firestorm', { dmg: 5, hits: 3, burn: 4, perHit: 1 }]]);
-sk('sacred_flame', 'Sacred Flame', ['zealot', 'pyre'], 'B', 3, { dmg: 9, burn: 4, heal: 8 }, [['purging_flame', 'Purging Flame', { dmg: 12, burn: 6, heal: 10 }], ['sunfire', 'Sunfire', { dmg: 9, burn: 4, heal: 8, cleanse: 1 }]]);
-sk('pandemic', 'Pandemic', ['venom', 'pyre'], 'A', 4, { burn: 8, poison: 6 }, [['apocalypse', 'Apocalypse', { burn: 12, poison: 10 }], ['black_death', 'Black Death', { burn: 8, poison: 6, weaken: 2 }]]);
-// Venom
-sk('venom_blade', 'Venom Blade', ['venom', 'blade'], 'E', 1, { dmg: 5, poison: 2 }, [['viper_fang', 'Viper Fang', { dmg: 7, poison: 4 }], ['toxic_flurry', 'Toxic Flurry', { dmg: 3, hits: 3, poison: 1, perHit: 1 }]]);
-sk('hex', 'Hex', ['venom', 'storm'], 'E', 2, { weaken: 2, poison: 2 }, [['curse_of_frailty', 'Curse of Frailty', { weaken: 3, poison: 4 }], ['wither', 'Wither', { weaken: 2, poison: 2, drainPoison: 1 }]]);
-sk('drain_life', 'Drain Life', ['venom', 'reaper'], 'E', 2, { dmg: 8, lifesteal: 0.5 }, [['soul_drain', 'Soul Drain', { dmg: 12, lifesteal: 0.6 }], ['blood_pact', 'Blood Pact', { dmg: 8, lifesteal: 1 }]]);
-sk('plague_cloud', 'Plague Cloud', ['venom'], 'D', 3, { poison: 6 }, [['pestilence', 'Pestilence', { poison: 10 }], ['rot', 'Rot', { poison: 6, bleed: 4 }]]);
-sk('malice', 'Malice', ['venom'], 'D', 1, { dmg: 4, malice: 3 }, [['spite', 'Spite', { dmg: 4, malice: 5 }], ['torment', 'Torment', { dmg: 6, malice: 3, weaken: 1 }]]);
-sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech', 'Blood Leech', { leech: 6 }], ['parasite', 'Parasite', { leech: 3, poison: 3 }]]);
-sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }]]);
-// Bladedancer
-sk('quick_slash', 'Quick Slash', ['blade'], 'E', 1, { dmg: 5, hits: 2 }, [['flurry', 'Flurry of Blades', { dmg: 5, hits: 3 }], ['bleeding_edge', 'Bleeding Edge', { dmg: 4, hits: 2, bleed: 2, perHit: 1 }]]);
-sk('lacerate', 'Lacerate', ['blade'], 'E', 2, { dmg: 4, bleed: 5 }, [['gash', 'Gash', { dmg: 4, bleed: 9 }], ['serrated_strike', 'Serrated Strike', { dmg: 9, bleed: 5 }]]);
-sk('smoke_bomb', 'Smoke Bomb', ['blade', 'arcanist'], 'E', 4, { evade: 1 }, [['vanish', 'Vanish', { evade: 2 }], ['caltrops', 'Caltrops', { evade: 1, bleed: 4 }]], { quick: true });
-sk('fan_of_knives', 'Fan of Knives', ['blade'], 'D', 3, { dmg: 4, hits: 4 }, [['blade_storm', 'Blade Storm', { dmg: 4, hits: 6 }], ['poisoned_knives', 'Poisoned Knives', { dmg: 3, hits: 4, poison: 1, perHit: 1 }]]);
-sk('precise_strike', 'Precise Strike', ['blade'], 'D', 2, { dmg: 11, critBonus: 0.5 }, [['vital_strike', 'Vital Strike', { dmg: 12, alwaysCrit: 1 }], ['heartseeker', 'Heartseeker', { dmg: 15, pierce: 1 }]]);
-sk('mark_prey', 'Mark Prey', ['blade'], 'C', 3, { mark: 2 }, [['hunters_mark', "Hunter's Mark", { mark: 3 }], ['deadly_mark', 'Deadly Mark', { mark: 2, nextCrit: 1 }]], { quick: true });
-sk('assassinate', 'Assassinate', ['blade', 'reaper'], 'B', 3, { dmg: 12, cruel: 2 }, [['death_blossom', 'Death Blossom', { dmg: 8, hits: 2, cruel: 2 }], ['coup_de_grace', 'Coup de Grace', { dmg: 16, cruel: 2.5 }]]);
-sk('thousand_cuts', 'Thousand Cuts', ['blade'], 'A', 4, { dmg: 3, hits: 6, bleed: 1, perHit: 1 }, [['dance_of_death', 'Dance of Death', { dmg: 4, hits: 7, bleed: 1, perHit: 1 }], ['crimson_tempest', 'Crimson Tempest', { dmg: 3, hits: 6, bleed: 2, perHit: 1 }]]);
-// Bastion
-sk('iron_guard', 'Iron Guard', ['bastion'], 'E', 1, { block: 9 }, [['fortress', 'Fortress', { block: 15 }], ['spiked_guard', 'Spiked Guard', { block: 9, thorns: 5 }]]);
-sk('shield_bash', 'Shield Bash', ['bastion', 'storm'], 'E', 2, { dmg: 6, block: 6 }, [['tower_bash', 'Tower Bash', { dmg: 8, block: 11 }], ['stunning_bash', 'Stunning Bash', { dmg: 6, stun: 1 }, 3]]);
-sk('smite', 'Smite', ['bastion', 'zealot'], 'E', 2, { dmg: 6, blockDmg: 0.5 }, [['judgement', 'Judgement', { dmg: 5, blockDmg: 1 }], ['righteous_smite', 'Righteous Smite', { dmg: 9, heal: 5 }]]);
-sk('retribution', 'Retribution', ['bastion'], 'D', 3, { block: 6, thorns: 8 }, [['vengeance', 'Vengeance', { block: 6, thorns: 14 }], ['iron_retort', 'Iron Retort', { block: 12, thorns: 8 }]]);
-sk('riposte', 'Riposte', ['bastion', 'blade'], 'C', 3, { block: 6, riposte: 1.5 }, [['perfect_riposte', 'Perfect Riposte', { block: 10, riposte: 2.5 }], ['parry_master', 'Parry Master', { block: 6, riposte: 1.5, evade: 1 }]]);
-sk('unbreakable', 'Unbreakable', ['bastion'], 'B', 4, { block: 20, cleanse: 1 }, [['immovable', 'Immovable', { block: 30, cleanse: 1 }], ['iron_skin', 'Iron Skin', { block: 18, cleanse: 1, thorns: 6 }]]);
-sk('bulwark_slam', 'Bulwark Slam', ['bastion'], 'A', 3, { dmg: 4, blockDmg: 1.2 }, [['titan_slam', 'Titan Slam', { dmg: 6, blockDmg: 1.6 }], ['shield_quake', 'Shield Quake', { dmg: 4, blockDmg: 1.2, stun: 1 }, 4]]);
-// Arcanist
-sk('spark', 'Spark', ['arcanist', 'storm'], 'E', 2, { dmg: 6 }, [['arc_spark', 'Arc Spark', { dmg: 10 }], ['static_spark', 'Static Spark', { dmg: 6, weaken: 1 }]], { quick: true });
-sk('focus', 'Focus', ['arcanist'], 'E', 3, { focus: 0.6 }, [['deep_focus', 'Deep Focus', { focus: 1 }], ['spellweave', 'Spellweave', { focus: 0.5, haste: 1 }]], { quick: true });
-sk('mana_shield', 'Mana Shield', ['arcanist', 'bastion'], 'E', 3, { block: 12 }, [['arcane_ward', 'Arcane Ward', { block: 20 }], ['retort_ward', 'Retort Ward', { block: 10, thorns: 6 }]]);
-sk('frost_lance', 'Frost Lance', ['arcanist'], 'E', 2, { dmg: 11, weaken: 2 }, [['glacial_spear', 'Glacial Spear', { dmg: 15, weaken: 2 }], ['deep_freeze', 'Deep Freeze', { dmg: 8, stun: 1 }, 4]]);
-sk('arcane_missiles', 'Arcane Missiles', ['arcanist'], 'D', 2, { dmg: 3, hits: 4, pierce: 1 }, [['arcane_barrage', 'Arcane Barrage', { dmg: 3, hits: 6, pierce: 1 }], ['mana_lance', 'Mana Lance', { dmg: 16, pierce: 1 }]]);
-sk('counterspell', 'Counterspell', ['arcanist', 'storm'], 'C', 3, { dmg: 7, interrupt: 1 }, [['nullify', 'Nullify', { dmg: 12, interrupt: 1 }], ['spell_theft', 'Spell Theft', { dmg: 7, interrupt: 1, empower: 2 }]]);
-sk('siphon', 'Siphon', ['arcanist'], 'C', 3, { siphon: 1 }, [['soul_siphon', 'Soul Siphon', { siphon: 1, heal: 5 }], ['hex_siphon', 'Hex Siphon', { siphon: 1, weaken: 1 }]], { quick: true });
-sk('time_warp', 'Time Warp', ['arcanist'], 'B', 6, { haste: 2 }, [['haste', 'Haste', { haste: 3 }], ['chrono_loop', 'Chrono Loop', { haste: 2 }, 4]], { quick: true });
-sk('cataclysm', 'Arcane Cataclysm', ['arcanist'], 'A', 4, { dmg: 24, pierce: 1 }, [['singularity', 'Singularity', { dmg: 34, pierce: 1 }], ['starfall', 'Starfall', { dmg: 8, hits: 4, pierce: 1 }]]);
-// Zealot
-sk('penance', 'Penance', ['zealot'], 'E', 1, { dmg: 6, heal: 2 }, [['atonement', 'Atonement', { dmg: 8, heal: 4 }], ['zeal', 'Zeal', { dmg: 5, hits: 2, heal: 2 }]]);
-sk('holy_light', 'Holy Light', ['zealot'], 'E', 3, { heal: 10 }, [['radiance', 'Radiance', { heal: 16 }], ['purifying_light', 'Purifying Light', { heal: 9, cleanse: 1 }]]);
-sk('shield_of_faith', 'Shield of Faith', ['zealot'], 'E', 3, { block: 6 }, [['aegis', 'Aegis', { block: 12 }], ['blessed_shield', 'Blessed Shield', { block: 6, cleanse: 1 }]], { quick: true });
-sk('purify', 'Purify', ['zealot'], 'D', 4, { cleanse: 1, heal: 6 }, [['sanctuary', 'Sanctuary', { cleanse: 1, heal: 10, block: 8 }], ['reversal', 'Reversal', { cleanse: 1, reflect: 1, block: 5 }]]);
-sk('second_wind', 'Second Wind', ['zealot'], 'D', 4, { healMissing: 0.25 }, [['last_breath', 'Last Breath', { healMissing: 0.4 }], ['rally', 'Rally', { healMissing: 0.25, empower: 1 }]]);
-sk('consecrate', 'Consecrate', ['zealot'], 'C', 4, { regen: 4 }, [['hallowed_ground', 'Hallowed Ground', { regen: 7 }], ['holy_fire', 'Holy Fire', { regen: 4, burn: 4 }]]);
-sk('miracle', 'Miracle', ['zealot'], 'A', 6, { healMissing: 0.5, cleanse: 1, block: 10 }, [['resurrection', 'Resurrection', { healMissing: 0.7, cleanse: 1, block: 12 }], ['divine_wrath', 'Divine Wrath', { healMissing: 0.4, dmg: 15 }]]);
-// Reaper
-sk('cleave', 'Cleave', ['reaper'], 'E', 1, { dmg: 10 }, [['great_cleave', 'Great Cleave', { dmg: 16 }], ['rending_cleave', 'Rending Cleave', { dmg: 8, bleed: 4 }]]);
-sk('berserk', 'Berserk', ['reaper'], 'E', 2, { dmg: 17, selfDmg: 3 }, [['blood_rage', 'Blood Rage', { dmg: 24, selfDmg: 4 }], ['frenzy', 'Frenzy', { dmg: 8, hits: 2, lifesteal: 0.3 }]]);
-sk('execute', 'Execute', ['reaper'], 'D', 3, { dmg: 10, execute: 0.3, execMult: 2.5 }, [['decapitate', 'Decapitate', { dmg: 12, execute: 0.3, execMult: 3 }], ['final_verdict', 'Final Verdict', { dmg: 10, execute: 0.5, execMult: 2.5 }]]);
-sk('heavy_blow', 'Heavy Blow', ['reaper'], 'D', 3, { dmg: 23 }, [['earthshaker', 'Earthshaker', { dmg: 33 }], ['crushing_blow', 'Crushing Blow', { dmg: 23, weaken: 2 }]]);
-sk('momentum', 'Momentum', ['reaper'], 'C', 1, { dmg: 5, momentum: 4 }, [['unstoppable', 'Unstoppable', { dmg: 5, momentum: 7 }], ['avalanche', 'Avalanche', { dmg: 4, hits: 2, momentum: 3 }]]);
-sk('doom', 'Doom', ['reaper'], 'B', 5, { doom: 26 }, [['swift_doom', 'Swift Doom', { doom: 22, doomT: 2 }], ['inevitable_doom', 'Inevitable Doom', { doom: 40 }]]);
-sk('soul_harvest', 'Soul Harvest', ['reaper'], 'A', 4, { dmg: 14, lifesteal: 0.6, execute: 0.3, execMult: 2 }, [['reaping', 'The Reaping', { dmg: 18, lifesteal: 0.6, execute: 0.3, execMult: 2.5 }], ['soul_feast', 'Soul Feast', { dmg: 14, lifesteal: 1, execute: 0.3, execMult: 2 }]]);
-// Stormcaller
-sk('static_jab', 'Static Jab', ['storm'], 'E', 1, { dmg: 6, weaken: 1 }, [['shock_jab', 'Shock Jab', { dmg: 9, weaken: 1 }], ['jolt', 'Jolt', { dmg: 6, weaken: 1, stunIfWeak: 1 }, 3]]);
-sk('war_cry', 'War Cry', ['storm', 'reaper'], 'E', 4, { empower: 2, block: 5 }, [['battle_roar', 'Battle Roar', { empower: 3, block: 10 }], ['intimidate', 'Intimidate', { empower: 2, weaken: 2 }]]);
-sk('thunderclap', 'Thunderclap', ['storm'], 'D', 4, { dmg: 8, stun: 1 }, [['thunderstorm', 'Thunderstorm', { dmg: 6, hits: 3, stun: 1 }], ['static_shock', 'Static Shock', { dmg: 11, stun: 1 }, 3]]);
-sk('chain_lightning', 'Chain Lightning', ['storm', 'blade'], 'C', 2, { dmg: 5, hits: 3 }, [['forked_lightning', 'Forked Lightning', { dmg: 5, hits: 4 }], ['ball_lightning', 'Ball Lightning', { dmg: 6, hits: 3, weaken: 1 }]]);
-sk('overload', 'Overload', ['storm'], 'B', 4, { dmg: 12, stunIfWeak: 1 }, [['supercharge', 'Supercharge', { dmg: 16, stunIfWeak: 1 }], ['short_circuit', 'Short Circuit', { dmg: 10, weaken: 2, stunIfWeak: 1 }]]);
-sk('thunder_wrath', "Thunder God's Wrath", ['storm'], 'A', 5, { dmg: 18, stun: 1 }, [['heavens_fury', "Heaven's Fury", { dmg: 26, stun: 1 }], ['eye_of_storm', 'Eye of the Storm', { dmg: 8, hits: 3, stun: 1 }]]);
-// Basic
-sk('attack', 'Attack', [], 'F', 0, { dmg: 5 }, null, { noShop: true, basic: true });
-
 // ---------- Gear: stats + one passive, no active skill ----------
-// `pas` values scale with stars; `fix` values don't.
-const GEAR = {
-  ember_gauntlets: { name: 'Ember Gauntlets', slot: 'weapon', tags: ['pyre'], rank: 'E', stats: { INT: 2 }, pas: { burnPlus: 2 }, text: v => `Burn you apply +${v.burnPlus}.` },
-  serpent_dagger: { name: 'Serpent Dagger', slot: 'weapon', tags: ['venom', 'blade'], rank: 'E', stats: { AGI: 2 }, pas: { poisonOnHit: 1 }, text: v => `Each skill that hits also applies ${v.poisonOnHit} Poison.` },
-  apprentice_staff: { name: 'Apprentice Staff', slot: 'weapon', tags: ['arcanist'], rank: 'E', stats: { INT: 2 }, pas: { afterQuick: 0.25 }, text: v => `After a Quick skill, your next skill deals ${pct(v.afterQuick)} more.` },
-  pilgrim_mace: { name: 'Pilgrim Mace', slot: 'weapon', tags: ['zealot'], rank: 'E', stats: { VIT: 1, STR: 1 }, pas: { hitHeal: 2 }, text: v => `Heal ${v.hitHeal} whenever a skill of yours deals damage.` },
-  duelist_rapier: { name: "Duelist's Rapier", slot: 'weapon', tags: ['blade'], rank: 'D', stats: { AGI: 2 }, pas: { critBonus: 0.1 }, fix: { firstCrit: 1 }, text: v => `+${pct(v.critBonus)} critical chance. Your first hit each fight is critical.` },
-  executioner_axe: { name: "Executioner's Axe", slot: 'weapon', tags: ['reaper'], rank: 'D', stats: { STR: 2 }, pas: { execBonus: 0.4 }, text: v => `+${pct(v.execBonus)} damage to opponents below 30% HP.` },
-  spiked_buckler: { name: 'Spiked Buckler', slot: 'weapon', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockThorns: 0.3 }, text: v => `Gaining Block also gives Thorns equal to ${pct(v.blockThorns)} of it.` },
-  blight_kris: { name: 'Blight Kris', slot: 'weapon', tags: ['venom'], rank: 'E', stats: { AGI: 2 }, pas: { startPoison: 3 }, text: v => `Your opponent starts each fight with ${v.startPoison} Poison.` },
-  thunder_maul: { name: 'Thunder Maul', slot: 'weapon', tags: ['storm'], rank: 'C', stats: { STR: 2 }, pas: { stunDmg: 6 }, fix: { firstStun: 1 }, text: v => `Your first damaging skill each fight Stuns. Your Stuns deal ${v.stunDmg} damage.` },
-  chain_mail: { name: 'Chain Mail', slot: 'armour', tags: ['bastion'], rank: 'E', stats: { VIT: 2 }, pas: { startBlock: 8 }, text: v => `Start each fight with ${v.startBlock} Block.` },
-  tower_shield: { name: 'Tower Shield', slot: 'armour', tags: ['bastion'], rank: 'D', stats: { VIT: 2 }, pas: { blockKeep: 0.3 }, text: v => `Keep ${pct(v.blockKeep)} of your Block between turns.` },
-  shadow_leathers: { name: 'Shadow Leathers', slot: 'armour', tags: ['blade', 'arcanist'], rank: 'D', stats: { AGI: 2 }, pas: { dodge: 0.06 }, fix: { firstEvade: 1 }, text: v => `+${pct(v.dodge)} dodge. Evade the first attack each fight.` },
-  cinder_robe: { name: 'Cinder Robe', slot: 'armour', tags: ['pyre', 'zealot'], rank: 'D', stats: { INT: 1, VIT: 1 }, pas: { burnHeal: 0.3 }, text: v => `Heal ${pct(v.burnHeal)} of the Burn damage your opponent takes.` },
-  conductive_mail: { name: 'Conductive Mail', slot: 'armour', tags: ['storm', 'bastion'], rank: 'D', stats: { VIT: 2 }, pas: { stunEmpower: 1 }, text: v => `Whenever you Stun or Interrupt, you are Empowered for ${v.stunEmpower} turn${v.stunEmpower > 1 ? 's' : ''}.` },
-  templar_plate: { name: 'Templar Plate', slot: 'armour', tags: ['zealot', 'bastion'], rank: 'C', stats: { VIT: 3 }, pas: { healBlock: 0.3 }, text: v => `Healing also gives Block equal to ${pct(v.healBlock)} of it.` },
-  grave_shroud: { name: 'Grave Shroud', slot: 'armour', tags: ['venom', 'reaper'], rank: 'C', stats: { VIT: 2 }, pas: { poisonHeal: 0.2 }, text: v => `Heal ${pct(Math.min(POISON_HEAL_CAP, v.poisonHeal))} of Poison damage dealt (max 30% from all sources).` },
-  prayer_beads: { name: 'Prayer Beads', slot: 'accessory', tags: ['zealot'], rank: 'E', stats: { VIT: 1 }, pas: { regen: 3 }, text: v => `Heal ${v.regen} at the start of each of your turns.` },
-  bloodstone_amulet: { name: 'Bloodstone Amulet', slot: 'accessory', tags: ['blade', 'zealot'], rank: 'C', stats: { VIT: 1 }, pas: { healOnBleed: 3 }, text: v => `Heal ${v.healOnBleed} whenever you apply Bleed.` },
-  crown_of_thorns: { name: 'Crown of Thorns', slot: 'accessory', tags: ['bastion'], rank: 'C', stats: { VIT: 1 }, pas: { thornsAlways: 3 }, text: v => `Always have ${v.thornsAlways} Thorns, doubled below half HP.` },
-  hourglass: { name: 'Hourglass Pendant', slot: 'accessory', tags: ['arcanist'], rank: 'C', stats: { INT: 1 }, pas: { quickFree: 1 }, text: v => v.quickFree > 1 ? `Your first ${v.quickFree} Quick skills each fight have no cooldown.` : 'Your first Quick skill each fight has no cooldown.' },
-  storm_ring: { name: 'Stormcaller Ring', slot: 'accessory', tags: ['storm'], rank: 'C', stats: { STR: 1 }, pas: { stunDmg: 10 }, text: v => `Your Stuns and Interrupts deal ${v.stunDmg} damage.` },
-  soul_lantern: { name: 'Soul Lantern', slot: 'accessory', tags: ['reaper'], rank: 'B', stats: { STR: 1, LUK: 1 }, pas: { lowLifesteal: 0.25 }, text: v => `Below half HP, heal ${pct(v.lowLifesteal)} of the damage you deal.` },
-  plague_censer: { name: 'Plague Censer', slot: 'accessory', tags: ['venom', 'pyre'], rank: 'A', stats: { INT: 2 }, pas: { burnPoison: 2 }, text: v => `Whenever you apply Burn, also apply ${v.burnPoison} Poison.` },
-};
-const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
-function pct(v) { return Math.round(v * 100) + '%'; }
-// Healing from Poison damage (Grave Warden, Grave Shroud, Plague Doctor) adds up to at most this share
-const POISON_HEAL_CAP = 0.3;
 const STAR_MULT = [0, 1, 1.5, 1.6];
 const GEAR_STAR = [0, 1, 1.5, 2], GEAR_STAR_PCT = [0, 1, 1.4, 1.8];
 function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); return Object.assign(o, g.fix || {}); }
@@ -194,158 +63,10 @@ function moddedDef(id, mods) {
 function effRank(id, mods) { const d = pieceDef(id); return RANKS[Math.min(6, RANKS.indexOf(d.rank) + (mods ? mods.length : 0))]; }
 function modName(id, mods) { return (mods && mods.length ? mods.map(m => PREFIXES[m].name).join(' ') + ' ' : '') + pieceDef(id).name; }
 
-// ---------- Gods ----------
-const GODS = {
-  war: { name: 'The God of War', short: 'War', arch: ['reaper', 'storm', 'bastion'], blessing: 'All your damage +15%.' },
-  trick: { name: 'The Trickster', short: 'Trickster', arch: ['venom', 'blade', 'arcanist'], blessing: 'Burn, Poison and Bleed you apply +2.' },
-  ruin: { name: 'The Goddess of Ruin', short: 'Ruin', arch: ['pyre', 'zealot', 'reaper'], blessing: 'Below half HP, deal 30% more damage.' },
-};
-
-// ---------- Worlds ----------
-const WORLD_TYPES = {
-  drowned: { name: 'Drowned Isles', flavour: 'Island kingdoms sinking into the sea.', home: 'zealot', gift: 'tidecaller', final: 'leviathan', names: [['Vel', 'Mar', 'Thal', 'Ner', 'Cor', 'Ys'], ['mora', 'mere', 'thys', 'una', 'aven', 'rith']], champs: ['Aldric', 'Maren', 'Isolde', 'Corin', 'Nerys', 'Talwyn'] },
-  burning: { name: 'Burning Empire', flavour: 'An empire that never stopped fighting.', home: 'pyre', gift: 'deserter', final: 'kharros', names: [['Khar', 'Vor', 'Ash', 'Ign', 'Sol', 'Pyr'], ['ros', 'kai', 'heim', 'gard', 'onis', 'ath']], champs: ['Varro', 'Kaela', 'Dax', 'Seren', 'Ignis', 'Tor'] },
-  hollow: { name: 'Hollow Kingdom', flavour: "A land where the dead won't rest.", home: 'venom', gift: 'warden', final: 'bone_saint', names: [['Mor', 'Gra', 'Duns', 'Ves', 'Ul', 'Kar'], ['vale', 'hollow', 'grave', 'mire', 'thorn', 'dun']], champs: ['Ebon', 'Lira', 'Mordecai', 'Wren', 'Silas', 'Ysolde'] },
-  verdant: { name: 'Verdant Wilds', flavour: 'Fey forests that eat travellers.', home: 'blade', gift: 'hedgewitch', final: 'thorn_mother', names: [['Syl', 'Fae', 'Bri', 'Ald', 'Thorn', 'Wy'], ['wood', 'glade', 'mere', 'wyn', 'holt', 'bryn']], champs: ['Rowan', 'Elowen', 'Bramble', 'Faye', 'Linden', 'Oriel'] },
-  sky: { name: 'Sky Reaches', flavour: 'Floating cities ruled by mages.', home: 'arcanist', gift: 'prodigy', final: 'archmage', names: [['Aer', 'Cel', 'Zeph', 'Ast', 'Lum', 'Vey'], ['ia', 'ora', 'ion', 'ara', 'elle', 'is']], champs: ['Cassian', 'Lyra', 'Orin', 'Vela', 'Theron', 'Mira'] },
-  iron: { name: 'Iron Hold', flavour: 'Mountain forges under siege.', home: 'bastion', gift: 'runesmith', final: 'forge_king', names: [['Dur', 'Gor', 'Bal', 'Kaz', 'Thra', 'Grim'], ['ak', 'heim', 'dur', 'mund', 'hold', 'rak']], champs: ['Brann', 'Helga', 'Tormund', 'Sigrun', 'Durek', 'Ingrid'] },
-};
+// ---------- World ranks ----------
 const WORLD_RANKS = ['E', 'D', 'C', 'B', 'A', 'S'];
 const RANK_W = [20, 25, 25, 15, 10, 5];
-const MODIFIERS = {
-  none: { name: 'Clear Skies', desc: 'No modifier.' },
-  bloodmoon: { name: 'Blood Moon', desc: 'Everyone deals 20% more damage.' },
-  famine: { name: 'Famine', desc: 'Healing after fights and at the Infirmary is halved.' },
-  golden: { name: 'Golden Age', desc: '+2 gold every round.' },
-  restless: { name: 'Restless Dead', desc: 'Erased champions appear more often.' },
-};
 
-// ---------- World Record ----------
-// Each run files 10 entries about its world, one per Heart, plus a bio for the champion. Losing Hearts erases entries.
-// Runs and snapshots store pool indexes, never text, so pool order is fixed once shipped: add new entries at the end, never reorder or delete.
-// k: place | person | custom. tier sets deletion order: far, then city, then home. near is the bio phrase for a home place; rel is a person's relation.
-const LORE = {
-  drowned: {
-    roles: ['lamplighter', 'pearl diver', 'tide priest', 'net mender', 'harbour runner'],
-    promises: ['bring back dry land', 'ring the bells again', 'come home before the tide'],
-    entries: [
-      { k: 'place', tier: 'far', name: 'The Sunken Archive', text: 'Every book the isles ever wrote, now read only by eels.' },
-      { k: 'place', tier: 'far', name: 'The First Shore', text: 'Where the first settlers landed. It went under two hundred years ago.' },
-      { k: 'place', tier: 'far', name: 'The Coral Library', text: 'Scholars grow their records in coral. A page takes a century.' },
-      { k: 'custom', tier: 'far', name: 'The Saltwar', text: 'The last war between the isles. Both sides lost the island they fought over.' },
-      { k: 'custom', tier: 'city', name: 'The Bell Vigil', text: 'When an island sinks, its bell is rung until the water reaches it.' },
-      { k: 'place', tier: 'city', name: 'The bells of Cor Aven', text: 'Seven bells, rung every dusk to count the islands still above water.' },
-      { k: 'custom', tier: 'city', name: 'The Tide Council', text: 'Nine elders who vote each year on which island to abandon next.' },
-      { k: 'person', tier: 'city', name: 'Harbourmaster Thel', text: 'Has evacuated eleven islands. Keeps a key to each one.' },
-      { k: 'place', tier: 'city', name: 'The Floating Market', text: 'Lashed-together boats that move whenever the coast does.' },
-      { k: 'custom', tier: 'city', name: 'Drowning Day', text: 'Once a year, everyone wades into the sea to remember what it took.' },
-      { k: 'place', tier: 'home', name: 'The Drowned Lighthouse', text: 'Still lit, though its base has been underwater for a generation.', near: 'in the shadow of the Drowned Lighthouse' },
-      { k: 'place', tier: 'home', name: 'The stilt house on Marrow Reef', text: 'Your family has raised it four times.', near: 'in a stilt house on Marrow Reef' },
-      { k: 'person', tier: 'home', name: 'Your sister Ilsa', text: 'Mends nets, and swears she can smell land on the wind.', rel: 'sister' },
-      { k: 'person', tier: 'home', name: 'Old Corwen', text: 'Taught you to swim before you could walk. Says the sea owes him one.', rel: 'teacher' },
-    ],
-  },
-  burning: {
-    roles: ['legionnaire', "smith's apprentice", 'standard-bearer', 'field medic', 'courier'],
-    promises: ['bring the legion home', 'end the war', 'light the Ember Gate again'],
-    entries: [
-      { k: 'place', tier: 'far', name: 'The Ashen Frontier', text: 'A border that has moved forty times. Nobody remembers who started it.' },
-      { k: 'custom', tier: 'far', name: 'The Thousand-Year Campaign', text: 'The war the empire was founded to win. It is in its thousand and twelfth year.' },
-      { k: 'place', tier: 'far', name: 'The Glass Desert', text: 'A battlefield burned so hot the sand turned to glass. Soldiers still find their reflections there.' },
-      { k: 'place', tier: 'far', name: 'The Treaty Stone', text: "Carved for a peace that lasted nine days. It is the empire's most visited monument." },
-      { k: 'place', tier: 'city', name: 'The Ember Gate', text: "The capital's great gate. It has been rebuilt after every siege, always a little taller." },
-      { k: 'place', tier: 'city', name: 'The Legion Rolls', text: "Every soldier's name, burned into iron plates that cover a whole street." },
-      { k: 'custom', tier: 'city', name: 'The Night of Cinders', text: 'Once a year the city puts out every fire and sits in the dark, to remember the cold.' },
-      { k: 'person', tier: 'city', name: 'Quartermaster Vossa', text: 'Has fed three armies on half rations. Never once lost a ledger.' },
-      { k: 'custom', tier: 'city', name: 'The Smoke Choir', text: 'Widows who sing the names of the fallen from the city walls at dusk.' },
-      { k: 'custom', tier: 'city', name: "Founders' Feast", text: 'The one day a year when nobody is allowed to draw a blade. Mostly.' },
-      { k: 'place', tier: 'home', name: 'The barracks on Kiln Street', text: 'Four generations of your family slept in the same bunk.', near: 'in the barracks on Kiln Street' },
-      { k: 'place', tier: 'home', name: 'The forge where you were born', text: 'Your mother refused to stop working, even for that.', near: 'beside the forge where you were born' },
-      { k: 'person', tier: 'home', name: 'Your brother Cass', text: 'Lost a hand at the frontier. Writes to you with the other one every week.', rel: 'brother' },
-      { k: 'person', tier: 'home', name: 'Sergeant Halla', text: 'Trained you with a wooden sword until you broke it. Then she gave you a real one.', rel: 'sergeant' },
-    ],
-  },
-  hollow: {
-    roles: ['lantern warden', 'gravedigger', 'candle-maker', 'bone-setter', 'chapel keeper'],
-    promises: ['let the dead rest', 'bring Ada peace', 'keep the lanterns lit'],
-    entries: [
-      { k: 'place', tier: 'far', name: 'The Unquiet Fields', text: 'Farmland where the old dead still work the soil at night. The harvests are excellent.' },
-      { k: 'custom', tier: 'far', name: 'The Last Funeral', text: 'Three hundred years ago, the kingdom buried someone and they stayed buried. Nobody knows how.' },
-      { k: 'place', tier: 'far', name: 'The Barrow Kings', text: 'Seven kings in seven hills. They still send tax demands.' },
-      { k: 'place', tier: 'far', name: 'The Ossuary Road', text: 'A highway paved with the bones of volunteers. It never needs repair.' },
-      { k: 'custom', tier: 'city', name: 'The Lantern Wardens', text: 'Keepers who walk the streets at night, reminding the dead which house is theirs.' },
-      { k: 'place', tier: 'city', name: 'The Grave Market', text: 'Where the living buy back things the dead took with them.' },
-      { k: 'custom', tier: 'city', name: "Mourners' Week", text: 'A week of feasting where every family sets one extra place, and it gets used.' },
-      { k: 'person', tier: 'city', name: 'Mother Rook', text: "The city's oldest gravedigger. Has buried the same man nine times." },
-      { k: 'place', tier: 'city', name: 'The Quiet Bell', text: 'A bell with no clapper. When it rings anyway, everyone goes indoors.' },
-      { k: 'custom', tier: 'city', name: 'The Salt Line', text: 'A ring of salt around the city, renewed every dawn by children.' },
-      { k: 'place', tier: 'home', name: 'The cottage by the yew', text: 'The yew is older than the kingdom, and its roots hold your ancestors.', near: 'in a cottage by the old yew' },
-      { k: 'place', tier: 'home', name: 'The chapel of St. Ves', text: 'Small, cold and always full. Not all the congregation breathes.', near: 'in the bell tower of St. Ves' },
-      { k: 'person', tier: 'home', name: 'Your grandmother Ada', text: 'Died when you were six. Still tucks you in when you visit.', rel: 'grandmother' },
-      { k: 'person', tier: 'home', name: 'Your friend Tobin', text: "A gravedigger's son who dared you into every crypt in the kingdom.", rel: 'friend' },
-    ],
-  },
-  verdant: {
-    roles: ['woodcutter', 'lantern-keeper', "hedge witch's apprentice", 'trapper', 'miller'],
-    promises: ['keep the lanterns burning', "bring Briar's voice back", 'walk home through the wood'],
-    entries: [
-      { k: 'place', tier: 'far', name: 'The Hungry Wood', text: 'The deepest forest. Maps of it are always missing the person who drew them.' },
-      { k: 'place', tier: 'far', name: 'The Court Under the Hill', text: 'Where the fey hold their feasts. Guests arrive for a night and leave a century later.' },
-      { k: 'custom', tier: 'far', name: 'The Treaty of Briars', text: 'The old pact: the forest leaves the villages alone, and the villages never count the trees.' },
-      { k: 'place', tier: 'far', name: 'The Moonmere', text: 'A lake that shows you as you will be. Most people stop looking after one visit.' },
-      { k: 'custom', tier: 'city', name: 'The Ring of Lanterns', text: "A circle of lights around every village. Step outside it after dark and you are the forest's." },
-      { k: 'place', tier: 'city', name: 'The Bargain Stone', text: 'Where deals are struck with the fey. Read every word twice.' },
-      { k: 'custom', tier: 'city', name: 'Name Day', text: 'Children are given a true name in secret and a false one for the forest to hear.' },
-      { k: 'person', tier: 'city', name: 'Warden Ash', text: "Has walked the Hungry Wood and come back. Twice. Won't say what she gave for it." },
-      { k: 'place', tier: 'city', name: 'The Thornwall', text: 'A living hedge around the town, fed every spring with a little blood.' },
-      { k: 'custom', tier: 'city', name: 'The Antler Fair', text: 'Once a year, the fey trade openly in the market. Everyone counts their children afterwards.' },
-      { k: 'place', tier: 'home', name: 'The house in the great oak', text: 'Your family lives inside a tree that agreed to it. Mostly.', near: 'inside the great oak' },
-      { k: 'place', tier: 'home', name: 'The mill at Wyn Ford', text: "Its wheel turns even when the river doesn't.", near: 'by the mill at Wyn Ford' },
-      { k: 'person', tier: 'home', name: 'Your sister Briar', text: 'Was taken by the fey for a year and came back speaking only in riddles.', rel: 'sister' },
-      { k: 'person', tier: 'home', name: 'Old Hob', text: 'A hedge-wizard who taught you which mushrooms to eat and which to apologise to.', rel: 'teacher' },
-    ],
-  },
-  sky: {
-    roles: ['spell-mechanic', 'chain-walker', 'academy student', 'skyship deckhand', 'cartographer'],
-    promises: ['keep the city in the sky', 'see the ground one day', 'finish your duel'],
-    entries: [
-      { k: 'place', tier: 'far', name: 'The Ground', text: 'Nobody has been down there in four hundred years. It is taught as a myth.' },
-      { k: 'place', tier: 'far', name: 'The Fallen City', text: 'One of the old floating cities lost its spell. Its wreckage is somewhere below the clouds.' },
-      { k: 'custom', tier: 'far', name: 'The First Ascent', text: 'The night the mages lifted the cities into the sky. The reasons were never written down.' },
-      { k: 'place', tier: 'far', name: 'The Storm Wall', text: 'A barrier of lightning around the Reaches. It keeps something out. Or in.' },
-      { k: 'place', tier: 'city', name: 'The Anchor Chains', text: 'Iron chains that tie the cities together. Children dare each other to walk them.' },
-      { k: 'place', tier: 'city', name: 'The Academy Spire', text: 'The highest tower in the Reaches. Every student who graduates moves one floor up.' },
-      { k: 'custom', tier: 'city', name: 'The Lift Toll', text: 'Everyone pays a little mana each morning to keep the city in the air.' },
-      { k: 'person', tier: 'city', name: 'Chancellor Vey', text: 'Rules the council of mages. Has not touched solid stone in sixty years.' },
-      { k: 'custom', tier: 'city', name: 'Windfall Day', text: 'Once a year, the cities drift close enough to step between them.' },
-      { k: 'place', tier: 'city', name: 'The Cloud Docks', text: 'Where skyships tie up, rattling in the wind like nervous horses.' },
-      { k: 'place', tier: 'home', name: 'The rooftop garden', text: 'Your family grows the only real soil in the district, in pots, very carefully.', near: 'in a rooftop garden above the Cloud Docks' },
-      { k: 'place', tier: 'home', name: 'The lower ring', text: 'The poorest part of the city, closest to the edge. You could always see the clouds.', near: 'on the lower ring, near the edge' },
-      { k: 'person', tier: 'home', name: 'Your father Oren', text: "A spell-mechanic who keeps the city's oldest engine running with his bare hands.", rel: 'father' },
-      { k: 'person', tier: 'home', name: 'Your rival Selis', text: 'Beat you at every exam. You still owe each other a duel.', rel: 'rival' },
-    ],
-  },
-  iron: {
-    roles: ['smith', 'miner', 'gate guard', 'tunnel runner', 'rune carver'],
-    promises: ['open the gates', 'keep the forge lit', 'see the sky above the mountain'],
-    entries: [
-      { k: 'place', tier: 'far', name: 'The Deep Roads', text: 'Tunnels running under the whole mountain range. The far ends were sealed for a reason.' },
-      { k: 'place', tier: 'far', name: 'The First Anvil', text: 'Struck by the founder of the Hold. It still rings if you touch it.' },
-      { k: 'custom', tier: 'far', name: 'The Long Siege', text: 'The army at the gates has been there for eighty years. Some of them were born there.' },
-      { k: 'place', tier: 'far', name: 'The Collapsed Mine', text: 'Three hundred miners were lost. Their hammers can still be heard on quiet nights.' },
-      { k: 'place', tier: 'city', name: 'The Great Gate', text: 'Twenty feet of steel. It has not opened in a lifetime.' },
-      { k: 'place', tier: 'city', name: 'The Ration Hall', text: 'Where everyone eats together, at long tables, in shifts, under strict rules.' },
-      { k: 'custom', tier: 'city', name: 'The Hearth Oath', text: 'Every child swears at twelve to keep a fire burning in the Hold.' },
-      { k: 'person', tier: 'city', name: 'Gatewarden Brekka', text: 'Has never left her post. Her family brings her meals.' },
-      { k: 'custom', tier: 'city', name: 'The Song of Seams', text: 'Miners sing to find weak rock. Every tunnel has its own verse.' },
-      { k: 'custom', tier: 'city', name: 'Stonefall Night', text: 'When the mountain shifts, everyone holds hands in the dark until it stops.' },
-      { k: 'place', tier: 'home', name: 'The forge on the third deep', text: "Your family's forge, hot for six generations.", near: 'at the forge on the third deep' },
-      { k: 'place', tier: 'home', name: 'The vent-house', text: 'A cramped home by an air shaft. You learned to sleep through the wind.', near: 'in a vent-house by the air shafts' },
-      { k: 'person', tier: 'home', name: 'Your mother Hild', text: 'A smith who makes a new blade every time the siege takes someone.', rel: 'mother' },
-      { k: 'person', tier: 'home', name: 'Your friend Pell', text: 'A runner who knows every tunnel. Taught you to find your way in the dark.', rel: 'friend' },
-    ],
-  },
-};
 const REC_SIZE = 10, REC_MAX = 20, TIER_ORDER = { far: 0, city: 1, home: 2 };
 const loreName = e => e.name.replace(/^(The|Your) /, m => m.toLowerCase()); // mid-sentence: "the Drowned Lighthouse", "your sister Ilsa"
 const loreWho = e => e.name.replace(/^Your \S+ /, ''); // a person in the Halls: "Ilsa"
@@ -444,60 +165,6 @@ function sanitizeRec(r, type) {
 }
 
 // ---------- Gifts ----------
-// cat: world | cheat (max 1) | growth | combat | fortune | divine | bloodline | flaw (max 2)
-// lock: a Title id that unlocks it, 'echo' (bought with Echoes) or 'chain' (found in an event chain)
-const GIFTS = {
-  tidecaller: { name: 'Tidecaller', cat: 'world', cost: 1, desc: 'Heal 2 at the start of each of your turns.' },
-  deserter: { name: 'Legion Deserter', cat: 'world', cost: 1, desc: 'Start each fight with 15 Block.' },
-  warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of Poison damage dealt (max 30% from all sources).' },
-  hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Burn fades slower and Poison deals 25% more.' },
-  prodigy: { name: 'Arcane Prodigy', cat: 'world', cost: 1, desc: 'A 5th skill slot, but 10% less max HP.' },
-  runesmith: { name: 'Runesmith', cat: 'world', cost: 1, desc: 'Your gear merges at 2 copies instead of 3.' },
-  appraisal: { name: 'Absolute Appraisal', cat: 'cheat', cost: 4, desc: "See every opponent's full kit and their next 2 moves." },
-  monarch: { name: "Monarch's Domain", cat: 'cheat', cost: 6, desc: 'Every archetype you have counts 1 extra piece.' },
-  rewind: { name: 'Return by Death', cat: 'cheat', cost: 6, desc: 'Once per run, a loss rewinds to the start of that fight.' },
-  copycat: { name: 'Copycat', cat: 'cheat', cost: 5, desc: "Once per fight, use the opponent's last move as your own.", lock: 'mirror_breaker' },
-  swordsaint: { name: 'Sword Saint', cat: 'cheat', cost: 5, desc: 'Your basic Attack becomes S-rank: far stronger, and it ignores Block.', lock: 'giant_slayer' },
-  gacha: { name: 'Gacha Luck', cat: 'cheat', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo' },
-  fastlearner: { name: 'Fast Learner', cat: 'growth', cost: 3, desc: '+50% XP.' },
-  merger: { name: 'Quick Study', cat: 'growth', cost: 3, desc: 'Your first 3 merges need only 2 copies.' },
-  veteran: { name: 'Tournament Veteran', cat: 'growth', cost: 2, desc: 'Start with 6 more gold and an extra draft reroll.' },
-  latebloomer: { name: 'Late Bloomer', cat: 'growth', cost: 2, desc: 'Every stat starts 1 lower, but each level gives 3 stat points instead of 2.', lock: 'echo' },
-  affinity: { name: 'Skill Affinity', cat: 'growth', cost: 2, desc: "Your world's home archetype pieces cost 1 less (minimum 1).", lock: 'echo' },
-  catalyst: { name: 'Catalyst', cat: 'combat', cost: 3, desc: 'Reactions are 50% stronger.' },
-  berserker: { name: "Berserker's Blood", cat: 'combat', cost: 2, desc: '+30% damage below half HP.' },
-  ironbody: { name: 'Iron Body', cat: 'combat', cost: 2, desc: 'Start each fight with Block equal to 10% of your max HP.' },
-  glass: { name: 'Glass Cannon', cat: 'combat', cost: 2, desc: '+30% damage, 20% less max HP.' },
-  foresight: { name: 'Foresight', cat: 'combat', cost: 3, desc: "Always see the opponent's next 2 moves." },
-  firststrike: { name: 'First Strike', cat: 'combat', cost: 2, desc: 'Your first damaging skill each fight deals double.', lock: 'first_blood' },
-  thickskin: { name: 'Thick Skin', cat: 'combat', cost: 2, desc: 'Every hit you take deals 2 less damage.', lock: 'untouched' },
-  vampire: { name: 'Vampirism', cat: 'combat', cost: 3, desc: 'Heal 8% of all damage you deal.', lock: 'bloodthirsty' },
-  manaaffinity: { name: 'Mana Affinity', cat: 'combat', cost: 2, desc: 'Quick skills have a 1 turn shorter cooldown.', lock: 'spellweaver' },
-  lucky: { name: 'Lucky Star', cat: 'fortune', cost: 2, desc: '+10% critical chance and better shop odds.' },
-  golden: { name: 'Golden Touch', cat: 'fortune', cost: 3, desc: 'Interest cap rises from 3 to 5.' },
-  breath: { name: 'Second Breath', cat: 'fortune', cost: 3, desc: 'Once per run, survive a killing blow with 1 HP.' },
-  gambler: { name: 'Gambler', cat: 'fortune', cost: 2, desc: 'Winning a wager pays 15 gold instead of 10.', lock: 'high_roller' },
-  haggler: { name: 'Haggler', cat: 'fortune', cost: 2, desc: 'The first piece you buy each round costs 1 less.', lock: 'echo' },
-  treasure: { name: 'Treasure Sense', cat: 'fortune', cost: 2, desc: 'Beating a hard opponent also pays 5 gold.', lock: 'underdog' },
-  chosen_war: { name: 'Chosen of War', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the God of War: their gift arrives at once.' },
-  chosen_trick: { name: 'Chosen of the Trickster', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Trickster: their gift arrives at once.' },
-  chosen_ruin: { name: 'Chosen of Ruin', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the Goddess of Ruin: their gift arrives at once.' },
-  ironwill: { name: 'Iron Will', cat: 'bloodline', cost: 3, desc: 'Lose 1 fewer Heart per defeat (minimum 1).' },
-  dragon: { name: 'Dragon Blood', cat: 'bloodline', cost: 4, desc: '+15% max HP. Toxic Flare and Cauterise heal you 5.', lock: 'emberfall' },
-  elf: { name: 'Elf-touched', cat: 'bloodline', cost: 3, desc: '+10% dodge, and Bleed you apply +1.', lock: 'thornbane' },
-  demon: { name: 'Demon Blood', cat: 'bloodline', cost: 3, desc: '+15% damage, but healing is 20% weaker.', lock: 'comeback' },
-  lastwords: { name: 'Last Words', cat: 'bloodline', cost: 3, desc: 'Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP.', lock: 'chain' },
-  f_glass: { name: 'Glass Body', cat: 'flaw', cost: -2, desc: '20% less max HP.' },
-  f_marked: { name: 'Marked by the System', cat: 'flaw', cost: -2, desc: 'Opponents are 10% stronger.' },
-  f_cursed: { name: 'Cursed Luck', cat: 'flaw', cost: -2, desc: 'Shop prices +1.' },
-  f_debt: { name: 'Debt to the Trickster', cat: 'flaw', cost: -3, desc: 'Lose 10 gold at the start of rounds 3 and 6.' },
-  f_amnesia: { name: 'Amnesia', cat: 'flaw', cost: -1, desc: 'The Tournament Archive is sealed for this run.' },
-  f_sluggish: { name: 'Sluggish', cat: 'flaw', cost: -2, desc: 'Start every fight Weakened.' },
-  f_unlucky: { name: 'Unlucky', cat: 'flaw', cost: -1, desc: 'Rerolls cost 3 gold.' },
-};
-// Affinity Gifts are only offered as the Additional Gift: +1 piece to one archetype.
-Object.keys(ARCH).forEach(k => { GIFTS['aff_' + k] = { name: `${ARCH[k].name} Affinity`, cat: 'extra', cost: 0, desc: `Your ${ARCH[k].name} bonuses count 1 extra piece.`, arch: k }; });
-const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw' };
 const SIGILS = ['✦', '☾', '♜', '⚔', '❖', '✠'];
 const SIGIL_COLS = ['#d6a04f', '#72d0ff', '#e15b52', '#9fd86a', '#c27ce6', '#efe6d8'];
 function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank]; }
@@ -537,80 +204,7 @@ function rollStats(rng) {
   return s;
 }
 
-// ---------- Titles ----------
-// Earned for feats, kept forever. Equip one per run for a small passive. Some unlock Gifts.
-const TITLES = {
-  first_blood: { name: 'First Blood', cond: 'Win a fight in 2 turns or fewer.', desc: 'Your first damaging skill each fight deals 50% more.' },
-  untouched: { name: 'Untouched', cond: 'Win a fight without losing any HP.', desc: 'Start each fight with 8 Block.' },
-  giant_slayer: { name: 'Giant Slayer', cond: 'Beat an opponent with at least twice your max HP.', desc: '+15% damage to opponents with more max HP than you.' },
-  mirror_breaker: { name: 'Mirror Breaker', cond: 'Defeat the Masked Entrant.', desc: '+8% critical chance.' },
-  bloodthirsty: { name: 'Bloodthirsty', cond: 'Heal 60 HP in a single fight.', desc: 'Heal 5% of the damage you deal.' },
-  spellweaver: { name: 'Spellweaver', cond: 'Use 3 Quick skills in a single turn.', desc: 'After a Quick skill, your next skill deals 10% more.' },
-  high_roller: { name: 'High Roller', cond: 'Win 3 wagers in one run.', desc: 'Winning a wager pays 3 more gold.' },
-  underdog: { name: 'Underdog', cond: 'Beat a hard opponent.', desc: '+10% damage to hard opponents.' },
-  comeback: { name: 'Comeback Kid', cond: 'Win a fight with 10% HP or less.', desc: 'Below 25% HP, take 20% less damage.' },
-  alchemist: { name: 'Alchemist', cond: 'Trigger 3 reactions in a single fight.', desc: 'Reactions are 20% stronger.' },
-  executioner: { name: 'Executioner', cond: 'Land a single hit of 60 or more.', desc: 'Critical hits deal ×1.75 instead of ×1.5.' },
-  tidebreaker: { name: 'Tidebreaker', cond: 'World first: defeat the Leviathan Queen.', desc: 'Start each fight with 6 Block.', first: true },
-  emberfall: { name: 'Emberfall', cond: 'World first: defeat Emperor Kharros.', desc: 'Burn you apply +1.', first: true },
-  bonebreaker: { name: 'Bonebreaker', cond: 'World first: defeat the Bone Saint.', desc: 'Poison you apply +1.', first: true },
-  thornbane: { name: 'Thornbane', cond: 'World first: defeat the Thorn Mother.', desc: 'Bleed you apply +1.', first: true },
-  skyfall: { name: 'Skyfall', cond: 'World first: defeat the Archmage Who Fell Upward.', desc: '+5% critical chance and +5% dodge.', first: true },
-  forgebreaker: { name: 'Forgebreaker', cond: 'World first: defeat the Forge King.', desc: 'Always have 2 Thorns.', first: true },
-  ascendant: { name: 'Ascendant', cond: 'World first: merge a piece to ★3.', desc: '+5% damage.', first: true },
-  pathfinder: { name: 'Pathfinder', cond: 'World first: unlock a Hidden Path.', desc: 'Start each fight with 5 Block and heal 1 each turn.', first: true },
-  unbeaten: { name: 'Unbeaten', cond: 'World first: defeat the Undefeated.', desc: '+10% damage.', first: true },
-};
-const FINAL_TITLE = { leviathan: 'tidebreaker', kharros: 'emberfall', bone_saint: 'bonebreaker', thorn_mother: 'thornbane', archmage: 'skyfall', forge_king: 'forgebreaker', undefeated: 'unbeaten' };
-
-// ---------- System quests ----------
-const QUESTS = {
-  rival_noheal: { text: 'Defeat a rival without healing.', reward: 'rune', goal: 1 },
-  fast3: { text: 'Win 3 fights within 6 turns each.', reward: 'gold8', goal: 3 },
-  react6: { text: 'Trigger 6 reactions.', reward: 'piece', goal: 6 },
-  hard2: { text: 'Beat 2 hard opponents.', reward: 'heart', goal: 2 },
-  merge4: { text: 'Merge pieces 4 times.', reward: 'gold8', goal: 4 },
-  path5: { text: 'Have the System recognise your path by round 5.', reward: 'rune', goal: 1, by: 5 },
-  // hidden: revealed only when completed
-  h_bankrupt: { text: 'Bankrupt: leave the shop with 0 gold.', reward: 'gold5', goal: 1, hidden: true },
-  h_stun3: { text: 'Lightning Rod: Stun or Interrupt one opponent 3 times.', reward: 'rune', goal: 1, hidden: true },
-  h_overkill: { text: 'Overkill: finish an opponent with 30 more damage than needed.', reward: 'favour', goal: 1, hidden: true },
-  h_clutch: { text: 'Clutch: win with 10% HP or less.', reward: 'heart', goal: 1, hidden: true },
-  h_collector: { text: 'Collector: own three ★2 pieces at once.', reward: 'gold6', goal: 1, hidden: true },
-};
-const QUEST_REWARD = { rune: 'a rune', gold5: '5 gold', gold6: '6 gold', gold8: '8 gold', piece: 'a free B-rank piece', heart: '+1 max Heart', favour: '2 Favour with the God of War' };
-
-// ---------- Hidden Paths: 4+ pieces in two archetypes at once ----------
-const HIDDEN_PATHS = {
-  'pyre+venom': { name: 'Plague Flame', desc: 'Toxic Flare ignites all of the Poison, not half.', fx: { flareFull: 1 } },
-  'blade+reaper': { name: 'Butcher', desc: 'Heal half of the Bleed damage your opponent takes.', fx: { bleedHeal: 0.5 } },
-  'bastion+storm': { name: 'Thunder Wall', desc: 'When your Block absorbs a hit, 25% chance to Stun the attacker.', fx: { blockStun: 0.25 } },
-  'arcanist+pyre': { name: 'Spellfire', desc: 'Quick skills apply 3 Burn.', fx: { quickBurn: 3 } },
-  'reaper+zealot': { name: 'Last Rites', desc: 'Your healing also deals 30% of it as damage to the opponent.', fx: { healDmg: 0.3 } },
-  'blade+pyre': { name: 'Cinderblade', desc: 'Multi-hit skills apply 1 Burn per hit.', fx: { hitBurn: 1 } },
-  'blade+venom': { name: 'Viper Dance', desc: 'Every Bleed you apply also applies 2 Poison.', fx: { bleedPoison: 2 } },
-  'reaper+venom': { name: 'Plague Doctor', desc: 'Heal 25% of Poison damage dealt (max 30% from all sources).', fx: { poisonHeal: 0.25 } },
-  'bastion+zealot': { name: 'Paladin', desc: 'Healing also gives Block equal to half of it.', fx: { healBlock: 0.5 } },
-  'arcanist+storm': { name: 'Tempest Mage', desc: 'Damaging Quick skills have a 25% chance to Stun.', fx: { quickStun: 0.25 } },
-  'reaper+storm': { name: 'Warlord', desc: '+25% damage to Stunned or Weakened opponents.', fx: { vsDisabled: 0.25 } },
-  'arcanist+blade': { name: 'Shadow Dancer', desc: 'Each Quick skill also lets you Evade the next attack.', fx: { quickEvade: 1 } },
-  'bastion+pyre': { name: 'Ember Wall', desc: 'Thorns also apply 2 Burn.', fx: { thornBurn: 2 } },
-  'pyre+zealot': { name: 'Sunpriest', desc: 'Heal 30% of the Burn damage your opponent takes.', fx: { burnHeal: 0.3 } },
-  'storm+venom': { name: 'Hexblade', desc: 'Weaken you apply also applies 3 Poison.', fx: { weakPoison: 3 } },
-  'bastion+blade': { name: 'Duelist', desc: 'Thorns and Riposte deal 50% more.', fx: { thornMult: 1.5 } },
-  'blade+storm': { name: 'Lightning Blade', desc: 'Multi-hit skills Weaken the opponent for 1 turn.', fx: { multiWeaken: 1 } },
-  'blade+zealot': { name: 'Blood Saint', desc: 'Heal 3 whenever you apply Bleed.', fx: { healOnBleed: 3 } },
-  'arcanist+bastion': { name: 'Spellshield', desc: 'Quick skills also give 5 Block.', fx: { quickBlock: 5 } },
-  'pyre+reaper': { name: 'Funeral Pyre', desc: '+25% damage to Burning opponents below half HP.', fx: { burnExec: 0.25 } },
-  'pyre+storm': { name: 'Wildstorm', desc: 'Your Stuns and Interrupts also apply 5 Burn.', fx: { stunBurn: 5 } },
-  'bastion+venom': { name: 'Thornbark', desc: 'Thorns also apply 2 Poison.', fx: { thornPoison: 2 } },
-  'arcanist+venom': { name: 'Apothecary', desc: 'Quick skills apply 2 Poison.', fx: { quickPoison: 2 } },
-  'venom+zealot': { name: 'Plague Saint', desc: 'Each skill that heals you also applies 3 Poison.', fx: { healPoison: 3 } },
-  'arcanist+zealot': { name: 'Chronomancer', desc: 'Quick skills heal you 4.', fx: { quickHeal: 4 } },
-  'arcanist+reaper': { name: 'Soul Weaver', desc: 'Doom and Leech you apply are 40% stronger.', fx: { doomLeech: 0.4 } },
-  'bastion+reaper': { name: 'Juggernaut', desc: 'Deal 1% more damage for every 2 Block you have (up to 40%).', fx: { blockDmgPct: 1 } },
-  'storm+zealot': { name: 'Inquisitor', desc: 'Your Stuns and Interrupts heal you 8.', fx: { stunHeal: 8 } },
-};
+// ---------- Hidden Paths ----------
 function pathKey(a, b) { return [a, b].sort().join('+'); }
 function hiddenPathOf(counts) {
   const ks = Object.keys(counts).filter(k => counts[k] >= 4);
@@ -619,33 +213,7 @@ function hiddenPathOf(counts) {
   return best ? best.key : null;
 }
 
-// ---------- Enemies ----------
-const ENEMIES = {
-  goblin: { name: 'Goblin Pit-Fighter', style: 'Fast, dirty fighter', tier: 1, rank: 'E', hp: 40, skills: [{ n: 'Shiv', fx: { dmg: 6 } }, { n: 'Dirty Trick', fx: { dmg: 3, weaken: 1 } }], script: [0, 0, 1] },
-  golem: { name: 'Shield Golem', style: 'Walls up, hits hard', tier: 1, rank: 'E', hp: 52, skills: [{ n: 'Slam', fx: { dmg: 9 } }, { n: 'Stone Wall', fx: { block: 10 } }], script: [1, 0] },
-  drake: { name: 'Venom Drake', style: 'Poisons, then waits', tier: 1, rank: 'E', hp: 44, skills: [{ n: 'Bite', fx: { dmg: 5 } }, { n: 'Venom Spit', fx: { poison: 4 } }], script: [1, 0, 0] },
-  ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, rank: 'E', hp: 42, skills: [{ n: 'Claw', fx: { dmg: 3, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 5, lifesteal: 1 } }], script: [0, 0, 1] },
-  imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, rank: 'E', hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 4, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
-  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 18 } }, { n: 'Shove', fx: { dmg: 6 } }], script: [2, 0, 1] },
-  seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, rank: 'B', rival: true, hp: 80, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 16, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
-  grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, rank: 'D', rival: true, hp: 56, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Axe Swing', fx: { dmg: 10 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 5, hits: 3 } }], script: [0, 1, 0, 2] },
-  lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 4, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
-  masked: { name: 'The Masked Entrant', style: 'Copies your last skill', tier: 2, rival: true, hp: 62, skills: [{ n: 'Strike', fx: { dmg: 8 } }, { n: 'Mirror Form', fx: { mirror: 1 }, label: 'Copying your last skill' }], script: [0, 1] },
-  kaito: { name: 'Kaito Ren', style: 'Survivor of three tournaments: cleanses, and resists the skill you use most', tier: 2, rank: 'A', rival: true, hp: 70, kaito: true, skills: [{ n: 'Katana Draw', fx: { dmg: 9 } }, { n: 'Purifying Seal', fx: { cleanse: 1, block: 6 } }, { n: 'Iaido', fx: { dmg: 16 } }], script: [0, 1, 0, 2] },
-  calder: { name: 'Ser Calder', style: 'A knight who fights by the book', tier: 2, rank: 'C', rival: true, hp: 76, skills: [{ n: 'Lance', fx: { dmg: 14 } }, { n: 'Shield Wall', fx: { block: 10 } }, { n: 'Disgrace', fx: { dmg: 6, weaken: 2 } }], script: [0, 1, 0, 2] },
-  leviathan: { name: 'The Leviathan Queen', style: 'Floods the arena every 3rd turn, Weakening whoever has less Block', tier: 3, rank: 'A', final: true, hp: 165, flood: true, skills: [{ n: 'Tidal Lash', fx: { dmg: 22 } }, { n: 'Coral Armour', fx: { block: 16 } }, { n: 'Crushing Depths', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2] },
-  kharros: { name: 'Emperor Kharros the Ashen', style: 'Sets you alight every turn, enrages at half HP', tier: 3, rank: 'A', final: true, hp: 112, aura: 0.7, enrage: 0.5, enrageMult: 1.25, skills: [{ n: 'Ashen Blade', fx: { dmg: 10 } }, { n: 'Ashen Pyre', fx: { burn: 3 } }, { n: 'Imperial Guard', fx: { block: 12 } }], script: [0, 1, 2, 0] },
-  bone_saint: { name: 'The Bone Saint', style: 'Poisons, drains, and rises once at 30% HP', tier: 3, rank: 'A', final: true, hp: 135, revive: 0.3, skills: [{ n: 'Bone Lance', fx: { dmg: 10 } }, { n: 'Plague Hymn', fx: { poison: 3 } }, { n: 'Marrow Feast', fx: { dmg: 7, lifesteal: 0.5 } }], script: [1, 0, 2, 0] },
-  thorn_mother: { name: 'The Thorn Mother', style: 'Briars make you Bleed every turn; she heals', tier: 3, rank: 'A', final: true, hp: 92, briar: 1, skills: [{ n: 'Thorn Lash', fx: { dmg: 5, hits: 2 } }, { n: 'Bloom', fx: { heal: 14 } }, { n: 'Strangling Vine', fx: { dmg: 8, weaken: 1 } }], script: [0, 2, 0, 1] },
-  archmage: { name: 'The Archmage Who Fell Upward', style: 'Casts twice every 3rd turn', tier: 3, rank: 'A', final: true, hp: 85, twincast: 3, skills: [{ n: 'Arcane Bolt', fx: { dmg: 11 } }, { n: 'Mirror Ward', fx: { block: 14 } }, { n: 'Starfall', fx: { dmg: 4, hits: 3 } }], script: [0, 2, 1, 0] },
-  forge_king: { name: 'The Forge King', style: 'His Block never fades and grows every turn', tier: 3, rank: 'A', final: true, hp: 120, forge: 3, skills: [{ n: 'Molten Hammer', fx: { dmg: 6, blockDmg: 0.4 } }, { n: 'Anvil Guard', fx: { block: 10 } }, { n: 'Quench', fx: { dmg: 13 } }], script: [0, 1, 2, 0] },
-  // The Rank Trial examiner. Its rank letter is the grade it tests for, and it fights at that grade's world rank (see trialMul).
-  proctor: { name: 'Proctor', style: "The System's examiner. Pass the condition to be promoted", tier: 2, hp: 70, skills: [{ n: 'Marked Strike', fx: { dmg: 9 } }, { n: 'Assessment', fx: { block: 8 } }, { n: 'Pop Quiz', fx: { dmg: 5, weaken: 2 } }, { n: 'Final Exam', fx: { dmg: 7, hits: 2 }, label: 'Preparing the final exam' }], script: [0, 1, 2, 3] },
-  legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
-  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
-};
-const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute'];
-const RIVALS = ['seraphine', 'grukk', 'lyss', 'masked', 'kaito', 'calder'];
+// ---------- Rounds and Echo unlocks ----------
 const ROUNDS = 8;
 
 const UNLOCKS = {
@@ -2281,22 +1849,6 @@ function rivalReplies(run, f) {
   return RIVAL_REPLIES.map((r, i) => i).filter(i => checkMet(run, null, RIVAL_REPLIES[i].check)).slice(0, 2);
 }
 function rivalReply(run, f, i) { if (!rivalReplies(run, f).includes(i)) return null; f.replied = true; return RIVAL_REPLIES[i].go(f); }
-// below: you're below them; level; above: you outrank them; grudge: you've beaten them before
-const RIVAL_LINES = {
-  grukk: { below: 'Little rank. Grukk go easy. Grukk not know how, but try.', level: 'Same letter as Grukk! Good. Fair fight. Grukk still win.', above: 'Big letter. Grukk lose to big letters lots. Grukk not mind.', grudge: 'You beat Grukk before. Grukk remember. Grukk get up again.' },
-  calder: { below: "A lower rank. I'll observe the rules all the same.", level: 'An equal. Salute, and we begin properly.', above: 'Outranked. Then it will be an honour to lose correctly.', grudge: "You beat me last time. I've filed a complaint. Shall we?" },
-  seraphine: { below: "You're new. Shield up. I won't hold back, but I'll pray for you after.", level: 'A worthy rank. My faith against yours, then.', above: "So high already. Remember who you're fighting for.", grudge: "You beat me once. I've been praying about that." },
-  lyss: { below: "A low rank. You won't even notice the poison.", level: "Same grade. Then I'll have to actually try. How dull.", above: 'Ooh, a high rank. Did you drink your water today?', grudge: "You again. I've switched to a stronger poison." },
-  kaito: { below: "Your rank is low. Your habits are lower. I've seen them before.", level: "We're equals. That's never happened in this tournament.", above: "You outrank me. Then you've seen what I've seen. Be careful.", grudge: "You beat me. I've studied that fight. Show me something new." },
-};
-const FINAL_GREET = {
-  leviathan: '{champ}. Even the deep has heard of you. It will still take you.',
-  kharros: '{champ}. At last, an enemy worth a war. I will not insult you with mercy.',
-  bone_saint: '{champ}. I have prayed for you. Lie down, and let me finish the prayer.',
-  thorn_mother: '{champ}. The forest has been saving a place for you.',
-  archmage: "{champ}. Ah. You're the first thing I've had to look up at in centuries.",
-  forge_king: '{champ}. I had the gates reinforced when I heard you were coming.',
-};
 function rankAddress(meta, champ, n) { const L = RANK_ADDRESS[meta.rank.letter]; return L[(n || 0) % L.length].replace('{champ}', champ || 'Entrant'); }
 // The fight intro, rank against rank. Returns the lines to show after "[X enters the arena.]"; the System's own lines are bracketed.
 function rankIntro(run, meta, spec, foeName) {
