@@ -1246,6 +1246,7 @@ function useSkill(f, X, s, opt) {
     const bm = (Y.P.bleedMult || 1) * (X.marked > 0 ? 2 : 1);
     const bd = Math.round(X.bleed * bm); X.hp -= bd; X.bleed--; ev(f, { k: 'dot', side: X.side, amt: bd, kind: 'bleed' });
     if (!X.isPlayer) f.dealt['Bleed'] = (f.dealt['Bleed'] || 0) + bd; else f.tally.hurtBy['Bleed'] = (f.tally.hurtBy['Bleed'] || 0) + bd;
+    if (Y.P.bleedHeal) heal(f, Y, bd * Y.P.bleedHeal); // Butcher
     if (X.hp <= 0) { checkRevive(f, X); if (X.hp <= 0) return; }
   }
   if (fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: fx.selfDmg, kind: 'self' }); }
