@@ -593,6 +593,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (t('reaper') >= 1) { add('vsHalf', 0.25); set('reapPierce', 1); set('reapBlood', 0.15); } if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
   if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
   gearPieces.filter(Boolean).forEach(g => Object.entries(gearPas(g.id, g.star)).forEach(([k, v]) => { if (k === 'firstCrit' || k === 'firstStun' || k === 'firstEvade') set(k, 1); else add(k, k === 'stunDmg' || k === 'thornsAlways' || k === 'regen' || k === 'startBlock' ? Math.round(v * lm) : v); }));
+  if (P.goldDmg) add('dmgPct', Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10))); // per 10 gold held when the fight starts, up to +25%
   // Hidden Path
   const hp = hiddenPathOf(c);
   if (hp) Object.entries(HIDDEN_PATHS[hp].fx).forEach(([k, v]) => add(k, v));
@@ -626,6 +627,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (T === 'bloodthirsty') add('lifesteal', 0.05);
   if (T === 'spellweaver') add('afterQuick', 0.1);
   if (T === 'underdog') add('vsHard', 0.1);
+  if (T === 'rank_is_just_a_letter') add('vsHigherRank', 0.1);
   if (T === 'comeback') set('lowDR', 0.2);
   if (T === 'alchemist') P.reactMult = (P.reactMult || 1) * 1.2;
   if (T === 'executioner') set('critMult', 1.75);
@@ -656,7 +658,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
-function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks }); }
+function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold }); }
 
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
@@ -1043,6 +1045,8 @@ function buildSnapEnemy(snap, p, hm, run) {
 function newFight(run, rng) {
   const spec = currentSpec(run);
   const A = buildPlayer(run), B = buildEnemy(run, spec);
+  // How many rank letters the opponent stands above the Entrant (Entrant Rank), for Rank Is Just a Letter
+  const foeRank = !run.practice && META && META.rank && specRank(spec, META); B.rankUp = foeRank ? rankIdx(foeRank) - rankIdx(META.rank.letter) : 0;
   const f = {
     rng: stream(run, 'fight', rng) || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
     tally: { burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
@@ -1082,6 +1086,7 @@ function dmgMult(f, X, Y) {
     if (Y.brokenT > 0) m *= 1.5;
     if (P.vsBigger && Y.maxHp > X.maxHp) m *= 1 + P.vsBigger;
     if (P.vsHard && Y.hard) m *= 1 + P.vsHard;
+    if (P.vsHigherRank && Y.rankUp > 0) m *= 1 + P.vsHigherRank;
     if (P.vsDisabled && (Y.stun > 0 || Y.weaken > 0)) m *= 1 + P.vsDisabled;
     if (P.burnExec && Y.burn > 0 && half(Y)) m *= 1 + P.burnExec;
   }
@@ -1583,6 +1588,7 @@ function resolveFight(run, f, meta, rng) {
     if (f.B.maxHp >= A.maxHp * 2) earnTitle(run, 'giant_slayer', msgs);
     if (spec.id === 'masked') earnTitle(run, 'mirror_breaker', msgs);
     if (spec.hard) earnTitle(run, 'underdog', msgs);
+    if (f.B.rankUp >= 2) earnTitle(run, 'rank_is_just_a_letter', msgs);
     if (A.hp <= A.maxHp * 0.1) earnTitle(run, 'comeback', msgs);
     if (FINAL_TITLE[spec.id]) worldFirst(run, 'final_' + spec.id, `has defeated ${ENEMIES[spec.id].name} in ${f.turn} turn${f.turn === 1 ? '' : 's'}.`, FINAL_TITLE[spec.id], msgs);
   }
