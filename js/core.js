@@ -11,7 +11,7 @@ const VERSION = 5;
 const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 
 // ---------- Archetypes ----------
-function alliesOf(k) { const i = WHEEL.indexOf(k); return [WHEEL[(i + 7) % 8], WHEEL[(i + 1) % 8]]; }
+function alliesOf(k) { const i = WHEEL.indexOf(k), n = WHEEL.length; return [WHEEL[(i + n - 1) % n], WHEEL[(i + 1) % n]]; }
 function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 
 // ---------- Gear: stats + one passive, no active skill ----------
@@ -284,7 +284,7 @@ function genWorld(rng, cap) {
 function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng, cap); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
 
 // ---------- Run ----------
-// setup: { name, sigil, color, stats, gifts:[], patron: 'war'|'trick'|'ruin'|'none' }
+// setup: { name, sigil, color, stats, gifts:[], patron: a GODS id or 'none' }
 function newRun(world, setup, meta, rng) {
   bindMeta(meta);
   const U = setup.seed ? {} : meta.unlocks, rs = rng || (setup.seed ? seedRng(setup.seed + ':setup') : undefined);
@@ -298,7 +298,7 @@ function newRun(world, setup, meta, rng) {
     stats: Object.assign({}, setup.stats), statPts: 0, level: 1, xp: 0,
     gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
-    favour: { war: 0, trick: 0, ruin: 0 }, gifted: { war: 0, trick: 0, ruin: 0 },
+    favour: godZeros(), gifted: godZeros(),
     slots: setup.gifts.includes('prodigy') ? 5 : 4, bar: [], gear: { weapon: null, armour: null, accessory: null }, bench: [], uid: 0,
     shop: null, locks: null, bonusSlot: null, merges: setup.gifts.includes('merger') ? 3 : 0,
     round: 1, losses: 0, elite: false, eliteIdx: 0, wins: 0, eliteWins: 0, hearts: 10, maxHearts: 10,
@@ -326,7 +326,7 @@ function newRun(world, setup, meta, rng) {
     if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
   }
   run.draft = rollDraft(run, stream(run, 'draft', rng));
-  ['war', 'trick', 'ruin'].forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
+  Object.keys(GODS).forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
   run.hp = maxHp(run);
   return run;
 }
@@ -652,9 +652,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   if (M.AGI) set('firstEvade', 1);
   if (M.INT) add('firstHit', 0.3);
   const F = favourTiers || {};
-  if (F.war >= 2) add('dmgPct', 0.15);
-  if (F.trick >= 2) add('dotPlus', 2);
-  if (F.ruin >= 2) add('lowHpDmg', 0.3);
+  Object.keys(GODS).forEach(g => { if (F[g] >= 2) Object.entries(GODS[g].bless).forEach(([k, v]) => add(k, v)); });
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
@@ -736,16 +734,18 @@ function makeWager(run, rng) {
   const keys = Object.keys(WAGERS).filter(k => k !== 'stop' || canStop(run));
   return { god, key: pick(keys, rng) };
 }
+// A god added after a run started has no Favour entry in that save yet, hence the || 0
+function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); return o; }
 function addFavour(run, god, n, meta, msgs, rng) {
-  run.favour[god] += n;
+  run.favour[god] = (run.favour[god] || 0) + n;
   msgs && msgs.push({ t: 'favour', text: `[${GODS[god].name} is pleased. Favour +${n}.]` });
-  if (run.favour[god] >= 4 && run.gifted[god] < 1) {
+  if (run.favour[god] >= 4 && !(run.gifted[god] >= 1)) {
     run.gifted[god] = 1;
     const pool = poolIds(run).filter(id => pieceDef(id).rank === 'B' && pieceDef(id).tags.some(t => GODS[god].arch.includes(t)));
     const id = pick(pool.length ? pool : poolIds(run).filter(x => pieceDef(x).rank === 'B'), rng);
     if (id) { msgs && msgs.push({ t: 'favour', text: `[Gift from ${GODS[god].name}: ${pieceDef(id).name}.]` }); addPiece(run, id, [], msgs); }
   }
-  if (run.favour[god] >= 8 && run.gifted[god] < 2) { run.gifted[god] = 2; msgs && msgs.push({ t: 'favour', text: `[Blessing of ${GODS[god].name}: ${GODS[god].blessing}]` }); }
+  if (run.favour[god] >= 8 && !(run.gifted[god] >= 2)) { run.gifted[god] = 2; msgs && msgs.push({ t: 'favour', text: `[Blessing of ${GODS[god].name}: ${GODS[god].blessing}]` }); }
 }
 
 // ---------- Between rounds ----------
@@ -766,68 +766,8 @@ function rollDistricts(run, rng) {
 }
 function infirmary(run) { const f = (run.world.mod === 'famine' ? 0.25 : 0.5) + (districtUp(run, 'infirmary') ? 0.15 : 0); const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
 function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + 2); restoreRecord(run, run.hearts - b, msgs); return run.hearts - b; }
-// Events. Chains set flags that later events check: they come back on their own a round or two later.
-// opts: { label, desc, can(run), check, go(run, meta, rng, msgs), reveal }
-// label is an action the player can take and desc a hint. Costs show only when paying is the action itself (Pay 6 gold);
-// any other consequence is revealed after the choice. An option whose can() fails is left out, never shown greyed out
-// In chains, desc is a hint and the reward stays hidden: reveal (a string or fn(run)) is shown after choosing
-// when go() adds no message of its own. Costs always stay visible in the label or desc.
-const EVENTS = {
-  merchant: { title: 'Hooded merchant', text: () => 'A merchant in the tunnels sells forbidden techniques. The price is a little of your life.', opts: [
-    { label: 'Buy a technique', desc: 'Whatever he has under the hood.', go: (run, meta, rng, msgs) => { lose(run, 0.1, msgs, 'The price is paid in blood.'); merchantPiece(run, rng, msgs, 1); } },
-    { check: { stat: 'INT', hard: true }, label: 'Inspect his stock', desc: 'Half of these scrolls are fakes.', go: (run, meta, rng, msgs) => { lose(run, 0.1, msgs, 'You picked the real one. The price is still blood.'); merchantPiece(run, rng, msgs, 2); } },
-    { check: { luck: true }, label: 'Rummage through the crates', desc: 'He is not watching them.', go: (run, meta, rng, msgs) => { msgs.push({ t: 'sys', text: '[Nobody saw. No price was paid.]' }); merchantPiece(run, rng, msgs, 1); } },
-    { label: 'Walk away', desc: 'Nothing happens', go: () => { } }] },
-  crowd: { title: 'The crowd chants', text: () => 'The crowd is chanting your name. The gods are listening.', opts: [
-    { label: 'Show off', desc: 'Give the gods something to watch.', go: (run, meta, rng, msgs) => { const b = run.hp; run.hp = Math.max(1, run.hp - 8); msgs.push({ t: 'loss', text: `[You overdid it. −${b - run.hp} HP.]` }); addFavour(run, pick(Object.keys(GODS), rng), 2, meta, msgs, rng); } },
-    { check: { stat: 'STR' }, label: 'Lift the arena gate one-handed', desc: 'Give them a show they can feel.', go: (run, meta, rng, msgs) => addFavour(run, 'war', 2, meta, msgs, rng) },
-    { check: { stat: 'AGI' }, label: 'Run the arena wall', desc: 'Upside down, if possible.', go: (run, meta, rng, msgs) => addFavour(run, 'trick', 2, meta, msgs, rng) },
-    { label: 'Wave and rest', desc: 'Let them chant. You sit down.', go: (run, meta, rng, msgs) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + 10); msgs.push({ t: 'loot', text: `[Rested. +${run.hp - b} HP.]` }); } }] },
-  // --- The Official ---
-  official_1: { chain: 'official', title: 'A quiet word', text: () => 'A tournament official offers to "adjust" your next match. He smiles too much.', opts: [
-    { label: 'Pay 6 gold', desc: 'He will "adjust" your next match.', reveal: '[Your next opponent starts with 20% less HP.]', can: run => run.gold >= 6, go: run => { run.gold -= 6; run.nextFlags.bribe = true; run.chains.official = { step: 'bribed', due: run.round + 2 }; } },
-    { check: { stat: 'INT', hard: true }, label: 'Quote the rules back at him', desc: 'Section 9, on officials.', reveal: '[He adjusts your match for free, and forgets your name. Your next opponent starts with 20% less HP.]', go: run => { run.nextFlags.bribe = true; run.chains.official = 'done'; } },
-    { check: { favour: 'war' }, label: '"Adjust it, or be adjusted."', desc: 'Say it the way War would.', go: (run, meta, rng, msgs) => { msgs.push({ t: 'sys', text: '[He adjusts it. Your next opponent starts with 20% less HP.]' }); run.nextFlags.bribe = true; run.chains.official = 'done'; addFavour(run, 'war', 1, meta, msgs, rng); } },
-    { label: 'Refuse', desc: 'Someone up there might respect that.', go: (run, meta, rng, msgs) => { addFavour(run, 'war', 2, meta, msgs, rng); run.chains.official = { step: 'refused', due: run.round + 2 }; } }] },
-  official_bribed: { chain: 'official', title: 'Blackmail', text: () => 'The official is back. He has a ledger with your name in it, and the System would love to read it.', opts: [
-    { label: 'Pay him 8 gold', desc: 'He goes away. For now.', can: run => run.gold >= 8, go: run => { run.gold -= 8; run.chains.official = 'done'; } },
-    { check: { stat: 'STR' }, label: 'Remind him how matches end', desc: 'Up close.', reveal: '[He remembers somewhere else to be. The ledger goes with him.]', go: run => { run.chains.official = 'done'; } },
-    { check: { stat: 'INT', hard: true }, label: 'Produce his own ledger', desc: 'You kept notes too.', reveal: '[He pays for your silence. +8 gold.]', go: run => { run.gold += 8; run.chains.official = 'done'; } },
-    { label: 'Let him talk', desc: 'Let the System read his ledger.', go: (run, meta, rng, msgs) => { msgs.push({ t: 'loss', text: '[Scandal recorded. Your world pays for it.]' }); if (run.hearts > 1) { run.hearts--; eraseRecord(run, 1, msgs); } run.chains.official = 'done'; } }] },
-  official_refused: { chain: 'official', title: 'The honest official', text: () => 'The official you refused finds you after a match. "Nobody turns me down. I respect that." He slips you a folded page: notes on how the Final Champion fights.', opts: [
-    { label: 'Take the notes', desc: 'A folded page about the final.', go: (run, meta, rng, msgs) => { run.chains.official = 'tip'; msgs.push({ t: 'sys', text: "[Final Champion notes acquired. In the final, you'll see their next 2 moves.]" }); } }] },
-  // --- The Poisoner ---
-  poisoner_1: { chain: 'poisoner', title: 'Tampered water', text: () => 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
-    { label: 'Drink it anyway', desc: 'It might be worth it.', reveal: '[+2 VIT. You start the next fight with 4 Poison.]', go: run => { run.stats.VIT += 2; run.nextFlags.poison = 4; run.chains.poisoner = 'done'; } },
-    { label: 'Investigate', desc: 'Find out who did it.', reveal: '[Inquiries made. A name will surface.]', go: (run, meta, rng) => poisonerFound(run, rng) },
-    { check: { stat: 'VIT' }, label: "Drink it. You've had worse", desc: 'Your stomach has survived the tournament food.', reveal: '[+2 VIT. The poison found nothing to work with.]', go: run => { run.stats.VIT += 2; run.chains.poisoner = 'done'; } },
-    { check: { stat: 'INT', hard: true }, label: 'Identify the herb', desc: 'You know this smell.', reveal: '[Nightroot. You coat your blade with it. Your next opponent starts with 6 Poison.]', go: run => { run.nextFlags.foePoison = 6; run.chains.poisoner = 'done'; } },
-    { check: { favour: 'ruin' }, label: 'Curse whoever did it', desc: 'Ruin knows their name already.', go: (run, meta, rng, msgs) => { const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.sabotage = who; run.chains.poisoner = 'done'; msgs.push({ t: 'sys', text: `[${ENEMIES[who].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]` }); addFavour(run, 'ruin', 1, meta, msgs, rng); } },
-    { label: 'Pour it out', desc: 'Nothing happens', go: run => { run.chains.poisoner = 'done'; } }] },
-  poisoner_found: { chain: 'poisoner', title: 'The poisoner', text: run => `A stable boy talks for a coin: it was ${ENEMIES[run.chains.poisoner.who].name}'s people who tampered with your water.`, opts: [
-    { label: 'Expose them to the crowd', desc: 'Let the crowd judge them. Someone will enjoy it.', go: (run, meta, rng, msgs) => { addFavour(run, 'trick', 3, meta, msgs, rng); run.chains.poisoner = 'done'; } },
-    { check: { stat: 'AGI', hard: true }, label: 'Swap their water', desc: 'And check their tent while you are there.', reveal: run => `[${ENEMIES[run.sabotage].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP. +5 gold from their tent.]`, go: run => { run.sabotage = run.chains.poisoner.who; run.gold += 5; run.chains.poisoner = 'done'; } },
-    { check: { favour: 'trick' }, label: 'Frame another entrant', desc: 'The Trickster has a candidate.', go: (run, meta, rng, msgs) => { const who = run.chains.poisoner.who, other = pick(RIVALS.filter(r => r !== who && !run.met.includes(r)), rng) || who; run.sabotage = other; run.chains.poisoner = 'done'; msgs.push({ t: 'sys', text: `[${ENEMIES[other].name} takes the blame. They will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]` }); addFavour(run, 'trick', 3, meta, msgs, rng); } },
-    { label: 'Return the favour', desc: 'A taste of their own medicine.', reveal: run => `[${ENEMIES[run.sabotage].name} will appear among your next rivals, Weakened for 3 turns and with 15% less HP.]`, go: run => { run.sabotage = run.chains.poisoner.who; run.chains.poisoner = 'done'; } }] },
-  // --- The Letter ---
-  letter_1: { chain: 'letter', title: 'A letter from the Erased', text: () => 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
-    { label: 'Read it', desc: 'Follow the map.', go: (run, meta, rng, msgs) => { const k = pick(STATS, rng); run.stats[k]++; msgs.push({ t: 'sys', text: `[+1 ${k}]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
-    { check: { stat: 'INT' }, label: 'Decipher the margins', desc: 'There is a second letter under the first.', go: (run, meta, rng, msgs) => { const ks = shuffle(STATS, rng).slice(0, 2); ks.forEach(k => run.stats[k]++); msgs.push({ t: 'sys', text: `[+1 ${ks[0]}, +1 ${ks[1]}. The map is yours.]` }); run.chains.letter = { step: 'map', due: run.round + 1 }; } },
-    { label: 'Sell it', desc: 'Someone will pay for a dead world\'s secrets.', reveal: '[Sold. +5 gold.]', go: run => { run.gold += 5; run.chains.letter = 'done'; } }] },
-  letter_map: { chain: 'letter', title: 'The old quarter', text: () => "The letter's map leads to a rusted grate in the old quarter. A bored sentry leans on it.", opts: [
-    { label: 'Bribe the sentry (5 gold)', desc: 'Go through', can: run => run.gold >= 5, go: run => { run.gold -= 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { label: 'Sneak past', desc: 'Wait for him to look away.', go: (run, meta, rng, msgs) => { lose(run, 0.15, msgs, 'He looked back. You got through anyway.'); run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { check: { stat: 'STR' }, label: 'Force the grate', desc: 'Rust is only a suggestion.', reveal: '[The grate gives. The sentry decides he saw nothing.]', go: run => { run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { check: { stat: 'AGI' }, label: 'Slip past the sentry', desc: 'Between one yawn and the next.', reveal: '[Through, unseen.]', go: run => { run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { check: { luck: true }, label: "There's another way in", desc: 'A loose stone, just there.', reveal: '[Through, and someone dropped a purse on the way. +5 gold.]', go: run => { run.gold += 5; run.chains.letter = { step: 'cache', due: run.round + 1 }; } },
-    { label: 'Give up', desc: 'Turn back. The map is lost.', go: run => { run.chains.letter = 'done'; } }] },
-  letter_cache: { chain: 'letter', title: 'The cache', text: () => "Behind the grate: a box with the Erased champion's last possession, and a note. [I lost. Make sure it meant something.]", opts: [
-    { label: 'Take it', desc: 'Whatever it is, it was theirs.', go: (run, meta, rng, msgs) => {
-      run.chains.letter = 'done';
-      if (meta) { meta.found = meta.found || {}; meta.found.lastwords = true; }
-      if (!hasGift(run, 'lastwords')) { run.gifts.push('lastwords'); msgs.push({ t: 'class', text: '[Hidden Gift acquired: Last Words.]' }); } else { run.gold += 10; msgs.push({ t: 'loot', text: '[+10 gold]' }); }
-    } }] },
-};
+// Events live in js/content/events/ (the format is described in js/content/events.js). Chains set run.chains[chain],
+// and a { step, due } there brings back the chain's next event on that round.
 // A consequence revealed after the choice: lose a share of max HP and say how much
 function lose(run, f, msgs, text) { const b = run.hp; run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * f)); msgs.push({ t: 'loss', text: `[${text} −${b - run.hp} HP.]` }); }
 function merchantPiece(run, rng, msgs, tries) {
@@ -835,11 +775,19 @@ function merchantPiece(run, rng, msgs, tries) {
   let id = pick(pool, rng); for (let k = 1; k < tries; k++) { const o = pick(pool, rng); if (pieceDef(o).rank === 'B') id = o; }
   msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs);
 }
-function poisonerFound(run, rng) { const who = pick(RIVALS.filter(r => !run.met.includes(r)), rng) || 'lyss'; run.chains.poisoner = { step: 'found', who, due: run.round + 1 }; }
-const CHAIN_STARTERS = { official: 'official_1', poisoner: 'poisoner_1', letter: 'letter_1' };
+// What an option's go(run, h) can use, since content cannot call the rules directly
+function eventKit(run, meta, rng, msgs) {
+  return {
+    meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
+    lose: (f, text) => lose(run, f, msgs, text), piece: tries => merchantPiece(run, rng, msgs, tries), eraseRecord: n => eraseRecord(run, n, msgs),
+    maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
+  };
+}
+function eventText(run, key) { const t = EVENTS[key].text; return typeof t === 'function' ? t(run) : t; }
+const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
-  const keys = ['merchant', 'crowd'].concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
-  const w = keys.map(k => EVENTS[k].chain ? 3 : 1);
+  const keys = Object.keys(EVENTS).filter(k => !EVENTS[k].chain).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
+  const w = keys.map(k => EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1);
   return wpick(keys, w, rng);
 }
 function dueChainEvents(run) {
@@ -865,7 +813,7 @@ function pushEvent(run, key, rng) {
 // The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines (hard and god lines first)
 function eventOpts(run, key) {
   const E = EVENTS[key]; if (!E) return [];
-  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && (!o.check || checkMet(run, key, o.check)); });
+  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && (!o.check || checkMet(run, key, o.check)); });
   const w = c => c.hard || c.favour ? 2 : c.luck ? 1 : 0;
   const lines = ok.filter(i => E.opts[i].check).sort((a, b) => w(E.opts[b].check) - w(E.opts[a].check));
   const cut = lines.slice(MAX_STAT_LINES);
@@ -876,10 +824,18 @@ function eventOpt(run, key, idx) { return eventOpts(run, key).includes(idx) ? EV
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
-  msgs = msgs || []; const before = msgs.length;
-  o.go(run, meta, stream(run, 'event', rng), msgs); notePick(run, 'e:' + key + '.' + idx);
+  msgs = msgs || []; const before = msgs.length, T = o.then || {}, r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
+  if (o.pay) run.gold -= o.pay;
+  if (T.gold) run.gold += T.gold;
+  Object.entries(T.stats || {}).forEach(([k, v]) => run.stats[k] += v);
+  Object.assign(run.nextFlags, T.next);
+  if (o.go) o.go(run, h);
+  const c = EVENTS[key].chain;
+  if (T.chain) run.chains[c] = typeof T.chain === 'string' ? T.chain : { step: T.chain.step, due: run.round + T.chain.after };
+  notePick(run, 'e:' + key + '.' + idx);
   if (run.luck) delete run.luck[key];
   if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
+  Object.entries(T.favour || {}).forEach(([g, n]) => h.favour(g, n));
   return true;
 }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -1694,7 +1650,7 @@ function runSummary(run, meta, outcome, now) {
   return {
     day: dailyDate(now), at: now, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
     world: String(run.world.type).slice(0, 16), wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? key(meta.rank.letter, 3) : null, path: key(run.path, 16), hidden: key(run.hiddenPath, 24),
-    patron: ['war', 'trick', 'ruin'].includes(run.patron) ? run.patron : 'none', gifts: (run.gifts || []).slice(0, 12).map(k => String(k).slice(0, 24)), title: key(run.title, 24),
+    patron: Object.keys(GODS).includes(run.patron) ? run.patron : 'none', gifts: (run.gifts || []).slice(0, 12).map(k => String(k).slice(0, 24)), title: key(run.title, 24),
     round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), maxHearts: int(run.maxHearts || 10, 0, 20),
     level: int(run.level, 1, 9), turns: int(H.reduce((a, h) => a + (h.turns || 0), 0), 0, 9999),
     mins: run.t0 ? int((now - run.t0) / 6e4, 0, 1440) : null,
@@ -1841,10 +1797,8 @@ const RIVAL_REPLIES = [
   { check: { stat: 'INT', hard: true }, label: 'Read their stance', go: f => { f.foresight = true; return `[You can read ${f.B.name} now. Their next 2 moves are shown.]`; } },
   { check: { stat: 'AGI', hard: true }, label: 'Feint', go: f => { f.A.evade += 1; return `[${f.B.name} bites on the feint. You will evade their next attack.]`; } },
   { check: { stat: 'VIT', hard: true }, label: '"Hit me, then."', go: f => { const b = Math.round(f.A.maxHp * 0.1); f.A.block += b; return `[You plant your feet. +${b} Block.]`; } },
-  { check: { favour: 'war' }, label: '"War is watching."', go: f => { f.A.empower = Math.max(f.A.empower, 2); return '[War agrees. You are Empowered.]'; } },
-  { check: { favour: 'trick' }, label: '"Your laces are undone."', go: f => { f.A.critNext = true; return `[${f.B.name} looks down. Your next hit is a critical.]`; } },
-  { check: { favour: 'ruin' }, label: '"Your world is next."', go: f => { const b = Math.max(5, Math.round(f.B.maxHp * 0.04)); f.B.burn += b; return `[Ruin hears you. ${f.B.name} burns: ${b} Burn.]`; } },
-];
+  // then one line per god, from GODS (js/content/gods.js)
+].concat(Object.entries(GODS).map(([g, G]) => ({ check: { favour: g }, label: G.reply.label, go: G.reply.go })));
 function rivalReplies(run, f) {
   if (!f || f.spec.kind !== 'rival' || f.replied || f.turn > 1 || f.phase !== 'player' || run.practice) return [];
   return RIVAL_REPLIES.map((r, i) => i).filter(i => checkMet(run, null, RIVAL_REPLIES[i].check)).slice(0, 2);
@@ -1914,7 +1868,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
