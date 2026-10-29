@@ -382,6 +382,8 @@
  "events": [
   "merchant",
   "crowd",
+  "large_chest",
+  "field_test",
   "official_1",
   "official_bribed",
   "official_refused",
@@ -399,6 +401,8 @@
  "eventOptions": {
   "merchant": 4,
   "crowd": 4,
+  "large_chest": 4,
+  "field_test": 3,
   "official_1": 4,
   "official_bribed": 4,
   "official_refused": 1,
