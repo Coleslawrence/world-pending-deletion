@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: archetypes, skills, gear, gods, world packs, enemies, Gifts, Titles, quests and Hidden Paths. Events, wagers, districts and runes are still in `js/core.js`, because their results are written as code.
+All of the game's content lives in `js/content/`: archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
 
 ## Where things go
 
@@ -10,8 +10,10 @@ All of the game's content lives in `js/content/`: archetypes, skills, gear, gods
 | Gear | `js/content/gear.js` |
 | An archetype | `js/content/archetypes.js` (the entry, the wheel), its skills file, a colour in `css/style.css`, a Hidden Path for every pair, `STAT_INFO` in `base.js` |
 | A world type | A new pack in `js/content/worlds/` (the world, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
-| A god | `js/content/gods.js`; the gods are also named in code in a few places until they become data |
-| An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS` |
+| A god | `js/content/gods.js` (its archetypes, blessing and rival reply line) and a `chosen_<id>` divine Gift in `gifts.js` |
+| An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS`. Boss mechanics are fields from the enemy mechanics list below |
+| An Undercity event | `js/content/events/undercity.js` |
+| An event chain | A new file in `js/content/events/`: its `CHAINS` entry and one event per step. The format is described at the top of `js/content/events.js` |
 | A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js` |
 
 A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`.
@@ -21,8 +23,10 @@ A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an e
 - **Content uses only content.** Files in `js/content/` may use each other and `base.js`, never anything from `js/core.js`. They load before it.
 - **Ids are permanent.** Saves, shared champions and the Halls store them. Rename the display name freely; never change or remove an id.
 - **World Record pools only grow at the end.** Runs store pool positions, so never reorder, edit or delete an entry, a role or a promise.
+- **Event options keep their places.** Run summaries store the option picked by its position, so add new options at the end and never remove one.
+- **Event outcomes are data where they can be.** `pay`, and `then` (gold, stats, next-fight flags, the chain's next step, Favour) cover most options. Anything else goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
-- **Every choice can be picked.** An event always keeps one option with no condition. Options the player can't take are left out, never shown greyed out.
+- **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
 - **Player text follows the style guide:** British spelling, no em-dashes, one name for one thing, and the length limits for one phone screen.
 
@@ -32,11 +36,15 @@ Every pull request runs these (`.github/workflows/checks.yml`):
 
 | Check | Run it yourself | Fails when |
 | --- | --- | --- |
-| Content checker | `node tools/check-content.js` | A content file isn't loaded or uses `core.js`; an id is removed; a World Record pool is reordered; a field is unknown or missing; a reference points at nothing; an effect key isn't one the engine reads; an event could show no options; text breaks the style guide; two things share a name |
+| Content checker | `node tools/check-content.js` | A content file isn't loaded or uses `core.js`; an id is removed; a World Record pool is reordered; a field is unknown or missing; a reference points at nothing; an effect key isn't one the engine reads; an event could show no options, hides a cost, or loses an option; text breaks the style guide; two things share a name |
 | Smoke sim | `node tools/stats.js 200 --seed 1`, `node tools/daily.js 2026-11-01`, `node tools/record.js` | The game crashes in play, or Pending World or the World Record checks break |
 | Balance gate | `node tools/balance-gate.js BASE_DIR .` | The overall spared rate moves more than 3 points, or any archetype as the bot's main moves more than 6. Label the pull request `balance-change` when moving the numbers is the point: the gate then only reports |
 
 After adding content, run `node tools/check-content.js --write`. It records the new ids in `tools/content-ids.json` and rewrites the effect lists below. Commit both.
+
+## Archetypes and the wheel
+
+`WHEEL` in `archetypes.js` sets the order of the archetype wheel: an archetype's allies are its neighbours on it. A new archetype goes into the wheel where it should sit, and the wheel grows with it.
 
 ## The effect menu
 
@@ -154,6 +162,14 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `thornPoison` | 1 | Thornbark (2) |
 | `vsDisabled` | 1 | Warlord (0.25) |
 | `weakPoison` | 1 | Hexblade (3) |
+
+### God blessings (`bless`, at 8 Favour)
+
+| Key | Used | Examples (value) |
+| --- | --- | --- |
+| `dmgPct` | 1 | The God of War (0.15) |
+| `dotPlus` | 1 | The Trickster (2) |
+| `lowHpDmg` | 1 | The Goddess of Ruin (0.3) |
 
 ### Enemy mechanics (fields on the enemy)
 

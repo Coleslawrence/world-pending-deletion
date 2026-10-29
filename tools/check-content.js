@@ -3,14 +3,14 @@
 //   node tools/check-content.js --write   # after adding content: records the new ids and rewrites the effect lists in docs/CONTENT.md
 // Checks that content files are all loaded and never call core.js; ids are well formed and never removed, and World Record
 // pools only grow at the end; every field is known and every reference points at something real; every effect key is one
-// the engine reads; every event keeps an option anyone can take; player text follows the style guide (British spelling,
+// the engine reads; every event keeps an option anyone can take, and its costs are in its words; player text follows the style guide (British spelling,
 // no em-dashes, length limits); and no two player-facing things share a name.
 'use strict';
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES })');
+const C = vm.runInThisContext('({ STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -31,12 +31,25 @@ listed.filter(f => !onDisk.includes(f)).forEach(f => err(f, 'listed in index.htm
 const box = vm.createContext({});
 listed.filter(f => onDisk.includes(f)).forEach(f => { try { vm.runInContext(read(f), box, { filename: f }); } catch (e) { err(f, 'fails without core.js (content may use only js/content/): ' + e.message); } });
 try { const any = new Proxy({}, { get: () => 2 }); Object.entries(vm.runInContext('GEAR', box)).forEach(([k, g]) => { try { g.text(any); } catch (e) { err('gear ' + k, 'text uses something outside js/content/: ' + e.message); } }); } catch (e) { /* reported above */ }
+// Event and reply functions run against a stand-in run and helpers; only a name content can't see is reported
+const stub = () => new Proxy(function () { }, { get: (_, k) => k === Symbol.toPrimitive ? () => 2 : k === 'filter' ? () => [] : stub(), set: () => true, apply: () => stub() });
+// Run twice with helpers that answer differently, so both sides of a simple if are tried
+const kits = [false, true].map(yes => ({ say() { }, favour() { }, lose() { }, piece() { }, eraseRecord() { }, maxHp: () => 100, hasGift: () => yes, pick: l => l[yes ? l.length - 1 : 0], shuffle: l => l, meta: yes ? {} : null }));
+const outside = (where, f) => { try { f(); } catch (e) { if (e && e.name === 'ReferenceError') err(where, 'uses something outside js/content/ (use the h helpers): ' + e.message); } };
+try {
+  Object.entries(vm.runInContext('EVENTS', box)).forEach(([k, E]) => {
+    if (typeof E.text === 'function') outside(`event ${k} text`, () => E.text(stub()));
+    E.opts.forEach((o, i) => ['go', 'reveal', 'can'].filter(f => typeof o[f] === 'function').forEach(f => kits.forEach(kit => outside(`event ${k} option ${i + 1} ${f}`, () => o[f](stub(), kit)))));
+  });
+  Object.entries(vm.runInContext('GODS', box)).forEach(([k, g]) => g.reply && outside(`gods ${k} reply`, () => g.reply.go(stub())));
+} catch (e) { /* reported above */ }
 
 // ---------- Ids: well formed, never removed; World Record pools only grow at the end ----------
 const ID = /^[a-z][a-z0-9_]*$/;
-const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, paths: C.HIDDEN_PATHS };
+const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS };
 const nowIds = {};
 Object.entries(lists).forEach(([kind, o]) => { nowIds[kind] = Object.keys(o); if (kind !== 'paths') nowIds[kind].filter(k => !ID.test(k)).forEach(k => err(kind + ' ' + k, 'ids are lower case letters, digits and _')); });
+nowIds.eventOptions = {}; Object.entries(C.EVENTS).forEach(([k, E]) => nowIds.eventOptions[k] = E.opts.length);
 nowIds.lore = {}; Object.entries(C.LORE).forEach(([w, L]) => nowIds.lore[w] = { roles: L.roles, promises: L.promises, entries: L.entries.map(e => e.name) });
 const saved = fs.existsSync(path.join(ROOT, IDS_FILE)) ? JSON.parse(read(IDS_FILE)) : null;
 if (saved) {
@@ -45,6 +58,7 @@ if (saved) {
     const cur = (nowIds.lore[w] || {})[a] || [];
     if (L[a].some((x, i) => cur[i] !== x)) err(`World Record ${w} ${a}`, 'an existing line was reordered, changed or removed. Runs store pool positions, so pools only grow at the end');
   }));
+  Object.entries(saved.eventOptions || {}).forEach(([k, n]) => { if ((nowIds.eventOptions[k] || 0) < n) err('event ' + k, `had ${n} options, now ${nowIds.eventOptions[k] || 0}. Run summaries store the option picked by its place, so options are never removed: add new ones at the end`); });
   const added = Object.keys(lists).flatMap(kind => nowIds[kind].filter(k => !(saved[kind] || []).includes(k)).map(k => kind + ' ' + k))
     .concat(Object.entries(nowIds.lore).flatMap(([w, L]) => ['roles', 'promises', 'entries'].filter(a => L[a].length > ((saved.lore[w] || {})[a] || []).length).map(a => `World Record ${w} ${a}`)));
   if (added.length && !WRITE) err(IDS_FILE, `new content isn't recorded yet (${added.slice(0, 5).join(', ')}${added.length > 5 ? ', …' : ''}). Run node tools/check-content.js --write and commit the result`);
@@ -56,7 +70,7 @@ const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind'], ['evo', 'base', 'noShop', 'quick', 'basic']],
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text'], ['fix']],
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b'], []],
-  gods: [C.GODS, ['name', 'short', 'arch', 'blessing'], []],
+  gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], []],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final'].concat(MECHANICS)],
@@ -64,10 +78,18 @@ const SCHEMA = {
   titles: [C.TITLES, ['name', 'cond', 'desc'], ['first']],
   quests: [C.QUESTS, ['text', 'reward', 'goal'], ['hidden', 'by']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
+  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight']],
+  chains: [C.CHAINS, ['name', 'start'], []],
 };
+const OPTION = [['label', 'desc'], ['check', 'pay', 'can', 'then', 'go', 'reveal']], THEN = ['gold', 'stats', 'next', 'chain', 'favour'];
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
   need.filter(f => d[f] == null).forEach(f => err(`${kind} ${k}`, `missing ${f}`));
   Object.keys(d).filter(f => !need.includes(f) && !may.includes(f)).forEach(f => err(`${kind} ${k}`, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
+}));
+Object.entries(C.EVENTS).forEach(([k, E]) => (E.opts || []).forEach((o, i) => {
+  const w = `event ${k} option ${i + 1}`;
+  Object.keys(o).filter(f => !OPTION[0].includes(f) && !OPTION[1].includes(f)).forEach(f => err(w, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
+  Object.keys(o.then || {}).filter(f => !THEN.includes(f)).forEach(f => err(w, `unknown outcome then.${f}; outcomes are ${THEN.join(', ')}, anything else goes in go`));
 }));
 
 // ---------- References: everything named points at something real ----------
@@ -90,7 +112,32 @@ Object.entries(C.GEAR).forEach(([k, g]) => {
 Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, a.b.length === 3, 'needs 3 tier bonuses'); });
 ref('archetypes WHEEL', C.WHEEL.length === archs.length && archs.every(a => C.WHEEL.includes(a)), 'the wheel must hold every archetype exactly once');
 C.START_ARCH.forEach(a => ref('archetypes START_ARCH', isArch(a), `${a} is not an archetype`));
-Object.entries(C.GODS).forEach(([k, g]) => g.arch.forEach(a => ref('gods ' + k, isArch(a), `${a} is not an archetype`)));
+Object.entries(C.GODS).forEach(([k, g]) => {
+  g.arch.forEach(a => ref('gods ' + k, isArch(a), `${a} is not an archetype`));
+  ref('gods ' + k, C.GIFTS['chosen_' + k] && C.GIFTS['chosen_' + k].cat === 'divine', `needs a divine Gift chosen_${k} in gifts.js`);
+  ref('gods ' + k, g.reply && g.reply.label && typeof g.reply.go === 'function', 'reply needs a label and go(f)');
+});
+const nextRead = new Set([...core.matchAll(/nextFlags\.(\w+)/g)].map(m => m[1]));
+const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.luck === true);
+Object.entries(C.CHAINS).forEach(([c, ch]) => ref('chains ' + c, C.EVENTS[ch.start] && C.EVENTS[ch.start].chain === c, `start ${ch.start} is not an event in this chain`));
+Object.entries(C.EVENTS).forEach(([k, E]) => {
+  if (E.chain) ref('event ' + k, C.CHAINS[E.chain], `chain ${E.chain} is not in CHAINS`);
+  E.opts.forEach((o, i) => {
+    const w = `event ${k} option ${i + 1}`, T = o.then || {};
+    if (o.check) ref(w, checkOk(o.check), `check ${JSON.stringify(o.check)} is not { stat }, { favour: god } or { luck: true }`);
+    if (o.pay != null) {
+      ref(w, Number.isInteger(o.pay) && o.pay > 0, 'pay is a whole number of gold');
+      ref(w, new RegExp(`\\b${o.pay} gold\\b`).test(o.label + ' ' + o.desc), `pays ${o.pay} gold, so the label or desc says "${o.pay} gold": paying is the action`);
+    }
+    Object.keys(T.stats || {}).forEach(s => ref(w, C.STATS.includes(s), `stat ${s} is unknown`));
+    Object.keys(T.favour || {}).forEach(g => ref(w, C.GODS[g], `${g} is not a god`));
+    Object.keys(T.next || {}).forEach(f => ref(w, nextRead.has(f), `core.js never reads nextFlags.${f}, so it does nothing`));
+    if (T.chain) {
+      ref(w, E.chain, 'then.chain needs the event to be in a chain');
+      if (typeof T.chain === 'object') ref(w, C.EVENTS[E.chain + '_' + T.chain.step] && Number.isInteger(T.chain.after) && T.chain.after > 0, `chain step ${T.chain.step} needs an event ${E.chain}_${T.chain.step} and a whole number of rounds in after`);
+    }
+  });
+});
 Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   const w = 'worlds ' + k, F = C.ENEMIES[t.final];
   ref(w, isArch(t.home), `home ${t.home} is not an archetype`);
@@ -125,14 +172,15 @@ Object.values(C.SKILLS).filter(s => s.base).forEach(s => Object.entries(s.fx).fo
 Object.values(C.ENEMIES).forEach(e => e.skills.forEach(m => Object.entries(m.fx).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
 Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix)).forEach(([k, v]) => use('gear', k, id, v)));
 Object.values(C.HIDDEN_PATHS).forEach(h => Object.entries(h.fx).forEach(([k, v]) => use('path', k, h.name, v)));
+Object.values(C.GODS).forEach(g => Object.entries(g.bless).forEach(([k, v]) => use('god', k, g.name, v)));
 Object.values(C.ENEMIES).forEach(e => MECHANICS.filter(k => e[k] != null).forEach(k => use('enemy', k, e.name, e[k])));
 Object.entries(uses.skill).forEach(([k, who]) => { if (!fxRead.has(k)) err('effect ' + k, `core.js never reads fx.${k}, so it does nothing (used by ${who[0][0]})`); });
-Object.entries(uses.gear).concat(Object.entries(uses.path)).forEach(([k, who]) => { if (!pRead.has(k)) err('effect ' + k, `core.js never reads P.${k}, so it does nothing (used by ${who[0][0]})`); });
+Object.entries(uses.gear).concat(Object.entries(uses.path), Object.entries(uses.god)).forEach(([k, who]) => { if (!pRead.has(k)) err('effect ' + k, `core.js never reads P.${k}, so it does nothing (used by ${who[0][0]})`); });
 Object.keys(uses.enemy).forEach(k => { if (!new RegExp('\\.' + k + '\\b').test(core)) err('enemy mechanic ' + k, 'core.js never reads it'); });
 
 // ---------- Events: one option is always there to take ----------
 Object.entries(G.EVENTS).forEach(([k, E]) => {
-  if (!E.opts.some(o => !o.can && !o.check)) err('event ' + k, 'every option has a condition, so the screen could be empty: keep one that anyone can take');
+  if (!E.opts.some(o => !o.can && !o.check && !o.pay)) err('event ' + k, 'every option has a condition, so the screen could be empty: keep one that anyone can take');
   E.opts.forEach((o, i) => { if (!o.label || !o.desc) err(`event ${k} option ${i + 1}`, 'needs a label (an action) and a desc (a hint)'); });
 });
 
@@ -146,7 +194,8 @@ const sampleRun = new Proxy({}, { get: (_, k) => k === 'chains' ? new Proxy({}, 
 Object.values(C.SKILLS).forEach(s => say('skills ' + s.id, s.name));
 Object.entries(C.GEAR).forEach(([k, g]) => { say('gear ' + k, g.name); try { say('gear ' + k, g.text(G.gearPas(k, 1))); } catch (e) { /* reported above */ } });
 Object.entries(C.ARCH).forEach(([k, a]) => [a.name, a.theme, a.path, ...a.b].forEach(s => say('archetypes ' + k, s)));
-Object.entries(C.GODS).forEach(([k, g]) => [g.name, g.blessing].forEach(s => say('gods ' + k, s)));
+Object.entries(C.GODS).forEach(([k, g]) => [g.name, g.blessing, g.reply && g.reply.label].forEach(s => say('gods ' + k, s)));
+Object.entries(C.CHAINS).forEach(([k, c]) => say('chains ' + k, c.name));
 Object.entries(C.WORLD_TYPES).forEach(([k, t]) => { say('worlds ' + k, t.name); say('worlds ' + k + ' flavour', t.flavour, 10); });
 Object.entries(C.MODIFIERS).forEach(([k, m]) => [m.name, m.desc].forEach(s => say('modifiers ' + k, s)));
 Object.entries(C.LORE).forEach(([w, L]) => L.entries.forEach(e => [e.name, e.text, e.near].forEach(s => say(`World Record ${w} ${e.name}`, s))));
@@ -159,7 +208,7 @@ Object.entries(C.QUESTS).forEach(([k, q]) => say('quests ' + k, q.text));
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => [h.name, h.desc].forEach(s => say('paths ' + k, s)));
 Object.entries(G.EVENTS).forEach(([k, E]) => {
   say(`event ${k} title`, E.title, 4);
-  try { say(`event ${k} text`, E.text(sampleRun), 35); } catch (e) { /* text that needs a real run is checked in play */ }
+  try { say(`event ${k} text`, G.eventText(sampleRun, k), 35); } catch (e) { /* text that needs a real run is checked in play */ }
   E.opts.forEach((o, i) => {
     say(`event ${k} option ${i + 1} label`, o.label, 5); say(`event ${k} option ${i + 1} desc`, o.desc, 15);
     if (typeof o.reveal === 'string') { say(`event ${k} option ${i + 1} reveal`, o.reveal); if (!/^\[.*\]$/.test(o.reveal)) err(`event ${k} option ${i + 1}`, 'reveal is a System line, so it goes in [brackets]'); }
@@ -202,6 +251,8 @@ function effectDoc() {
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.gear).map(([k, who]) => row(k, who, '')),
     '', '### Hidden Path effects (`fx`)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.path).map(([k, who]) => row(k, who, '')),
+    '', '### God blessings (`bless`, at 8 Favour)',
+    '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.god).map(([k, who]) => row(k, who, '')),
     '', '### Enemy mechanics (fields on the enemy)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
   ].join('\n');
@@ -221,6 +272,6 @@ if (WRITE) {
   console.log(`wrote ${IDS_FILE} and ${DOC_FILE}`);
 }
 warnings.forEach(w => console.log('warning  ' + w));
-errors.forEach(e => console.log('ERROR    ' + e));
+[...new Set(errors)].forEach(e => console.log('ERROR    ' + e));
 console.log(`content: ${errors.length} error${errors.length === 1 ? '' : 's'}, ${warnings.length} warning${warnings.length === 1 ? '' : 's'} (${listed.length} files, ${Object.keys(C.SKILLS).length} skills, ${Object.keys(C.GEAR).length} gear, ${Object.keys(C.ENEMIES).length} enemies, ${Object.keys(G.EVENTS).length} events)`);
 process.exit(errors.length ? 1 : 0);
