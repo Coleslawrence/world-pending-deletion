@@ -44,7 +44,7 @@ Object.entries(G.PREFIXES).forEach(([k, p]) => own(p.name, 'rune ' + k));
 // The effect menu, read from docs/CONTENT.md (the checker keeps it current), plus what an event option can do as data
 const menuDoc = fs.readFileSync(path.join(ROOT, 'docs/CONTENT.md'), 'utf8');
 const MENU = new Set([...menuDoc.slice(menuDoc.indexOf('<!-- effects:start')).matchAll(/^\| `(\w+)` \|/gm)].map(m => m[1])
-  .concat(['pay', 'check', 'can', 'go', 'reveal', 'then', 'gold', 'stats', 'next', 'chain', 'favour', 'bribe', 'poison', 'foePoison', 'foeWeaken', 'piece', 'lose', 'say', 'eraseRecord', 'pick', 'shuffle', 'maxHp', 'hasGift', 'meta']));
+  .concat(['pay', 'check', 'can', 'go', 'reveal', 'then', 'gold', 'stats', 'next', 'chain', 'favour', 'bribe', 'poison', 'foePoison', 'foeWeaken', 'piece', 'lose', 'say', 'eraseRecord', 'pick', 'shuffle', 'maxHp', 'hasGift', 'meta', 'phase', 'passives']));
 
 // ---------- Starting a card ----------
 const STATUSES = ['Draft', 'Proposed', 'Approved', 'Declined', 'In a PR', 'On dev', 'Shipped'];
