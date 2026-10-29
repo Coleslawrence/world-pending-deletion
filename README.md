@@ -20,11 +20,14 @@ On a phone, open the link and use **Add to Home Screen** to install it as an app
 |---|---|
 | `index.html` | The page shell |
 | `css/style.css` | All styling (one dark theme, phone-first) |
-| `js/core.js` | Game data and rules. No DOM, so it also runs in Node for simulations |
+| `js/content/` | Game content: archetypes, skills (one file per archetype), gear, gods, world packs (one per world type: the world, its World Record pool and its Final Champion's greeting), enemies, Undercity events (one file per event chain), Gifts, Titles, quests and Hidden Paths. Plain data that never calls into `core.js` |
+| `js/core.js` | Game rules. No DOM, so it also runs in Node for simulations, where it loads `js/content/` itself |
 | `js/ui.js` | Screens, sheets and input |
 | `js/firebase-config.js`, `js/cloud-firebase.js`, `firestore.rules` | Cloud saves and shared champions (Firebase) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable web app and offline support |
 | `tools/bot.js`, `tools/stats.js` | An auto-player and balance statistics |
+| `tools/check-content.js`, `tools/balance-gate.js` | The content checker and the balance gate that every pull request runs (`.github/workflows/checks.yml`; see [docs/CONTENT.md](docs/CONTENT.md)) |
+| `tools/content-index.js` | Writes the content index (every name, what it belongs to, the release it shipped in) for the lore bible |
 | `tools/build-single.py` | Bundles everything into one HTML file in `dist/` |
 | `.github/workflows/pages.yml` | Publishes the site to GitHub Pages on every push to `main` |
 
@@ -60,6 +63,15 @@ It plays a bot run, restores each stage in a real browser (Playwright with Chrom
 ## Saves and shared champions
 
 Progress (Echoes, Titles, unlocks, the Halls and the current run) is saved in the browser. Signing in with Google or GitHub adds cloud saves across devices and lets players share champions, who can then appear in each other's tournaments. This uses Firebase; setup steps are in [docs/FIREBASE.md](docs/FIREBASE.md).
+
+## Adding content
+
+New content goes in `js/content/`. [docs/CONTENT.md](docs/CONTENT.md) says where each kind goes, the rules it follows (ids are permanent, World Record pools only grow at the end, content never calls `core.js`) and the menu of effects it can use. Before opening a pull request:
+
+```
+node tools/check-content.js --write   # records new ids and refreshes the effect menu; commit what it changes
+node tools/check-content.js           # the same check CI runs
+```
 
 ## Publishing changes
 
