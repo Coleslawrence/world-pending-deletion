@@ -400,6 +400,18 @@
   "poisoner",
   "letter"
  ],
+ "traitPool": [
+  "spiked",
+  "armoured",
+  "regenerating",
+  "savage",
+  "frenzied",
+  "elusive",
+  "smouldering",
+  "barbed",
+  "leeching",
+  "braced"
+ ],
  "eventOptions": {
   "merchant": 4,
   "crowd": 4,
