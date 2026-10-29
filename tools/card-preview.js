@@ -4,7 +4,9 @@
 //   node tools/card-preview.js CARD.md [CARD.md ...]    # writes <cards folder>/previews/<card>-<n>.png
 //   node tools/card-preview.js DIR                      # every Approved, Draft or Proposed card in DIR
 // Works for events (the event, then the System's lines after the first option), gear (the shop and the piece's
-// sheet) and Titles (the toast when earned, and the Title in the Status sheet). Other kinds are listed and skipped.
+// sheet), Titles (the toast when earned, and the Title in the Status sheet) and enemies (the scout report, the fight,
+// and its second phase). Other kinds are listed and skipped. A card can carry a ```js block of draft data under
+// Mechanics (what the data PR would add); it runs in the page first. Enemies need one: their moves don't fit in words.
 // The numbers in a preview are stand-ins: a preview shows the words and the screen, the data PR sets the real values.
 // Needs Playwright with Chromium. Serves the repo itself on a free port, like tools/layout-check.js.
 'use strict';
@@ -31,7 +33,7 @@ function cardContent(file) {
   const ui = [...words.matchAll(/\*\*UI copy\*\*[^:]*:\s*(.+)/g)].flatMap(m => ticks(m[1]).length ? ticks(m[1]) : [m[1].trim()]);
   const system = [...words.matchAll(/\*\*System\*\*[^:]*:\s*(.+)/g)].flatMap(m => ticks(m[1]));
   const status = field(/\*\*Status:\*\*\s*([^·\n]+)/);
-  const C = { kind, name, id, status };
+  const C = { kind, name, id, status, data: (mech.match(/```js\n([\s\S]*?)```/) || [])[1] || '' };
   if (kind === 'event') {
     const rows = words.split('\n').filter(l => /^\|/.test(l) && !/^\|\s*-/.test(l)).slice(1).map(l => l.replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map(c => c.trim())).filter(r => r.some(Boolean));
     const check = c => { const s = /\b(STR|AGI|INT|VIT|LUK)\b/.exec(c); if (s) return { stat: s[1], hard: /\b(10|hard)\b/i.test(c) || undefined }; if (/luck/i.test(c)) return { luck: true }; const g = /\b(war|trick\w*|ruin)\b/i.exec(c); return g ? { favour: g[1].toLowerCase().startsWith('trick') ? 'trick' : g[1].toLowerCase() } : null; };
@@ -80,6 +82,7 @@ function serve() {
 // Each step returns a caption; the tool screenshots after it. Runs in the browser, where content names are globals.
 function stage([C, step]) {
   clearToasts(); ui.sheet = null; run.pending = []; ui.screen = 'shop'; meta.statLines = true;
+  if (C.data) (0, eval)(C.data); // the card's draft data, in the global scope like a content file
   Object.keys(run.stats).forEach(k => run.stats[k] = Math.max(run.stats[k], 12)); run.gold = Math.max(run.gold, 30);
   if (C.kind === 'event') {
     EVENTS[C.id] = { title: C.name, text: C.text, opts: C.opts.map(o => Object.assign({ label: o.label, desc: o.desc, go: (r, h) => o.says.forEach(s => h.say(s, /−|lose|lost/i.test(s) ? 'loss' : 'sys')) }, o.pay ? { pay: o.pay } : {}, o.check ? { check: o.check } : {})) };
@@ -101,9 +104,16 @@ function stage([C, step]) {
     ui.sheet = 'stats'; render();
     return 'Equipped, in the Status sheet';
   }
+  if (/^enemy/.test(C.kind) && ENEMIES[C.id]) {
+    const E = ENEMIES[C.id]; run.chosen = { kind: E.final ? 'final' : E.rival ? 'rival' : 'monster', id: C.id };
+    if (step === 0) { ui.sheet = { type: 'scout' }; render(); return 'The scout report'; }
+    startFightUI(); if (step === 1) return 'The fight starts';
+    const f = ui.fight; f.B.hp = Math.floor(f.B.maxHp * E.phase.at); checkPhase(f, f.B, false); planIntent(f, f.B); render();
+    return 'Below half HP: the second phase';
+  }
   return null;
 }
-const steps = C => C.kind === 'event' ? 1 + Math.min(C.opts.length, 3) : ['gear', 'title'].includes(C.kind) ? 2 : 0;
+const steps = C => C.kind === 'event' ? 1 + Math.min(C.opts.length, 3) : ['gear', 'title'].includes(C.kind) ? 2 : /^enemy/.test(C.kind) && C.data ? (/phase\s*:/.test(C.data) ? 3 : 2) : 0;
 
 (async () => {
   const files = args.flatMap(a => fs.statSync(a).isDirectory() ? fs.readdirSync(a).filter(f => f.endsWith('.md') && !/^(README|TEMPLATE|INDEX|IMPORT)\.md$/.test(f)).map(f => path.join(a, f)) : [a]);
@@ -113,7 +123,7 @@ const steps = C => C.kind === 'event' ? 1 + Math.min(C.opts.length, 3) : ['gear'
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: SIZE.w, height: SIZE.h }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   for (const C of cards) {
-    const n = steps(C); if (!n) { console.log(`skip  ${path.basename(C.file)}: no preview for ${C.kind || 'this kind'} yet (events, gear and Titles)`); continue; }
+    const n = steps(C); if (!n) { console.log(`skip  ${path.basename(C.file)}: no preview for ${C.kind || 'this kind'} yet (events, gear, Titles, and enemies with draft data)`); continue; }
     const dir = path.join(path.dirname(C.file), 'previews'), base = path.basename(C.file, '.md'); fs.mkdirSync(dir, { recursive: true });
     fs.readdirSync(dir).filter(f => f.startsWith(base + '-')).forEach(f => fs.unlinkSync(path.join(dir, f)));
     const shots = [];
