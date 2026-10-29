@@ -10,6 +10,7 @@ const TITLES = {
   spellweaver: { name: 'Spellweaver', cond: 'Use 3 Quick skills in a single turn.', desc: 'After a Quick skill, your next skill deals 10% more.' },
   high_roller: { name: 'High Roller', cond: 'Win 3 wagers in one run.', desc: 'Winning a wager pays 3 more gold.' },
   underdog: { name: 'Underdog', cond: 'Beat a hard opponent.', desc: '+10% damage to hard opponents.' },
+  rank_is_just_a_letter: { name: 'Rank Is Just a Letter', cond: 'Beat an opponent two rank letters above your Entrant Rank.', desc: '+10% damage to opponents of a higher rank than you.' },
   comeback: { name: 'Comeback Kid', cond: 'Win a fight with 10% HP or less.', desc: 'Below 25% HP, take 20% less damage.' },
   alchemist: { name: 'Alchemist', cond: 'Trigger 3 reactions in a single fight.', desc: 'Reactions are 20% stronger.' },
   executioner: { name: 'Executioner', cond: 'Land a single hit of 60 or more.', desc: 'Critical hits deal ×1.75 instead of ×1.5.' },

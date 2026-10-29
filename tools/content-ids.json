@@ -202,7 +202,8 @@
   "hourglass",
   "storm_ring",
   "soul_lantern",
-  "plague_censer"
+  "plague_censer",
+  "misers_ring"
  ],
  "archetypes": [
   "pyre",
@@ -323,6 +324,7 @@
   "spellweaver",
   "high_roller",
   "underdog",
+  "rank_is_just_a_letter",
   "comeback",
   "alchemist",
   "executioner",
