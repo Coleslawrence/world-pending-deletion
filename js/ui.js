@@ -90,6 +90,7 @@ function styleOf(spec) {
   if (spec.snap && spec.snap.owner) return spec.kind === 'champion' ? `Saved ${spec.snap.worldName} in ${ownerName(spec.snap.owner)}'s tournament` : `Fell in ${ownerName(spec.snap.owner)}'s tournament, round ${spec.snap.round}`;
   return specStyle(spec);
 }
+function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · <span class="nw">${r}-rank</span>` : ''; }
 function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
 function rankChip(r) { return `<span class="rank r${r}">${WORLD_RANKS[r]}</span>`; }
@@ -543,7 +544,7 @@ function draftHTML() {
 // ---------- Choose opponent ----------
 function chooseHTML() {
   const cards = run.choices.map((spec, i) => `<button class="opp ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
-      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>
+      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${traitsHTML(spec)}
       <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
@@ -662,6 +663,7 @@ function fightHTML() {
 }
 function chipsHTML(X, f) {
   const c = [];
+  if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait">${esc(TRAIT_POOL[k].name)}</span>`));
   if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
   if (X.burn > 0) c.push(`<span class="chip burn">Burn ${n0(X.burn)}</span>`);
   if (X.poison > 0) c.push(`<span class="chip poison">Poison ${n0(X.poison)}</span>`);
@@ -979,7 +981,7 @@ function scoutSheet() {
   const spec = currentSpec(run);
   let body = '';
   if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
-  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}`; }
+  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}${traitsHTML(spec)}`; }
   if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }

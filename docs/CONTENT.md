@@ -12,6 +12,7 @@ All of the game's content lives in `js/content/`: archetypes, skills, gear, gods
 | A world type | A new pack in `js/content/worlds/` (the world, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
 | A god | `js/content/gods.js` (its archetypes, blessing and rival reply line) and a `chosen_<id>` divine Gift in `gifts.js` |
 | An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS`. Boss mechanics are fields from the enemy mechanics list below |
+| A trait monsters and rivals can roll | `js/content/traits.js` |
 | An Undercity event | `js/content/events/undercity.js` |
 | An event chain | A new file in `js/content/events/`: its `CHAINS` entry and one event per step. The format is described at the top of `js/content/events.js` |
 | A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js` |
@@ -34,7 +35,9 @@ node tools/card-check.js <cards folder> --index                           # also
 
 It fails on an id or name the game or another card already uses, an effect that isn't on the menu below (unless the card says it needs a new one), an event with no free option or with a locked one, and the style guide's spelling, dash and bracket rules. A Draft card also needs its source and an "Adapted from" section.
 
-Card previews show a card in the real game before anything is built: `node tools/card-preview.js <card or cards folder>` adds the card's event, gear or Title to the game in a browser, opens the screen it appears on at 360×640, saves screenshots in `<cards folder>/previews/` and rewrites the card's Preview section with them. Numbers in a preview are stand-ins until the data PR.
+Card previews show a card in the real game before anything is built: `node tools/card-preview.js <card or cards folder>` adds the card's event, gear, Title or enemy to the game in a browser, opens the screen it appears on at 360×640, saves screenshots in `<cards folder>/previews/` and rewrites the card's Preview section with them. Numbers in a preview are stand-ins until the data PR. An enemy card needs a ```js block of draft data under Mechanics (its `ENEMIES` entry as the data PR would add it); the preview shows its scout report, the fight starting, and its second phase.
+
+This whole process, from an outside source to Draft cards with previews, is called an **intake** (`content/cards/IMPORT.md`).
 
 ## Rules
 
@@ -85,6 +88,8 @@ An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as playe
 Burn, Bleed and Block amounts scale with the enemy's power, like its moves.
 
 **Passives** (`passives: { regen: 3, thornsAlways: 2 }`) use the gear and Hidden Path keys that work on enemies, listed in the menu below. Flat amounts scale with the enemy's power; rates don't.
+
+**The trait pool** (`js/content/traits.js`) gives monsters and rivals extra traits each run. When opponents are offered, each monster or rival rolls `TRAIT_COUNT[round - 1]` traits from `TRAIT_POOL`, and the choice screen, the fight and the scout report show them with their `desc`, so the player can pick the opponent their build handles. An entry is a `name`, a `desc` (what it does, in a few words) and `passives` and/or `traits` as above. Passives add to the enemy's own; for a trait it already has, the stronger value counts. Finals, the Elite bracket, erased champions and Rank Trials never roll from the pool.
 
 **Phases** turn a boss into a two-part fight:
 
@@ -225,11 +230,11 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | Key | Used | Examples (value) |
 | --- | --- | --- |
 | `adapt` | 1 | Kaito Ren (0.6) |
-| `aura` | 1 | Emperor Kharros the Ashen (0.7) |
-| `briar` | 1 | The Thorn Mother (1) |
-| `dodge` | 1 | Lyss of the Thorn (0.05) |
-| `enrage` | 2 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5) |
-| `enrageMult` | 2 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25) |
+| `aura` | 2 | Emperor Kharros the Ashen (0.7), trait Smouldering (1.5) |
+| `briar` | 2 | The Thorn Mother (1), trait Barbed (1) |
+| `dodge` | 2 | Lyss of the Thorn (0.05), trait Elusive (0.12) |
+| `enrage` | 3 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5), trait Frenzied (0.5) |
+| `enrageMult` | 3 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4) |
 | `flood` | 1 | The Leviathan Queen (3) |
 | `forge` | 1 | The Forge King (3) |
 | `revive` | 1 | The Bone Saint (0.3) |
@@ -243,21 +248,21 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `bleedPlus` | 0 |  | yes |
 | `blockKeep` | 0 |  | no |
 | `burnPlus` | 0 |  | yes |
-| `dmgPct` | 0 |  | no |
+| `dmgPct` | 1 | trait Savage (0.2) | no |
 | `dotPlus` | 0 |  | yes |
-| `flatDR` | 1 | Ser Calder (2) | yes |
+| `flatDR` | 2 | Ser Calder (2), trait Armoured (2) | yes |
 | `healPct` | 0 |  | no |
-| `lifesteal` | 0 |  | no |
+| `lifesteal` | 1 | trait Leeching (0.25) | no |
 | `lowDR` | 0 |  | no |
 | `lowHpDmg` | 0 |  | no |
 | `poisonMult` | 0 |  | no |
 | `poisonPlus` | 0 |  | yes |
-| `regen` | 1 | Seraphine Vale (2) | yes |
+| `regen` | 2 | Seraphine Vale (2), trait Regenerating (3) | yes |
 | `startBlock` | 0 |  | yes |
-| `startBlockPct` | 0 |  | no |
+| `startBlockPct` | 1 | trait Braced (0.15) | no |
 | `thornBurn` | 0 |  | yes |
 | `thornMult` | 0 |  | no |
 | `thornPoison` | 0 |  | yes |
-| `thornsAlways` | 0 |  | yes |
+| `thornsAlways` | 1 | trait Spiked (2) | yes |
 | `vsHalf` | 0 |  | no |
 <!-- effects:end -->
