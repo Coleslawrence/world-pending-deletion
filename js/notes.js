@@ -4,6 +4,22 @@
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
+    id: '2026-10-29b', title: "[System Notice: Intake Update]", pages: [
+      { h: "Opponents", sys: "[Opponents have been reviewed. Several were found to be coasting.]", items: [
+        "[Final Champions now have a second phase. Watch the System when they falter.]",
+        "[The scout report warns you when an opponent has a second phase. Not what it is.]",
+        "[Seraphine, Calder and Grukk have trained. The Masked Entrant copies less well.]",
+        "[The Leviathan Queen and the Forge King no longer take all evening.]"] },
+      { h: "Corrections", sys: "[A Hidden Path was found not doing its job. It has been spoken to.]", items: [
+        "[Butcher now heals you from Bleed, as its description always claimed.]"] },
+      { h: "New arrivals", sys: "[New items have been admitted to the tournament. Most passed inspection.]", items: [
+        "[A Large Chest has been sighted in the Undercity. Its contents are unverified.]",
+        "[A System clerk is issuing experimental equipment. Testing is mandatory.]",
+        "[Miser's Ring: hoarding is now a combat strategy. The System does not approve.]",
+        "[New Title: Rank Is Just a Letter. The System disagrees.]"] },
+    ],
+  },
+  {
     id: '2026-10-29', title: "[System Notice: Compliance Update]", pages: [
       { h: "Audit", sys: "[Irregularities at the Awakening have been closed. The System noticed.]", items: [
         "[The System chooses once per world. Asking again gets the same answer.]",
