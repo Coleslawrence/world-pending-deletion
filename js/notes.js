@@ -4,6 +4,27 @@
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
+    id: '2026-10-29', title: "[System Notice: Compliance Update]", pages: [
+      { h: "Audit", sys: "[Irregularities at the Awakening have been closed. The System noticed.]", items: [
+        "[The System chooses once per world. Asking again gets the same answer.]",
+        "[The stat roll is fixed per world. Leaving and returning changes nothing.]",
+        "[Your own screen now shows the name others see. Accounts stay private.]"] },
+      { h: "Balance", sys: "[The tournament found you comfortable. That has been corrected.]", items: [
+        "[Opponents from round 5 on hit harder each round. The final hits hardest.]",
+        "[Blight still doubles a Leech's drain. Only the usual amount heals you now.]",
+        "[Thousand Needles raises Poison by half, not double. Venom was enjoying itself.]",
+        "[The Elite bracket is unchanged. The Undefeated did not ask for help.]"] },
+      { h: "Notices", sys: "[System notices have been asked to form a queue. They complied.]", items: [
+        "[Messages now wait their turn. Each stays long enough to read.]",
+        "[Tap a message to dismiss it. The next one steps forward.]",
+        "[Missed one? Log, top right, keeps every message this run.]"] },
+      { h: "Complaints", sys: "[A complaints desk has opened. The System reads every one.]", items: [
+        "[Report a bug or idea from the Menu, or from the title screen.]",
+        "[Reports carry your screen and your run. Never your name.]",
+        "[Signed out? The report waits on your device until you sign in.]"] },
+    ],
+  },
+  {
     id: '2026-10-28', title: "[System Notice: Display Update]", pages: [
       { h: "Display", sys: "[Display faults corrected. Small screens are no longer an excuse.]", items: [
         "[Screens that do not fit now scroll. Nothing is cut off, and Fight stays in reach.]",
