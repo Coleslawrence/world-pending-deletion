@@ -164,6 +164,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `firstCrit` | 1 | duelist_rapier (1) |
 | `firstEvade` | 1 | shadow_leathers (1) |
 | `firstStun` | 1 | thunder_maul (1) |
+| `goldDmg` | 1 | misers_ring (0.05) |
 | `healBlock` | 1 | templar_plate (0.3) |
 | `healOnBleed` | 1 | bloodstone_amulet (3) |
 | `hitHeal` | 1 | pilgrim_mace (2) |

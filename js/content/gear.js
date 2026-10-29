@@ -25,5 +25,6 @@ const GEAR = {
   storm_ring: { name: 'Stormcaller Ring', slot: 'accessory', tags: ['storm'], rank: 'C', stats: { STR: 1 }, pas: { stunDmg: 10 }, text: v => `Your Stuns and Interrupts deal ${v.stunDmg} damage.` },
   soul_lantern: { name: 'Soul Lantern', slot: 'accessory', tags: ['reaper'], rank: 'B', stats: { STR: 1, LUK: 1 }, pas: { lowLifesteal: 0.25 }, text: v => `Below half HP, heal ${pct(v.lowLifesteal)} of the damage you deal.` },
   plague_censer: { name: 'Plague Censer', slot: 'accessory', tags: ['venom', 'pyre'], rank: 'A', stats: { INT: 2 }, pas: { burnPoison: 2 }, text: v => `Whenever you apply Burn, also apply ${v.burnPoison} Poison.` },
+  misers_ring: { name: "Miser's Ring", slot: 'accessory', tags: ['venom', 'blade', 'arcanist'], rank: 'C', stats: { LUK: 1 }, pas: { goldDmg: 0.05 }, text: v => `+${pct(v.goldDmg)} damage for every 10 gold you hold when a fight starts, up to +25%.` },
 };
 const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
