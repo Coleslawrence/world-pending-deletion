@@ -27,6 +27,7 @@ On a phone, open the link and use **Add to Home Screen** to install it as an app
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable web app and offline support |
 | `tools/bot.js`, `tools/stats.js` | An auto-player and balance statistics |
 | `tools/check-content.js`, `tools/balance-gate.js` | The content checker and the balance gate that every pull request runs (`.github/workflows/checks.yml`; see [docs/CONTENT.md](docs/CONTENT.md)) |
+| `tools/content-index.js` | Writes the content index (every name, what it belongs to, the release it shipped in) for the lore bible |
 | `tools/build-single.py` | Bundles everything into one HTML file in `dist/` |
 | `.github/workflows/pages.yml` | Publishes the site to GitHub Pages on every push to `main` |
 
