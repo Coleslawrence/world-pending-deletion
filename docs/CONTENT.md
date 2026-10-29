@@ -34,6 +34,8 @@ node tools/card-check.js <cards folder> --index                           # also
 
 It fails on an id or name the game or another card already uses, an effect that isn't on the menu below (unless the card says it needs a new one), an event with no free option or with a locked one, and the style guide's spelling, dash and bracket rules. A Draft card also needs its source and an "Adapted from" section.
 
+Card previews show a card in the real game before anything is built: `node tools/card-preview.js <card or cards folder>` adds the card's event, gear or Title to the game in a browser, opens the screen it appears on at 360×640, saves screenshots in `<cards folder>/previews/` and rewrites the card's Preview section with them. Numbers in a preview are stand-ins until the data PR.
+
 ## Rules
 
 - **Content uses only content.** Files in `js/content/` may use each other and `base.js`, never anything from `js/core.js`. They load before it.
