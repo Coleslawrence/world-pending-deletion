@@ -44,7 +44,7 @@ Object.entries(G.PREFIXES).forEach(([k, p]) => own(p.name, 'rune ' + k));
 // The effect menu, read from docs/CONTENT.md (the checker keeps it current), plus what an event option can do as data
 const menuDoc = fs.readFileSync(path.join(ROOT, 'docs/CONTENT.md'), 'utf8');
 const MENU = new Set([...menuDoc.slice(menuDoc.indexOf('<!-- effects:start')).matchAll(/^\| `(\w+)` \|/gm)].map(m => m[1])
-  .concat(['pay', 'check', 'can', 'go', 'reveal', 'then', 'gold', 'stats', 'next', 'chain', 'favour', 'bribe', 'poison', 'foePoison', 'foeWeaken', 'piece', 'lose', 'say', 'eraseRecord', 'pick', 'shuffle', 'maxHp', 'hasGift', 'meta']));
+  .concat(['pay', 'check', 'can', 'go', 'reveal', 'then', 'gold', 'stats', 'next', 'chain', 'favour', 'bribe', 'poison', 'foePoison', 'foeWeaken', 'piece', 'lose', 'say', 'eraseRecord', 'pick', 'shuffle', 'maxHp', 'hasGift', 'meta', 'phase', 'passives']));
 
 // ---------- Starting a card ----------
 const STATUSES = ['Draft', 'Proposed', 'Approved', 'Declined', 'In a PR', 'On dev', 'Shipped'];
@@ -119,9 +119,9 @@ cards.forEach(c => {
     c.ids.filter(id => o.ids.includes(id)).forEach(id => err(c, `id "${id}" is also on ${o.f}`));
     c.names.filter(n => o.names.some(m => m.toLowerCase() === n.toLowerCase())).forEach(n => err(c, `name "${n}" is also on ${o.f}`));
   });
-  // Effects: from the menu, or the card says a mechanic PR comes first
+  // Effects: from the menu, or the card says a mechanic PR comes first (until it is built: then the effect exists)
   const needsNew = /^yes/i.test(c.newEffect);
-  c.effects.filter(k => !MENU.has(k)).forEach(k => needsNew ? warn(c, `effect "${k}" is new: it needs a mechanic PR before the data PR`) : err(c, `effect "${k}" isn't on the effect menu (docs/CONTENT.md). Use a menu key, or answer "yes" to "New effect needed?" and describe it`));
+  if (waiting) c.effects.filter(k => !MENU.has(k)).forEach(k => needsNew ? warn(c, `effect "${k}" is new: it needs a mechanic PR before the data PR`) : err(c, `effect "${k}" isn't on the effect menu (docs/CONTENT.md). Use a menu key, or answer "yes" to "New effect needed?" and describe it`));
   if (!c.effects.length && !needsNew && waiting) warn(c, 'no effects listed on the **Effects used** line');
   // Player text, from the Words section (the System's lines are the `[...]` ones)
   const text = c.words.replace(/<!--[\s\S]*?-->/g, '').split('\n').filter(l => !/^\s*(\||- \*\*\w[\w ]*\*\* \(|For an event)/.test(l) || /`/.test(l)).join('\n');
