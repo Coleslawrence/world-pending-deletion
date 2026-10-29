@@ -379,6 +379,35 @@
   "bastion+reaper",
   "storm+zealot"
  ],
+ "events": [
+  "merchant",
+  "crowd",
+  "official_1",
+  "official_bribed",
+  "official_refused",
+  "poisoner_1",
+  "poisoner_found",
+  "letter_1",
+  "letter_map",
+  "letter_cache"
+ ],
+ "chains": [
+  "official",
+  "poisoner",
+  "letter"
+ ],
+ "eventOptions": {
+  "merchant": 4,
+  "crowd": 4,
+  "official_1": 4,
+  "official_bribed": 4,
+  "official_refused": 1,
+  "poisoner_1": 6,
+  "poisoner_found": 4,
+  "letter_1": 3,
+  "letter_map": 6,
+  "letter_cache": 1
+ },
  "lore": {
   "drowned": {
    "roles": [

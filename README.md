@@ -20,7 +20,7 @@ On a phone, open the link and use **Add to Home Screen** to install it as an app
 |---|---|
 | `index.html` | The page shell |
 | `css/style.css` | All styling (one dark theme, phone-first) |
-| `js/content/` | Game content: archetypes, skills (one file per archetype), gear, gods, world packs (one per world type: the world, its World Record pool and its Final Champion's greeting), enemies, Gifts, Titles, quests and Hidden Paths. Plain data that never calls into `core.js` |
+| `js/content/` | Game content: archetypes, skills (one file per archetype), gear, gods, world packs (one per world type: the world, its World Record pool and its Final Champion's greeting), enemies, Undercity events (one file per event chain), Gifts, Titles, quests and Hidden Paths. Plain data that never calls into `core.js` |
 | `js/core.js` | Game rules. No DOM, so it also runs in Node for simulations, where it loads `js/content/` itself |
 | `js/ui.js` | Screens, sheets and input |
 | `js/firebase-config.js`, `js/cloud-firebase.js`, `firestore.rules` | Cloud saves and shared champions (Firebase) |
