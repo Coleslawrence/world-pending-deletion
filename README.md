@@ -26,6 +26,7 @@ On a phone, open the link and use **Add to Home Screen** to install it as an app
 | `js/firebase-config.js`, `js/cloud-firebase.js`, `firestore.rules` | Cloud saves and shared champions (Firebase) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable web app and offline support |
 | `tools/bot.js`, `tools/stats.js` | An auto-player and balance statistics |
+| `tools/check-content.js`, `tools/balance-gate.js` | The content checker and the balance gate that every pull request runs (`.github/workflows/checks.yml`; see [docs/CONTENT.md](docs/CONTENT.md)) |
 | `tools/build-single.py` | Bundles everything into one HTML file in `dist/` |
 | `.github/workflows/pages.yml` | Publishes the site to GitHub Pages on every push to `main` |
 
@@ -64,7 +65,12 @@ Progress (Echoes, Titles, unlocks, the Halls and the current run) is saved in th
 
 ## Adding content
 
-New content goes in `js/content/`. A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`; Node reads its list from `index.html`. Content files can use each other and `base.js`, never `core.js`. Ids are permanent once shipped, because saves and shared champions store them. Lists that runs read by position, such as World Record pools and the order skills are added in, only ever grow at the end.
+New content goes in `js/content/`. [docs/CONTENT.md](docs/CONTENT.md) says where each kind goes, the rules it follows (ids are permanent, World Record pools only grow at the end, content never calls `core.js`) and the menu of effects it can use. Before opening a pull request:
+
+```
+node tools/check-content.js --write   # records new ids and refreshes the effect menu; commit what it changes
+node tools/check-content.js           # the same check CI runs
+```
 
 ## Publishing changes
 
