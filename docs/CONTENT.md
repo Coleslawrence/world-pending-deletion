@@ -103,14 +103,14 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | --- | --- | --- | --- | --- |
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `bleed` | 12 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 42 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 43 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 7 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
-| `burn` | 24 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
+| `burn` | 25 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `cleanse` | 14 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `critBonus` | 1 | Precise Strike (0.5) | +50% critical chance. | no |
 | `cruel` | 3 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5) | ×2 damage if the opponent has 2 or more effects. | yes |
 | `detonate` | 3 | Ignite (2), Combust (3), Wildfire (2) | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `dmg` | 142 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 147 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `doom` | 3 | Doom (26), Swift Doom (22), Inevitable Doom (40) | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
 | `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
@@ -121,9 +121,9 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `execute` | 6 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
 | `focus` | 3 | Focus (0.6), Deep Focus (1), Spellweave (0.5) | Your next damaging skill deals 60% more. | yes |
 | `haste` | 4 | Time Warp (2), Spellweave (1), Haste (3), … | Your other cooldowns drop by 2. | yes |
-| `heal` | 15 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
+| `heal` | 16 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 6 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
-| `hits` | 34 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
+| `hits` | 36 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
 | `interrupt` | 3 | Counterspell (1), Nullify (1), Spell Theft (1) | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
 | `leech` | 3 | Leech (3), Blood Leech (6), Parasite (3) | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
@@ -135,7 +135,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `nextCrit` | 1 | Deadly Mark (1) | Your next hit is a critical. | no |
 | `perHit` | 12 | Flame Wave (1), Thousand Cuts (1), Fire Rain (1), … | (works with other keys on the same skill) | no |
 | `pierce` | 7 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
-| `poison` | 21 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `poison` | 22 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
 | `regen` | 3 | Consecrate (4), Hallowed Ground (7), Holy Fire (4) | Heal 4 at the start of your next 3 turns. | yes |
 | `riposte` | 3 | Riposte (1.5), Perfect Riposte (2.5), Parry Master (1.5) | Until your next turn, damage you block is dealt back ×1.5. | yes |
@@ -144,7 +144,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `stun` | 9 | Thunderclap (1), Thunder God's Wrath (1), Stunning Bash (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
 | `stunIfWeak` | 4 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 7 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
-| `weaken` | 23 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 24 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Gear passives (`pas` scales with stars, `fix` does not)
 
@@ -226,7 +226,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `briar` | 1 | The Thorn Mother (1) |
 | `dodge` | 1 | Lyss of the Thorn (0.05) |
 | `enrage` | 2 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5) |
-| `enrageMult` | 2 | Grukk the Unbroken (1.25), Emperor Kharros the Ashen (1.25) |
+| `enrageMult` | 2 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25) |
 | `flood` | 1 | The Leviathan Queen (3) |
 | `forge` | 1 | The Forge King (3) |
 | `revive` | 1 | The Bone Saint (0.3) |
@@ -242,14 +242,14 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `burnPlus` | 0 |  | yes |
 | `dmgPct` | 0 |  | no |
 | `dotPlus` | 0 |  | yes |
-| `flatDR` | 0 |  | yes |
+| `flatDR` | 1 | Ser Calder (2) | yes |
 | `healPct` | 0 |  | no |
 | `lifesteal` | 0 |  | no |
 | `lowDR` | 0 |  | no |
 | `lowHpDmg` | 0 |  | no |
 | `poisonMult` | 0 |  | no |
 | `poisonPlus` | 0 |  | yes |
-| `regen` | 0 |  | yes |
+| `regen` | 1 | Seraphine Vale (2) | yes |
 | `startBlock` | 0 |  | yes |
 | `startBlockPct` | 0 |  | no |
 | `thornBurn` | 0 |  | yes |
