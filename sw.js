@@ -1,6 +1,6 @@
 // [World Pending Deletion] service worker: offline play.
 // Bump VERSION whenever the game files change so players get the update.
-const VERSION = 'wpd-v6';
+const VERSION = 'wpd-v7';
 const CORE = [
   './', 'index.html', 'css/style.css', 'js/firebase-config.js', 'js/core.js', 'js/notes.js', 'js/ui.js', 'js/cloud-firebase.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.svg',
