@@ -145,6 +145,9 @@ div.bar.foe-bar i { background: linear-gradient(90deg, #a83a33, var(--foe)); }
 .nx-k { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .nx-name { font-family: var(--f-d); font-size: 19px; line-height: 1.15; }
 .nx-style { font-size: 13.5px; color: var(--muted); }
+.nx-traits { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; font-size: 12.5px; color: var(--text); }
+.nx-traits b { color: #ffb257; font-weight: 600; }
+.chip.trait { color: #ffb257; border-style: dashed; }
 .nx-scout { font-size: 12.5px; color: var(--sys); font-family: var(--f-m); margin-top: 2px; }
 .crest { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 2px solid var(--line2); background: radial-gradient(circle at 35% 30%, var(--panel2), var(--bg)); font-family: var(--f-d); font-size: 20px; color: var(--text); position: relative; }
 .crest::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 1px dashed currentColor; opacity: .25; }
