@@ -34,7 +34,9 @@ node tools/card-check.js <cards folder> --index                           # also
 
 It fails on an id or name the game or another card already uses, an effect that isn't on the menu below (unless the card says it needs a new one), an event with no free option or with a locked one, and the style guide's spelling, dash and bracket rules. A Draft card also needs its source and an "Adapted from" section.
 
-Card previews show a card in the real game before anything is built: `node tools/card-preview.js <card or cards folder>` adds the card's event, gear or Title to the game in a browser, opens the screen it appears on at 360×640, saves screenshots in `<cards folder>/previews/` and rewrites the card's Preview section with them. Numbers in a preview are stand-ins until the data PR.
+Card previews show a card in the real game before anything is built: `node tools/card-preview.js <card or cards folder>` adds the card's event, gear, Title or enemy to the game in a browser, opens the screen it appears on at 360×640, saves screenshots in `<cards folder>/previews/` and rewrites the card's Preview section with them. Numbers in a preview are stand-ins until the data PR. An enemy card needs a ```js block of draft data under Mechanics (its `ENEMIES` entry as the data PR would add it); the preview shows its scout report, the fight starting, and its second phase.
+
+This whole process, from an outside source to Draft cards with previews, is called an **intake** (`content/cards/IMPORT.md`).
 
 ## Rules
 
