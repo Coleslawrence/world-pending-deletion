@@ -107,6 +107,32 @@ await check('a long title is refused', assertFails(postRun(alice, 'alice', 17000
 await check('a world rank as a number is refused', assertFails(postRun(alice, 'alice', 1700000000015, { wrank: 3 })));
 await check('maxHearts of 21 is refused', assertFails(postRun(alice, 'alice', 1700000000016, { maxHearts: 21 })));
 
+// Bug reports: a real report from the game's own builder, with and without a run attached
+const G2 = createRequire(import.meta.url)('../js/core.js');
+const env2 = { build: '2026-10-28/s5', screen: 'shop/shop', w: 320, h: 693, app: true, ua: 'Mozilla/5.0 (iPhone)' };
+const fbRun = (() => { const req = createRequire(import.meta.url), B = req('./bot.js'), m = G2.newMeta(); return B.playRun(m, false, { noElite: true }).run; })();
+const fbDoc = (o = {}, withRun = true) => Object.assign(G2.feedbackDoc('bug', 'The shop froze after I sold a skill.', env2, withRun ? fbRun : null, 1700000000000), o);
+const fbRef = (db, id) => doc(db, 'feedback/' + id);
+const postFb = (db, uid, at, o = {}, withRun) => setDoc(fbRef(db, uid + '_' + at), fbDoc(Object.assign({ at }, o), withRun));
+await check('a tester files a report with a run attached', assertSucceeds(setDoc(fbRef(alice, 'alice_1700000000000'), fbDoc())));
+await check('a report without a run is fine', assertSucceeds(postFb(alice, 'alice', 1700000000001, {}, false)));
+await check('an unapproved player can file a report', assertSucceeds(postFb(erin, 'erin', 1700000000002)));
+await check('a signed-out report is refused', assertFails(setDoc(fbRef(anon, 'dave_1700000000003'), fbDoc({ at: 1700000000003 }))));
+await check('a report cannot be overwritten', assertFails(setDoc(fbRef(alice, 'alice_1700000000000'), fbDoc())));
+await check('a report cannot be deleted', assertFails(deleteDoc(fbRef(alice, 'alice_1700000000000'))));
+await check('nobody reads reports in game, not even their own', assertFails(getDoc(fbRef(alice, 'alice_1700000000000'))));
+await check('nobody lists reports in game', assertFails(getDocs(collection(alice, 'feedback'))));
+await check('a report under someone else\'s id is refused', assertFails(postFb(bob, 'alice', 1700000000004)));
+await check('a report whose id and time differ is refused', assertFails(setDoc(fbRef(alice, 'alice_1700000000005'), fbDoc())));
+await check('a report with a name field is refused', assertFails(postFb(alice, 'alice', 1700000000006, { name: 'Wren' })));
+await check('an unknown report type is refused', assertFails(postFb(alice, 'alice', 1700000000007, { type: 'rant' })));
+await check('an empty report is refused', assertFails(postFb(alice, 'alice', 1700000000008, { text: '' })));
+await check('a 1001-character report is refused', assertFails(postFb(alice, 'alice', 1700000000009, { text: 'x'.repeat(1001) })));
+await check('a 1000-character report is fine', assertSucceeds(postFb(alice, 'alice', 1700000000010, { text: 'x'.repeat(1000) })));
+await check('11 log lines are refused', assertFails(postFb(alice, 'alice', 1700000000011, { run: Object.assign({}, fbDoc().run, { log: Array(11).fill('[x]') }) })));
+await check('an extra run field is refused', assertFails(postFb(alice, 'alice', 1700000000012, { run: Object.assign({}, fbDoc().run, { name: 'Wren' }) })));
+await check('a 201-character device line is refused', assertFails(postFb(alice, 'alice', 1700000000013, { ua: 'x'.repeat(201) })));
+
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);
