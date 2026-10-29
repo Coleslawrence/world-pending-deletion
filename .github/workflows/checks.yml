@@ -1,0 +1,49 @@
+# Checks every pull request: content mistakes, crashes in play, and balance against the base branch.
+# What each check catches and how to run it locally: docs/CONTENT.md, "Checks".
+name: Checks
+
+on:
+  pull_request:
+    branches: [dev, main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  content:
+    name: Content and smoke sim
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Content checker
+        run: node tools/check-content.js
+      - name: Smoke sim (200 seeded bot runs)
+        run: node tools/stats.js 200 --seed 1
+      - name: Pending World checks
+        run: node tools/daily.js 2026-11-01
+      - name: World Record checks
+        run: node tools/record.js
+
+  balance:
+    name: Balance gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check out the base branch beside this one
+        run: git worktree add ../base ${{ github.event.pull_request.base.sha }}
+      # Label the pull request balance-change when moving the numbers is the point: the gate then reports without failing
+      - name: Balance gate (same seeded bot runs on the base branch and this one)
+        run: node tools/balance-gate.js ../base . ${{ contains(github.event.pull_request.labels.*.name, 'balance-change') && '--report-only' || '' }}
