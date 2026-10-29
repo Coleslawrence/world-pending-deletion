@@ -113,7 +113,7 @@ function playRun(meta, verbose, opts = {}) {
   const home = G.WORLD_TYPES[w.type].home, main = opts.main || home, hs = G.ARCH[main].stat;
   // opts.roll: the Awakening's stat roll; opts.sys: keep the System's Gift picks for its bonus points
   const st = opts.roll ? G.rollStats() : { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; if (!opts.roll) { st[hs] += 2; st.VIT += 2; }
-  const patron = G.pick(['war', 'trick', 'ruin']);
+  const patron = G.pick(Object.keys(G.GODS));
   G.bindMeta(meta);
   const offer = G.makeOffer(w, meta);
   const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer, null, opts.sys ? G.SYS_BONUS : 0);

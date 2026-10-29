@@ -1,8 +1,11 @@
 // [World Pending Deletion] service worker: offline play.
 // Bump VERSION whenever the game files change so players get the update.
-const VERSION = 'wpd-v7';
+const VERSION = 'wpd-v8';
 const CORE = [
-  './', 'index.html', 'css/style.css', 'js/firebase-config.js', 'js/core.js', 'js/notes.js', 'js/ui.js', 'js/cloud-firebase.js', 'manifest.webmanifest',
+  './', 'index.html', 'css/style.css', 'js/firebase-config.js',
+  'js/content/base.js', 'js/content/archetypes.js', 'js/content/skills.js', 'js/content/skills/pyre.js', 'js/content/skills/venom.js', 'js/content/skills/blade.js', 'js/content/skills/bastion.js', 'js/content/skills/arcanist.js', 'js/content/skills/zealot.js', 'js/content/skills/reaper.js', 'js/content/skills/storm.js', 'js/content/skills/basic.js', 'js/content/gear.js', 'js/content/gods.js', 'js/content/worlds.js', 'js/content/worlds/drowned.js', 'js/content/worlds/burning.js', 'js/content/worlds/hollow.js', 'js/content/worlds/verdant.js', 'js/content/worlds/sky.js', 'js/content/worlds/iron.js', 'js/content/gifts.js', 'js/content/titles.js', 'js/content/quests.js', 'js/content/paths.js', 'js/content/enemies.js',
+  'js/content/events.js', 'js/content/events/undercity.js', 'js/content/events/official.js', 'js/content/events/poisoner.js', 'js/content/events/letter.js',
+  'js/core.js', 'js/notes.js', 'js/ui.js', 'js/cloud-firebase.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png', 'icons/favicon.svg',
 ];
 self.addEventListener('install', e => {

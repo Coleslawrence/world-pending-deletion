@@ -731,6 +731,7 @@ function playEvents(f) {
     else if (e.k === 'heal') { setTimeout(() => floatAt(e.side, '+' + e.amt, 'heal'), at); d += 90; }
     else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
     else if (e.k === 'reaction') { setTimeout(() => floatAt(e.side, e.name + '!', 'react'), at); d += 160; }
+    else if (e.k === 'phase') { setTimeout(() => { floatAt(e.side, 'Phase 2', 'react'); shake(e.side); }, at); d += 200; }
   });
   f.events = [];
 }
@@ -867,8 +868,8 @@ function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
-    const chainTag = E.chain && CHAIN_STARTERS[E.chain] !== p.key ? `<p class="sh-p fine">[Event chain: ${{ official: 'The Official', poisoner: 'The Poisoner', letter: 'The Letter' }[E.chain]}]</p>` : '';
-    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(E.text(run))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check ? `<span class="chk-tag">${esc(checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
+    const chainTag = E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
+    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check ? `<span class="chk-tag">${esc(checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
@@ -940,7 +941,7 @@ function resultSheet() {
 function statsSheet() {
   const s = effStats(run), p = buildPlayer(run);
   const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : '<span></span>'}</div>`).join('');
-  const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g]} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, run.favour[g] / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
+  const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g] || 0} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, (run.favour[g] || 0) / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
   const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : ''}${rows}
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
     <h4>Stat milestones</h4><ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>
@@ -978,7 +979,7 @@ function scoutSheet() {
   const spec = currentSpec(run);
   let body = '';
   if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
-  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>`; }
+  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}`; }
   if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }
