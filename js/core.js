@@ -684,6 +684,8 @@ function makeChoices(run, meta, rng) {
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
   if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
+  // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
+  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : TRAIT_COUNT[run.round - 1] || 0; if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -990,7 +992,19 @@ function buildEnemy(run, spec) {
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
     skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || null, P: enemyPassives(t.passives, p),
     weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
-  }, enemyTraits(t, p)));
+  }, enemyTraits(t, p), poolTraits(spec, t, p)));
+}
+// A spec's traits from the pool, on top of the enemy's own: passives add up; for a trait it already has, the
+// stronger value counts (every how many turns: the more often)
+function poolTraits(spec, t, p) {
+  if (!spec.traits || !spec.traits.length) return {};
+  const o = { P: enemyPassives(t.passives, p) }, own = enemyTraits(t, p);
+  spec.traits.forEach(k => {
+    const T = TRAIT_POOL[k]; if (!T) return;
+    Object.entries(enemyPassives(T.passives, p)).forEach(([q, v]) => o.P[q] = (o.P[q] || 0) + v);
+    Object.entries(enemyTraits(T.traits || {}, p)).forEach(([q, v]) => { const was = o[q] != null ? o[q] : own[q]; o[q] = was == null ? v : q === 'flood' || q === 'twincast' ? Math.min(was, v) : Math.max(was, v); });
+  });
+  return o;
 }
 function enemyMove(x, i, power) { return { key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power, cd: 0 }; }
 // The trait library: fields on an enemy (or in its phase's set) that give it a signature. What each does is in
@@ -1906,7 +1920,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,

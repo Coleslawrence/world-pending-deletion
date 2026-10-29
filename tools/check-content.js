@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS })');
+const C = vm.runInThisContext('({ STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -46,7 +46,7 @@ try {
 
 // ---------- Ids: well formed, never removed; World Record pools only grow at the end ----------
 const ID = /^[a-z][a-z0-9_]*$/;
-const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS };
+const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
 const nowIds = {};
 Object.entries(lists).forEach(([kind, o]) => { nowIds[kind] = Object.keys(o); if (kind !== 'paths') nowIds[kind].filter(k => !ID.test(k)).forEach(k => err(kind + ' ' + k, 'ids are lower case letters, digits and _')); });
 nowIds.eventOptions = {}; Object.entries(C.EVENTS).forEach(([k, E]) => nowIds.eventOptions[k] = E.opts.length);
@@ -80,6 +80,7 @@ const SCHEMA = {
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight']],
   chains: [C.CHAINS, ['name', 'start'], []],
+  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
 };
 const OPTION = [['label', 'desc'], ['check', 'pay', 'can', 'then', 'go', 'reveal']], THEN = ['gold', 'stats', 'next', 'chain', 'favour'];
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
@@ -150,11 +151,18 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   ref(w, t.champs.length >= 4, 'needs at least 4 champion names');
 });
 Object.entries(C.ENEMIES).forEach(([k, e]) => e.script.forEach(i => ref('enemies ' + k, Number.isInteger(i) && e.skills[i], `script move ${i} does not exist`)));
-// Traits: the numbers make sense; phases point at real moves; passives are ones that work on enemies
+// Traits: the numbers make sense; phases point at real moves; passives are ones that work on enemies; the trait pool too
 const share = v => typeof v === 'number' && v > 0 && v < 1, every = v => Number.isInteger(v) && v >= 2;
 const TRAIT_OK = { enrage: [share, 'a share of max HP between 0 and 1'], enrageMult: [v => v > 1, 'a damage multiplier above 1'], dodge: [share, 'a chance between 0 and 1'], adapt: [share, 'the share of damage taken from your most used skill, between 0 and 1'],
   flood: [every, 'every how many turns, 2 or more'], twincast: [every, 'every how many turns, 2 or more'], revive: [share, 'the share of max HP it rises with, between 0 and 1'], aura: [v => v > 0, 'Burn per turn'], briar: [v => v > 0, 'Bleed per turn'], forge: [v => v > 0, 'Block gained per turn'] };
 const traitCheck = (w, o) => Object.entries(o).forEach(([t, v]) => { if (!TRAIT_OK[t]) err(w, `${t} is not a trait (${MECHANICS.join(', ')})`); else if (!TRAIT_OK[t][0](v)) err(w, `${t} is ${JSON.stringify(v)}; it should be ${TRAIT_OK[t][1]}`); });
+Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
+  const w = 'trait pool ' + k;
+  traitCheck(w, T.traits || {});
+  Object.keys(T.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies`));
+  ref(w, T.passives || T.traits, 'needs passives or traits, or it does nothing');
+});
+ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).length), 'one whole number per round, no more than the pool holds');
 Object.entries(C.ENEMIES).forEach(([k, e]) => {
   const w = 'enemies ' + k;
   traitCheck(w, Object.fromEntries(MECHANICS.filter(t => e[t] != null).map(t => [t, e[t]])));
@@ -195,6 +203,7 @@ Object.values(C.GODS).forEach(g => Object.entries(g.bless).forEach(([k, v]) => u
 Object.values(C.ENEMIES).forEach(e => MECHANICS.filter(k => e[k] != null).forEach(k => use('enemy', k, e.name, e[k])));
 Object.values(C.ENEMIES).forEach(e => e.phase && Object.entries(e.phase.set || {}).forEach(([k, v]) => use('enemy', k, e.name + ' (phase)', v)));
 Object.values(C.ENEMIES).forEach(e => Object.entries(e.passives || {}).forEach(([k, v]) => use('passive', k, e.name, v)));
+Object.values(C.TRAIT_POOL).forEach(T => { Object.entries(T.passives || {}).forEach(([k, v]) => use('passive', k, 'trait ' + T.name, v)); Object.entries(T.traits || {}).forEach(([k, v]) => use('enemy', k, 'trait ' + T.name, v)); });
 Object.entries(uses.skill).forEach(([k, who]) => { if (!fxRead.has(k)) err('effect ' + k, `core.js never reads fx.${k}, so it does nothing (used by ${who[0][0]})`); });
 Object.entries(uses.gear).concat(Object.entries(uses.path), Object.entries(uses.god)).forEach(([k, who]) => { if (!pRead.has(k)) err('effect ' + k, `core.js never reads P.${k}, so it does nothing (used by ${who[0][0]})`); });
 Object.keys(uses.enemy).forEach(k => { if (!new RegExp('\\.' + k + '\\b').test(core)) err('enemy mechanic ' + k, 'core.js never reads it'); });
@@ -217,6 +226,7 @@ Object.entries(C.GEAR).forEach(([k, g]) => { say('gear ' + k, g.name); try { say
 Object.entries(C.ARCH).forEach(([k, a]) => [a.name, a.theme, a.path, ...a.b].forEach(s => say('archetypes ' + k, s)));
 Object.entries(C.GODS).forEach(([k, g]) => [g.name, g.blessing, g.reply && g.reply.label].forEach(s => say('gods ' + k, s)));
 Object.entries(C.CHAINS).forEach(([k, c]) => say('chains ' + k, c.name));
+Object.entries(C.TRAIT_POOL).forEach(([k, T]) => { say('trait pool ' + k, T.name, 1); say('trait pool ' + k, T.desc, 8); });
 Object.entries(C.WORLD_TYPES).forEach(([k, t]) => { say('worlds ' + k, t.name); say('worlds ' + k + ' flavour', t.flavour, 10); });
 Object.entries(C.MODIFIERS).forEach(([k, m]) => [m.name, m.desc].forEach(s => say('modifiers ' + k, s)));
 Object.entries(C.LORE).forEach(([w, L]) => L.entries.forEach(e => [e.name, e.text, e.near].forEach(s => say(`World Record ${w} ${e.name}`, s))));
@@ -253,6 +263,7 @@ Object.entries(C.ARCH).forEach(([k, a]) => { own(a.name, 'archetype ' + k); own(
 Object.entries(C.GIFTS).forEach(([k, g]) => own(g.name, 'Gift ' + k));
 Object.entries(C.TITLES).forEach(([k, t]) => own(t.name, 'Title ' + k));
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => own(h.name, 'Hidden Path ' + k));
+Object.entries(C.TRAIT_POOL).forEach(([k, T]) => own(T.name, 'enemy trait ' + k));
 Object.entries(G.REACTIONS).forEach(([k, r]) => own(r.name, 'reaction ' + k));
 Object.entries(G.MILESTONES).forEach(([k, m]) => own(m.name, 'milestone ' + k));
 Object.entries(G.PREFIXES).forEach(([k, p]) => own(p.name, 'rune ' + k));
