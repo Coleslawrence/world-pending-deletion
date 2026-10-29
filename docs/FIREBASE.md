@@ -26,6 +26,7 @@ The web version uses Firebase for sign-in, cloud saves and shared champions. Wit
 | `testers/{uid}` | One document per approved playtester | Only that player (to check) | Nobody: console only |
 | `requests/{uid}` | An access request: the name the player chose in game and when | Only that player | Only that player |
 | `runs/{uid}_{time}` | One anonymous summary per finished run, for the stats dashboard: world, class, round, Hearts, picks. No names | Nobody in game: console and exports only | Only that player, if a tester, once |
+| `feedback/{uid}_{time}` | Bug reports and feedback from Menu → Report: type, what the player typed, game build, screen, screen size, device line, optionally the run (round, skills, last 10 System messages). No names | Nobody in game: console, exports and the Discord alert script | Any signed-in player, their own, once |
 
 Shared records are treated as untrusted by the game: unknown pieces are dropped and stats are clamped.
 
@@ -50,6 +51,17 @@ be counted per entrant.
 To refresh the dashboard: export the `runs` collection as JSON (an array of documents, or an object keyed by document
 ID), then `node tools/run-report.js runs.json stats.json` and publish `stats.json` with the dashboard page.
 `node tools/run-report.js --sample 90 stats.json` makes bot runs instead, to try the page without real data.
+
+## Bug reports and feedback
+
+Menu → **Report a bug or idea** (also **Report** on the title screen) files one document in `feedback`. A report made
+while signed out waits on the device and posts at the next sign-in (the device keeps the last 10). Any signed-in player
+can report, approved or not; nobody can read reports in game.
+
+- **Discord:** the alert script in the project files (`alerts/`, Apps Script) posts each new report to a private channel
+  within 5 minutes and a weekly summary on Mondays. Webhook URLs live only in the script's properties, never here.
+- **Dashboard:** export `feedback` as JSON, then `node tools/feedback-report.js feedback.json DIR` writes the two
+  tables (`reports.json`, `report-types.json`) for the dashboard's Reports section. `--sample DIR` makes sample ones.
 
 ## Free-plan limits (Spark)
 
