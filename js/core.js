@@ -2136,6 +2136,28 @@ function runSummary(run, meta, outcome, now) {
   };
 }
 
+// ---------- Bug reports and feedback ----------
+// The Report form in the Menu files one document per report (feedback/{uid}_{at}, see firestore.rules). Only the console
+// and the stats dashboard read them. What the player typed, plus where they were: never a name or account detail.
+const FEEDBACK_TYPES = ['bug', 'idea', 'balance', 'other'];
+const FEEDBACK_MAX = 1000;
+// env: { build, screen, w, h, app, ua } from the device. With a run, a short snapshot and the last few System messages.
+function feedbackDoc(type, text, env, run, now) {
+  now = Math.round(now == null ? Date.now() : now);
+  const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0)), str = (v, n) => String(v == null ? '' : v).slice(0, n);
+  const d = {
+    type: FEEDBACK_TYPES.includes(type) ? type : 'other', text: str(text, FEEDBACK_MAX).trim() || '(empty)', at: now,
+    build: str(env.build, 24), screen: str(env.screen, 24), w: int(env.w, 0, 9999), h: int(env.h, 0, 9999), app: !!env.app, ua: str(env.ua, 200),
+  };
+  if (run) d.run = {
+    world: str(run.world.type, 16), mode: run.practice ? 'practice' : run.daily ? (run.ranked ? 'daily' : 'replay') : 'world', stage: str(run.stage, 16),
+    round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), gold: int(run.gold, 0, 999), level: int(run.level, 1, 9),
+    path: run.path ? str(run.path, 16) : null, bar: run.bar.filter(Boolean).slice(0, 8).map(p => baseId(p.id)),
+    log: (run.log || []).slice(-10).map(l => str(l.text, 160)),
+  };
+  return d;
+}
+
 // ---------- Entrant Rank ----------
 // A permanent grade from F to S, with SS and SSS hidden above. RP opens a Rank Trial; only passing it promotes. Rank never goes down.
 const RANK_LADDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
@@ -2348,5 +2370,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX,
+  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
