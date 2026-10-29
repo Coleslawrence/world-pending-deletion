@@ -280,6 +280,30 @@ async function postRuns() {
   }
   ui.postingRuns = false;
 }
+// Bug reports and feedback (Menu → Report). Queued on the device and posted to feedback/{uid}_{at} once signed in,
+// approved or not; only the console and the stats dashboard read them. A refused post stays queued for a later sync.
+const FBQ_KEY = 'wpd-fbq';
+// An unsent draft is kept if the form is closed and opened again
+function openReport() { ui.fb = Object.assign({ type: 'bug', text: '', attach: !!run }, ui.fb, { from: ui.screen + (run ? '/' + run.stage : '') }); ui.sheet = { type: 'report' }; render(); }
+function sendReport() {
+  const F = ui.fb; if (!F) return;
+  if (!F.text.trim()) { toast('[The System cannot read an empty report. Type something.]', 'loss'); return; }
+  const s = screenInfo(), build = (typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length ? PATCH_NOTES[0].id : '?') + '/s' + VERSION;
+  const d = feedbackDoc(F.type, F.text, { build, screen: F.from, w: innerWidth, h: s.vh, app: s.standalone, ua: navigator.userAgent }, F.attach && run && !run.practice ? run : null);
+  const q = lsGet(FBQ_KEY) || []; q.push(d); lsSet(FBQ_KEY, q.slice(-10));
+  ui.fb = null; ui.sheet = null; render();
+  toast(cloud.on ? '[Report filed. The System reads every one. Eventually.]' : '[Report filed. It sends once you sign in.]', 'sys');
+  postFeedback();
+}
+async function postFeedback() {
+  if (!cloud.on || !cloud.db || !cloud.uid || ui.postingFb) return;
+  ui.postingFb = true;
+  for (const r of lsGet(FBQ_KEY) || []) {
+    try { await cloud.db.doc(`feedback/${cloud.uid}_${r.at}`).set(r); lsSet(FBQ_KEY, (lsGet(FBQ_KEY) || []).filter(x => x.at !== r.at)); }
+    catch (e) { console.warn('[cloud] post report failed:', e && e.code, e); break; }
+  }
+  ui.postingFb = false;
+}
 // The board: today's top 20, plus your own score pinned with its rank when you're outside them. About 21 reads.
 async function loadBoard() {
   const date = dailyDate(), B = ui.board;
@@ -417,7 +441,7 @@ function titleHTML() {
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
-      <div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button></div>
+      <div class="row3"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button><button class="btn ghost small" data-act="report">Report</button></div>
       ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
     </div></main>`;
 }
@@ -963,9 +987,20 @@ function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key =
 function screenLine() { const s = screenInfo(); return `[Display: ${innerWidth}×${s.vh} of ${s.sh} · insets ${Math.round(s.top)}/${Math.round(s.bottom)}${s.standalone ? ' · app' : ''}${document.documentElement.style.getPropertyValue('--app-h') ? ' · stretched' : ''}]`; }
 function menuSheet() {
   const cs = !cloud.on ? (FIREBASE ? '' : 'Progress is saved on this device only.') : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
-  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}<br><span class="scr-info">${screenLine()}</span></p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
+  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}<br><span class="scr-info">${screenLine()}</span></p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button><button class="btn" data-act="report">Report a bug or idea</button>
     ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
+}
+const FB_LABEL = { bug: 'Bug', idea: 'Idea', balance: 'Balance', other: 'Other' };
+function reportSheet() {
+  const F = ui.fb || (ui.fb = { type: 'bug', text: '', attach: !!run, from: ui.screen });
+  const hint = { bug: 'What happened, and what did you expect?', idea: 'What would you add or change?', balance: 'What felt too strong, too weak or unfair?', other: 'Anything else the System should know.' }[F.type];
+  const body = `<p class="sh-p sysl">[Complaints are now accepted. The System reads every one.]</p>
+    <div class="fb-types" role="group" aria-label="Report type">${FEEDBACK_TYPES.map(k => `<button class="btn small ${F.type === k ? 'primary' : 'ghost'}" data-act="fb-type" data-k="${k}" aria-pressed="${F.type === k}">${FB_LABEL[k]}</button>`).join('')}</div>
+    <label class="fld"><span>${esc(FB_LABEL[F.type])} report</span><textarea id="fb-text" rows="5" maxlength="${FEEDBACK_MAX}" placeholder="${esc(hint)}">${esc(F.text)}</textarea></label>
+    ${run && !run.practice ? `<label class="fb-chk"><input type="checkbox" id="fb-attach" ${F.attach ? 'checked' : ''}> Attach this run (round, skills, last System messages)</label>` : ''}
+    <p class="sh-p fine">Sent with the game version, the screen you were on and your screen size. Never your name or email.${FIREBASE && !cloud.on ? ' You are signed out: it waits on this device until you sign in.' : ''}</p>`;
+  return sheetWrap('Report a bug or idea', body, `<button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="fb-send">Send</button>`, 'report-sheet');
 }
 function syslogSheet() { return sheetWrap('System log', `<ul class="msgs">${run.log.slice().reverse().map(l => `<li class="t-${l.t}">${esc(l.text)}</li>`).join('') || '<li class="unk">Nothing yet.</li>'}</ul>`, `<button class="btn primary" data-act="close">Close</button>`); }
 // ---------- What's new ----------
@@ -1055,6 +1090,8 @@ function endHTML() {
 function render() {
   if (ui.screen === 'district' && run && run.stage === 'shop' && !ui.sheet && !run.pending.length) ui.screen = 'shop';
   const focusName = document.activeElement && document.activeElement.id === 'aw-name';
+  // A sync can redraw while a report is being typed: put the cursor back where it was
+  const fbFocus = document.activeElement && document.activeElement.id === 'fb-text' ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
   let h = '';
   const scr = ui.screen;
   if (scr === 'title') h = titleHTML();
@@ -1070,7 +1107,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1081,6 +1118,7 @@ function render() {
   if (scr === 'fight') updateFight();
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (fbFocus) { const el = document.getElementById('fb-text'); if (el) { el.focus(); el.setSelectionRange(fbFocus[0], fbFocus[1]); } }
 }
 
 // ---------- Actions ----------
@@ -1128,6 +1166,9 @@ function onAct(el) {
     case 'erase-next': return eraseNext();
     case 'sheet': ui.sheet = { type: d.s }; return render();
     case 'menu': ui.sheet = { type: 'menu' }; return render();
+    case 'report': return openReport();
+    case 'fb-type': ui.fb.type = d.k; return render();
+    case 'fb-send': return sendReport();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
     case 'speed-cycle': ui.speed = ui.speed >= 3 ? 1 : ui.speed + 1; lsSet('wpd-speed', ui.speed); return render();
@@ -1376,6 +1417,7 @@ async function cloudInit() {
     await checkRests();
     postDaily();
     postRuns();
+    postFeedback();
     if (cloud.status === 'syncing') cloud.status = 'synced';
     render();
   } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }
@@ -1544,7 +1586,8 @@ function cloudSignInHTML(compact) {
 
 app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
-app.addEventListener('change', e => { if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
+app.addEventListener('input', e => { if (e.target.id === 'fb-text' && ui.fb) ui.fb.text = e.target.value; });
+app.addEventListener('change', e => { if (e.target.id === 'fb-attach' && ui.fb) ui.fb.attach = e.target.checked; if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && ui.sheet && !['result'].includes(ui.sheet.type)) { ui.sheet = null; render(); }
   if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }

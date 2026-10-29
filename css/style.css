@@ -683,3 +683,9 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
   .sheet-bg { align-items: center; padding: 24px; }
   .sheet { max-width: 560px; max-height: min(100%, 780px); border-bottom: 1px solid var(--line2); border-radius: 14px; padding-bottom: 0; }
 }
+/* Report a bug or idea */
+.fb-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 10px; }
+.fb-types .btn { padding-left: 4px; padding-right: 4px; min-width: 0; }
+.fld textarea { font: 16px var(--f-b); color: var(--text); background: var(--bg); border: 1px solid var(--line2); border-radius: 5px; padding: 9px 10px; width: 100%; resize: vertical; min-height: 110px; }
+.fb-chk { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 4px; font-size: 14px; color: var(--text); }
+.fb-chk input { margin-top: 3px; flex: none; }

@@ -49,7 +49,7 @@ function states() {
     out.forEach(s => { s.run.name = 'Oringe waan the Unbowed'; s.run.world.name = 'Morgravel-under-Ash'; s.run.champ = s.run.name + ' of ' + s.run.world.name; });
     const mid = out.find(s => s.label === 'r5-shop') || out[0];
     out.unshift({ label: 'title', stage: 'title', run: mid.run }, { label: 'worlds', stage: 'worlds', run: mid.run });
-    ['stats', 'archetypes', 'menu'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
+    ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };
   }
