@@ -22,6 +22,18 @@ A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an e
 
 New content starts as a content card in the project files (`content/cards/`, from `TEMPLATE.md`): what it is, where it belongs, every line in its voice, and the effects it uses. Nothing is built until Slaw says yes on the card. A new world, god or Final Champion gets its lore bible entry agreed first.
 
+Ideas from outside the project (Slaw's inspiration list, a game or book, a pasted doc, a playtester's suggestion) come in as **Draft** cards, following `content/cards/IMPORT.md`: capture the source, sort it into ideas, adapt each one (the mechanic, never another work's names or text), check, and hand the batch to Slaw.
+
+The card checker reads cards against the game before Slaw sees them:
+
+```
+node tools/card-check.js <cards folder>                                   # checks every card; exits 1 on any error
+node tools/card-check.js <cards folder> --new event "Name" --source TEXT  # starts a Draft card with a free id
+node tools/card-check.js <cards folder> --index                           # also writes INDEX.md, every card by status
+```
+
+It fails on an id or name the game or another card already uses, an effect that isn't on the menu below (unless the card says it needs a new one), an event with no free option or with a locked one, and the style guide's spelling, dash and bracket rules. A Draft card also needs its source and an "Adapted from" section.
+
 ## Rules
 
 - **Content uses only content.** Files in `js/content/` may use each other and `base.js`, never anything from `js/core.js`. They load before it.
