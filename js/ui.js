@@ -40,7 +40,7 @@ if (run && run.v !== VERSION) run = null;
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
 ensureRecord(run);
-const ui = { screen: 'title', worlds: null, world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: [1, 2, 3].includes(lsGet('wpd-speed')) ? lsGet('wpd-speed') : 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
+const ui = { screen: 'title', worlds: null, seed: '', world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: [1, 2, 3].includes(lsGet('wpd-speed')) ? lsGet('wpd-speed') : 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
 if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
 function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
@@ -48,16 +48,35 @@ function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; m
 function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
 // ---------- Toasts ----------
-function toast(text, t = 'sys') {
-  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text;
-  placeToasts(); toastsEl.appendChild(el); while (toastsEl.children.length > (ui.screen === 'fight' ? 2 : 3)) toastsEl.firstChild.remove();
-  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350); }, t === 'broadcast' ? 4200 : t === 'class' ? 3400 : 2600);
+// Notices wait their turn instead of pushing each other off screen: a few show at once, each stays long enough to
+// read (longer lines stay longer), and a tap clears one early so the next comes in. Missed ones are in the System log.
+const toastQ = [];
+const toastMs = (text, t) => Math.min(9000, 2400 + text.length * 45) + (t === 'broadcast' ? 1200 : 0);
+function toast(text, t = 'sys', onTap) { toastQ.push({ text, t, onTap }); pumpToasts(); }
+function pumpToasts() {
+  if (!toastQ.length || pumpToasts.gap || toastsEl.querySelectorAll('.toast:not(.out)').length >= (ui.screen === 'fight' ? 2 : 3)) return;
+  const { text, t, onTap } = toastQ.shift();
+  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text; el.onTap = onTap;
+  placeToasts(); toastsEl.appendChild(el);
+  el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
+  pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280);
 }
+function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => el.remove(), 350); pumpToasts(); }
+function clearToasts() { toastQ.length = 0; toastsEl.querySelectorAll('.toast').forEach(el => clearTimeout(el.timer)); toastsEl.replaceChildren(); }
+toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast'); if (!el) return; dropToast(el); if (el.onTap) el.onTap(); });
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
-function pushMsgs(msgs, logged) { if (!logged) msgs.forEach(m => logRun(m.text, m.t)); msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9)).slice(0, 3).forEach((m, i) => setTimeout(() => toast(m.text, m.t), i * 280)); }
+const TOAST_MAX = 5;
+function pushMsgs(msgs, logged) {
+  if (!logged) msgs.forEach(m => logRun(m.text, m.t));
+  const show = msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9));
+  show.slice(0, TOAST_MAX).forEach(m => toast(m.text, m.t));
+  const more = show.length - TOAST_MAX;
+  if (more > 0 && run) toast(`[${more} more in the System log. Tap to read.]`, 'sys', openLog);
+}
+function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ui.sheet.type === 'result')) return; ui.sheet = { type: 'syslog' }; render(); }
 
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial' };
@@ -90,7 +109,7 @@ function bracketDots() {
 }
 // The fight screen leaves out gold (nothing to spend it on mid-fight) to make room for its speed and ? buttons
 function topBar(title, extra, fight) {
-  return `<header class="bar"><div class="bar-l"><div class="bar-w"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}</div><span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+  return `<header class="bar"><div class="bar-l"><div class="bar-w"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}</div><span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
 }
 function archChips(counts, small) {
   return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span>${ARCH[k].name}</span><small>/${next}</small></button>`; }).join('')}</div>`;
@@ -261,6 +280,30 @@ async function postRuns() {
   }
   ui.postingRuns = false;
 }
+// Bug reports and feedback (Menu → Report). Queued on the device and posted to feedback/{uid}_{at} once signed in,
+// approved or not; only the console and the stats dashboard read them. A refused post stays queued for a later sync.
+const FBQ_KEY = 'wpd-fbq';
+// An unsent draft is kept if the form is closed and opened again
+function openReport() { ui.fb = Object.assign({ type: 'bug', text: '', attach: !!run }, ui.fb, { from: ui.screen + (run ? '/' + run.stage : '') }); ui.sheet = { type: 'report' }; render(); }
+function sendReport() {
+  const F = ui.fb; if (!F) return;
+  if (!F.text.trim()) { toast('[The System cannot read an empty report. Type something.]', 'loss'); return; }
+  const s = screenInfo(), build = (typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length ? PATCH_NOTES[0].id : '?') + '/s' + VERSION;
+  const d = feedbackDoc(F.type, F.text, { build, screen: F.from, w: innerWidth, h: s.vh, app: s.standalone, ua: navigator.userAgent }, F.attach && run && !run.practice ? run : null);
+  const q = lsGet(FBQ_KEY) || []; q.push(d); lsSet(FBQ_KEY, q.slice(-10));
+  ui.fb = null; ui.sheet = null; render();
+  toast(cloud.on ? '[Report filed. The System reads every one. Eventually.]' : '[Report filed. It sends once you sign in.]', 'sys');
+  postFeedback();
+}
+async function postFeedback() {
+  if (!cloud.on || !cloud.db || !cloud.uid || ui.postingFb) return;
+  ui.postingFb = true;
+  for (const r of lsGet(FBQ_KEY) || []) {
+    try { await cloud.db.doc(`feedback/${cloud.uid}_${r.at}`).set(r); lsSet(FBQ_KEY, (lsGet(FBQ_KEY) || []).filter(x => x.at !== r.at)); }
+    catch (e) { console.warn('[cloud] post report failed:', e && e.code, e); break; }
+  }
+  ui.postingFb = false;
+}
 // The board: today's top 20, plus your own score pinned with its rank when you're outside them. About 21 reads.
 async function loadBoard() {
   const date = dailyDate(), B = ui.board;
@@ -398,8 +441,8 @@ function titleHTML() {
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
-      <div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button></div>
-      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(window.WPD_CLOUD.displayName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
+      <div class="row3"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button><button class="btn ghost small" data-act="report">Report</button></div>
+      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
     </div></main>`;
 }
 function worldsHTML() {
@@ -423,9 +466,13 @@ function worldsHTML() {
 // ---------- Awakening ----------
 // In Pending World the record and the System Offer come from the day's seed, and Echo unlocks don't count
 function newAw(w, date) {
-  return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
-    offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta), title: null };
+  return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type, awRng('record')), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
+    offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta, awRng('offer')), title: null };
 }
+// Everything the System draws at an Awakening comes from a seed: the day's in Pending World, otherwise one drawn when
+// the worlds are offered. Backing out to the worlds and returning, or asking the System again, gives the same record,
+// Offer, Gift picks and stat roll, so they can't be fished for. A fresh set of worlds brings a fresh seed.
+function awRng(tag) { return seedRng((ui.daily ? dailySeed(ui.daily.date) : 'aw:' + ui.seed + ':' + ui.world) + ':' + tag); }
 // Any change to the System's Gift picks withdraws its bonus points
 function sysOverruled(A) { if (!A.sysPts) return; A.sysPts = 0; toast('[You overruled the System. Its bonus Gift Points are withdrawn.]', 'loss'); }
 function awMeta() { return ui.daily ? levelMeta(meta) : meta; }
@@ -706,7 +753,7 @@ function summarize(f, side) {
 function startFightUI() {
   ui.fight = newFight(run);
   ui.busy = false; ui.screen = 'fight'; ui.sheet = null;
-  toastsEl.replaceChildren(); // shop toasts don't carry into the fight
+  clearToasts(); // shop toasts don't carry into the fight
   const f = ui.fight;
   say2(f, `[${f.B.name} enters the arena.]`, 'sys');
   const intro = rankIntro(run, meta, f.spec, f.B.name);
@@ -940,9 +987,20 @@ function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key =
 function screenLine() { const s = screenInfo(); return `[Display: ${innerWidth}×${s.vh} of ${s.sh} · insets ${Math.round(s.top)}/${Math.round(s.bottom)}${s.standalone ? ' · app' : ''}${document.documentElement.style.getPropertyValue('--app-h') ? ' · stretched' : ''}]`; }
 function menuSheet() {
   const cs = !cloud.on ? (FIREBASE ? '' : 'Progress is saved on this device only.') : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
-  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}<br><span class="scr-info">${screenLine()}</span></p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button>
+  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}<br><span class="scr-info">${screenLine()}</span></p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button><button class="btn" data-act="report">Report a bug or idea</button>
     ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
+}
+const FB_LABEL = { bug: 'Bug', idea: 'Idea', balance: 'Balance', other: 'Other' };
+function reportSheet() {
+  const F = ui.fb || (ui.fb = { type: 'bug', text: '', attach: !!run, from: ui.screen });
+  const hint = { bug: 'What happened, and what did you expect?', idea: 'What would you add or change?', balance: 'What felt too strong, too weak or unfair?', other: 'Anything else the System should know.' }[F.type];
+  const body = `<p class="sh-p sysl">[Complaints are now accepted. The System reads every one.]</p>
+    <div class="fb-types" role="group" aria-label="Report type">${FEEDBACK_TYPES.map(k => `<button class="btn small ${F.type === k ? 'primary' : 'ghost'}" data-act="fb-type" data-k="${k}" aria-pressed="${F.type === k}">${FB_LABEL[k]}</button>`).join('')}</div>
+    <label class="fld"><span>${esc(FB_LABEL[F.type])} report</span><textarea id="fb-text" rows="5" maxlength="${FEEDBACK_MAX}" placeholder="${esc(hint)}">${esc(F.text)}</textarea></label>
+    ${run && !run.practice ? `<label class="fb-chk"><input type="checkbox" id="fb-attach" ${F.attach ? 'checked' : ''}> Attach this run (round, skills, last System messages)</label>` : ''}
+    <p class="sh-p fine">Sent with the game version, the screen you were on and your screen size. Never your name or email.${FIREBASE && !cloud.on ? ' You are signed out: it waits on this device until you sign in.' : ''}</p>`;
+  return sheetWrap('Report a bug or idea', body, `<button class="btn ghost" data-act="close">Cancel</button><button class="btn primary" data-act="fb-send">Send</button>`, 'report-sheet');
 }
 function syslogSheet() { return sheetWrap('System log', `<ul class="msgs">${run.log.slice().reverse().map(l => `<li class="t-${l.t}">${esc(l.text)}</li>`).join('') || '<li class="unk">Nothing yet.</li>'}</ul>`, `<button class="btn primary" data-act="close">Close</button>`); }
 // ---------- What's new ----------
@@ -1032,6 +1090,8 @@ function endHTML() {
 function render() {
   if (ui.screen === 'district' && run && run.stage === 'shop' && !ui.sheet && !run.pending.length) ui.screen = 'shop';
   const focusName = document.activeElement && document.activeElement.id === 'aw-name';
+  // A sync can redraw while a report is being typed: put the cursor back where it was
+  const fbFocus = document.activeElement && document.activeElement.id === 'fb-text' ? [document.activeElement.selectionStart, document.activeElement.selectionEnd] : null;
   let h = '';
   const scr = ui.screen;
   if (scr === 'title') h = titleHTML();
@@ -1047,7 +1107,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1058,6 +1118,7 @@ function render() {
   if (scr === 'fight') updateFight();
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (fbFocus) { const el = document.getElementById('fb-text'); if (el) { el.focus(); el.setSelectionRange(fbFocus[0], fbFocus[1]); } }
 }
 
 // ---------- Actions ----------
@@ -1065,7 +1126,7 @@ function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.world = null; ui.end = null; return go('worlds');
+    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
@@ -1078,14 +1139,14 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(ui.daily ? seedRng(dailySeed(ui.daily.date) + ':roll') : undefined); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
+    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(awRng('roll')); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
     case 'aw-unroll': { const A = ui.aw; A.stats = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; A.pts = 4; A.rolled = false; return render(); }
     case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (A.rolled) return; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
     case 'aw-cat': ui.aw.cat = d.c; return render();
     case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
     case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
     case 'aw-title': ui.aw.title = ui.aw.title === d.k ? null : d.k; return render();
-    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, ui.daily ? seedRng(dailySeed(ui.daily.date) + ':sys') : undefined, A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
+    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, awRng('sys'), A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
     case 'aw-save': { const A = ui.aw; meta.presets = (meta.presets || []).concat({ name: 'Preset ' + ((meta.presets || []).length + 1), gifts: A.gifts.filter(k => GIFTS[k].cat !== 'world') }).slice(-3); meta.presets.forEach((p, i) => p.name = 'Preset ' + (i + 1)); saveMeta(); toast('[Preset saved.]', 'sys'); return render(); }
     case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
@@ -1105,6 +1166,9 @@ function onAct(el) {
     case 'erase-next': return eraseNext();
     case 'sheet': ui.sheet = { type: d.s }; return render();
     case 'menu': ui.sheet = { type: 'menu' }; return render();
+    case 'report': return openReport();
+    case 'fb-type': ui.fb.type = d.k; return render();
+    case 'fb-send': return sendReport();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
     case 'speed-cycle': ui.speed = ui.speed >= 3 ? 1 : ui.speed + 1; lsSet('wpd-speed', ui.speed); return render();
@@ -1353,6 +1417,7 @@ async function cloudInit() {
     await checkRests();
     postDaily();
     postRuns();
+    postFeedback();
     if (cloud.status === 'syncing') cloud.status = 'synced';
     render();
   } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }
@@ -1515,13 +1580,14 @@ function cloudSignInHTML(compact) {
   if (!FIREBASE) return '';
   const C = window.WPD_CLOUD;
   if (C && C.error) return compact ? '' : '<p class="sh-p fine">Cloud saves are unavailable right now (offline?). Progress is saved on this device.</p>';
-  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(C.displayName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p>${cloud.tester === false ? `<p class="sh-p sysl">${PENDING}</p><p class="sh-p fine">Your request is filed under this name. Daily scores and shared champions open once you are approved.</p>` : ''}<button class="btn small ghost" data-act="signout">Sign out</button></div>`;
+  if (cloud.on) return compact ? '' : `<div class="cloudbox"><p class="sh-p">Signed in as <b>${esc(publicName())}</b>. Progress syncs across your devices.</p><label class="fld"><span>Name other players see</span><input id="cloud-name" maxlength="18" value="${esc(publicName())}" autocomplete="off"></label><p class="sh-p fine">Your account name and email are never shown to other players.</p>${cloud.tester === false ? `<p class="sh-p sysl">${PENDING}</p><p class="sh-p fine">Your request is filed under this name. Daily scores and shared champions open once you are approved.</p>` : ''}<button class="btn small ghost" data-act="signout">Sign out</button></div>`;
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
 app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
-app.addEventListener('change', e => { if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
+app.addEventListener('input', e => { if (e.target.id === 'fb-text' && ui.fb) ui.fb.text = e.target.value; });
+app.addEventListener('change', e => { if (e.target.id === 'fb-attach' && ui.fb) ui.fb.attach = e.target.checked; if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && ui.sheet && !['result'].includes(ui.sheet.type)) { ui.sheet = null; render(); }
   if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }
