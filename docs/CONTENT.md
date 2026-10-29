@@ -64,6 +64,34 @@ After adding content, run `node tools/check-content.js --write`. It records the 
 
 `WHEEL` in `archetypes.js` sets the order of the archetype wheel: an archetype's allies are its neighbours on it. A new archetype goes into the wheel where it should sit, and the wheel grows with it.
 
+## Enemy traits, passives and phases
+
+An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as player skills), the order it uses them (`script`, looping), and any of these. A new boss mixes them; a trait that doesn't exist yet is a mechanic and gets its own pull request first.
+
+| Trait | Value | What it does |
+| --- | --- | --- |
+| `enrage`, `enrageMult` | share of max HP, multiplier (default 1.5) | At or below that HP, deals that much more damage |
+| `dodge` | chance | Dodges attacks |
+| `adapt` | share, like 0.6 | Takes that share of the damage from the skill you have used most this fight |
+| `flood` | every N turns | The arena floods: whoever has less Block is Weakened for 2 turns |
+| `aura` | Burn per turn | Sets you alight at the start of each of its turns |
+| `briar` | Bleed per turn | Makes you Bleed at the start of each of its turns |
+| `twincast` | every N turns | Uses its move twice |
+| `forge` | Block per turn | Its Block never fades and grows each turn |
+| `revive` | share of max HP | Rises once with that much HP |
+
+Burn, Bleed and Block amounts scale with the enemy's power, like its moves.
+
+**Passives** (`passives: { regen: 3, thornsAlways: 2 }`) use the gear and Hidden Path keys that work on enemies, listed in the menu below. Flat amounts scale with the enemy's power; rates don't.
+
+**Phases** turn a boss into a two-part fight:
+
+```js
+phase: { at: 0.5, say: '[The Forge King\'s anvil cracks.]', add: [{ n: 'Slag Burst', fx: { dmg: 4, hits: 3, burn: 2 } }], script: [3, 2, 0], set: { forge: 5 } }
+```
+
+At or below `at` of max HP, the System says `say`, the moves in `add` join its moves (numbered after its own, so the first added move is `skills.length`), and it switches to `script` from the start, with any traits in `set`. Intent stays honest: the move already shown still happens as shown, and the new traits start after it. The scout report says the enemy has a second phase, not what it is.
+
 ## The effect menu
 
 Written from the content itself by the checker, so it is always current. "Bot scores it: no" means the balance sims undervalue skills that lean on that effect.
@@ -189,18 +217,44 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `dotPlus` | 1 | The Trickster (2) |
 | `lowHpDmg` | 1 | The Goddess of Ruin (0.3) |
 
-### Enemy mechanics (fields on the enemy)
+### Enemy traits (fields on the enemy, or in its phase's set)
 
 | Key | Used | Examples (value) |
 | --- | --- | --- |
+| `adapt` | 1 | Kaito Ren (0.6) |
 | `aura` | 1 | Emperor Kharros the Ashen (0.7) |
 | `briar` | 1 | The Thorn Mother (1) |
 | `dodge` | 1 | Lyss of the Thorn (0.05) |
 | `enrage` | 2 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5) |
 | `enrageMult` | 2 | Grukk the Unbroken (1.25), Emperor Kharros the Ashen (1.25) |
-| `flood` | 1 | The Leviathan Queen (true) |
+| `flood` | 1 | The Leviathan Queen (3) |
 | `forge` | 1 | The Forge King (3) |
-| `kaito` | 1 | Kaito Ren (true) |
 | `revive` | 1 | The Bone Saint (0.3) |
 | `twincast` | 1 | The Archmage Who Fell Upward (3) |
+
+### Enemy passives (`passives`, from the gear and Hidden Path keys that work on enemies)
+
+| Key | Used | Examples (value) | Scales with enemy power |
+| --- | --- | --- | --- |
+| `bleedMult` | 0 |  | no |
+| `bleedPlus` | 0 |  | yes |
+| `blockKeep` | 0 |  | no |
+| `burnPlus` | 0 |  | yes |
+| `dmgPct` | 0 |  | no |
+| `dotPlus` | 0 |  | yes |
+| `flatDR` | 0 |  | yes |
+| `healPct` | 0 |  | no |
+| `lifesteal` | 0 |  | no |
+| `lowDR` | 0 |  | no |
+| `lowHpDmg` | 0 |  | no |
+| `poisonMult` | 0 |  | no |
+| `poisonPlus` | 0 |  | yes |
+| `regen` | 0 |  | yes |
+| `startBlock` | 0 |  | yes |
+| `startBlockPct` | 0 |  | no |
+| `thornBurn` | 0 |  | yes |
+| `thornMult` | 0 |  | no |
+| `thornPoison` | 0 |  | yes |
+| `thornsAlways` | 0 |  | yes |
+| `vsHalf` | 0 |  | no |
 <!-- effects:end -->
