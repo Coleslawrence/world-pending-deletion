@@ -65,7 +65,7 @@ if (saved) {
 } else if (!WRITE) err(IDS_FILE, 'missing. Run node tools/check-content.js --write');
 
 // ---------- Fields: required ones present, nothing unknown (a typo is an unknown field) ----------
-const MECHANICS = ['enrage', 'enrageMult', 'dodge', 'kaito', 'flood', 'aura', 'revive', 'briar', 'twincast', 'forge'];
+const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind'], ['evo', 'base', 'noShop', 'quick', 'basic']],
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text'], ['fix']],
@@ -73,7 +73,7 @@ const SCHEMA = {
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], []],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
-  enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final'].concat(MECHANICS)],
+  enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives'].concat(MECHANICS)],
   gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch']],
   titles: [C.TITLES, ['name', 'cond', 'desc'], ['first']],
   quests: [C.QUESTS, ['text', 'reward', 'goal'], ['hidden', 'by']],
@@ -150,6 +150,25 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   ref(w, t.champs.length >= 4, 'needs at least 4 champion names');
 });
 Object.entries(C.ENEMIES).forEach(([k, e]) => e.script.forEach(i => ref('enemies ' + k, Number.isInteger(i) && e.skills[i], `script move ${i} does not exist`)));
+// Traits: the numbers make sense; phases point at real moves; passives are ones that work on enemies
+const share = v => typeof v === 'number' && v > 0 && v < 1, every = v => Number.isInteger(v) && v >= 2;
+const TRAIT_OK = { enrage: [share, 'a share of max HP between 0 and 1'], enrageMult: [v => v > 1, 'a damage multiplier above 1'], dodge: [share, 'a chance between 0 and 1'], adapt: [share, 'the share of damage taken from your most used skill, between 0 and 1'],
+  flood: [every, 'every how many turns, 2 or more'], twincast: [every, 'every how many turns, 2 or more'], revive: [share, 'the share of max HP it rises with, between 0 and 1'], aura: [v => v > 0, 'Burn per turn'], briar: [v => v > 0, 'Bleed per turn'], forge: [v => v > 0, 'Block gained per turn'] };
+const traitCheck = (w, o) => Object.entries(o).forEach(([t, v]) => { if (!TRAIT_OK[t]) err(w, `${t} is not a trait (${MECHANICS.join(', ')})`); else if (!TRAIT_OK[t][0](v)) err(w, `${t} is ${JSON.stringify(v)}; it should be ${TRAIT_OK[t][1]}`); });
+Object.entries(C.ENEMIES).forEach(([k, e]) => {
+  const w = 'enemies ' + k;
+  traitCheck(w, Object.fromEntries(MECHANICS.filter(t => e[t] != null).map(t => [t, e[t]])));
+  Object.keys(e.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies (they can use ${Object.keys(G.ENEMY_PASSIVES).join(', ')})`));
+  const ph = e.phase; if (!ph) return;
+  const moves = e.skills.concat(ph.add || []);
+  Object.keys(ph).filter(f => !['at', 'say', 'script', 'add', 'set'].includes(f)).forEach(f => err(w + ' phase', `unknown field ${f} (at, say, script, add, set)`));
+  ref(w + ' phase', share(ph.at), 'at is the share of max HP the phase starts at, between 0 and 1');
+  ref(w + ' phase', typeof ph.say === 'string' && /^\[.*\]$/.test(ph.say), 'say is the System line announcing it, in [brackets]');
+  ref(w + ' phase', Array.isArray(ph.script) && ph.script.length && ph.script.every(i => Number.isInteger(i) && moves[i]), `script must list moves that exist (0 to ${moves.length - 1}; added moves come after the enemy's own)`);
+  (ph.add || []).forEach(m => ref(w + ' phase', m.n && m.fx, 'each added move needs n and fx'));
+  traitCheck(w + ' phase set', ph.set || {});
+  if (e.revive && ph.at <= e.revive) warn(w + ' phase', `starts at ${ph.at} of max HP, at or below where it rises (${e.revive}), so it may start only after it rises`);
+});
 C.MONSTERS.concat(C.RIVALS).forEach(k => ref('enemies', C.ENEMIES[k], `${k} is listed in MONSTERS or RIVALS but not defined`));
 C.RIVALS.forEach(k => ref('enemies ' + k, C.ENEMIES[k] && C.ENEMIES[k].rival, 'is in RIVALS but not marked rival: true'));
 Object.entries(C.RIVAL_LINES).forEach(([k, L]) => { ref('enemies ' + k, C.RIVALS.includes(k), 'has rival lines but is not a rival'); ['below', 'level', 'above', 'grudge'].forEach(f => ref('enemies ' + k, L[f], `rival lines need ${f}`)); });
@@ -169,11 +188,13 @@ const uses = {};
 const use = (kind, key, who, v) => { const u = (uses[kind] = uses[kind] || {}); (u[key] = u[key] || []).push([who, v]); };
 Object.values(C.SKILLS).filter(s => !s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.SKILLS).filter(s => s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
-Object.values(C.ENEMIES).forEach(e => e.skills.forEach(m => Object.entries(m.fx).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
+Object.values(C.ENEMIES).forEach(e => e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.entries(m.fx || {}).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
 Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix)).forEach(([k, v]) => use('gear', k, id, v)));
 Object.values(C.HIDDEN_PATHS).forEach(h => Object.entries(h.fx).forEach(([k, v]) => use('path', k, h.name, v)));
 Object.values(C.GODS).forEach(g => Object.entries(g.bless).forEach(([k, v]) => use('god', k, g.name, v)));
 Object.values(C.ENEMIES).forEach(e => MECHANICS.filter(k => e[k] != null).forEach(k => use('enemy', k, e.name, e[k])));
+Object.values(C.ENEMIES).forEach(e => e.phase && Object.entries(e.phase.set || {}).forEach(([k, v]) => use('enemy', k, e.name + ' (phase)', v)));
+Object.values(C.ENEMIES).forEach(e => Object.entries(e.passives || {}).forEach(([k, v]) => use('passive', k, e.name, v)));
 Object.entries(uses.skill).forEach(([k, who]) => { if (!fxRead.has(k)) err('effect ' + k, `core.js never reads fx.${k}, so it does nothing (used by ${who[0][0]})`); });
 Object.entries(uses.gear).concat(Object.entries(uses.path), Object.entries(uses.god)).forEach(([k, who]) => { if (!pRead.has(k)) err('effect ' + k, `core.js never reads P.${k}, so it does nothing (used by ${who[0][0]})`); });
 Object.keys(uses.enemy).forEach(k => { if (!new RegExp('\\.' + k + '\\b').test(core)) err('enemy mechanic ' + k, 'core.js never reads it'); });
@@ -200,7 +221,7 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => { say('worlds ' + k, t.name); 
 Object.entries(C.MODIFIERS).forEach(([k, m]) => [m.name, m.desc].forEach(s => say('modifiers ' + k, s)));
 Object.entries(C.LORE).forEach(([w, L]) => L.entries.forEach(e => [e.name, e.text, e.near].forEach(s => say(`World Record ${w} ${e.name}`, s))));
 Object.entries(C.FINAL_GREET).forEach(([k, s]) => say('greeting ' + k, s));
-Object.entries(C.ENEMIES).forEach(([k, e]) => { say('enemies ' + k, e.name); say('enemies ' + k + ' style', e.style, 14); e.skills.forEach(m => say('enemies ' + k, m.n)); });
+Object.entries(C.ENEMIES).forEach(([k, e]) => { say('enemies ' + k, e.name); say('enemies ' + k + ' style', e.style, 14); e.skills.concat(e.phase && e.phase.add || []).forEach(m => say('enemies ' + k, m.n)); if (e.phase) say('enemies ' + k + ' phase', e.phase.say, 20); });
 Object.entries(C.RIVAL_LINES).forEach(([k, L]) => Object.values(L).forEach(s => say('rival lines ' + k, s)));
 Object.entries(C.GIFTS).forEach(([k, g]) => [g.name, g.desc].forEach(s => say('gifts ' + k, s)));
 Object.entries(C.TITLES).forEach(([k, t]) => [t.name, t.cond, t.desc].forEach(s => say('titles ' + k, s)));
@@ -253,8 +274,10 @@ function effectDoc() {
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.path).map(([k, who]) => row(k, who, '')),
     '', '### God blessings (`bless`, at 8 Favour)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.god).map(([k, who]) => row(k, who, '')),
-    '', '### Enemy mechanics (fields on the enemy)',
+    '', '### Enemy traits (fields on the enemy, or in its phase\'s set)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
+    '', '### Enemy passives (`passives`, from the gear and Hidden Path keys that work on enemies)',
+    '', '| Key | Used | Examples (value) | Scales with enemy power |', '| --- | --- | --- | --- |', ...Object.keys(G.ENEMY_PASSIVES).sort().map(k => row(k, (uses.passive || {})[k] || [], ` ${G.ENEMY_PASSIVES[k] === 'flat' ? 'yes' : 'no'} |`)),
   ].join('\n');
 }
 const START = '<!-- effects:start (written by node tools/check-content.js --write) -->', END = '<!-- effects:end -->';

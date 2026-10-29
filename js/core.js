@@ -981,16 +981,44 @@ function buildEnemy(run, spec) {
   const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha;
   if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; return e; }
   const t = ENEMIES[spec.id];
-  const fin = t.tier === 3;
+  const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
   let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85);
-  return blankFighter({
-    side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: t.dodge || 0, script: t.script, scriptIdx: 0, turns: 0,
-    skills: t.skills.map((x, i) => ({ key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power: p * (fin ? TUNE.finalDmg : 1), cd: 0 })),
-    enrage: t.enrage || 0, enrageMult: t.enrageMult || 1.5, aura: t.aura ? t.aura * p : 0, flood: !!t.flood, revive: t.revive || 0, kaito: !!t.kaito,
-    briar: t.briar ? t.briar * p : 0, twincast: t.twincast || 0, forge: t.forge ? Math.round(t.forge * p) : 0, weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
-  });
+  return blankFighter(Object.assign({
+    side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
+    skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || null, P: enemyPassives(t.passives, p),
+    weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
+  }, enemyTraits(t, p)));
 }
+function enemyMove(x, i, power) { return { key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power, cd: 0 }; }
+// The trait library: fields on an enemy (or in its phase's set) that give it a signature. What each does is in
+// docs/CONTENT.md, "Enemy traits". Amounts that deal or block damage scale with the enemy's power, like its moves.
+const ENEMY_TRAITS = ['enrage', 'enrageMult', 'dodge', 'adapt', 'flood', 'aura', 'revive', 'briar', 'twincast', 'forge'];
+function enemyTraits(t, p) {
+  const o = {};
+  ENEMY_TRAITS.forEach(k => { if (t[k] != null) o[k] = t[k]; });
+  if (o.enrage && !o.enrageMult) o.enrageMult = 1.5;
+  if (o.aura) o.aura *= p; if (o.briar) o.briar *= p; if (o.forge) o.forge = Math.round(o.forge * p);
+  return o;
+}
+// Enemy passives: the same P keys as gear and Hidden Paths, for keys that work on either side. Flat amounts scale
+// with the enemy's power; rates and multipliers don't.
+const ENEMY_PASSIVES = { regen: 'flat', thornsAlways: 'flat', startBlock: 'flat', burnPlus: 'flat', poisonPlus: 'flat', bleedPlus: 'flat', dotPlus: 'flat', thornBurn: 'flat', thornPoison: 'flat',
+  lifesteal: 'rate', dmgPct: 'rate', lowHpDmg: 'rate', vsHalf: 'rate', startBlockPct: 'rate', blockKeep: 'rate', healPct: 'rate', flatDR: 'flat', lowDR: 'rate', poisonMult: 'rate', bleedMult: 'rate', thornMult: 'rate' };
+function enemyPassives(o, p) { const P = {}; Object.entries(o || {}).forEach(([k, v]) => P[k] = ENEMY_PASSIVES[k] === 'flat' ? Math.round(v * p) : v); return P; }
+// Boss phases: once at or below phase.at of max HP, the enemy says phase.say, learns the moves in phase.add, takes the
+// traits in phase.set and starts phase.script from its first move. The move already shown as its intent still happens
+// as shown: when the line is crossed on your turn, the new traits wait until that move is done.
+function checkPhase(f, B, playerTurn) {
+  const ph = B.phase; if (!ph || B.phased || B.hp <= 0 || B.hp > B.maxHp * ph.at) return false;
+  B.phased = true;
+  (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
+  if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
+  B.script = ph.script; B.scriptIdx = 0;
+  say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
+  return true;
+}
+function phaseTraits(B) { Object.assign(B, enemyTraits(B.phase.set || {}, B.power)); }
 function snapshot(run) {
   const s = effStats(run), R = run.record;
   const snap = {
@@ -1066,7 +1094,7 @@ function hit(f, X, Y, raw, o = {}) {
   if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); return 0; }
   let d = raw, crit = false;
   if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0))) { crit = true; d *= X.critMult; X.critNext = false; }
-  if (o.resist) d *= 0.6;
+  if (o.resist) d *= o.resist;
   if (Y.P.lowDR && Y.hp < Y.maxHp * 0.25) d *= 1 - Y.P.lowDR;
   if (Y.P.flatDR && !o.isThorns) d -= Y.P.flatDR;
   d = Math.max(0, Math.round(d));
@@ -1207,7 +1235,7 @@ function useSkill(f, X, s, opt) {
   }
   if (fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: fx.selfDmg, kind: 'self' }); }
   let m = dmgMult(f, X, Y);
-  const resist = Y.kaito && X.isPlayer && f.tally.mostUsed === s.key;
+  const resist = Y.adapt && X.isPlayer && f.tally.mostUsed === s.key ? Y.adapt : 0;
   const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum);
   if (damaging && X.focus) { m *= 1 + X.focus; X.focus = 0; }
   if (damaging && !def.quick && X.aq) { m *= 1 + X.aq; X.aq = 0; }
@@ -1328,6 +1356,7 @@ function playerAct(f, idx) {
   const A = f.A, s = A.skills[idx]; if (!s || !canUse(s)) return false;
   f.events = [];
   useSkill(f, A, s);
+  checkPhase(f, f.B, true);
   s.cd = s.def.cd || 0;
   if (s.def.quick) s.cd += 1; // quick skills tick at the end of this same turn
   if (s.def.quick && A.quickFree > 0) { A.quickFree--; s.cd = 1; say(f, `[Hourglass: ${s.def.name} has no cooldown.]`, 'skill'); }
@@ -1368,16 +1397,18 @@ function enemyTurn(f) {
   const can = startTurn(f, B);
   if (checkOver(f)) return;
   if (can) {
-    if (B.flood && B.turns % 3 === 0) { const T = f.A.block < B.block ? f.A : f.A.block > B.block ? B : f.A; T.weaken = Math.max(T.weaken, 2); say(f, `[The arena floods. ${T === f.A ? 'You are' : B.name + ' is'} Weakened.]`, T === f.A ? 'loss' : 'skill'); ev(f, { k: 'flood' }); react(f, B, T); }
+    if (B.flood && B.turns % B.flood === 0) { const T = f.A.block < B.block ? f.A : f.A.block > B.block ? B : f.A; T.weaken = Math.max(T.weaken, 2); say(f, `[The arena floods. ${T === f.A ? 'You are' : B.name + ' is'} Weakened.]`, T === f.A ? 'loss' : 'skill'); ev(f, { k: 'flood' }); react(f, B, T); }
     const s = B.intent || B.skills[0];
     useSkill(f, B, s);
     if (!s.def.fx.mirror) f.lastEnemySkill = { def: s.def, power: s.power };
     if (B.twincast && B.turns % B.twincast === 0 && f.A.hp > 0) { say(f, `[${B.name} casts twice!]`, 'loss'); useSkill(f, B, s, { echo: true }); }
     s.cd = s.def.cd || 0;
-    if (!B.smart) B.scriptIdx++;
+    if (!B.smart && !B.phaseFresh) B.scriptIdx++;
     endTurn(f, B, s.key);
   } else endTurn(f, B, null);
+  if (B.phaseFresh) { B.phaseFresh = false; phaseTraits(B); }
   if (checkOver(f)) return;
+  checkPhase(f, B);
   planIntent(f, B);
   f.turn++;
   f.phase = 'player';
@@ -1413,6 +1444,7 @@ function intentInfo(f) {
   if (B.stun > 0) return { kind: 'stunned', name: 'Stunned', text: B.interrupted ? B.interrupted + ' interrupted' : 'loses next turn' };
   const r = intentText(f, s, B);
   if (B.twincast && (B.turns + 1) % B.twincast === 0) r.text += ' · twice';
+  if (B.flood && (B.turns + 1) % B.flood === 0) r.text += ' · flood';
   if (f.foresight) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; }
   return r;
 }
@@ -1868,7 +1900,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
