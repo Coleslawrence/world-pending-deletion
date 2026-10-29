@@ -20,7 +20,8 @@ On a phone, open the link and use **Add to Home Screen** to install it as an app
 |---|---|
 | `index.html` | The page shell |
 | `css/style.css` | All styling (one dark theme, phone-first) |
-| `js/core.js` | Game data and rules. No DOM, so it also runs in Node for simulations |
+| `js/content/` | Game content: archetypes, skills (one file per archetype), gear, gods, world packs (one per world type: the world, its World Record pool and its Final Champion's greeting), enemies, Gifts, Titles, quests and Hidden Paths. Plain data that never calls into `core.js` |
+| `js/core.js` | Game rules. No DOM, so it also runs in Node for simulations, where it loads `js/content/` itself |
 | `js/ui.js` | Screens, sheets and input |
 | `js/firebase-config.js`, `js/cloud-firebase.js`, `firestore.rules` | Cloud saves and shared champions (Firebase) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installable web app and offline support |
@@ -60,6 +61,10 @@ It plays a bot run, restores each stage in a real browser (Playwright with Chrom
 ## Saves and shared champions
 
 Progress (Echoes, Titles, unlocks, the Halls and the current run) is saved in the browser. Signing in with Google or GitHub adds cloud saves across devices and lets players share champions, who can then appear in each other's tournaments. This uses Firebase; setup steps are in [docs/FIREBASE.md](docs/FIREBASE.md).
+
+## Adding content
+
+New content goes in `js/content/`. A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`; Node reads its list from `index.html`. Content files can use each other and `base.js`, never `core.js`. Ids are permanent once shipped, because saves and shared champions store them. Lists that runs read by position, such as World Record pools and the order skills are added in, only ever grow at the end.
 
 ## Publishing changes
 
