@@ -4,6 +4,14 @@
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
+    id: '2026-10-29c', title: "[System Notice: Opposition Update]", pages: [
+      { h: "Opposition", sys: "[Entrants were winning comfortably. Comfort has been withdrawn.]", items: [
+        "[Opponents now carry traits. Read them before you choose who to fight.]",
+        "[Every opponent has one move that hurts. It is announced. Answer it.]",
+        "[Qualifiers stay gentle. The bracket does not.]"] },
+    ],
+  },
+  {
     id: '2026-10-29b', title: "[System Notice: Intake Update]", pages: [
       { h: "Opponents", sys: "[Opponents have been reviewed. Several were found to be coasting.]", items: [
         "[Final Champions now have a second phase. Watch the System when they falter.]",
