@@ -5,7 +5,7 @@
 // player's reading of it, so keep it to what the trait does.
 'use strict';
 const TRAIT_POOL = {
-  spiked: { name: 'Spiked', desc: 'Hitting it hurts you back.', passives: { thornsAlways: 2 } },
+  spiked: { name: 'Spiked', desc: 'Hits back, double below half HP.', passives: { thornsAlways: 2 } },
   armoured: { name: 'Armoured', desc: 'Takes 2 less damage from every hit.', passives: { flatDR: 2 } },
   regenerating: { name: 'Regenerating', desc: 'Heals a little every turn.', passives: { regen: 3 } },
   savage: { name: 'Savage', desc: 'Deals 20% more damage.', passives: { dmgPct: 0.2 } },
