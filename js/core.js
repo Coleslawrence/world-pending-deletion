@@ -642,10 +642,13 @@ function makeChoices(run, meta, rng) {
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
   if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
+  // Someone an event sent for (a copy of you, an Erased champion, an auditor) takes the hard slot on the round they are due
+  const due = (run.summons || []).findIndex(x => x.round <= run.round);
+  if (due >= 0 && !(run.trial && !run.trial.done && run.round === run.trial.round)) { hard = run.summons[due].spec; run.summons.splice(due, 1); }
   // A Gatekeeper: at a GATES round the hard rival guards the way on, with an extra trait, a second phase and a better reward
   if (GATES.includes(run.round) && hard.kind === 'rival' && !run.practice) hard.gate = true;
   // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
-  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
+  [easy, hard].forEach(c => { const n = run.practice || c.summoned || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -750,13 +753,15 @@ function merchantPiece(run, rng, msgs, tries) {
 }
 // What an option's go(run, h) can use, since content cannot call the rules directly
 function eventKit(run, meta, rng, msgs) {
-  return {
+  const kit = {
     meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
     lose: (f, text) => lose(run, f, msgs, text), piece: tries => merchantPiece(run, rng, msgs, tries), eraseRecord: n => eraseRecord(run, n, msgs),
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
+    apply: T => { const ctx = { run, h: kit, msgs }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
     heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
     sellLowest: mult => { const p = run.bench.slice().sort((a, b) => sellValue(a) - sellValue(b))[0]; if (!p) return 0; const v = sellValue(p) * (mult || 1); removePiece(run, p.u); run.gold += v; msgs.push({ t: 'loot', text: `[Sold: ${pieceDef(baseId(p.id)).name}. +${v} gold.]` }); return v; },
   };
+  return kit;
 }
 function eventText(run, key) { const t = EVENTS[key].text; return typeof t === 'function' ? t(run) : t; }
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
@@ -851,6 +856,9 @@ const OUTCOME_APPLY = {
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
   stakes: (v, c) => { const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
+  respec: (v, c) => { const pts = STATS.reduce((n, k) => n + Math.max(0, c.run.stats[k] - 1), 0); STATS.forEach(k => c.run.stats[k] = Math.min(c.run.stats[k], 1)); c.run.statPts += pts; c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: 'level', text: `[Stats reset. ${pts} stat points to place again.]` }); },
+  summon: (v, c) => { const s = summonSpec(c.run, v, stream(c.run, 'opps')); if (!s) return; (c.run.summons = c.run.summons || []).push({ round: c.run.round + 1, spec: s }); },
+  amend: (v, c) => { c.run.amend = v; c.msgs.push({ t: 'class', text: `[Amendment passed: ${AMENDMENTS[v].name}. ${AMENDMENTS[v].say}]` }); },
   restore: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.min(c.run.maxHearts, c.run.hearts + v); const k = c.run.hearts - b; if (k) { c.msgs.push({ t: 'loot', text: `[+${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); restoreRecord(c.run, k, c.msgs); } },
   notice: (v, c) => {
     const was = noticeOf(c.run); c.run.notice = Math.max(0, Math.min(TUNE.noticeMax, (c.run.notice || 0) + v)); const now = noticeOf(c.run);
@@ -860,6 +868,16 @@ const OUTCOME_APPLY = {
   chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
   favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
 };
+// A summoned opponent: { who: 'copy' | 'erased' | a rival id, bounty?: outcomes for beating them, traits?: n }. An Erased champion
+// when there is none to send falls back to an unmet rival; summoned rivals are Veterans
+function summonSpec(run, v, rng) {
+  let spec = null;
+  if (v.who === 'copy') { const snap = snapshot(run); snap.champ = `${run.champ} (copy)`; spec = { kind: 'erased', snap, hard: true }; }
+  if (v.who === 'erased') { const pool = run.seed ? [] : (META ? META.erased : []).concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at)); if (pool.length) spec = { kind: 'erased', snap: pick(pool, rng), hard: true }; }
+  if (!spec) { const id = ENEMIES[v.who] ? v.who : pick(RIVALS.filter(r => !run.met.includes(r)), rng) || pick(RIVALS, rng); spec = { kind: 'rival', id, hard: true, traits: shuffle(Object.keys(TRAIT_POOL), rng).slice(0, v.traits || 1) }; }
+  spec.summoned = true; if (v.bounty) spec.bounty = v.bounty; if (v.say) spec.say = v.say;
+  return spec;
+}
 // Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
 function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -940,6 +958,7 @@ function enterChoose(run, meta, rng, msgs) {
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
+  const sm = run.choices.find(c => c.summoned && c.say); if (sm) msgs && msgs.push({ t: 'class', text: sm.say });
   run.wager = makeWager(run, stream(run, 'opps', rng));
   run.stage = 'choose';
 }
@@ -979,7 +998,7 @@ function buildPlayer(run) {
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
     crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
-    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0, str: s.STR,
+    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: (P.sluggish ? 1 : 0) + (run.nextFlags.weaken || 0), lastWords: P.lastWords || 0, str: s.STR,
     res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
   });
 }
@@ -988,8 +1007,9 @@ function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.
 function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
 function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
 function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); }
-function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run); }
-function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
+function amendOf(run) { return run.amend && !run.elite && !run.practice ? AMENDMENTS[run.amend] || {} : {}; }
+function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1); }
+function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run) * (amendOf(run).foeHp || 1); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
@@ -1650,6 +1670,8 @@ function resolveFight(run, f, meta, rng) {
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr, null, run) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); }
+    if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
+    if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
       const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
       if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${noticePct(run)}%.]` });
@@ -1956,7 +1978,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,

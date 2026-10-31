@@ -15,6 +15,10 @@
 //   restore: n         Hearts back, up to your max; the World Record entries come back partial
 //   erase: n           Hearts lost (never the last one); World Record entries erased as in a defeat
 //   stakes: { win: {…}, lose: {…} }   outcomes that happen when your next fight is won or lost
+//   respec: true       every stat back to 1, the points returned to place again
+//   summon: { who, bounty?, traits? }   someone takes the hard opponent's place next round: who is 'copy' (you, as you are now),
+//                      'erased' (an Erased champion) or a rival's id; bounty: outcomes for beating them
+//   amend: id          a Tournament Amendment (AMENDMENTS in events.js) for the rest of the run, replacing any other
 //   notice: n          the System's notice up or down (0 to its cap); each step makes opponents stronger or weaker. Announced after the reveal
 //   chain: 'done', or { step, after }   where the event chain goes next (events only); applied late, so an option's go still sees the chain's state
 //   favour: { war: 2 } Favour with gods, announced last
@@ -30,6 +34,9 @@ const OUTCOMES = {
   restore: { say: n => `${n} Heart${n === 1 ? '' : 's'} restored` },
   erase: { say: n => `${n} Heart${n === 1 ? '' : 's'} erased` },
   stakes: { say: () => 'stakes on your next fight' },
+  respec: { say: () => 'your stat points to place again' },
+  summon: { say: () => 'a visitor in your bracket' },
+  amend: { say: v => `the Amendment ${AMENDMENTS[v].name}` },
   notice: { say: n => n > 0 ? "the System's notice" : 'the System looking elsewhere', late: true },
   chain: { say: () => 'the story goes on', late: true },
   favour: { say: o => Object.entries(o).map(([g, n]) => `${n} Favour with ${GODS[g].name.replace(/^The /, 'the ')}`).join(', '), late: true },

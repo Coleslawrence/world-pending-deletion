@@ -391,6 +391,9 @@
   "restore",
   "erase",
   "stakes",
+  "respec",
+  "summon",
+  "amend",
   "notice",
   "chain",
   "favour"
@@ -437,7 +440,12 @@
   "poisoner_found",
   "letter_1",
   "letter_map",
-  "letter_cache"
+  "letter_cache",
+  "clerical_error",
+  "amendment",
+  "audit",
+  "lost_property",
+  "sponsors"
  ],
  "chains": [
   "official",
@@ -468,7 +476,12 @@
   "poisoner_found": 4,
   "letter_1": 3,
   "letter_map": 6,
-  "letter_cache": 3
+  "letter_cache": 3,
+  "clerical_error": 3,
+  "amendment": 3,
+  "audit": 3,
+  "lost_property": 3,
+  "sponsors": 4
  },
  "lore": {
   "drowned": {
