@@ -7,8 +7,9 @@ const PATCH_NOTES = [
     id: '2026-10-31', title: "[System Notice: Recalibration Update]", pages: [
       { h: "Stats", sys: "[Experience is retired. Gold buys strength now.]", items: [
         "[Stat points are bought with gold, one at a time. Each costs more than the last.]",
-        "[Every two points is a level. Income rises to 7 gold a round to pay for it.]",
-        "[Fast Learner: stat points cost a third less. Late Bloomer: each level is a free point.]"] },
+        "[Every two points is a level.]",
+        "[Fast Learner: stat points cost a third less. Late Bloomer: each level is a free point.]",
+        "[Income is now 5 gold, plus 1 for every 4 you hold, up to 5. Thrift is rewarded.]"] },
       { h: "Faces", sys: "[Every stat now has three faces. Power, as before.]", items: [
         "[Finesse: STR breaks guards faster, INT shortens long cooldowns.]",
         "[Finesse: VIT strengthens the healing you receive.]",
@@ -28,7 +29,8 @@ const PATCH_NOTES = [
       { h: "Corrections", sys: "[Several records have been corrected. The System admits nothing.]", items: [
         "[Thorns doubles below half HP. Bastion, Forgebreaker and Spiked now admit it.]",
         "[Hedge Witch now feeds on Bleed: +1 to Bleed you apply, heal 1 each time.]",
-        "[Zealots are no longer asked to win without healing. The System saw the problem.]"] },
+        "[Zealots are no longer asked to win without healing. The System saw the problem.]",
+        "[Stormcallers and Reapers were found underperforming. Strength now grants more HP.]"] },
     ],
   },
   {
