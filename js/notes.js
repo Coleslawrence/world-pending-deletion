@@ -2,9 +2,10 @@
 // Shown once after an update (meta.notesSeen) and from "What's new" on the title screen.
 // Each page must fit one 360×640 screen: a System line and up to 4 short lines.
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
+// The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
-    id: '2026-10-31', title: "[System Notice: Recalibration Update]", pages: [
+    id: '2026-10-31', release: 'wpd-v10', title: "[System Notice: Recalibration Update]", pages: [
       { h: "Stats", sys: "[Experience is retired. Gold buys strength now.]", items: [
         "[Stat points are bought with gold, one at a time. Each costs more than the last.]",
         "[Every two points is a level.]",

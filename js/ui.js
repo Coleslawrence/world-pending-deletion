@@ -434,7 +434,7 @@ function compareSheet() {
 function titleHTML() {
   const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
   return `<main class="screen title ${canResume ? 'resume' : ''}">
-    <div class="t-top"><div class="eyebrow">[System notice] · Prototype v5.2</div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
+    <div class="t-top"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
     <div class="sysbox"><p>${meta.runs && meta.rank ? esc(rankAddress(meta, meta.champions[0] && meta.champions[0].name, meta.runs)) : '[The Grand Tournament has begun.]'}</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
     <div class="t-stats"><div><b>${meta.wins}</b><span>spared</span></div><div><b>${meta.erased.length}</b><span>erased</span></div><div><b>${meta.echoes}</b><span>Echoes</span></div><button data-act="sheet" data-s="halls"><b>${meta.rank ? meta.rank.letter : 'F'}</b><span>Entrant Rank</span></button></div>
@@ -1016,6 +1016,7 @@ function reportSheet() {
 function syslogSheet() { return sheetWrap('System log', `<ul class="msgs">${run.log.slice().reverse().map(l => `<li class="t-${l.t}">${esc(l.text)}</li>`).join('') || '<li class="unk">Nothing yet.</li>'}</ul>`, `<button class="btn primary" data-act="close">Close</button>`); }
 // ---------- What's new ----------
 // Update notes from js/notes.js, one page per screen. Opening them marks the latest notes as seen.
+function releaseLabel() { const r = typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length && PATCH_NOTES[0].release; return r ? r.replace(/^wpd-/, '') : ''; }
 function newsUnseen() { return typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length && meta.notesSeen !== PATCH_NOTES[0].id; }
 function openNews() { ui.sheet = { type: 'news', p: 0 }; if (newsUnseen()) { meta.notesSeen = PATCH_NOTES[0].id; saveMeta(); } }
 function newsSheet() {

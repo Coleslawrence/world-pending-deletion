@@ -27,6 +27,9 @@ onDisk.filter(f => !listed.includes(f)).forEach(f => err(f, 'not loaded: add a <
 listed.filter(f => tags.indexOf(f) > tags.indexOf('js/core.js')).forEach(f => err(f, 'loaded after js/core.js in index.html; content must load first'));
 listed.filter(f => !cached.includes(f)).forEach(f => err(f, "missing from the CORE list in sw.js, so it won't work offline"));
 listed.filter(f => !onDisk.includes(f)).forEach(f => err(f, 'listed in index.html but the file does not exist'));
+// The title screen shows the newest What's new entry's release, so it must match the service worker's VERSION
+const swVersion = (sw.match(/const VERSION = '([^']+)'/) || [])[1], notesRelease = (read('js/notes.js').match(/release: '([^']+)'/) || [])[1];
+if (notesRelease !== swVersion) err('js/notes.js', `newest entry's release is ${notesRelease || 'missing'} but sw.js VERSION is ${swVersion}; bump both at release`);
 // Content may use only other content: run it all in an empty context, without core.js, and call its text functions
 const box = vm.createContext({});
 listed.filter(f => onDisk.includes(f)).forEach(f => { try { vm.runInContext(read(f), box, { filename: f }); } catch (e) { err(f, 'fails without core.js (content may use only js/content/): ' + e.message); } });
