@@ -665,18 +665,22 @@ function chooseOpponent(run, i, wagerOn) {
 }
 function currentSpec(run) { return run.elite ? run.eliteBracket[run.eliteIdx] : run.chosen; }
 
-// ---------- Wagers ----------
-const WAGERS = {
-  fast: { text: 'Win within 6 turns', check: f => f.turn <= 6 },
-  noheal: { text: 'Win without healing', check: f => f.tally.healed <= 0 },
-  react: { text: 'Trigger 2 reactions', check: f => f.tally.reactions >= 2 },
-  stop: { text: "Stun or Interrupt the opponent's big move", check: f => f.tally.bigStopped >= 1 },
-  healthy: { text: 'Win with more than half your HP', check: f => f.A.hp > f.A.maxHp / 2 },
-};
+// ---------- Feats ----------
+// A feat (feats.js) is one measured deed. Wagers, Rank Trial conditions, Titles and quests all ask for feats by key.
+function featCtx(run, f, won, spec) { return { run, f, T: f && f.tally, A: f && f.A, B: f && f.B, won: !!won, spec, pieces: () => allPieces(run) }; }
+// Did feat k happen in context c, needing n of it (the feat's usual n when not given)? A feat measured at 'win' needs a won fight.
+function featOk(k, c, n) { const F = FEATS[k]; if (F.at === 'win' && !c.won) return false; return !!F.hit(c, n != null ? n : F.n); }
 function canStop(run) { const P = runP(run); return P.firstStun || P.every3Stun || run.bar.some(p => p && SKILLS[p.id] && (SKILLS[p.id].fx.stun || SKILLS[p.id].fx.interrupt || SKILLS[p.id].fx.stunIfWeak)); }
+const FEAT_TOOLS = { stop: canStop }; // what a feat's needs asks the run to have
+function featPossible(run, k) { const F = FEATS[k]; return !F.needs || FEAT_TOOLS[F.needs](run); }
+// ---------- Wagers ----------
+// The feats a god will bet on. Trials never ask one that is unfair for an archetype; wagers and quests still do (a later fix).
+const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
+const WAGERS = {};
+WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
-  const keys = Object.keys(WAGERS).filter(k => k !== 'stop' || canStop(run));
+  const keys = WAGER_FEATS.filter(k => featPossible(run, k));
   return { god, key: pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
@@ -791,27 +795,15 @@ function applyPrefix(run, u, m) {
 }
 
 // ---------- Quests ----------
+// Which feats each moment can measure: a fight settles both 'win' and 'fight' feats
+const QUEST_AT = { fight: ['win', 'fight'], merge: ['merge'], path: ['path'], shop: ['shop'], wager: ['wager'] };
 function questEvent(run, kind, d, msgs) {
+  const c = featCtx(run, d.f, d.won, d.spec);
   (run.quests || []).forEach(q => {
     if (q.done || q.failed) return;
-    let inc = 0; const f = d.f;
-    if (kind === 'fight' && d.won) {
-      if (q.id === 'rival_noheal' && d.spec.kind === 'rival' && f.tally.healed <= 0) inc = 1;
-      if (q.id === 'fast3' && f.turn <= 6) inc = 1;
-      if (q.id === 'hard2' && d.spec.hard) inc = 1;
-      if (q.id === 'h_overkill' && f.tally.overkill >= 30) inc = 1;
-      if (q.id === 'h_clutch' && f.A.hp <= f.A.maxHp * 0.1) inc = 1;
-    }
-    if (kind === 'fight') {
-      if (q.id === 'react6') inc = f.tally.reactions;
-      if (q.id === 'h_stun3' && f.tally.stuns >= 3) inc = 1;
-    }
-    if (kind === 'merge') {
-      if (q.id === 'merge4') inc = 1;
-      if (q.id === 'h_collector' && allPieces(run).filter(p => p.star >= 2).length >= 3) inc = 1;
-    }
-    if (kind === 'path' && q.id === 'path5' && run.round <= 5) inc = 1;
-    if (kind === 'shop' && q.id === 'h_bankrupt' && run.gold === 0) inc = 1;
+    const Q = QUESTS[q.id], feats = [].concat(Q.feat);
+    if (!feats.every(k => QUEST_AT[kind].includes(FEATS[k].at))) return;
+    const inc = Q.count ? FEATS[feats[0]].measure(c) : feats.every(k => featOk(k, c, Q.n)) ? 1 : 0;
     if (inc) { q.prog = Math.min(QUESTS[q.id].goal, q.prog + inc); if (q.prog >= QUESTS[q.id].goal) completeQuest(run, q, msgs); }
   });
 }
@@ -1518,15 +1510,18 @@ function resolveFight(run, f, meta, rng) {
   }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
   run.nextFlags = {};
+  const c = featCtx(run, f, won, spec);
+  // Titles are earned for feats (titles.js); world firsts for a Final Champion come between the won-fight ones and the any-fight ones
+  const titleFeats = at => Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === at && featOk(t.feat, c, t.n)) earnTitle(run, k, msgs); });
   // Wager
   if (run.wagerOn && run.wager) {
-    const W = WAGERS[run.wager.key], ok = won && W.check(f);
+    const W = WAGERS[run.wager.key], ok = won && featOk(run.wager.key, c);
     res.wager = { ok, text: W.text, god: run.wager.god };
     if (ok) {
       const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0);
       run.gold += pay; run.wagersWon = (run.wagersWon || 0) + 1;
       msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, lr);
-      if (run.wagersWon >= 3) earnTitle(run, 'high_roller', msgs);
+      titleFeats('wager');
     }
     else msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.]` });
     run.wagerOn = false;
@@ -1535,21 +1530,11 @@ function resolveFight(run, f, meta, rng) {
   const hist = { round: curRound(run), name: f.B.name, won, turns: f.turn, hard: !!spec.hard, kind: spec.kind, hl: 0, dealt: Object.values(f.dealt).reduce((a, b) => a + b, 0) };
   run.history.push(hist);
   // Titles and world firsts
-  const T = f.tally, A = f.A;
   if (won) {
-    if (f.turn <= 2) earnTitle(run, 'first_blood', msgs);
-    if (T.taken === 0) earnTitle(run, 'untouched', msgs);
-    if (f.B.maxHp >= A.maxHp * 2) earnTitle(run, 'giant_slayer', msgs);
-    if (spec.id === 'masked') earnTitle(run, 'mirror_breaker', msgs);
-    if (spec.hard) earnTitle(run, 'underdog', msgs);
-    if (f.B.rankUp >= 2) earnTitle(run, 'rank_is_just_a_letter', msgs);
-    if (A.hp <= A.maxHp * 0.1) earnTitle(run, 'comeback', msgs);
+    titleFeats('win');
     if (FINAL_TITLE[spec.id]) worldFirst(run, 'final_' + spec.id, `has defeated ${ENEMIES[spec.id].name} in ${f.turn} turn${f.turn === 1 ? '' : 's'}.`, FINAL_TITLE[spec.id], msgs);
   }
-  if (T.healed >= 60) earnTitle(run, 'bloodthirsty', msgs);
-  if (T.maxQuick >= 3) earnTitle(run, 'spellweaver', msgs);
-  if (T.reactions >= 3) earnTitle(run, 'alchemist', msgs);
-  if (T.bigHit >= 60) earnTitle(run, 'executioner', msgs);
+  titleFeats('fight');
   questEvent(run, 'fight', { f, won, spec }, msgs);
   if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
@@ -1680,7 +1665,7 @@ function feedbackDoc(type, text, env, run, now) {
 const RANK_LADDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
 const RANK_RP = { E: 80, D: 300, C: 700, B: 1400, A: 2600, S: 4500, SS: 7000, SSS: 10000 }; // SS and SSS are placeholders
 const TRIAL_ROUND = { E: 3, D: 3, C: 4, B: 4, A: 5, S: 6, SS: 6, SSS: 6 };
-const TRIAL_CONDS = ['fast', 'react', 'stop', 'healthy']; // never "without healing": Zealot and Leech builds can't meet it
+const TRIAL_CONDS = WAGER_FEATS.filter(k => !FEATS[k].unfairFor); // never "without healing": Zealot and Leech builds can't meet it
 const PERKS = {
   stipend: { name: "Sponsor's Stipend", desc: '+1 starting gold.', flavour: 'A god has started sending pocket money.' },
   kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start.", p: { burnPlus: 1 } },
@@ -1705,7 +1690,7 @@ const TRIAL_TEXT = {
   SS: ['[Promotion match: ███-rank Proctor. Rank not found.{c}]', '[Promoted to SS-rank. Record updated. Record should not exist.]', '[Trial failed. Record not created.]'],
   SSS: ["[Promotion match. The Proctor has no rank. The Proctor has never lost.{c}]", '[Promoted to SSS-rank. The System has run out of letters.]', "[Trial failed. The Proctor's record remains unbroken.]"],
 };
-const COND_TEXT = { fast: 'Win within 6 turns.', react: 'Trigger 2 reactions.', stop: "Stun or Interrupt the Proctor's big move.", healthy: 'Win with more than half your HP.' };
+const COND_TEXT = {}; TRIAL_CONDS.forEach(k => COND_TEXT[k] = FEATS[k].say(FEATS[k].n).replace("the opponent's", "the Proctor's") + '.');
 function newRank() { return { letter: 'F', rp: 0, trial: null, history: [], perks: [] }; }
 function rankIdx(l) { return RANK_LADDER.indexOf(l); }
 function nextRank(l) { return RANK_LADDER[rankIdx(l) + 1] || null; }
@@ -1752,7 +1737,7 @@ function eliteRank(run, meta) {
 }
 function trialSpec(run, rng) {
   const to = run.trial.to, early = rankIdx(to) <= rankIdx('D');
-  const conds = TRIAL_CONDS.filter(k => k !== 'stop' || canStop(run));
+  const conds = TRIAL_CONDS.filter(k => featPossible(run, k));
   return { kind: 'trial', id: 'proctor', to, hard: !early, cond: early ? null : pick(conds, rng) };
 }
 // The Proctor fights at the world rank of the grade it examines: E-rank at E worlds up to S-rank (and beyond) at S
@@ -1761,7 +1746,7 @@ function trialLine(to, i, cond) { return TRIAL_TEXT[to][i].replace('{c}', cond ?
 function perkOffers(meta, rng) { return shuffle(Object.keys(PERKS).filter(k => !meta.rank.perks.includes(k)), rng).slice(0, 2); }
 // A lost fight costs the round's normal Hearts as usual. A won fight that misses the condition costs nothing. Either way the trial waits for the next run.
 function settleTrial(run, f, won, meta, msgs, rng) {
-  const spec = f.spec, ok = won && (!spec.cond || WAGERS[spec.cond].check(f));
+  const spec = f.spec, ok = won && (!spec.cond || featOk(spec.cond, featCtx(run, f, won, spec)));
   run.trial.done = true;
   if (!ok) { msgs.push({ t: 'loss', text: trialLine(spec.to, 2) }); return { ok, to: spec.to }; }
   const R = meta.rank; R.letter = spec.to; R.trial = null; run.promoted = spec.to;
@@ -1860,7 +1845,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
