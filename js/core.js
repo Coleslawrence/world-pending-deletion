@@ -295,7 +295,7 @@ function newRun(world, setup, meta, rng) {
   const G = setup.gifts;
   const run = {
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
-    stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0,
+    stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0, notice: 0,
     gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
     favour: godZeros(), gifted: godZeros(),
@@ -612,12 +612,16 @@ function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), ru
 // enemy is Broken: it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns.
 // The bar drains BREAK.drain of its size at the start of each of the enemy's turns.
 const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
-const TUNE = { late: 0.03, hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
+// The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
+// notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
+// gate: Gatekeepers (the hard pick at a GATES round) are this much tougher again, with an extra trait and a second phase.
+const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 1 };
+const GATES = [4, 7];
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
-const HEART_COST = [1, 1, 2, 2, 3, 3, 4, 5];
+const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
 function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
@@ -634,8 +638,10 @@ function makeChoices(run, meta, rng) {
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
   if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
+  // A Gatekeeper: at a GATES round the hard rival guards the way on, with an extra trait, a second phase and a better reward
+  if (GATES.includes(run.round) && hard.kind === 'rival' && !run.practice) hard.gate = true;
   // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
-  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : TRAIT_COUNT[run.round - 1] || 0; if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
+  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -643,6 +649,7 @@ function specName(spec) {
   if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
   if (spec.kind === 'erased' || spec.kind === 'champion') return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
+  if (spec.gate) return n + ', Gatekeeper';
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
   return n;
 }
@@ -664,6 +671,7 @@ function specReward(spec) {
   if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
   if (spec.kind === 'final') return 'Spares your world';
   if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
+  if (spec.gate) return '3 gold, a stat point, a rune and a rare shop slot';
   if (spec.hard) return '3 gold, a rune and a rare shop slot';
   return '3 gold';
 }
@@ -931,12 +939,16 @@ function buildPlayer(run) {
   });
 }
 function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
-function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run); }
+// The System's notice: +TUNE.notice per straight win, never in the Elite bracket or practice
+function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
+function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
+function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
-  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha;
+  const gate = spec.gate ? TUNE.gate : 1;
+  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
   if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; return e; }
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
@@ -944,7 +956,7 @@ function buildEnemy(run, spec) {
   let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85);
   return blankFighter(Object.assign({
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
-    skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || null, P: enemyPassives(t.passives, p),
+    skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
     weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
 }
@@ -960,6 +972,8 @@ function poolTraits(spec, t, p) {
   });
   return o;
 }
+// A Gatekeeper without a phase of its own digs in at half HP: from then on it deals 30% more damage (more if it already enrages)
+function gatePhase(t) { return { at: 0.5, say: `[${t.name} will not let you pass. The Gatekeeper digs in.]`, set: { enrage: 1, enrageMult: Math.max(1.3, t.enrageMult || 0) } }; }
 function enemyMove(x, i, power) { return { key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power, cd: 0 }; }
 // The trait library: fields on an enemy (or in its phase's set) that give it a signature. What each does is in
 // docs/CONTENT.md, "Enemy traits". Amounts that deal or block damage scale with the enemy's power, like its moves.
@@ -976,14 +990,14 @@ function enemyTraits(t, p) {
 const ENEMY_PASSIVES = {}; Object.keys(EFFECTS).filter(k => EFFECTS[k].enemy).forEach(k => ENEMY_PASSIVES[k] = EFFECTS[k].enemy);
 function enemyPassives(o, p) { const P = {}; Object.entries(o || {}).forEach(([k, v]) => P[k] = ENEMY_PASSIVES[k] === 'flat' ? Math.round(v * p) : v); return P; }
 // Boss phases: once at or below phase.at of max HP, the enemy says phase.say, learns the moves in phase.add, takes the
-// traits in phase.set and starts phase.script from its first move. The move already shown as its intent still happens
+// traits in phase.set and starts phase.script (if it has one) from its first move. The move already shown as its intent still happens
 // as shown: when the line is crossed on your turn, the new traits wait until that move is done.
 function checkPhase(f, B, playerTurn) {
   const ph = B.phase; if (!ph || B.phased || B.hp <= 0 || B.hp > B.maxHp * ph.at) return false;
   B.phased = true;
   (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
   if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
-  B.script = ph.script; B.scriptIdx = 0;
+  if (ph.script) { B.script = ph.script; B.scriptIdx = 0; }
   say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
   return true;
 }
@@ -1585,6 +1599,11 @@ function resolveFight(run, f, meta, rng) {
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr, null, run) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); }
+    if (!run.elite && !run.practice && spec.kind !== 'final') {
+      const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
+      if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${Math.round(TUNE.notice * noticeOf(run) * 100)}%.]` });
+    }
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
       run.eliteWins++;
@@ -1597,6 +1616,7 @@ function resolveFight(run, f, meta, rng) {
     else {
       const cost = heartCost(run, spec);
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
+      if (run.notice && !run.practice) { run.notice = 0; msgs.push({ t: 'class', text: '[Streak broken. The System looks away.]' }); }
       if (run.hearts <= 0) {
         run.hearts = 0; res.death = true; run.cause = f.B.name;
         // At 0 Hearts every entry left goes, then the world's name
@@ -1885,7 +1905,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,

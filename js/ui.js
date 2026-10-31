@@ -546,13 +546,13 @@ function draftHTML() {
 // ---------- Choose opponent ----------
 function chooseHTML() {
   const cards = run.choices.map((spec, i) => `<button class="opp ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
-      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${traitsHTML(spec)}
+      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.gate ? 'Gatekeeper' : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${traitsHTML(spec)}
       <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
   const fin = run.choices.length === 1;
   return `<main class="screen choose">${topBar()}<div class="col col-a">${bracketDots()}${champLine()}${questLine()}</div><div class="col col-b">
-    <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">+${run.lastIncome || 0}g income</span></div>
+    <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">${noticeOf(run) ? `<span class="bad" title="Each straight win makes opponents stronger. Losing a Heart resets it.">Noticed +${Math.round(TUNE.notice * noticeOf(run) * 100)}%</span> · ` : ''}+${run.lastIncome || 0}g income</span></div>
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
 }
@@ -639,7 +639,7 @@ function districtHTML() {
   const spec = currentSpec(run), done = run.stage !== 'district';
   const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
   return `<main class="screen district">${topBar(roundLabel() + ' · District')}<div class="col col-a">${champLine()}
-    <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
+    <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.gate ? ' · Gatekeeper' : spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     </div><div class="col col-b"><div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
     <section class="inter">${opts}</section>
     <section class="minibar c${run.slots}">${run.bar.map(p => p ? `<button class="mb ${mainTag(p.id)}" data-act="own" data-u="${p.u}"><span>${esc(SKILLS[p.id].name)}</span><small>${effRank(p.id, p.mods)}${p.star > 1 ? ' ' + '★'.repeat(p.star) : ''}${p.mods.length ? ' · ' + p.mods.map(m => PREFIXES[m].name).join(' ') : ''}</small></button>` : '<div class="mb empty"><span>Empty</span></div>').join('')}</section></div>
@@ -1046,6 +1046,8 @@ function howtoSheet() {
     <li><b>Hidden Paths:</b> reach 4 pieces in two archetypes at once for a hybrid bonus.</li>
     <li><b>Stats</b> have three faces. Power: the archetypes whose skills they strengthen. Finesse: STR fills break bars faster, AGI adds dodge, INT shortens long cooldowns, VIT strengthens healing you receive, LUK adds crit. Resistance: each point shrugs off 4% of one status, up to 60% (STR Weaken, AGI Bleed, INT Burn, VIT Poison, LUK the chance a Stun lands).</li>
     <li><b>Stat milestones:</b> 10 in a stat grants a named perk.</li>
+    <li><b>Gatekeepers</b> guard rounds 4 and 7: the hard pick there has an extra trait and a second phase, and pays a stat point too.</li>
+    <li><b>The System takes notice</b> of a win streak: each straight win makes opponents 6% stronger, up to 30%. Losing a Heart resets it.</li>
     <li><b>Hearts</b> are your world. Each loss erases part of it, and losses cost more later. At zero your world is erased, and its champion will return to face you.</li>
   </ul>`, `<button class="btn primary" data-act="close">Got it</button>`);
 }
