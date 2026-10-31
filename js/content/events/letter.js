@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: event chain, The Letter =====
 'use strict';
-CHAINS.letter = { name: 'The Letter', start: 'letter_1' };
+CHAINS.letter = { name: 'The Letter', start: 'letter_1', theme: 'reaper' };
 
 EVENTS.letter_1 = { chain: 'letter', title: 'A letter from the Erased', text: 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
   { label: 'Read it', desc: 'Follow the map.', then: { chain: { step: 'map', after: 1 } }, go: (run, h) => { const k = h.pick(STATS); run.stats[k]++; h.say(`[+1 ${k}]`); } },

@@ -1,7 +1,7 @@
 // ===== [World Pending Deletion] — content: event chain, The Poisoner =====
 // run.sabotage: a rival who turns up among your next rivals, Weakened for 3 turns and with 15% less HP
 'use strict';
-CHAINS.poisoner = { name: 'The Poisoner', start: 'poisoner_1' };
+CHAINS.poisoner = { name: 'The Poisoner', start: 'poisoner_1', theme: 'venom' };
 const unmetRival = (run, h, not) => h.pick(RIVALS.filter(r => r !== not && !run.met.includes(r)));
 
 EVENTS.poisoner_1 = { chain: 'poisoner', title: 'Tampered water', text: 'Someone has tampered with your water skin. It smells of herbs and something worse.', opts: [
