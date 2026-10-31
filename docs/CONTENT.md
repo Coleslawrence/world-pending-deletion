@@ -53,6 +53,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
 - **Passive effects live in `js/content/effects.js`.** Archetype bonuses, gear, Hidden Paths, Gifts, Titles, Rank perks, stat milestones, god blessings and enemy passives all say what they do as `{ key: value }` from it. Each entry has the phrase players read, so a description says what the effect says. Where an effect has a rule players couldn't guess from its number (Thorns double below half HP), its `must` makes the checker fail any description that leaves the rule out.
 - **Feats live in `js/content/feats.js`.** A deed the player can be asked for (win within 6 turns, trigger 2 reactions, defeat a rival without healing) is declared once as a feat, and wagers, Rank Trial conditions, Titles and quests all ask for it by key, so it is measured the same way everywhere. A feat that an archetype's kit can't meet says so (`unfairFor`), and one that needs a tool says which (`needs`). The checker makes a Title's or quest's words say what counts (`must`).
+- **Content sits on the wheel.** Every skill, piece of gear, enemy, world, god and event chain is tagged with one archetype or two neighbours, and uses what they own (see Archetypes and the wheel).
 - **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
 - **Player text follows the style guide:** British spelling, no em-dashes, one name for one thing, and the length limits for one phone screen.
@@ -73,7 +74,13 @@ After adding content, run `node tools/check-content.js --write`. It records the 
 
 ## Archetypes and the wheel
 
-`WHEEL` in `archetypes.js` sets the order of the archetype wheel: an archetype's allies are its neighbours on it. A new archetype goes into the wheel where it should sit, and the wheel grows with it.
+The eight archetypes are the game's themes, laid out on a wheel like a colour pie. `WHEEL` in `archetypes.js` sets the order: an archetype's allies are its two neighbours, everything further round is its enemy, and a run is dealt its home archetype's allies first. A new archetype goes into the wheel between the two it borrows from, and the wheel grows with it.
+
+Each archetype carries its `line` (its philosophy in one sentence; everything made for it fits the line), `owns` (the skill effects it owns) and `words` (imagery for names and lore). The wheel table in the menu below is written from them.
+
+**Tags.** A piece of content carries one archetype, or two neighbours (a pair, like a Bastion and Stormcaller boss that blocks and stuns): skills and gear in `tags`, worlds in `home`, gods in `arch`, enemies and event chains in `theme`. Finals carry their world's home. The System's own fighters (the Proctor, legends, the Undefeated) and events about the tournament itself carry none.
+
+**The pie.** A skill or an enemy move may use the effects its archetype owns, or what a neighbour owns; `dmg` and `block` are open to all. The checker warns about a **pie break** (a Pyre skill that Bleeds) rather than failing: a break is fine when it is meant, and `breaks: ['bleed']` on the skill or enemy says so once Slaw has agreed. ★3 evolutions may borrow from anywhere. A new skill effect is given an owner in `owns` before content uses it; passive effects say their own theme in `effects.js`. The content index (`tools/content-index.js`) shows what each archetype has, so a theme with no home world or no enemies shows as a gap.
 
 ## Enemy traits, passives and phases
 
@@ -270,6 +277,21 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `forge` | 1 | The Forge King (3) |
 | `revive` | 1 | The Bone Saint (0.3) |
 | `twincast` | 1 | The Archmage Who Fell Upward (3) |
+
+### The wheel, from `js/content/archetypes.js`
+
+Each archetype is a theme. Its neighbours on the wheel are its allies; a piece of content carries one archetype, or two neighbours. Owns: the skill effects it owns, which it and its neighbours may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.
+
+| Archetype | Stat | Line | Owns | Allies | Words |
+| --- | --- | --- | --- | --- | --- |
+| Zealot | VIT | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` | Bladedancer, Bastion | light, prayer, vow, saint, tide, undying |
+| Bastion | VIT | Takes the hit, then gives it back. | `thorns` `blockDmg` `riposte` `keep` `reflect` | Zealot, Stormcaller | wall, iron, shield, anvil, stand, weight |
+| Stormcaller | STR | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` | Bastion, Arcanist | thunder, lightning, crack, break, sky, gale |
+| Arcanist | INT | Does more in a turn than anyone should. | `focus` `pierce` `siphon` `haste` `evade` `interrupt` `hits` `mirror` | Stormcaller, Pyre | glyph, mind, spell, time, trick, sky |
+| Pyre | INT | Sets a fire and lets it finish the work. | `burn` `detonate` | Arcanist, Reaper | ember, ash, flame, cinder, blaze, smoke |
+| Reaper | STR | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` | Pyre, Venom | scythe, grave, harvest, end, hollow, bone |
+| Venom | AGI | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` | Reaper, Bladedancer | fang, rot, drip, plague, patience, thorn |
+| Bladedancer | AGI | Never stops moving: a hundred cuts beat one. | `bleed` `hits` `perHit` `mark` `critBonus` `cruel` `riposte` `evade` `alwaysCrit` `nextCrit` | Venom, Zealot | edge, dance, cut, flurry, quick, step |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
 

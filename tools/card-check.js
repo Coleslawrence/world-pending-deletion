@@ -15,7 +15,7 @@ const G = require('../js/core.js');
 const C = vm.runInThisContext('({ ARCH, SKILLS, GEAR, GODS, WORLD_TYPES, MODIFIERS, LORE, GIFTS, TITLES, QUESTS, HIDDEN_PATHS, ENEMIES, EVENTS, CHAINS })');
 const args = process.argv.slice(2), opt = k => args.includes(k) ? args[args.indexOf(k) + 1] : null;
 const target = args[0];
-if (!target || target.startsWith('--')) { console.log('usage: node tools/card-check.js DIR|CARD.md [--new KIND "Name" [--source TEXT]] [--index]'); process.exit(2); }
+if (!target || target.startsWith('--')) { console.log('usage: node tools/card-check.js DIR|CARD.md [--new KIND "Name" [--source TEXT] [--theme ARCHETYPE]] [--index]'); process.exit(2); }
 const DIR = fs.statSync(target).isDirectory() ? target : path.dirname(target);
 
 // ---------- What the game already has ----------
@@ -59,11 +59,13 @@ if (args.includes('--new')) {
   const taken = new Set(Object.keys(gameIds).concat(cardFiles().flatMap(f => parse(f).ids)));
   let id = slug(name.replace(/^the\s+/i, '')).replace(/-/g, '_'), n = 2; const base = id; while (taken.has(id)) id = `${base}_${n++}`;
   const K = kind[0].toUpperCase() + kind.slice(1);
-  const today = new Date().toISOString().slice(0, 10), src = opt('--source');
+  const today = new Date().toISOString().slice(0, 10), src = opt('--source'), theme = opt('--theme');
+  if (theme && !theme.split('+').every(t => G.ARCH[t])) { console.log(`--theme is an archetype id (${Object.keys(G.ARCH).join(', ')}), or two joined by +`); process.exit(2); }
   const card = fs.readFileSync(path.join(DIR, 'TEMPLATE.md'), 'utf8')
     .replace('# <Kind>: <Name>', `# ${K}: ${name}`).replace('**Status:** Proposed', '**Status:** Draft').replace('<YYYY-MM-DD>', today)
     .replace(/(\*\*Card for:\*\*) <[^>\n]*>/, `$1 ${kind}`).replace(/(\*\*Source:\*\*) <[^\n]*>/, src ? `$1 ${src}` : '$&')
-    .replace('`<id>`', '`' + id + '`').replace('<Name, and any other new name>', name);
+    .replace('`<id>`', '`' + id + '`').replace('<Name, and any other new name>', name)
+    .replace(/(\*\*World, god or archetype:\*\*) <[^\n]*>/, theme ? `$1 ${theme.split('+').map(t => G.ARCH[t].name).join(' + ')} (wheel theme ${theme})` : '$&');
   fs.writeFileSync(file, card);
   console.log(`wrote ${file} (id ${id}). Fill it in, then run node tools/card-check.js ${DIR}`);
   process.exit(0);

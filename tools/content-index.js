@@ -34,6 +34,13 @@ const an = k => C.ARCH[k] ? C.ARCH[k].name : k, list = a => a.map(an).join(', ')
 const finalOf = {}; Object.entries(C.WORLD_TYPES).forEach(([w, t]) => finalOf[t.final] = t.name);
 
 table('Archetypes', ['Name', 'Id', 'Stat', 'Path name'], Object.entries(C.ARCH).map(([k, a]) => [a.name, k, a.stat, a.path]));
+// The wheel: what each archetype has, so gaps show (a theme with no home world, god or enemies)
+const themed = (o, f) => Object.entries(o).filter(([, d]) => [].concat(f(d) == null ? [] : f(d)).length).map(([k, d]) => [k, [].concat(f(d))]);
+const WHEEL = vm.runInThisContext('WHEEL');
+sections.push(['## The wheel', '', 'Each archetype is a theme; neighbours are allies. What belongs to each, from its tags; a blank is a gap.', '',
+  '| Archetype | Line | Home world | Gods | Final Champion | Enemies | Event chains | Skills | Gear |', '|' + ' --- |'.repeat(9),
+  ...WHEEL.map(k => { const a = C.ARCH[k]; const has = (o, f) => themed(o, f).filter(([, t]) => t.includes(k)).map(([id]) => id); return `| ${a.name} | ${a.line || ''} | ${Object.entries(C.WORLD_TYPES).filter(([, t]) => t.home === k).map(([, t]) => t.name).join(', ')} | ${Object.values(C.GODS).filter(g => g.arch.includes(k)).map(g => g.short).join(', ')} | ${Object.entries(C.ENEMIES).filter(([, e]) => e.final && [].concat(e.theme || []).includes(k)).map(([, e]) => e.name).join(', ')} | ${has(C.ENEMIES, e => e.final ? null : e.theme).length} | ${has(C.CHAINS, c => c.theme).map(id => C.CHAINS[id].name).join(', ')} | ${Object.values(C.SKILLS).filter(s => !s.base && s.tags.includes(k)).length} | ${Object.values(C.GEAR).filter(g => g.tags.includes(k)).length} |`; }),
+  ''].join('\n'));
 table('Skills', ['Name', 'Id', 'Archetypes', 'Rank', 'Evolves into'], Object.values(C.SKILLS).filter(s => !s.base).map(s => [s.name, s.id, list(s.tags), s.rank, (s.evo || []).map(e => C.SKILLS[e].name).join(', ')]));
 table('Skill evolutions (★3)', ['Name', 'Id', 'From'], Object.values(C.SKILLS).filter(s => s.base).map(s => [s.name, s.id, C.SKILLS[s.base].name]));
 table('Gear', ['Name', 'Id', 'Slot', 'Archetypes', 'Rank'], Object.entries(C.GEAR).map(([k, g]) => [g.name, k, g.slot, list(g.tags), g.rank]));
