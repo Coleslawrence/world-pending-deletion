@@ -4,7 +4,7 @@
 // in the same order under Node), and may use only each other and this file, never core.js.
 const STATS = ['STR', 'AGI', 'INT', 'VIT', 'LUK'];
 const STAT_INFO = {
-  STR: { name: 'Strength', short: 'Reaper and Stormcaller skills, some HP' },
+  STR: { name: 'Strength', short: 'Reaper and Stormcaller skills, HP' },
   AGI: { name: 'Agility', short: 'Bladedancer and Venom skills, dodge' },
   INT: { name: 'Intelligence', short: 'Pyre and Arcanist skills' },
   VIT: { name: 'Vitality', short: 'HP, Bastion and Zealot skills' },
