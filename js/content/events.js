@@ -1,7 +1,8 @@
 // ===== [World Pending Deletion] — content: Undercity events =====
 // One file per chain in events/, plus events/undercity.js for the ones that stand alone. Ids are permanent, and so are
 // option positions: run summaries store the option picked by its place in opts, so add options at the end.
-//   EVENTS.id = { title, text, opts, chain?, weight?, theme? }
+//   EVENTS.id = { title, text, opts, chain?, weight?, theme?, can? }
+//   can(run): when the event can turn up in the Undercity at all (a stand-alone event that needs something, like a past defeat)
 //   text: a string, or fn(run) when it names something from the run
 //   chain: the CHAINS id the event belongs to; weight: odds of turning up in the Undercity (default 1, chain starters 3)
 //   theme: the archetype (or two neighbours) a stand-alone event belongs to, when it belongs to one; a chain's events take the chain's
