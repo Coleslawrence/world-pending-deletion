@@ -654,7 +654,7 @@ function fightHTML() {
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
   return `<main class="screen fight">${topBar(roundLabel(), `<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`, true)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
-      <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="chips" id="stB"></div></div>
+      <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
     <section class="log" id="log" aria-live="polite"></section></div><div class="col col-b">
     <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(run.name)}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
@@ -694,6 +694,8 @@ function updateFight() {
     document.getElementById('bk' + k).style.width = Math.min(100, X.block / X.maxHp * 100) + '%';
     document.getElementById('st' + k).innerHTML = chipsHTML(X, f);
   });
+  const br = document.getElementById('brB');
+  if (br && f.B.breakMax) { br.style.width = Math.min(100, f.B.brk / f.B.breakMax * 100) + '%'; br.parentNode.classList.toggle('near', f.B.brk >= f.B.breakMax * 0.7); }
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
@@ -1026,6 +1028,7 @@ function howtoSheet() {
     <li><b>Each round:</b> choose your opponent, shop, visit one district, then fight.</li>
     <li><b>Fights:</b> pick one skill a turn. The opponent's next move is always shown. Quick skills don't end your turn.</li>
     <li><b>Stun and Interrupt</b> cancel the opponent's telegraphed move and put it on cooldown.</li>
+    <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns.</li>
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
     <li><b>Gold:</b> 5 a round, +interest of 1 per 10 gold you hold (up to 3). Reroll for 2, buy XP for 4. Higher levels see rarer pieces.</li>
@@ -1282,6 +1285,7 @@ const COACH = [
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Buying XP levels you up, and higher levels find rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
+  { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'Damage past their Block fills the gold break bar, and big hits fill it twice as fast. Full, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Tap a skill to use it. Numbers include your stats and stars. Used skills go on cooldown for a few turns; Attack never does.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Use Venom Blade first, then Firebolt: Burn landing on a Poisoned target triggers the reaction Toxic Flare.', until: () => ui.fight && (ui.fight.tally.reactions > 0 || ui.fight.over), skippable: true },
   { scr: 'fight', pos: 'mid', text: 'Reaction! There are six to discover. Now finish the fight, and use Iron Guard when a big hit is coming.', until: () => ui.fight && ui.fight.over, skippable: true },
