@@ -375,6 +375,16 @@
   "bankrupt",
   "wagers"
  ],
+ "outcomes": [
+  "gold",
+  "stats",
+  "heart",
+  "rune",
+  "piece",
+  "next",
+  "chain",
+  "favour"
+ ],
  "paths": [
   "pyre+venom",
   "blade+reaper",
