@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -310,6 +310,21 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
 Object.keys(C.PIE).forEach(fx => { if (!fxRead.has(fx)) err('archetypes PIE', `${fx} is owned but core.js never reads fx.${fx}`); });
 Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the wheel, so any archetype may use it`));
 
+// ---------- Moves and the power budget: every enemy move plays a role, and its numbers sit in its tier (warn only) ----------
+const inRange = (v, [a, b]) => v >= a && v <= b;
+const budget = (where, what, v, range) => { if (range && !inRange(v, range)) warn(where, `${what} is ${v}; tier ${range.join(' to ')} (a power budget warning: fine if meant, or tune it)`); };
+Object.entries(C.ENEMIES).forEach(([k, e]) => {
+  const w = 'enemies ' + k, N = C.MOVE_NUMBERS[e.tier], moves = e.skills.concat(e.phase && e.phase.add || []);
+  if (!N) return err(w, `tier ${e.tier} has no numbers in moves.js (tiers ${Object.keys(C.MOVE_NUMBERS).join(', ')})`);
+  budget(w, 'hp', e.hp, N.hp);
+  const roles = moves.map(m => C.moveRole(m.fx || {}, e.tier));
+  moves.forEach((m, i) => { const r = roles[i], d = C.moveDmg(m.fx || {}); if (r === 'strike' || r === 'big') budget(`${w} move ${m.n}`, `${r} damage`, d, N[r]); if (r === 'guard') budget(`${w} move ${m.n}`, 'guard Block', m.fx.block, N.guard); });
+  budget(w, 'damage per turn over its script', Math.round(10 * e.script.reduce((a, i) => a + C.moveDmg(e.skills[i].fx || {}), 0) / e.script.length) / 10, N.dpt);
+  const has = { damage: moves.some(m => C.moveDmg(m.fx || {}) > 0), trait: MECHANICS.some(t => e[t] != null) || !!e.phase };
+  (C.MOVE_NEEDS[e.tier] || []).forEach(need => { if (!need.split('|').some(r => has[r] != null ? has[r] : roles.includes(r))) warn(w, `a tier ${e.tier} enemy needs ${need.replace(/\|/g, ' or ')} (it has ${roles.join(', ')}${has.trait ? ', a trait' : ''})`); });
+});
+Object.keys(C.MOVE_NUMBERS).forEach(t => ref('moves ' + t, ['hp', 'strike', 'big', 'guard', 'dpt'].every(k => Array.isArray(C.MOVE_NUMBERS[t][k]) && C.MOVE_NUMBERS[t][k].length === 2), 'needs hp, strike, big, guard and dpt as [low, high]'));
+
 // ---------- Events: one option is always there to take ----------
 Object.entries(G.EVENTS).forEach(([k, E]) => {
   if (!E.opts.some(o => !o.can && !o.check && !o.pay)) err('event ' + k, 'every option has a condition, so the screen could be empty: keep one that anyone can take');
@@ -391,6 +406,12 @@ function effectDoc() {
     '', 'Each archetype is a theme. Its neighbours on the wheel are its allies; a piece of content carries one archetype, or two neighbours. Owns: the skill effects it owns, which it and its neighbours may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.',
     '', '| Archetype | Stat | Line | Owns | Allies | Words |', '| --- | --- | --- | --- | --- | --- |',
     ...C.WHEEL.map(k => { const a = C.ARCH[k], near = C.themeNear(k).slice(1); return `| ${a.name} | ${a.stat} | ${a.line} | ${(a.owns || []).map(x => '`' + x + '`').join(' ')} | ${near.map(n => C.ARCH[n].name).join(', ')} | ${(a.words || []).join(', ')} |`; }),
+    '', '### Enemy move roles and tier numbers, from `js/content/moves.js`',
+    '', 'A move\'s role is read from its effects (`moveRole`). A big hit is one of at least the tier\'s BIG_HIT damage before the round\'s scaling. Numbers are ranges the checker warns outside of; the balance gate has the last word.',
+    '', '| Tier | Who | HP | Strike | Big hit (from) | Guard Block | Damage per turn | Needs |', '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...Object.entries(C.MOVE_NUMBERS).map(([t, N]) => `| ${t} | ${{ 1: 'arena beasts, rounds 1 to 3', 2: 'rivals and the Proctor, rounds 4 to 7', 3: 'Final Champions', 4: 'the Elite bracket' }[t]} | ${N.hp.join(' to ')} | ${N.strike.join(' to ')} | ${N.big.join(' to ')} (${C.BIG_HIT[t]}) | ${N.guard.join(' to ')} | ${N.dpt.join(' to ')} | ${(C.MOVE_NEEDS[t] || []).map(x => x.replace('|', ' or ')).join(', ')} |`),
+    '', '| Role | Meaning | Used by |', '| --- | --- | --- |',
+    ...Object.entries(C.MOVE_ROLES).map(([r, m]) => `| ${r} | ${m} | ${Object.values(C.ENEMIES).reduce((n, e) => n + e.skills.concat(e.phase && e.phase.add || []).filter(x => C.moveRole(x.fx || {}, e.tier) === r).length, 0)} moves |`),
     '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
     '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
     '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
