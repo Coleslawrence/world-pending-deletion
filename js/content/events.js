@@ -9,6 +9,10 @@
 //   label is an action the player can take and desc a hint. Every option shown can be picked: one with a check shows
 //   only when the player qualifies, one with pay only when they can afford it. Keep one option with neither.
 //   check: { stat: 'STR', hard?: true } (6, or 10 if hard), { favour: god } (4 Favour) or { luck: true } (rolled once on LUK)
+//   roll: { stat: 'AGI', hard?: true } a chance option: always shown, with the odds on the button ([AGI 58%]). The chance is
+//     30% + 7% per point of the stat + 1% per LUK (hard: from 10%), 5% to 95%, rolled when the event appears. Success runs the
+//     option's then/go/reveal; failure runs fail: { then?, go?, reveal? }, which must do something (a failed roll still moves the story)
+//   An option is a roll or a check, never both. Use sure checks for build moments, rolls for risky acts (sneaking, lying, stealing)
 //   pay: gold, a shown cost. The label or desc says it ("Pay 6 gold"): costs show only when paying is the action itself
 //   payHeart: Hearts, a shown cost like pay ("Pay 1 Heart"); shown only when it would leave you at least 1 Heart
 //   can(run): any other condition; an option that fails it is left out, never shown greyed out

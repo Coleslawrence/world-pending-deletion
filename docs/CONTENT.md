@@ -320,18 +320,20 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 8 (quests, events) |
+| `gold` | 8 | 8 gold |  | 11 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 2 (events) |
-| `heart` | 1 | +1 max Heart |  | 2 (quests) |
-| `rune` | 1 | a rune |  | 3 (quests) |
-| `piece` | "B" | a free B-rank piece |  | 1 (quests) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 5 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 0 () |
-| `max_hp` | -0.1 | −10% max HP |  | 0 () |
-| `restore` | 1 | 1 Heart restored |  | 0 () |
-| `notice` | 1 | the System's notice |  | 0 () |
-| `chain` | "done" | the story goes on |  | 28 (events) |
-| `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
+| `heart` | 1 | +1 max Heart |  | 3 (quests, events) |
+| `rune` | 1 | a rune |  | 5 (quests, events) |
+| `piece` | "B" | a free B-rank piece |  | 7 (quests, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 9 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 4 (events) |
+| `max_hp` | -0.1 | −10% max HP |  | 1 (events) |
+| `restore` | 1 | 1 Heart restored |  | 1 (events) |
+| `erase` | 1 | 1 Heart erased |  | 0 () |
+| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 2 (events) |
+| `notice` | 1 | the System's notice | yes | 12 (events) |
+| `chain` | "done" | the story goes on | yes | 33 (events) |
+| `favour` | {"war":2} | 2 Favour with the God of War | yes | 6 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`
 

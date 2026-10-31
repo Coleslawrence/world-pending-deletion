@@ -88,7 +88,7 @@ const SCHEMA = {
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
   traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
 };
-const OPTION = [['label', 'desc'], ['check', 'pay', 'payHeart', 'can', 'then', 'go', 'reveal']], THEN = Object.keys(C.OUTCOMES);
+const OPTION = [['label', 'desc'], ['check', 'roll', 'fail', 'pay', 'payHeart', 'can', 'then', 'go', 'reveal']], THEN = Object.keys(C.OUTCOMES);
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
   need.filter(f => d[f] == null).forEach(f => err(`${kind} ${k}`, `missing ${f}`));
   Object.keys(d).filter(f => !need.includes(f) && !may.includes(f)).forEach(f => err(`${kind} ${k}`, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
@@ -140,7 +140,9 @@ const outcomeOk = (where, T, what) => {
     if (k === 'next') Object.keys(v).forEach(f => ref(where, nextRead.has(f), `core.js never reads nextFlags.${f}, so it does nothing`));
     if (k === 'foe') Object.entries(v).forEach(([f, n]) => ref(where, ['weaken', 'poison', 'burn', 'hp', 'trait'].includes(f) && typeof n === 'number' && n !== 0, `foe takes weaken, poison, burn, hp (a share) or trait (a count), as numbers; ${f} is not one`));
     if (k === 'max_hp') ref(where, typeof v === 'number' && v !== 0 && Math.abs(v) <= 0.5, 'max_hp is a share of max HP, like -0.1');
-    if (k === 'restore' || k === 'notice') ref(where, Number.isInteger(v) && v !== 0 && (k === 'notice' || v > 0), `${k} is a whole number${k === 'notice' ? ' (up or down)' : ' above 0'}`);
+    if (k === 'stakes') { ref(where, v && (v.win || v.lose) && Object.keys(v).every(w => ['win', 'lose'].includes(w)), 'stakes is { win: outcomes, lose: outcomes }'); ['win', 'lose'].forEach(w => v && v[w] && outcomeOk(where + ' stakes.' + w, v[w], what)); }
+    if (k === 'restore' || k === 'notice' || k === 'erase') ref(where, Number.isInteger(v) && v !== 0 && (k === 'notice' || v > 0), `${k} is a whole number${k === 'notice' ? ' (up or down)' : ' above 0'}`);
+    if (k === 'erase') ref(where, Number.isInteger(v) && v > 0, 'erase is a whole number above 0');
   });
 };
 Object.entries(C.QUESTS).forEach(([k, q]) => { outcomeOk('quests ' + k, q.reward, 'quest ' + k); if (q.reward && q.reward.chain != null) err('quests ' + k, 'chain is an event outcome'); });
@@ -152,6 +154,12 @@ Object.entries(C.EVENTS).forEach(([k, E]) => {
   E.opts.forEach((o, i) => {
     const w = `event ${k} option ${i + 1}`, T = o.then || {};
     if (o.check) ref(w, checkOk(o.check), `check ${JSON.stringify(o.check)} is not { stat }, { favour: god } or { luck: true }`);
+    if (o.roll) {
+      ref(w, C.STATS.includes(o.roll.stat) && !o.check, `roll is { stat, hard? } with a stat from ${C.STATS.join(' ')}, and an option is either a roll or a check`);
+      ref(w, o.fail && (o.fail.then || o.fail.go || o.fail.reveal), 'a roll needs a fail branch that does something (then, go or reveal): a failed roll still moves the story');
+      if (o.fail && o.fail.then) outcomeOk(w + ' fail', o.fail.then, 'event ' + k);
+      if (o.fail && o.fail.then && o.fail.then.chain && typeof o.fail.then.chain === 'object') ref(w, C.EVENTS[E.chain + '_' + o.fail.then.chain.step], `fail chain step ${o.fail.then.chain.step} needs an event ${E.chain}_${o.fail.then.chain.step}`);
+    } else ref(w, !o.fail, 'fail only goes with a roll');
     if (o.pay != null) {
       ref(w, Number.isInteger(o.pay) && o.pay > 0, 'pay is a whole number of gold');
       ref(w, new RegExp(`\\b${o.pay} gold\\b`).test(o.label + ' ' + o.desc), `pays ${o.pay} gold, so the label or desc says "${o.pay} gold": paying is the action`);
@@ -426,7 +434,7 @@ function effectDoc() {
     '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
     '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
     '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
-    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
+    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
     '', '### Feats (`feat`), from `js/content/feats.js`',
     '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
     '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',

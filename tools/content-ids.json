@@ -389,6 +389,8 @@
   "foe",
   "max_hp",
   "restore",
+  "erase",
+  "stakes",
   "notice",
   "chain",
   "favour"
@@ -455,18 +457,18 @@
   "braced"
  ],
  "eventOptions": {
-  "merchant": 4,
+  "merchant": 5,
   "crowd": 4,
   "large_chest": 4,
   "field_test": 3,
-  "official_1": 4,
+  "official_1": 5,
   "official_bribed": 4,
   "official_refused": 1,
   "poisoner_1": 6,
   "poisoner_found": 4,
   "letter_1": 3,
   "letter_map": 6,
-  "letter_cache": 1
+  "letter_cache": 3
  },
  "lore": {
   "drowned": {
