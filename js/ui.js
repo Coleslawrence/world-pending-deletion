@@ -614,7 +614,7 @@ function shopHTML() {
     <div class="col col-a">${archChips(counts)}
     <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
     <div class="shopgrid">${items}</div>
-    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}<span class="interest">Interest +${Math.min(interestCap(run), Math.floor(run.gold / 10))}g</span></div>
+    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}<span class="interest">Interest +${interestOf(run)}g</span></div>
     </div><div class="col col-b"><div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
     <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
     <div class="sec-h"><span${over ? ' class="bad"' : ''}>Bench ${run.bench.length}/8</span><span class="fine">Tap to equip, swap or sell</span></div>
@@ -1037,7 +1037,7 @@ function howtoSheet() {
     <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns.</li>
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
-    <li><b>Gold:</b> 7 a round, +interest of 1 per 10 gold you hold (up to 3). Reroll for 2.</li>
+    <li><b>Gold:</b> 5 a round, +interest of 1 per 4 gold you hold (up to 5, so a 20-gold bank doubles your income). Reroll for 2.</li>
     <li><b>Training:</b> in the shop, buy stat points with gold. Each costs a little more than the last. Every 2 points is a level: +4 Max HP and rarer pieces.</li>
     <li><b>Reactions:</b> Burn + Poison, Burn + Bleed, Bleed + Mark, Stun + Weaken and more trigger bonus effects.</li>
     <li><b>Wagers:</b> a god bets on your next fight. Stake 5 gold for 10 and their Favour.</li>
@@ -1292,7 +1292,7 @@ const COACH = [
   { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Copies get a Buy button of their own. Buy both Firebolts.', until: () => ownsStar('firebolt', 2) },
   { scr: 'shop', pos: 'bottom', hl: '[data-act="shop-tab"][data-k="gear"]', text: 'Merged! Now open the Gear shop. Gear gives stats and one passive, and counts toward archetypes too.', wait: 'shop-tab' },
   { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
-  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on stat points, and every 2 points is a level that finds rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
+  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on stat points, and every 2 points is a level that finds rarer pieces. Gold you keep earns interest: +1 for every 4, up to 5.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'Damage past their Block fills the gold break bar, and big hits fill it twice as fast. Full, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },

@@ -33,7 +33,7 @@ const GIFTS = {
   vampire: { name: 'Vampirism', cat: 'combat', cost: 3, desc: 'Heal 8% of all damage you deal.', lock: 'bloodthirsty', p: { lifesteal: 0.08 } },
   manaaffinity: { name: 'Mana Affinity', cat: 'combat', cost: 2, desc: 'Quick skills have a 1 turn shorter cooldown.', lock: 'spellweaver', p: { quickCd: 1 } },
   lucky: { name: 'Lucky Star', cat: 'fortune', cost: 2, desc: '+10% critical chance and better shop odds.', p: { critBonus: 0.1 } },
-  golden: { name: 'Golden Touch', cat: 'fortune', cost: 3, desc: 'Interest cap rises from 3 to 5.' },
+  golden: { name: 'Golden Touch', cat: 'fortune', cost: 3, desc: 'Interest cap rises from 5 to 8.' },
   breath: { name: 'Second Breath', cat: 'fortune', cost: 3, desc: 'Once per run, survive a killing blow with 1 HP.' },
   gambler: { name: 'Gambler', cat: 'fortune', cost: 2, desc: 'Winning a wager pays 15 gold instead of 10.', lock: 'high_roller' },
   haggler: { name: 'Haggler', cat: 'fortune', cost: 2, desc: 'The first piece you buy each round costs 1 less.', lock: 'echo' },
