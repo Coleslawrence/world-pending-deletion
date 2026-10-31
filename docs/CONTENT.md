@@ -176,7 +176,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `arcCd` | 1 | Arcanist 2 (8) | Your other skills: 1 turn shorter cooldown for every 8 INT (minimum 1). | set |  |  | Arcanist |
 | `bleedHeal` | 1 | Butcher (0.5) | Heal 50% of the Bleed damage your opponent takes. | add |  |  | Bladedancer, Reaper |
 | `bleedMult` | 1 | Bladedancer 6 (2) | Bleed deals double damage. | set |  | rate | Bladedancer |
-| `bleedPlus` | 4 | Bladedancer 4 (2), Elf-touched (1), Thornbane (1), … | Bleed you apply +2. | add |  | flat, scales with power | Bladedancer |
+| `bleedPlus` | 5 | Bladedancer 4 (2), Hedge Witch (1), Elf-touched (1), … | Bleed you apply +2. | add |  | flat, scales with power | Bladedancer |
 | `bleedPoison` | 1 | Viper Dance (2) | Every Bleed you apply also applies 2 Poison. | add |  |  | Bladedancer, Venom |
 | `blockDmgPct` | 1 | Juggernaut (1) | Deal 1% more damage for every 2 Block you have (up to 40%). | add |  |  | Bastion, Reaper |
 | `blockKeep` | 2 | Bastion 2 (0.25), tower_shield (0.3) | Keep 25% of your Block between turns. | add |  | rate | Bastion |
@@ -184,7 +184,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `blockStun` | 1 | Thunder Wall (0.25) | When your Block absorbs a hit, 25% chance to Stun the attacker. | add |  |  | Bastion, Stormcaller |
 | `blockThorns` | 1 | spiked_buckler (0.3) | Gaining Block also gives Thorns equal to 30% of it. | add |  |  | Bastion |
 | `burnExec` | 1 | Funeral Pyre (0.25) | +25% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
-| `burnFade` | 3 | Pyre 2 (0.15), Pyre 6 (0), Hedge Witch (0.2) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
+| `burnFade` | 2 | Pyre 2 (0.15), Pyre 6 (0) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
 | `burnHeal` | 2 | cinder_robe (0.3), Sunpriest (0.3) | Heal 30% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
 | `burnPlus` | 4 | Pyre 4 (4), ember_gauntlets (2), Emberfall (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 1 | plague_censer (2) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
@@ -209,7 +209,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `goldDmg` | 1 | misers_ring (0.05) | +5% damage for every 10 gold you hold when a fight starts, up to +25%. | add |  |  |  |
 | `healBlock` | 2 | templar_plate (0.3), Paladin (0.5) | Healing also gives Block equal to 30% of it. | add |  |  | Zealot, Bastion |
 | `healDmg` | 1 | Last Rites (0.3) | Your healing also deals 30% of it as damage to the opponent. | add |  |  | Reaper, Zealot |
-| `healOnBleed` | 2 | bloodstone_amulet (3), Blood Saint (3) | Heal 3 whenever you apply Bleed. | add |  |  | Bladedancer, Zealot |
+| `healOnBleed` | 3 | bloodstone_amulet (3), Blood Saint (3), Hedge Witch (1) | Heal 3 whenever you apply Bleed. | add |  |  | Bladedancer, Zealot |
 | `healPct` | 2 | Zealot 2 (0.1), Demon Blood (-0.2) | Healing +10%. | add |  | rate | Zealot |
 | `healPoison` | 1 | Plague Saint (3) | Each skill that heals you also applies 3 Poison. | add |  |  | Venom, Zealot |
 | `heartOnWin` | 1 | Reaper 6 (1) | Each win restores 1 Heart. | set |  |  | Reaper |
@@ -224,7 +224,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `multiWeaken` | 1 | Lightning Blade (1) | Multi-hit skills Weaken the opponent for 1 turn. | add |  |  | Bladedancer, Stormcaller |
 | `overhealBlock` | 1 | Zealot 6 (1) | Overhealing becomes Block. | set |  |  | Zealot |
 | `poisonHeal` | 3 | grave_shroud (0.2), Plague Doctor (0.25), Grave Warden (0.3) | Heal 20% of Poison damage dealt (max 30% from all sources). | add |  |  | Venom |
-| `poisonMult` | 2 | Venom 6 (1.5), Hedge Witch (1.25) | Poison deals 50% more damage. | mul |  | rate | Venom |
+| `poisonMult` | 1 | Venom 6 (1.5) | Poison deals 50% more damage. | mul |  | rate | Venom |
 | `poisonOnHit` | 1 | serpent_dagger (1) | Each skill that hits also applies 1 Poison. | add |  |  | Venom |
 | `poisonPlus` | 4 | Venom 2 (1), Venom 4 (1), Bonebreaker (1), … | Poison you apply +1. | add |  | flat, scales with power | Venom |
 | `quickBlock` | 1 | Spellshield (5) | Quick skills also give 5 Block. | add |  |  | Arcanist, Bastion |

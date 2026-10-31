@@ -8,7 +8,7 @@ const GIFTS = {
   tidecaller: { name: 'Tidecaller', cat: 'world', cost: 1, desc: 'Heal 2 at the start of each of your turns.', p: { regen: 2 } },
   deserter: { name: 'Legion Deserter', cat: 'world', cost: 1, desc: 'Start each fight with 15 Block.', p: { startBlock: 15 } },
   warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of Poison damage dealt (max 30% from all sources).', p: { poisonHeal: 0.3 } },
-  hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Burn fades slower and Poison deals 25% more.', p: { burnFade: 0.2, poisonMult: 1.25 } },
+  hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Bleed you apply +1, and heal 1 whenever you apply Bleed.', p: { bleedPlus: 1, healOnBleed: 1 } },
   prodigy: { name: 'Arcane Prodigy', cat: 'world', cost: 1, desc: 'A 5th skill slot, but 10% less max HP.' },
   runesmith: { name: 'Runesmith', cat: 'world', cost: 1, desc: 'Your gear merges at 2 copies instead of 3.' },
   appraisal: { name: 'Absolute Appraisal', cat: 'cheat', cost: 4, desc: "See every opponent's full kit and their next 2 moves." },
