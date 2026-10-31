@@ -223,7 +223,7 @@ const UNLOCKS = {
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 25 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 15 },
   gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Cheat skill: a free reroll each round and better shop odds.', cost: 25 },
-  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, 3 stat points per level.', cost: 15 },
+  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, a free stat point each level.', cost: 15 },
   gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 1 less.", cost: 15 },
   gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs 1 less.', cost: 15 },
 };
@@ -295,7 +295,7 @@ function newRun(world, setup, meta, rng) {
   const G = setup.gifts;
   const run = {
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
-    stats: Object.assign({}, setup.stats), statPts: 0, level: 1, xp: 0,
+    stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0,
     gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
     favour: godZeros(), gifted: godZeros(),
@@ -339,18 +339,22 @@ function effStats(run) {
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
 function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 2 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
-const XP_NEED = [0, 2, 4, 6, 10, 14, 20, 26, 32, 999];
-function xpNeed(level) { return XP_NEED[Math.min(level, 9)]; }
-function gainXp(run, n, msgs) {
-  if (hasGift(run, 'fastlearner')) n = Math.round(n * 1.5);
-  run.xp += n;
-  while (run.level < 9 && run.xp >= xpNeed(run.level)) {
-    run.xp -= xpNeed(run.level); const before = maxHp(run); run.level++; const sp = hasGift(run, 'latebloomer') ? 3 : 2; run.statPts += sp; run.hp += maxHp(run) - before;
-    msgs && msgs.push({ t: 'level', text: `[Level up! Level ${run.level}. +${sp} stat points. Shop odds improved.]` });
-  }
-  if (run.level >= 9) run.xp = 0;
+// Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
+// points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
+const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
+function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)]; return hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p; }
+function levelFor(bought) { return Math.min(9, 1 + Math.floor(bought / 2)); }
+function trainStat(run, k, msgs) {
+  if (!STATS.includes(k)) return false;
+  const pr = pointPrice(run); if (run.gold < pr) return false;
+  const before = maxHp(run), lv = run.level;
+  run.gold -= pr; run.stats[k]++; run.bought = (run.bought || 0) + 1;
+  if (hasGift(run, 'latebloomer') && run.bought % 2 === 0) run.statPts++;
+  run.level = levelFor(run.bought); run.hp += maxHp(run) - before;
+  if (run.level > lv) msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. Shop odds improved.]` });
+  if (run.milestones) checkMilestones(run, msgs);
+  return true;
 }
-function buyXp(run, msgs) { if (run.gold < 4 || run.level >= 9) return false; run.gold -= 4; gainXp(run, 4, msgs); return true; }
 
 // ---------- Pool and shop ----------
 const ODDS = [[70, 25, 5, 0, 0], [45, 35, 17, 3, 0], [25, 35, 28, 10, 2], [15, 25, 32, 20, 8]];
@@ -403,7 +407,7 @@ function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) r
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
 function interestCap(run) { return (hasGift(run, 'golden') ? 5 : 3) + (hasPerk(run, 'ledger') ? 1 : 0); }
-function income(run) { return 5 + Math.min(interestCap(run), Math.floor(run.gold / 10)) + (run.world.mod === 'golden' ? 2 : 0); }
+function income(run) { return 7 + Math.min(interestCap(run), Math.floor(run.gold / 10)) + (run.world.mod === 'golden' ? 2 : 0); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
   let i = run.bar.findIndex(p => p && p.u === u); if (i >= 0) return { p: run.bar[i], at: 'bar', i };
@@ -872,7 +876,7 @@ function enterChoose(run, meta, rng, msgs) {
   run.scouted = false; run.wagerOn = false; run.chosen = null;
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
-  if (run.visit > 1) { gainXp(run, 2, msgs); refreshShop(run, stream(run, 'shop', rng)); }
+  if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
   run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
@@ -1530,7 +1534,7 @@ function resolveFight(run, f, meta, rng) {
   if (spec.kind === 'rival' && won) meta.archive.beat[spec.id] = true;
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
-  const res = { won, gold: 0, xp: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
+  const res = { won, gold: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
   if (!won && !run.elite && hasGift(run, 'rewind') && !run.usedRewind) {
     run.usedRewind = true; run.hp = f.startHp; res.rewind = true;
     msgs.push({ t: 'class', text: '[Return by Death. The world rewinds to the start of the fight.]' });
@@ -1878,7 +1882,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
