@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
+All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
 
 ## Where things go
 
@@ -17,6 +17,7 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | An event chain | A new file in `js/content/events/`: its `CHAINS` entry and one event per step. The format is described at the top of `js/content/events.js` |
 | A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js`. A Gift or Title's fight effect is its `p`, from `effects.js`. A Title is earned for, and a quest asks for, a `feat` from `feats.js` |
 | A wager or Trial condition | `WAGER_FEATS` in `js/core.js`: the feats a god will bet on |
+| A new outcome (something given or set as a consequence) | `js/content/outcomes.js` (its words and whether it is announced last), plus the code in `js/core.js` that applies it (`OUTCOME_APPLY`) |
 | A new feat (a measured deed) | `js/content/feats.js`: when it is measured, its words, and how it is checked against the fight tally |
 | A new passive effect | `js/content/effects.js` (its phrase, how it combines, whether enemies can carry it), plus the code in `js/core.js` that reads it |
 
@@ -48,7 +49,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Ids are permanent.** Saves, shared champions and the Halls store them. Rename the display name freely; never change or remove an id.
 - **World Record pools only grow at the end.** Runs store pool positions, so never reorder, edit or delete an entry, a role or a promise.
 - **Event options keep their places.** Run summaries store the option picked by its position, so add new options at the end and never remove one.
-- **Event outcomes are data where they can be.** `pay`, and `then` (gold, stats, next-fight flags, the chain's next step, Favour) cover most options. Anything else goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
+- **Outcomes live in `js/content/outcomes.js`.** Whatever an event option gives (`then`), a quest pays (`reward`) or a wager pays is a set of outcomes, `{ gold: 8, favour: { war: 2 } }`, applied and worded by one piece of code. An event option that needs more goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
 - **Passive effects live in `js/content/effects.js`.** Archetype bonuses, gear, Hidden Paths, Gifts, Titles, Rank perks, stat milestones, god blessings and enemy passives all say what they do as `{ key: value }` from it. Each entry has the phrase players read, so a description says what the effect says. Where an effect has a rule players couldn't guess from its number (Thorns double below half HP), its `must` makes the checker fail any description that leaves the rule out.
 - **Feats live in `js/content/feats.js`.** A deed the player can be asked for (win within 6 turns, trigger 2 reactions, defeat a rival without healing) is declared once as a feat, and wagers, Rank Trial conditions, Titles and quests all ask for it by key, so it is measured the same way everywhere. A feat that an archetype's kit can't meet says so (`unfairFor`), and one that needs a tool says which (`needs`). The checker makes a Title's or quest's words say what counts (`must`).
@@ -269,6 +270,21 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `forge` | 1 | The Forge King (3) |
 | `revive` | 1 | The Bone Saint (0.3) |
 | `twincast` | 1 | The Archmage Who Fell Upward (3) |
+
+### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
+
+What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.
+
+| Key | Example | Shown to players as | Late | Used by |
+| --- | --- | --- | --- | --- |
+| `gold` | 8 | 8 gold |  | 8 (quests, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 2 (events) |
+| `heart` | 1 | +1 max Heart |  | 2 (quests) |
+| `rune` | 1 | a rune |  | 3 (quests) |
+| `piece` | "B" | a free B-rank piece |  | 1 (quests) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 5 (events) |
+| `chain` | "done" | the story goes on |  | 28 (events) |
+| `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`
 

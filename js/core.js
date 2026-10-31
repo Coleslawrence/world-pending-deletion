@@ -775,18 +775,29 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
   if (!o) return false;
   msgs = msgs || []; const before = msgs.length, T = o.then || {}, r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
   if (o.pay) run.gold -= o.pay;
-  if (T.gold) run.gold += T.gold;
-  Object.entries(T.stats || {}).forEach(([k, v]) => run.stats[k] += v);
-  Object.assign(run.nextFlags, T.next);
+  const ctx = { run, h, msgs, chain: EVENTS[key].chain };
+  applyOutcomes(T, ctx, false);
   if (o.go) o.go(run, h);
-  const c = EVENTS[key].chain;
-  if (T.chain) run.chains[c] = typeof T.chain === 'string' ? T.chain : { step: T.chain.step, due: run.round + T.chain.after };
   notePick(run, 'e:' + key + '.' + idx);
   if (run.luck) delete run.luck[key];
   if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
-  Object.entries(T.favour || {}).forEach(([g, n]) => h.favour(g, n));
+  applyOutcomes(T, ctx, true);
   return true;
 }
+// ---------- Outcomes ----------
+// What each outcome in outcomes.js does. ctx: { run, h (an eventKit), msgs, chain (the event's chain), label (for a piece's line) }
+const OUTCOME_APPLY = {
+  gold: (v, c) => { c.run.gold += v; },
+  stats: (v, c) => Object.entries(v).forEach(([k, n]) => c.run.stats[k] += n),
+  heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
+  rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(c.run, 'loot'), null, c.run) }); },
+  piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) { c.msgs && c.msgs.push({ t: 'loot', text: `[${c.label || 'Reward'}: ${pieceDef(id).name}]` }); addPiece(c.run, id, [], c.msgs); } },
+  next: (v, c) => { Object.assign(c.run.nextFlags, v); },
+  chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
+  favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
+};
+// Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
+function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
 function applyPrefix(run, u, m) {
   const f = findPiece(run, u); if (!f || !prefixOk(f.p.id, m, f.p.mods)) return false;
@@ -810,13 +821,9 @@ function questEvent(run, kind, d, msgs) {
 function completeQuest(run, q, msgs) {
   const Q = QUESTS[q.id]; q.done = true;
   if (META) META.archive.quests[q.id] = true;
-  msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${QUEST_REWARD[Q.reward]}.]` });
-  const r = Q.reward;
-  if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(run, 'loot'), null, run) });
-  if (r === 'gold5') run.gold += 5; if (r === 'gold6') run.gold += 6; if (r === 'gold8') run.gold += 8;
-  if (r === 'heart') { run.maxHearts++; run.hearts++; amendRecord(run, msgs, stream(run, 'record')); }
-  if (r === 'favour') addFavour(run, 'war', 2, META, msgs);
-  if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool, stream(run, 'loot')); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
+  msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${outcomeText(Q.reward)}.]` });
+  const ctx = { run, h: eventKit(run, META, undefined, msgs), msgs, label: 'Quest reward' };
+  applyOutcomes(Q.reward, ctx, false); applyOutcomes(Q.reward, ctx, true);
 }
 // ---------- Additional Gift (after round 4) ----------
 function extraGiftOffers(run, rng) {
@@ -1518,9 +1525,10 @@ function resolveFight(run, f, meta, rng) {
     const W = WAGERS[run.wager.key], ok = won && featOk(run.wager.key, c);
     res.wager = { ok, text: W.text, god: run.wager.god };
     if (ok) {
-      const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0);
-      run.gold += pay; run.wagersWon = (run.wagersWon || 0) + 1;
-      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, lr);
+      const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0), prize = { gold: pay, favour: { [run.wager.god]: 2 } };
+      const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs };
+      applyOutcomes(prize, ctx, false); run.wagersWon = (run.wagersWon || 0) + 1;
+      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); applyOutcomes(prize, ctx, true);
       titleFeats('wager');
     }
     else msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.]` });
@@ -1853,6 +1861,6 @@ if (typeof module !== 'undefined') module.exports = {
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
-  TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
+  TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

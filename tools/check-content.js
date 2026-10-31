@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -46,7 +46,7 @@ try {
 
 // ---------- Ids: well formed, never removed; World Record pools only grow at the end ----------
 const ID = /^[a-z][a-z0-9_]*$/;
-const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, feats: C.FEATS, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
+const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, feats: C.FEATS, outcomes: C.OUTCOMES, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
 const nowIds = {};
 Object.entries(lists).forEach(([kind, o]) => { nowIds[kind] = Object.keys(o); if (kind !== 'paths') nowIds[kind].filter(k => !ID.test(k)).forEach(k => err(kind + ' ' + k, 'ids are lower case letters, digits and _')); });
 nowIds.eventOptions = {}; Object.entries(C.EVENTS).forEach(([k, E]) => nowIds.eventOptions[k] = E.opts.length);
@@ -79,12 +79,13 @@ const SCHEMA = {
   effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
   feats: [C.FEATS, ['at', 'say', 'hit'], ['n', 'measure', 'must', 'unfairFor', 'needs', 'theme']],
   quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n']],
+  outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight']],
   chains: [C.CHAINS, ['name', 'start'], []],
   traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
 };
-const OPTION = [['label', 'desc'], ['check', 'pay', 'can', 'then', 'go', 'reveal']], THEN = ['gold', 'stats', 'next', 'chain', 'favour'];
+const OPTION = [['label', 'desc'], ['check', 'pay', 'can', 'then', 'go', 'reveal']], THEN = Object.keys(C.OUTCOMES);
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
   need.filter(f => d[f] == null).forEach(f => err(`${kind} ${k}`, `missing ${f}`));
   Object.keys(d).filter(f => !need.includes(f) && !may.includes(f)).forEach(f => err(`${kind} ${k}`, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
@@ -92,7 +93,7 @@ Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).for
 Object.entries(C.EVENTS).forEach(([k, E]) => (E.opts || []).forEach((o, i) => {
   const w = `event ${k} option ${i + 1}`;
   Object.keys(o).filter(f => !OPTION[0].includes(f) && !OPTION[1].includes(f)).forEach(f => err(w, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
-  Object.keys(o.then || {}).filter(f => !THEN.includes(f)).forEach(f => err(w, `unknown outcome then.${f}; outcomes are ${THEN.join(', ')}, anything else goes in go`));
+  Object.keys(o.then || {}).filter(f => !THEN.includes(f)).forEach(f => err(w, `unknown outcome then.${f}; outcomes (outcomes.js) are ${THEN.join(', ')}, anything else goes in go`));
 }));
 
 // ---------- References: everything named points at something real ----------
@@ -121,6 +122,23 @@ Object.entries(C.GODS).forEach(([k, g]) => {
   ref('gods ' + k, g.reply && g.reply.label && typeof g.reply.go === 'function', 'reply needs a label and go(f)');
 });
 const nextRead = new Set([...core.matchAll(/nextFlags\.(\w+)/g)].map(m => m[1]));
+// Outcomes: every set of them (an event's then, a quest's reward) uses outcomes that exist, with values that make sense
+const outcomeUses = {};
+const outcomeOk = (where, T, what) => {
+  if (!T || typeof T !== 'object') return err(where, 'outcomes are an object like { gold: 8 } (see outcomes.js)');
+  Object.entries(T).forEach(([k, v]) => {
+    if (!C.OUTCOMES[k]) return err(where, `unknown outcome ${k}; outcomes (outcomes.js) are ${THEN.join(', ')}`);
+    (outcomeUses[k] = outcomeUses[k] || []).push(what);
+    if (k === 'gold') ref(where, Number.isInteger(v) && v > 0, 'gold is a whole number above 0');
+    if (k === 'heart' || k === 'rune') ref(where, Number.isInteger(v) && v > 0, `${k} is a whole number of them`);
+    if (k === 'piece') ref(where, C.RANKS.includes(v), `piece is a rank, one of ${C.RANKS.join(' ')}`);
+    if (k === 'stats') Object.keys(v).forEach(s => ref(where, C.STATS.includes(s), `stat ${s} is unknown`));
+    if (k === 'favour') Object.keys(v).forEach(g => ref(where, C.GODS[g], `${g} is not a god`));
+    if (k === 'next') Object.keys(v).forEach(f => ref(where, nextRead.has(f), `core.js never reads nextFlags.${f}, so it does nothing`));
+  });
+};
+Object.entries(C.QUESTS).forEach(([k, q]) => { outcomeOk('quests ' + k, q.reward, 'quest ' + k); if (q.reward && q.reward.chain != null) err('quests ' + k, 'chain is an event outcome'); });
+Object.keys(C.OUTCOMES).forEach(k => { if (typeof C.OUTCOMES[k].say !== 'function') err('outcomes ' + k, 'say(v) gives the words players read for it'); });
 const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.luck === true);
 Object.entries(C.CHAINS).forEach(([c, ch]) => ref('chains ' + c, C.EVENTS[ch.start] && C.EVENTS[ch.start].chain === c, `start ${ch.start} is not an event in this chain`));
 Object.entries(C.EVENTS).forEach(([k, E]) => {
@@ -132,9 +150,7 @@ Object.entries(C.EVENTS).forEach(([k, E]) => {
       ref(w, Number.isInteger(o.pay) && o.pay > 0, 'pay is a whole number of gold');
       ref(w, new RegExp(`\\b${o.pay} gold\\b`).test(o.label + ' ' + o.desc), `pays ${o.pay} gold, so the label or desc says "${o.pay} gold": paying is the action`);
     }
-    Object.keys(T.stats || {}).forEach(s => ref(w, C.STATS.includes(s), `stat ${s} is unknown`));
-    Object.keys(T.favour || {}).forEach(g => ref(w, C.GODS[g], `${g} is not a god`));
-    Object.keys(T.next || {}).forEach(f => ref(w, nextRead.has(f), `core.js never reads nextFlags.${f}, so it does nothing`));
+    if (o.then) outcomeOk(w, T, 'event ' + k);
     if (T.chain) {
       ref(w, E.chain, 'then.chain needs the event to be in a chain');
       if (typeof T.chain === 'object') ref(w, C.EVENTS[E.chain + '_' + T.chain.step] && Number.isInteger(T.chain.after) && T.chain.after > 0, `chain step ${T.chain.step} needs an event ${E.chain}_${T.chain.step} and a whole number of rounds in after`);
@@ -187,7 +203,6 @@ Object.entries(C.GIFTS).forEach(([k, g]) => {
   if (g.lock) ref('gifts ' + k, ['echo', 'chain'].includes(g.lock) || C.TITLES[g.lock], `lock ${g.lock} is not echo, chain or a Title`);
   if (g.lock === 'echo') ref('gifts ' + k, G.UNLOCKS['gift_' + k], `is bought with Echoes but UNLOCKS has no gift_${k}`);
 });
-Object.entries(C.QUESTS).forEach(([k, q]) => ref('quests ' + k, C.QUEST_REWARD[q.reward], `reward ${q.reward} is not in QUEST_REWARD`));
 // Feats: wagers, Trials, Titles and quests ask for feats that exist, and their words say what counts (must in feats.js)
 const featUses = {};
 const askFeat = (where, k, n, text, what) => {
@@ -343,6 +358,10 @@ function effectDoc() {
     ...sorted(C.EFFECTS).map(([k, E]) => { const who = passiveUses(k); let t = ''; try { t = E.say(who.length && typeof who[0][1] === 'number' ? who[0][1] : 1); } catch (e) { /* reported above */ } return row(k, who, ` ${t.replace(/\|/g, '\\|')} | ${E.how || 'add'} | ${E.lvl ? 'yes' : ''} | ${E.enemy ? E.enemy + (E.enemy === 'flat' ? ', scales with power' : '') : ''} | ${[].concat(E.theme || []).map(a => C.ARCH[a] ? C.ARCH[a].name : a).join(', ')} |`); }),
     '', '### Enemy traits (fields on the enemy, or in its phase\'s set)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
+    '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
+    '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
+    '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
+    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
     '', '### Feats (`feat`), from `js/content/feats.js`',
     '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
     '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',
