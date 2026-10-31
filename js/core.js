@@ -310,7 +310,7 @@ function newRun(world, setup, meta, rng) {
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // System quests: two visible, every hidden one quietly active
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden), rs).slice(0, 2);
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
@@ -673,14 +673,16 @@ function featOk(k, c, n) { const F = FEATS[k]; if (F.at === 'win' && !c.won) ret
 function canStop(run) { const P = runP(run); return P.firstStun || P.every3Stun || run.bar.some(p => p && SKILLS[p.id] && (SKILLS[p.id].fx.stun || SKILLS[p.id].fx.interrupt || SKILLS[p.id].fx.stunIfWeak)); }
 const FEAT_TOOLS = { stop: canStop }; // what a feat's needs asks the run to have
 function featPossible(run, k) { const F = FEATS[k]; return !F.needs || FEAT_TOOLS[F.needs](run); }
+// A feat is fair unless the run leans on an archetype it is unfair for: the recognised path, or the home archetype before one
+function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; return !(F.unfairFor || []).includes(lead); }
 // ---------- Wagers ----------
-// The feats a god will bet on. Trials never ask one that is unfair for an archetype; wagers and quests still do (a later fix).
+// The feats a god will bet on. Trials never ask one that is unfair for any archetype; wagers and quests skip it for the run that leans on one.
 const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
 const WAGERS = {};
 WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
-  const keys = WAGER_FEATS.filter(k => featPossible(run, k));
+  const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
   return { god, key: pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
@@ -1853,7 +1855,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
