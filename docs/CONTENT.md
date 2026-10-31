@@ -218,7 +218,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
 | `hitHeal` | 1 | pilgrim_mace (2) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
 | `lastWords` | 1 | Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP. | set |  |  |  |
-| `lifesteal` | 4 | Reaper 4 (0.2), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 20% of the damage you deal. | add |  | rate | Reaper |
+| `lifesteal` | 4 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDR` | 1 | Comeback Kid (0.2) | Below 25% HP, take 20% less damage. | set |  | rate |  |
 | `lowHpDmg` | 2 | Berserker's Blood (0.3), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
 | `lowLifesteal` | 1 | soul_lantern (0.25) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
@@ -249,10 +249,10 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `startPoison` | 1 | blight_kris (3) | Your opponent starts each fight with 3 Poison. | add |  |  | Venom |
 | `stormBreak` | 1 | Stormcaller 2 (1) | Your Stuns and Interrupts add your STR to their damage and shatter Block. Stopping a big attack Empowers you for 2 turns. | set |  |  | Stormcaller |
 | `stunBurn` | 1 | Wildstorm (5) | Your Stuns and Interrupts also apply 5 Burn. | add |  |  | Stormcaller, Pyre |
-| `stunDmg` | 3 | Stormcaller 2 (12), thunder_maul (6), storm_ring (10) | Your Stuns and Interrupts deal 12 damage. | add | yes |  | Stormcaller |
+| `stunDmg` | 3 | Stormcaller 2 (16), thunder_maul (6), storm_ring (10) | Your Stuns and Interrupts deal 16 damage. | add | yes |  | Stormcaller |
 | `stunEmpower` | 2 | conductive_mail (1), Stormbreaker (1) | Whenever you Stun or Interrupt, you are Empowered for 1 turn. | add |  |  | Stormcaller |
 | `stunHeal` | 1 | Inquisitor (8) | Your Stuns and Interrupts heal you 8. | add |  |  | Stormcaller, Zealot |
-| `stunWeaken` | 1 | Stormcaller 4 (2) | Your Stuns also Weaken for 2 turns. | set |  |  | Stormcaller |
+| `stunWeaken` | 1 | Stormcaller 4 (3) | Your Stuns also Weaken for 3 turns. | set |  |  | Stormcaller |
 | `swordSaint` | 1 | Sword Saint (1) | Your basic Attack becomes S-rank: far stronger, and it ignores Block. | set |  |  |  |
 | `thornBurn` | 1 | Ember Wall (2) | Thorns also apply 2 Burn. | add |  | flat, scales with power | Bastion, Pyre |
 | `thornMult` | 1 | Duelist (1.5) | Thorns and Riposte deal 50% more. | add |  | rate | Bastion, Bladedancer |
@@ -260,7 +260,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `thornsAlways` | 4 | Bastion 4 (4), crown_of_thorns (3), Forgebreaker (2), … | Always have 4 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
 | `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |
 | `vsDisabled` | 1 | Warlord (0.25) | +25% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
-| `vsHalf` | 1 | Reaper 2 (0.25) | Opponents below half HP take 25% more damage from you. | add |  | rate | Reaper |
+| `vsHalf` | 1 | Reaper 2 (0.35) | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
 | `vsHard` | 1 | Underdog (0.1) | +10% damage to hard opponents. | add |  |  |  |
 | `vsHigherRank` | 1 | Rank Is Just a Letter (0.1) | +10% damage to opponents of a higher rank than you. | add |  |  |  |
 | `weakPoison` | 1 | Hexblade (3) | Weaken you apply also applies 3 Poison. | add |  |  | Stormcaller, Venom |
