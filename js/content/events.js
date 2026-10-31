@@ -30,3 +30,9 @@ const EVENTS = {};
 // CHAINS.id = { name, start, theme? }: name is shown on later steps ("[Event chain: The Official]"), start is the first event,
 // theme the archetype (or two neighbours) the chain belongs to on the wheel, when it belongs to one
 const CHAINS = {};
+// Tournament Amendments: rules an event can change for the rest of the run (the outcome amend), outside the Elite bracket.
+// foeHp / foeDmg multiply every opponent's HP and damage; winGold is paid on each win
+const AMENDMENTS = {
+  sudden: { name: 'Sudden Death', say: 'Opponents have 30% less HP and deal 30% more damage.', foeHp: 0.7, foeDmg: 1.3 },
+  extended: { name: 'Extended Bouts', say: 'Opponents have 20% more HP. Every win pays 4 gold.', foeHp: 1.2, winGold: 4 },
+};

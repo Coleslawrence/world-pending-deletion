@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -140,6 +140,9 @@ const outcomeOk = (where, T, what) => {
     if (k === 'next') Object.keys(v).forEach(f => ref(where, nextRead.has(f), `core.js never reads nextFlags.${f}, so it does nothing`));
     if (k === 'foe') Object.entries(v).forEach(([f, n]) => ref(where, ['weaken', 'poison', 'burn', 'hp', 'trait'].includes(f) && typeof n === 'number' && n !== 0, `foe takes weaken, poison, burn, hp (a share) or trait (a count), as numbers; ${f} is not one`));
     if (k === 'max_hp') ref(where, typeof v === 'number' && v !== 0 && Math.abs(v) <= 0.5, 'max_hp is a share of max HP, like -0.1');
+    if (k === 'amend') ref(where, C.AMENDMENTS && C.AMENDMENTS[v], `amend ${v} is not in AMENDMENTS (events.js)`);
+    if (k === 'respec') ref(where, v === true, 'respec is true');
+    if (k === 'summon') { ref(where, v && (['copy', 'erased'].includes(v.who) || (C.ENEMIES[v.who] && C.RIVALS.includes(v.who))), `summon.who is 'copy', 'erased' or a rival's id`); if (v && v.bounty) outcomeOk(where + ' summon.bounty', v.bounty, what); }
     if (k === 'stakes') { ref(where, v && (v.win || v.lose) && Object.keys(v).every(w => ['win', 'lose'].includes(w)), 'stakes is { win: outcomes, lose: outcomes }'); ['win', 'lose'].forEach(w => v && v[w] && outcomeOk(where + ' stakes.' + w, v[w], what)); }
     if (k === 'restore' || k === 'notice' || k === 'erase') ref(where, Number.isInteger(v) && v !== 0 && (k === 'notice' || v > 0), `${k} is a whole number${k === 'notice' ? ' (up or down)' : ' above 0'}`);
     if (k === 'erase') ref(where, Number.isInteger(v) && v > 0, 'erase is a whole number above 0');
@@ -434,7 +437,7 @@ function effectDoc() {
     '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
     '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
     '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
-    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
+    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
     '', '### Feats (`feat`), from `js/content/feats.js`',
     '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
     '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',
