@@ -13,8 +13,10 @@
 //   foe: { weaken: 2, poison: 4, burn: 4, hp: -0.1, trait: 1 }   your next opponent starts with these (hp: a share more or less; trait: n extra pool traits)
 //   max_hp: -0.1       a share of max HP, gained or lost for the rest of the run (lost at most half)
 //   restore: n         Hearts back, up to your max; the World Record entries come back partial
-//   notice: n          the System's notice up or down (0 to its cap); each step makes opponents stronger or weaker
-//   chain: 'done', or { step, after }   where the event chain goes next (events only)
+//   erase: n           Hearts lost (never the last one); World Record entries erased as in a defeat
+//   stakes: { win: {…}, lose: {…} }   outcomes that happen when your next fight is won or lost
+//   notice: n          the System's notice up or down (0 to its cap); each step makes opponents stronger or weaker. Announced after the reveal
+//   chain: 'done', or { step, after }   where the event chain goes next (events only); applied late, so an option's go still sees the chain's state
 //   favour: { war: 2 } Favour with gods, announced last
 const OUTCOMES = {
   gold: { say: n => `${n} gold` },
@@ -26,8 +28,10 @@ const OUTCOMES = {
   foe: { say: () => 'a mark on your next opponent' },
   max_hp: { say: v => `${v > 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)}% max HP` },
   restore: { say: n => `${n} Heart${n === 1 ? '' : 's'} restored` },
-  notice: { say: n => n > 0 ? "the System's notice" : 'the System looking elsewhere' },
-  chain: { say: () => 'the story goes on' },
+  erase: { say: n => `${n} Heart${n === 1 ? '' : 's'} erased` },
+  stakes: { say: () => 'stakes on your next fight' },
+  notice: { say: n => n > 0 ? "the System's notice" : 'the System looking elsewhere', late: true },
+  chain: { say: () => 'the story goes on', late: true },
   favour: { say: o => Object.entries(o).map(([g, n]) => `${n} Favour with ${GODS[g].name.replace(/^The /, 'the ')}`).join(', '), late: true },
 };
 // The words for a whole set of outcomes, in order: "8 gold, 2 Favour with the God of War"

@@ -709,6 +709,7 @@ function makeWager(run, rng) {
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
 function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); return o; }
 function addFavour(run, god, n, meta, msgs, rng) {
+  if (n < 0) { const b = run.favour[god] || 0; run.favour[god] = Math.max(0, b + n); if (b > run.favour[god]) msgs && msgs.push({ t: 'loss', text: `[${GODS[god].name} is displeased. Favour −${b - run.favour[god]}.]` }); return; }
   run.favour[god] = (run.favour[god] || 0) + n;
   msgs && msgs.push({ t: 'favour', text: `[${GODS[god].name} is pleased. Favour +${n}.]` });
   if (run.favour[god] >= 4 && !(run.gifted[god] >= 1)) {
@@ -753,12 +754,16 @@ function eventKit(run, meta, rng, msgs) {
     meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
     lose: (f, text) => lose(run, f, msgs, text), piece: tries => merchantPiece(run, rng, msgs, tries), eraseRecord: n => eraseRecord(run, n, msgs),
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
+    heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
+    sellLowest: mult => { const p = run.bench.slice().sort((a, b) => sellValue(a) - sellValue(b))[0]; if (!p) return 0; const v = sellValue(p) * (mult || 1); removePiece(run, p.u); run.gold += v; msgs.push({ t: 'loot', text: `[Sold: ${pieceDef(baseId(p.id)).name}. +${v} gold.]` }); return v; },
   };
 }
 function eventText(run, key) { const t = EVENTS[key].text; return typeof t === 'function' ? t(run) : t; }
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
-  const keys = Object.keys(EVENTS).filter(k => !EVENTS[k].chain).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
+  // Stand-alone events don't repeat in a run until every one has been seen
+  const fresh = Object.keys(EVENTS).filter(k => !EVENTS[k].chain && !(run.seen || []).includes(k));
+  const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(k => !EVENTS[k].chain)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
   const w = keys.map(k => EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1);
   return wpick(keys, w, rng);
 }
@@ -778,16 +783,25 @@ function checkMet(run, key, c) {
   return !!(c.luck && run.luck && run.luck[key]);
 }
 function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : '[LUK]'; }
+// Chance options ({ roll: { stat, hard? } }): always shown, with the odds on the button. ROLL_BASE (ROLL_HARD if hard) + ROLL_PER per
+// point of the stat + ROLL_LUK per point of LUK, kept between ROLL_MIN and ROLL_MAX. The roll is made when the event appears and kept
+// with the run, so reloading never changes it; a failed roll takes the option's fail branch, which always does something.
+const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, ROLL_MAX = 95;
+function rollChance(run, r) { const s = effStats(run); return Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0)))); }
+function rollTag(run, r) { return `[${r.stat} ${rollChance(run, r)}%]`; }
 function pushEvent(run, key, rng) {
   run.pending.push({ type: 'event', key });
+  run.seen = run.seen || []; if (!run.seen.includes(key)) run.seen.push(key);
+  if (EVENTS[key] && EVENTS[key].opts.some(o => o.roll)) { run.rolls = run.rolls || {}; run.rolls[key] = rnd(stream(run, 'event', rng)) * 100; }
   if (EVENTS[key] && EVENTS[key].opts.some(o => o.check && o.check.luck)) { run.luck = run.luck || {}; run.luck[key] = rnd(stream(run, 'event', rng)) < LUCK_LINE * effStats(run).LUK; }
 }
-// The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines (hard and god lines first)
+// The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines and chance options together
+// (chance options first, then hard and god lines), so the sheet fits one screen
 function eventOpts(run, key) {
   const E = EVENTS[key]; if (!E) return [];
   const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && !(o.payHeart >= run.hearts) && (!o.check || checkMet(run, key, o.check)); });
-  const w = c => c.hard || c.favour ? 2 : c.luck ? 1 : 0;
-  const lines = ok.filter(i => E.opts[i].check).sort((a, b) => w(E.opts[b].check) - w(E.opts[a].check));
+  const w = o => o.roll ? 3 : o.check.hard || o.check.favour ? 2 : o.check.luck ? 1 : 0; // a chance option is always shown, so it is never the one cut
+  const lines = ok.filter(i => E.opts[i].check || E.opts[i].roll).sort((a, b) => w(E.opts[b]) - w(E.opts[a]));
   const cut = lines.slice(MAX_STAT_LINES);
   return ok.filter(i => !cut.includes(i));
 }
@@ -796,15 +810,24 @@ function eventOpt(run, key, idx) { return eventOpts(run, key).includes(idx) ? EV
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
-  msgs = msgs || []; const before = msgs.length, T = o.then || {}, r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
+  msgs = msgs || []; const r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
   if (o.pay) run.gold -= o.pay;
   if (o.payHeart) { run.hearts -= o.payHeart; msgs.push({ t: 'loss', text: `[Paid: ${o.payHeart} Heart${o.payHeart > 1 ? 's' : ''}, ${run.hearts} left.]` }); eraseRecord(run, o.payHeart, msgs); }
+  // A chance option: the roll made when the event appeared decides which branch happens
+  let B = o;
+  if (o.roll) {
+    const ch = rollChance(run, o.roll), got = run.rolls && run.rolls[key] != null ? run.rolls[key] : rnd(r) * 100, won = got < ch;
+    msgs.push({ t: won ? 'class' : 'loss', text: `[${o.roll.stat} check: ${ch}%. ${won ? 'Success' : 'Failed'}.]` });
+    if (!won) B = o.fail;
+    if (run.rolls) delete run.rolls[key];
+  }
+  const before = msgs.length, T = B.then || {};
   const ctx = { run, h, msgs, chain: EVENTS[key].chain };
   applyOutcomes(T, ctx, false);
-  if (o.go) o.go(run, h);
+  if (B.go) B.go(run, h);
   notePick(run, 'e:' + key + '.' + idx);
   if (run.luck) delete run.luck[key];
-  if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
+  if (B.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof B.reveal === 'function' ? B.reveal(run) : B.reveal });
   applyOutcomes(T, ctx, true);
   return true;
 }
@@ -826,6 +849,8 @@ const OUTCOME_APPLY = {
     if (v.trait) { const have = F.foeTraits || [], add = shuffle(Object.keys(TRAIT_POOL).filter(k => !have.includes(k)), stream(c.run, 'opps')).slice(0, v.trait); F.foeTraits = have.concat(add); }
   },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
+  erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
+  stakes: (v, c) => { const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
   restore: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.min(c.run.maxHearts, c.run.hearts + v); const k = c.run.hearts - b; if (k) { c.msgs.push({ t: 'loot', text: `[+${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); restoreRecord(c.run, k, c.msgs); } },
   notice: (v, c) => {
     const was = noticeOf(c.run); c.run.notice = Math.max(0, Math.min(TUNE.noticeMax, (c.run.notice || 0) + v)); const now = noticeOf(c.run);
@@ -952,7 +977,7 @@ function buildPlayer(run) {
   const s = effStats(run), P = runP(run), mh = maxHp(run);
   if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
-    side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, P,
+    side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
     crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
     breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0, str: s.STR,
     res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
@@ -1583,6 +1608,9 @@ function resolveFight(run, f, meta, rng) {
     msgs.push({ t: 'class', text: '[Return by Death. The world rewinds to the start of the fight.]' });
     return res;
   }
+  // Stakes set on this fight by an event: outcomes for a win or a loss
+  const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'];
+  if (stakes) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Stakes' }; applyOutcomes(stakes, ctx, false); applyOutcomes(stakes, ctx, true); }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
   run.nextFlags = {};
   const c = featCtx(run, f, won, spec);
@@ -1928,7 +1956,7 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
