@@ -308,7 +308,7 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   if (gift) themedFits(w + ' World Gift ' + t.gift, gift.theme != null ? gift.theme : t.home, gift.p);
 });
 Object.keys(C.PIE).forEach(fx => { if (!fxRead.has(fx)) err('archetypes PIE', `${fx} is owned but core.js never reads fx.${fx}`); });
-Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the wheel, so any archetype may use it`));
+Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block', 'brk'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the wheel, so any archetype may use it`));
 
 // ---------- Moves and the power budget: every enemy move plays a role, and its numbers sit in its tier (warn only) ----------
 const inRange = (v, [a, b]) => v >= a && v <= b;

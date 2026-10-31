@@ -125,6 +125,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `bleed` | 12 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
 | `block` | 43 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 7 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
+| `brk` | 18 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
 | `burn` | 25 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `cleanse` | 14 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `critBonus` | 1 | Precise Strike (0.5) | +50% critical chance. | no |
