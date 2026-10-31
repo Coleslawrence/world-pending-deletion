@@ -226,7 +226,8 @@
   "hollow",
   "verdant",
   "sky",
-  "iron"
+  "iron",
+  "steppes"
  ],
  "modifiers": [
   "none",
@@ -254,6 +255,7 @@
   "thorn_mother",
   "archmage",
   "forge_king",
+  "herald",
   "proctor",
   "legend",
   "undefeated"
@@ -265,6 +267,7 @@
   "hedgewitch",
   "prodigy",
   "runesmith",
+  "lightningrod",
   "appraisal",
   "monarch",
   "rewind",
@@ -334,6 +337,7 @@
   "thornbane",
   "skyfall",
   "forgebreaker",
+  "stormbreaker",
   "ascendant",
   "pathfinder",
   "unbeaten"
@@ -639,6 +643,36 @@
     "The vent-house",
     "Your mother Hild",
     "Your friend Pell"
+   ]
+  },
+  "steppes": {
+   "roles": [
+    "rod-keeper",
+    "herd rider",
+    "storm reader",
+    "tent-weaver",
+    "clan runner"
+   ],
+   "promises": [
+    "ride to the Eye",
+    "keep the herd together",
+    "win back the last race"
+   ],
+   "entries": [
+    "The Eye",
+    "The First Rider",
+    "The Quiet Year",
+    "The Glass Flats",
+    "The Rod Field",
+    "The Herd Roads",
+    "The Thunder Count",
+    "Warden Kesh",
+    "The Tent Moot",
+    "The Long Grass",
+    "The family tent",
+    "The windbreak wall",
+    "Your mother Ilse",
+    "Your rival Brun"
    ]
   }
  },
