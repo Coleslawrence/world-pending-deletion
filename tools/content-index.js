@@ -9,7 +9,7 @@ const { execFileSync } = require('child_process'), fs = require('fs'), path = re
 const ROOT = path.join(__dirname, '..');
 const args = process.argv.slice(2), out = args.includes('--out') ? args[args.indexOf('--out') + 1] : null;
 const G = require(args[0] === '--names' ? path.resolve(args[1], 'js/core.js') : '../js/core.js');
-const C = args[0] === '--names' ? null : vm.runInThisContext('({ ARCH, SKILLS, GEAR, GODS, WORLD_TYPES, MODIFIERS, LORE, GIFTS, GIFT_CATS, TITLES, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, EVENTS, CHAINS })');
+const C = args[0] === '--names' ? null : vm.runInThisContext('({ ARCH, SKILLS, GEAR, GODS, WORLD_TYPES, MODIFIERS, LORE, GIFTS, GIFT_CATS, TITLES, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, EVENTS, CHAINS, moveRole })');
 const git = (...a) => { try { return execFileSync('git', a, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { return null; } };
 
 // Every player-facing name a version of the game has, from its exports (works for releases before js/content/ too)
@@ -49,7 +49,7 @@ table('World types', ['Name', 'Id', 'Home archetype', 'Final Champion', 'World G
 table('World modifiers', ['Name', 'Id', 'Effect'], Object.entries(C.MODIFIERS).map(([k, m]) => [m.name, k, m.desc]));
 table('World Record entries', ['Name', 'World'], Object.entries(C.LORE).flatMap(([w, L]) => L.entries.map(e => [e.name, C.WORLD_TYPES[w].name])), 'Pools only grow at the end: runs store positions.');
 table('Enemies', ['Name', 'Id', 'Kind', 'Style'], Object.entries(C.ENEMIES).map(([k, e]) => [e.name, k, e.final ? `Final Champion of ${finalOf[k] || '?'}` : C.RIVALS.includes(k) ? 'Rival' : C.MONSTERS.includes(k) ? 'Monster' : 'Other', e.style]));
-table('Enemy moves', ['Name', 'Used by'], Object.values(Object.values(C.ENEMIES).reduce((o, e) => { e.skills.forEach(m => (o[m.n] = o[m.n] || [m.n, []])[1].push(e.name)); return o; }, {})).map(([n, by]) => [n, by.join(', ')]));
+table('Enemy moves', ['Name', 'Role', 'Used by'], Object.values(Object.values(C.ENEMIES).reduce((o, e) => { e.skills.forEach(m => (o[m.n] = o[m.n] || [m.n, C.moveRole(m.fx || {}, e.tier), []])[2].push(e.name)); return o; }, {})).map(([n, r, by]) => [n, r, by.join(', ')]));
 table('Gifts', ['Name', 'Id', 'Category'], Object.entries(C.GIFTS).map(([k, g]) => [g.name, k, g.arch ? 'Affinity' : g.cat === 'extra' ? 'Additional' : C.GIFT_CATS[g.cat] || g.cat]));
 table('Titles', ['Name', 'Id', 'Earned by'], Object.entries(C.TITLES).map(([k, t]) => [t.name, k, t.cond]));
 table('Hidden Paths', ['Name', 'Archetypes'], Object.entries(C.HIDDEN_PATHS).map(([k, h]) => [h.name, k.split('+').map(an).join(' + ')]));

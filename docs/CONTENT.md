@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
+All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), enemy move roles (`moves.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
 
 ## Where things go
 
@@ -11,7 +11,7 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | An archetype | `js/content/archetypes.js` (the entry, the wheel), its skills file, a colour in `css/style.css`, a Hidden Path for every pair, `STAT_INFO` in `base.js` |
 | A world type | A new pack in `js/content/worlds/` (the world, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
 | A god | `js/content/gods.js` (its archetypes, blessing and rival reply line) and a `chosen_<id>` divine Gift in `gifts.js` |
-| An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS`. Boss mechanics are fields from the enemy mechanics list below |
+| An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS`. Its moves play roles (strike, big hit, guard, setup, sustain) with numbers from its tier in `moves.js`; boss mechanics are fields from the enemy mechanics list below |
 | A trait monsters and rivals can roll | `js/content/traits.js` |
 | An Undercity event | `js/content/events/undercity.js` |
 | An event chain | A new file in `js/content/events/`: its `CHAINS` entry and one event per step. The format is described at the top of `js/content/events.js` |
@@ -84,7 +84,7 @@ Each archetype carries its `line` (its philosophy in one sentence; everything ma
 
 ## Enemy traits, passives and phases
 
-An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as player skills), the order it uses them (`script`, looping), and any of these. A new boss mixes them; a trait that doesn't exist yet is a mechanic and gets its own pull request first.
+An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as player skills), the order it uses them (`script`, looping), and any of these. Every move plays a role the checker reads from its effects: a **strike**, a **big hit** (the one to Block or Stun; it shows as a big move), a **guard**, a **setup** (its theme's status, with little damage) or **sustain**. `moves.js` holds each tier's numbers for those roles and what a tier needs (a Final Champion has a big hit or sustain). Numbers outside the tier warn, as the power budget, and the balance gate (the sims) decides in the end. A new enemy is a theme from the wheel plus roles: a Stormcaller boss is a strike, a guard, a big hit and a Stun setup. A new boss mixes them; a trait that doesn't exist yet is a mechanic and gets its own pull request first.
 
 | Trait | Value | What it does |
 | --- | --- | --- |
@@ -292,6 +292,25 @@ Each archetype is a theme. Its neighbours on the wheel are its allies; a piece o
 | Reaper | STR | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` | Pyre, Venom | scythe, grave, harvest, end, hollow, bone |
 | Venom | AGI | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` | Reaper, Bladedancer | fang, rot, drip, plague, patience, thorn |
 | Bladedancer | AGI | Never stops moving: a hundred cuts beat one. | `bleed` `hits` `perHit` `mark` `critBonus` `cruel` `riposte` `evade` `alwaysCrit` `nextCrit` | Venom, Zealot | edge, dance, cut, flurry, quick, step |
+
+### Enemy move roles and tier numbers, from `js/content/moves.js`
+
+A move's role is read from its effects (`moveRole`). A big hit is one of at least the tier's BIG_HIT damage before the round's scaling. Numbers are ranges the checker warns outside of; the balance gate has the last word.
+
+| Tier | Who | HP | Strike | Big hit (from) | Guard Block | Damage per turn | Needs |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | arena beasts, rounds 1 to 3 | 36 to 60 | 3 to 12 | 18 to 26 (18) | 5 to 10 | 3 to 10 | damage |
+| 2 | rivals and the Proctor, rounds 4 to 7 | 50 to 80 | 5 to 14 | 16 to 22 (16) | 6 to 14 | 2 to 11 | damage |
+| 3 | Final Champions | 80 to 110 | 4 to 13 | 14 to 24 (14) | 10 to 14 | 4 to 11 | damage, big or sustain|trait |
+| 4 | the Elite bracket | 140 to 200 | 6 to 18 | 20 to 28 (20) | 14 to 18 | 7 to 15 | damage, big or sustain|trait |
+
+| Role | Meaning | Used by |
+| --- | --- | --- |
+| strike | a plain hit | 22 moves |
+| big | a big hit, the one to Block or Stun | 8 moves |
+| guard | Block and nothing else | 13 moves |
+| setup | a status, buff or trick with little damage | 17 moves |
+| sustain | healing or draining | 5 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
 
