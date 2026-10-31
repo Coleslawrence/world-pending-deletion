@@ -326,6 +326,10 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `rune` | 1 | a rune |  | 3 (quests) |
 | `piece` | "B" | a free B-rank piece |  | 1 (quests) |
 | `next` | {"bribe":true} | a mark on your next fight |  | 5 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 0 () |
+| `max_hp` | -0.1 | −10% max HP |  | 0 () |
+| `restore` | 1 | 1 Heart restored |  | 0 () |
+| `notice` | 1 | the System's notice |  | 0 () |
 | `chain` | "done" | the story goes on |  | 28 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 

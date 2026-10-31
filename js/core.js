@@ -338,7 +338,7 @@ function effStats(run) {
   return s;
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0))); }
 // Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
 // points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
 const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
@@ -785,7 +785,7 @@ function pushEvent(run, key, rng) {
 // The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines (hard and god lines first)
 function eventOpts(run, key) {
   const E = EVENTS[key]; if (!E) return [];
-  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && (!o.check || checkMet(run, key, o.check)); });
+  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && !(o.payHeart >= run.hearts) && (!o.check || checkMet(run, key, o.check)); });
   const w = c => c.hard || c.favour ? 2 : c.luck ? 1 : 0;
   const lines = ok.filter(i => E.opts[i].check).sort((a, b) => w(E.opts[b].check) - w(E.opts[a].check));
   const cut = lines.slice(MAX_STAT_LINES);
@@ -798,6 +798,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
   if (!o) return false;
   msgs = msgs || []; const before = msgs.length, T = o.then || {}, r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
   if (o.pay) run.gold -= o.pay;
+  if (o.payHeart) { run.hearts -= o.payHeart; msgs.push({ t: 'loss', text: `[Paid: ${o.payHeart} Heart${o.payHeart > 1 ? 's' : ''}, ${run.hearts} left.]` }); eraseRecord(run, o.payHeart, msgs); }
   const ctx = { run, h, msgs, chain: EVENTS[key].chain };
   applyOutcomes(T, ctx, false);
   if (o.go) o.go(run, h);
@@ -816,6 +817,21 @@ const OUTCOME_APPLY = {
   rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(c.run, 'loot'), null, c.run) }); },
   piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) { c.msgs && c.msgs.push({ t: 'loot', text: `[${c.label || 'Reward'}: ${pieceDef(id).name}]` }); addPiece(c.run, id, [], c.msgs); } },
   next: (v, c) => { Object.assign(c.run.nextFlags, v); },
+  foe: (v, c) => {
+    const F = c.run.nextFlags;
+    if (v.weaken) F.foeWeaken = (F.foeWeaken || 0) + v.weaken;
+    if (v.poison) F.foePoison = (F.foePoison || 0) + v.poison;
+    if (v.burn) F.foeBurn = (F.foeBurn || 0) + v.burn;
+    if (v.hp) F.foeHp = (F.foeHp || 1) * (1 + v.hp);
+    if (v.trait) { const have = F.foeTraits || [], add = shuffle(Object.keys(TRAIT_POOL).filter(k => !have.includes(k)), stream(c.run, 'opps')).slice(0, v.trait); F.foeTraits = have.concat(add); }
+  },
+  max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
+  restore: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.min(c.run.maxHearts, c.run.hearts + v); const k = c.run.hearts - b; if (k) { c.msgs.push({ t: 'loot', text: `[+${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); restoreRecord(c.run, k, c.msgs); } },
+  notice: (v, c) => {
+    const was = noticeOf(c.run); c.run.notice = Math.max(0, Math.min(TUNE.noticeMax, (c.run.notice || 0) + v)); const now = noticeOf(c.run);
+    if (now > was) c.msgs.push({ t: 'class', text: `[The System takes notice. Opponents +${noticePct(c.run)}%.]` });
+    else if (now < was) c.msgs.push({ t: 'sys', text: now ? `[The System looks elsewhere. Opponents +${noticePct(c.run)}%.]` : '[The System looks elsewhere. Notice cleared.]' });
+  },
   chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
   favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
 };
@@ -946,6 +962,7 @@ function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.
 // The System's notice: +TUNE.notice per straight win, never in the Elite bracket or practice
 function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
 function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
+function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); }
 function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
@@ -953,15 +970,16 @@ function buildEnemy(run, spec) {
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
   const gate = spec.gate ? TUNE.gate : 1;
   const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
-  if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; return e; }
+  if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0; if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp)); return e; }
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
-  let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85);
+  let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85); if (run.nextFlags.foeHp) hp = Math.max(1, Math.round(hp * run.nextFlags.foeHp));
+  if (run.nextFlags.foeTraits) spec = Object.assign({}, spec, { traits: (spec.traits || []).concat(run.nextFlags.foeTraits.filter(k => !(spec.traits || []).includes(k))) });
   return blankFighter(Object.assign({
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
     skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
-    weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
+    weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0, burn: run.nextFlags.foeBurn || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
 }
 // A spec's traits from the pool, on top of the enemy's own: passives add up; for a trait it already has, the
@@ -1606,7 +1624,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
       const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
-      if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${Math.round(TUNE.notice * noticeOf(run) * 100)}%.]` });
+      if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${noticePct(run)}%.]` });
     }
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
