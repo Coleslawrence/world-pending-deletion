@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -69,13 +69,14 @@ const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind'], ['evo', 'base', 'noShop', 'quick', 'basic']],
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text'], ['fix']],
-  archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b'], []],
+  archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], []],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives'].concat(MECHANICS)],
-  gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch']],
-  titles: [C.TITLES, ['name', 'cond', 'desc'], ['first']],
+  gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch', 'p']],
+  titles: [C.TITLES, ['name', 'cond', 'desc'], ['first', 'p']],
+  effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
   quests: [C.QUESTS, ['text', 'reward', 'goal'], ['hidden', 'by']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight']],
@@ -110,7 +111,7 @@ Object.entries(C.GEAR).forEach(([k, g]) => {
   ref(w, C.RANKS.includes(g.rank), `rank ${g.rank} is unknown`);
   Object.keys(g.stats).forEach(s => ref(w, C.STATS.includes(s), `stat ${s} is unknown`));
 });
-Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, a.b.length === 3, 'needs 3 tier bonuses'); });
+Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
 ref('archetypes WHEEL', C.WHEEL.length === archs.length && archs.every(a => C.WHEEL.includes(a)), 'the wheel must hold every archetype exactly once');
 C.START_ARCH.forEach(a => ref('archetypes START_ARCH', isArch(a), `${a} is not an archetype`));
 Object.entries(C.GODS).forEach(([k, g]) => {
@@ -191,21 +192,53 @@ archs.forEach((a, i) => archs.slice(i + 1).forEach(b => { const k = [a, b].sort(
 
 // ---------- Effects: every key is one the engine reads ----------
 const reads = re => new Set([...core.matchAll(re)].map(m => m[1]));
-const fxRead = reads(/\bfx\.(\w+)/g), pRead = reads(/\bP\.(\w+)/g), botRead = new Set([...bot.matchAll(/\bfx\.(\w+)/g)].map(m => m[1]));
+const fxRead = reads(/\bfx\.(\w+)/g), botRead = new Set([...bot.matchAll(/\bfx\.(\w+)/g)].map(m => m[1]));
 const uses = {};
 const use = (kind, key, who, v) => { const u = (uses[kind] = uses[kind] || {}); (u[key] = u[key] || []).push([who, v]); };
 Object.values(C.SKILLS).filter(s => !s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.SKILLS).filter(s => s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.ENEMIES).forEach(e => e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.entries(m.fx || {}).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
 Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix)).forEach(([k, v]) => use('gear', k, id, v)));
+Object.values(C.ARCH).forEach(a => a.p.forEach((p, i) => Object.entries(p).forEach(([k, v]) => use('arch', k, `${a.name} ${[2, 4, 6][i]}`, v))));
 Object.values(C.HIDDEN_PATHS).forEach(h => Object.entries(h.fx).forEach(([k, v]) => use('path', k, h.name, v)));
+Object.values(C.GIFTS).forEach(g => Object.entries(g.p || {}).forEach(([k, v]) => use('gift', k, g.name, v)));
+Object.values(C.TITLES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('title', k, t.name, v)));
+Object.values(G.PERKS).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('perk', k, t.name, v)));
+Object.values(G.MILESTONES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('milestone', k, t.name, v)));
 Object.values(C.GODS).forEach(g => Object.entries(g.bless).forEach(([k, v]) => use('god', k, g.name, v)));
 Object.values(C.ENEMIES).forEach(e => MECHANICS.filter(k => e[k] != null).forEach(k => use('enemy', k, e.name, e[k])));
 Object.values(C.ENEMIES).forEach(e => e.phase && Object.entries(e.phase.set || {}).forEach(([k, v]) => use('enemy', k, e.name + ' (phase)', v)));
 Object.values(C.ENEMIES).forEach(e => Object.entries(e.passives || {}).forEach(([k, v]) => use('passive', k, e.name, v)));
 Object.values(C.TRAIT_POOL).forEach(T => { Object.entries(T.passives || {}).forEach(([k, v]) => use('passive', k, 'trait ' + T.name, v)); Object.entries(T.traits || {}).forEach(([k, v]) => use('enemy', k, 'trait ' + T.name, v)); });
 Object.entries(uses.skill).forEach(([k, who]) => { if (!fxRead.has(k)) err('effect ' + k, `core.js never reads fx.${k}, so it does nothing (used by ${who[0][0]})`); });
-Object.entries(uses.gear).concat(Object.entries(uses.path), Object.entries(uses.god)).forEach(([k, who]) => { if (!pRead.has(k)) err('effect ' + k, `core.js never reads P.${k}, so it does nothing (used by ${who[0][0]})`); });
+// Passive effects all come from the registry in effects.js, and the engine reads every one of them
+const PASSIVE_USES = ['arch', 'gear', 'path', 'gift', 'title', 'perk', 'milestone', 'god', 'passive'];
+const passiveUses = k => PASSIVE_USES.flatMap(u => (uses[u] || {})[k] || []);
+PASSIVE_USES.forEach(u => Object.entries(uses[u] || {}).forEach(([k, who]) => { if (!C.EFFECTS[k]) err('effect ' + k, `isn't in js/content/effects.js (used by ${who[0][0]}). Add it there with its phrase; a brand new effect also needs code in core.js`); }));
+Object.entries(C.EFFECTS).forEach(([k, E]) => {
+  const w = 'effects ' + k;
+  if (!new RegExp('\\.' + k + '\\b').test(core)) err(w, `core.js never reads it, so it does nothing`);
+  if (typeof E.say !== 'function') err(w, 'say(v) gives the words players read for it');
+  ref(w, !E.how || ['add', 'set', 'mul', 'min'].includes(E.how), `how is add, set, mul or min, not ${E.how}`);
+  ref(w, !E.enemy || ['flat', 'rate'].includes(E.enemy), `enemy is flat or rate, not ${E.enemy}`);
+  [].concat(E.theme || []).forEach(t => ref(w, isArch(t), `theme ${t} is not an archetype`));
+  if (!passiveUses(k).length) warn(w, 'nothing uses it yet');
+});
+// Words match mechanics: a description has to state any rule its effects carry that players couldn't guess (must in effects.js)
+const described = [];
+Object.entries(C.ARCH).forEach(([k, a]) => a.b.forEach((b, i) => described.push([`archetypes ${k} tier ${i + 1}`, b, a.p[i]])));
+Object.entries(C.GEAR).forEach(([k, g]) => { try { described.push(['gear ' + k, g.text(G.gearPas(k, 1)), Object.assign({}, g.pas, g.fix)]); } catch (e) { /* reported above */ } });
+Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => described.push(['paths ' + k, h.desc, h.fx]));
+Object.entries(C.GODS).forEach(([k, g]) => described.push(['gods ' + k, g.blessing, g.bless]));
+Object.entries(C.GIFTS).forEach(([k, g]) => described.push(['gifts ' + k, g.desc, g.p]));
+Object.entries(C.TITLES).forEach(([k, t]) => described.push(['titles ' + k, t.desc, t.p]));
+Object.entries(G.PERKS).forEach(([k, t]) => described.push(['perks ' + k, t.desc, t.p]));
+Object.entries(G.MILESTONES).forEach(([k, t]) => described.push(['milestones ' + k, t.desc, t.p]));
+Object.entries(C.TRAIT_POOL).forEach(([k, T]) => described.push(['trait pool ' + k, T.desc, T.passives]));
+described.forEach(([w, text, p]) => Object.entries(p || {}).forEach(([k, v]) => {
+  const E = C.EFFECTS[k];
+  if (E && E.must && !E.must.test(text)) err(w, `uses ${k}, so its words have to say what effects.js says about it, like "${E.say(v)}"`);
+}));
 Object.keys(uses.enemy).forEach(k => { if (!new RegExp('\\.' + k + '\\b').test(core)) err('enemy mechanic ' + k, 'core.js never reads it'); });
 
 // ---------- Events: one option is always there to take ----------
@@ -279,16 +312,12 @@ function effectDoc() {
     '### Skill effects (`fx`), used by skills and enemy moves',
     '', '| Key | Used | Examples (value) | Shown to players as | Bot scores it |', '| --- | --- | --- | --- | --- |',
     ...sorted(uses.skill).map(([k, who]) => row(k, who, ` ${line(k)} | ${botRead.has(k) ? 'yes' : 'no'} |`)),
-    '', '### Gear passives (`pas` scales with stars, `fix` does not)',
-    '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.gear).map(([k, who]) => row(k, who, '')),
-    '', '### Hidden Path effects (`fx`)',
-    '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.path).map(([k, who]) => row(k, who, '')),
-    '', '### God blessings (`bless`, at 8 Favour)',
-    '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.god).map(([k, who]) => row(k, who, '')),
+    '', '### Passive effects (`p`), from `js/content/effects.js`',
+    '', 'Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not), Hidden Paths (`fx`), Gifts and Titles (`p`), Rank perks and stat milestones (`p`), god blessings (`bless`, at 8 Favour) and enemies (`passives`, only the ones marked for enemies). Combines: how values from several sources add up. Grows: grows with your level when it comes from gear or an archetype bonus.',
+    '', '| Key | Used | Examples (value) | Shown to players as | Combines | Grows | Enemies | Theme |', '| --- | --- | --- | --- | --- | --- | --- | --- |',
+    ...sorted(C.EFFECTS).map(([k, E]) => { const who = passiveUses(k); let t = ''; try { t = E.say(who.length && typeof who[0][1] === 'number' ? who[0][1] : 1); } catch (e) { /* reported above */ } return row(k, who, ` ${t.replace(/\|/g, '\\|')} | ${E.how || 'add'} | ${E.lvl ? 'yes' : ''} | ${E.enemy ? E.enemy + (E.enemy === 'flat' ? ', scales with power' : '') : ''} | ${[].concat(E.theme || []).map(a => C.ARCH[a] ? C.ARCH[a].name : a).join(', ')} |`); }),
     '', '### Enemy traits (fields on the enemy, or in its phase\'s set)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
-    '', '### Enemy passives (`passives`, from the gear and Hidden Path keys that work on enemies)',
-    '', '| Key | Used | Examples (value) | Scales with enemy power |', '| --- | --- | --- | --- |', ...Object.keys(G.ENEMY_PASSIVES).sort().map(k => row(k, (uses.passive || {})[k] || [], ` ${G.ENEMY_PASSIVES[k] === 'flat' ? 'yes' : 'no'} |`)),
   ].join('\n');
 }
 const START = '<!-- effects:start (written by node tools/check-content.js --write) -->', END = '<!-- effects:end -->';

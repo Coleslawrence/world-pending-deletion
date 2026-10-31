@@ -560,9 +560,9 @@ function checkPath(run, msgs) {
 }
 // Stat milestones at 10
 const MILESTONES = {
-  STR: { name: 'Mighty Frame', desc: 'Reaper and Stormcaller skills deal 10% more.' },
-  AGI: { name: 'Afterimage', desc: 'Evade the first attack each fight.' },
-  INT: { name: 'Arcane Mind', desc: 'Your first damaging skill each fight deals 30% more.' },
+  STR: { name: 'Mighty Frame', desc: 'Reaper and Stormcaller skills deal 10% more.', p: { mighty: 0.1 } },
+  AGI: { name: 'Afterimage', desc: 'Evade the first attack each fight.', p: { firstEvade: 1 } },
+  INT: { name: 'Arcane Mind', desc: 'Your first damaging skill each fight deals 30% more.', p: { firstHit: 0.3 } },
   VIT: { name: 'Iron Constitution', desc: '+1 max Heart.' },
   LUK: { name: "Fortune's Favourite", desc: 'One free reroll every round.' },
 };
@@ -580,81 +580,22 @@ function checkMilestones(run, msgs) {
 // P: every passive modifier the combat engine reads.
 // x: { title, stats (effective), milestones }
 function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
-  const P = {}, add = (k, v) => P[k] = (P[k] || 0) + v, set = (k, v) => P[k] = v;
+  const P = {};
   x = x || {};
   const c = archCounts(barPieces, gearPieces, gifts), lm = 1 + 0.08 * ((lvl || 1) - 1);
-  const t = k => archTier(c[k] || 0);
-  if (t('pyre') >= 1) set('burnFade', 0.15); if (t('pyre') >= 2) add('burnPlus', 4); if (t('pyre') >= 3) set('burnFade', 0);
-  if (t('venom') >= 1) add('poisonPlus', 1); if (t('venom') >= 2) add('poisonPlus', 1); if (t('venom') >= 3) set('poisonMult', 1.5);
-  if (t('blade') >= 1) set('extraHit', 1); if (t('blade') >= 2) add('bleedPlus', 2); if (t('blade') >= 3) set('bleedMult', 2);
-  if (t('bastion') >= 1) add('blockKeep', 0.25); if (t('bastion') >= 2) add('thornsAlways', Math.round(4 * lm)); if (t('bastion') >= 3) set('blockStrike', 0.5);
-  if (t('arcanist') >= 1) { add('quickCd', 1); set('arcCd', 8); } if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
-  if (t('zealot') >= 1) add('healPct', 0.1); if (t('zealot') >= 2) add('regen', Math.round(2 * lm)); if (t('zealot') >= 3) set('overhealBlock', 1);
-  if (t('reaper') >= 1) { add('vsHalf', 0.25); set('reapPierce', 1); set('reapBlood', 0.15); } if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
-  if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
-  gearPieces.filter(Boolean).forEach(g => Object.entries(gearPas(g.id, g.star)).forEach(([k, v]) => { if (k === 'firstCrit' || k === 'firstStun' || k === 'firstEvade') set(k, 1); else add(k, k === 'stunDmg' || k === 'thornsAlways' || k === 'regen' || k === 'startBlock' ? Math.round(v * lm) : v); }));
-  if (P.goldDmg) add('dmgPct', Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10))); // per 10 gold held when the fight starts, up to +25%
-  // Hidden Path
+  // Archetype bonuses, then gear (both grow with level), then everything else. Effects and how they combine: effects.js
+  ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach(p => addEffects(P, p, lm)));
+  gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(g.id, g.star), lm));
+  if (P.goldDmg) addEffects(P, { dmgPct: Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10)) }); // per 10 gold held when the fight starts, up to +25%
   const hp = hiddenPathOf(c);
-  if (hp) Object.entries(HIDDEN_PATHS[hp].fx).forEach(([k, v]) => add(k, v));
+  if (hp) addEffects(P, HIDDEN_PATHS[hp].fx);
   const G = gifts || [];
-  if (G.includes('tidecaller')) add('regen', 2);
-  if (G.includes('deserter')) add('startBlock', 15);
-  if (G.includes('warden')) add('poisonHeal', 0.3);
-  if (G.includes('hedgewitch')) { P.burnFade = Math.min(P.burnFade != null ? P.burnFade : 0.3, 0.2); P.poisonMult = (P.poisonMult || 1) * 1.25; }
-  if (G.includes('catalyst')) P.reactMult = (P.reactMult || 1) * 1.5;
-  if (G.includes('berserker')) add('lowHpDmg', 0.3);
-  if (G.includes('ironbody')) add('startBlockPct', 0.1);
-  if (G.includes('glass')) add('dmgPct', 0.3);
-  if (G.includes('lucky')) add('critBonus', 0.1);
-  if (G.includes('firststrike')) add('firstHit', 1);
-  if (G.includes('thickskin')) add('flatDR', 2);
-  if (G.includes('vampire')) add('lifesteal', 0.08);
-  if (G.includes('manaaffinity')) add('quickCd', 1);
-  if (G.includes('elf')) { add('dodge', 0.1); add('bleedPlus', 1); }
-  if (G.includes('demon')) { add('dmgPct', 0.15); add('healPct', -0.2); }
-  if (G.includes('dragon')) set('reactHeal', 5);
-  if (G.includes('lastwords')) set('lastWords', 0.25);
-  if (G.includes('f_sluggish')) set('sluggish', 1);
-  if (G.includes('swordsaint')) set('swordSaint', 1);
-  if (G.includes('copycat')) set('copycat', 1);
-  // Title
-  const T = x.title;
-  if (T === 'first_blood') add('firstHit', 0.5);
-  if (T === 'untouched') add('startBlock', 8);
-  if (T === 'giant_slayer') add('vsBigger', 0.15);
-  if (T === 'mirror_breaker') add('critBonus', 0.08);
-  if (T === 'bloodthirsty') add('lifesteal', 0.05);
-  if (T === 'spellweaver') add('afterQuick', 0.1);
-  if (T === 'underdog') add('vsHard', 0.1);
-  if (T === 'rank_is_just_a_letter') add('vsHigherRank', 0.1);
-  if (T === 'comeback') set('lowDR', 0.2);
-  if (T === 'alchemist') P.reactMult = (P.reactMult || 1) * 1.2;
-  if (T === 'executioner') set('critMult', 1.75);
-  if (T === 'tidebreaker') add('startBlock', 6);
-  if (T === 'emberfall') add('burnPlus', 1);
-  if (T === 'bonebreaker') add('poisonPlus', 1);
-  if (T === 'thornbane') add('bleedPlus', 1);
-  if (T === 'skyfall') { add('critBonus', 0.05); add('dodge', 0.05); }
-  if (T === 'forgebreaker') add('thornsAlways', 2);
-  if (T === 'ascendant') add('dmgPct', 0.05);
-  if (T === 'pathfinder') { add('startBlock', 5); add('regen', 1); }
-  if (T === 'unbeaten') add('dmgPct', 0.1);
-  // Promotion perks, about the size of a Title each
-  const K = x.perks || [];
-  if (K.includes('kindling')) add('burnPlus', 1);
-  if (K.includes('steeped')) add('poisonPlus', 1);
-  if (K.includes('whetted')) add('bleedPlus', 1);
-  if (K.includes('guard')) add('startBlock', 5);
-  if (K.includes('keen')) add('critBonus', 0.04);
-  if (K.includes('light')) add('dodge', 0.03);
-  // Stat milestones
-  const M = x.milestones || {};
-  if (M.STR) set('mighty', 0.1);
-  if (M.AGI) set('firstEvade', 1);
-  if (M.INT) add('firstHit', 0.3);
+  Object.keys(GIFTS).filter(k => G.includes(k)).forEach(k => addEffects(P, GIFTS[k].p));
+  if (TITLES[x.title]) addEffects(P, TITLES[x.title].p);
+  Object.keys(PERKS).filter(k => (x.perks || []).includes(k)).forEach(k => addEffects(P, PERKS[k].p));
+  Object.keys(MILESTONES).filter(k => (x.milestones || {})[k]).forEach(k => addEffects(P, MILESTONES[k].p));
   const F = favourTiers || {};
-  Object.keys(GODS).forEach(g => { if (F[g] >= 2) Object.entries(GODS[g].bless).forEach(([k, v]) => add(k, v)); });
+  Object.keys(GODS).forEach(g => { if (F[g] >= 2) addEffects(P, GODS[g].bless); });
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
@@ -1017,10 +958,9 @@ function enemyTraits(t, p) {
   if (o.aura) o.aura *= p; if (o.briar) o.briar *= p; if (o.forge) o.forge = Math.round(o.forge * p);
   return o;
 }
-// Enemy passives: the same P keys as gear and Hidden Paths, for keys that work on either side. Flat amounts scale
+// Enemy passives: the effects marked enemy in effects.js, the ones that work on either side. Flat amounts scale
 // with the enemy's power; rates and multipliers don't.
-const ENEMY_PASSIVES = { regen: 'flat', thornsAlways: 'flat', startBlock: 'flat', burnPlus: 'flat', poisonPlus: 'flat', bleedPlus: 'flat', dotPlus: 'flat', thornBurn: 'flat', thornPoison: 'flat',
-  lifesteal: 'rate', dmgPct: 'rate', lowHpDmg: 'rate', vsHalf: 'rate', startBlockPct: 'rate', blockKeep: 'rate', healPct: 'rate', flatDR: 'flat', lowDR: 'rate', poisonMult: 'rate', bleedMult: 'rate', thornMult: 'rate' };
+const ENEMY_PASSIVES = {}; Object.keys(EFFECTS).filter(k => EFFECTS[k].enemy).forEach(k => ENEMY_PASSIVES[k] = EFFECTS[k].enemy);
 function enemyPassives(o, p) { const P = {}; Object.entries(o || {}).forEach(([k, v]) => P[k] = ENEMY_PASSIVES[k] === 'flat' ? Math.round(v * p) : v); return P; }
 // Boss phases: once at or below phase.at of max HP, the enemy says phase.say, learns the moves in phase.add, takes the
 // traits in phase.set and starts phase.script from its first move. The move already shown as its intent still happens
@@ -1743,13 +1683,13 @@ const TRIAL_ROUND = { E: 3, D: 3, C: 4, B: 4, A: 5, S: 6, SS: 6, SSS: 6 };
 const TRIAL_CONDS = ['fast', 'react', 'stop', 'healthy']; // never "without healing": Zealot and Leech builds can't meet it
 const PERKS = {
   stipend: { name: "Sponsor's Stipend", desc: '+1 starting gold.', flavour: 'A god has started sending pocket money.' },
-  kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start." },
-  steeped: { name: 'Steeped Blades', desc: 'Poison you apply +1.', flavour: 'Your edges never quite dry.' },
-  whetted: { name: 'Whetted Edge', desc: 'Bleed you apply +1.', flavour: 'Sharper than it needs to be.' },
-  guard: { name: 'Drilled Guard', desc: 'Start each fight with 5 Block.', flavour: 'Your shield is up before the bell.' },
+  kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start.", p: { burnPlus: 1 } },
+  steeped: { name: 'Steeped Blades', desc: 'Poison you apply +1.', flavour: 'Your edges never quite dry.', p: { poisonPlus: 1 } },
+  whetted: { name: 'Whetted Edge', desc: 'Bleed you apply +1.', flavour: 'Sharper than it needs to be.', p: { bleedPlus: 1 } },
+  guard: { name: 'Drilled Guard', desc: 'Start each fight with 5 Block.', flavour: 'Your shield is up before the bell.', p: { startBlock: 5 } },
   frame: { name: 'Seasoned Frame', desc: '+8 max HP.', flavour: 'Scar tissue counts.' },
-  keen: { name: 'Keen Eye', desc: '+4% critical chance.', flavour: 'You see the gap a moment sooner.' },
-  light: { name: 'Light Feet', desc: '+3% dodge.', flavour: 'Harder to pin down than you used to be.' },
+  keen: { name: 'Keen Eye', desc: '+4% critical chance.', flavour: 'You see the gap a moment sooner.', p: { critBonus: 0.04 } },
+  light: { name: 'Light Feet', desc: '+3% dodge.', flavour: 'Harder to pin down than you used to be.', p: { dodge: 0.03 } },
   dressing: { name: 'Field Dressing', desc: 'Heal 6 more after each won fight.', flavour: 'You patch yourself up between bouts.' },
   redraft: { name: 'Second Draft', desc: 'One extra opening draft reroll.', flavour: 'The System lets you look twice.' },
   patron: { name: "Patron's Ear", desc: 'Start with +1 Favour with your Patron.', flavour: 'Your god remembers your name.' },

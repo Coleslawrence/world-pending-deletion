@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
+All of the game's content lives in `js/content/`: the effect registry (`effects.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
 
 ## Where things go
 
@@ -15,7 +15,8 @@ All of the game's content lives in `js/content/`: archetypes, skills, gear, gods
 | A trait monsters and rivals can roll | `js/content/traits.js` |
 | An Undercity event | `js/content/events/undercity.js` |
 | An event chain | A new file in `js/content/events/`: its `CHAINS` entry and one event per step. The format is described at the top of `js/content/events.js` |
-| A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js` |
+| A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js`. A Gift or Title's fight effect is its `p`, from `effects.js` |
+| A new passive effect | `js/content/effects.js` (its phrase, how it combines, whether enemies can carry it), plus the code in `js/core.js` that reads it |
 
 A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`.
 
@@ -47,6 +48,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Event options keep their places.** Run summaries store the option picked by its position, so add new options at the end and never remove one.
 - **Event outcomes are data where they can be.** `pay`, and `then` (gold, stats, next-fight flags, the chain's next step, Favour) cover most options. Anything else goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
+- **Passive effects live in `js/content/effects.js`.** Archetype bonuses, gear, Hidden Paths, Gifts, Titles, Rank perks, stat milestones, god blessings and enemy passives all say what they do as `{ key: value }` from it. Each entry has the phrase players read, so a description says what the effect says. Where an effect has a rule players couldn't guess from its number (Thorns double below half HP), its `must` makes the checker fail any description that leaves the rule out.
 - **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
 - **Player text follows the style guide:** British spelling, no em-dashes, one name for one thing, and the length limits for one phone screen.
@@ -87,7 +89,7 @@ An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as playe
 
 Burn, Bleed and Block amounts scale with the enemy's power, like its moves.
 
-**Passives** (`passives: { regen: 3, thornsAlways: 2 }`) use the gear and Hidden Path keys that work on enemies, listed in the menu below. Flat amounts scale with the enemy's power; rates don't.
+**Passives** (`passives: { regen: 3, thornsAlways: 2 }`) use the effects marked for enemies in `effects.js`, listed in the menu below. Flat amounts scale with the enemy's power; rates don't.
 
 **The trait pool** (`js/content/traits.js`) gives monsters and rivals extra traits each run. When opponents are offered, each monster or rival rolls `TRAIT_COUNT[round - 1]` traits from `TRAIT_POOL`, and the choice screen, the fight and the scout report show them with their `desc`, so the player can pick the opponent their build handles. An entry is a `name`, a `desc` (what it does, in a few words) and `passives` and/or `traits` as above. Passives add to the enemy's own; for a trait it already has, the stronger value counts. Finals, the Elite bracket, erased champions and Rank Trials never roll from the pool.
 
@@ -153,77 +155,102 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `thorns` | 7 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `weaken` | 24 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
-### Gear passives (`pas` scales with stars, `fix` does not)
+### Passive effects (`p`), from `js/content/effects.js`
 
-| Key | Used | Examples (value) |
-| --- | --- | --- |
-| `afterQuick` | 1 | apprentice_staff (0.25) |
-| `blockKeep` | 1 | tower_shield (0.3) |
-| `blockThorns` | 1 | spiked_buckler (0.3) |
-| `burnHeal` | 1 | cinder_robe (0.3) |
-| `burnPlus` | 1 | ember_gauntlets (2) |
-| `burnPoison` | 1 | plague_censer (2) |
-| `critBonus` | 1 | duelist_rapier (0.1) |
-| `dodge` | 1 | shadow_leathers (0.06) |
-| `execBonus` | 1 | executioner_axe (0.4) |
-| `firstCrit` | 1 | duelist_rapier (1) |
-| `firstEvade` | 1 | shadow_leathers (1) |
-| `firstStun` | 1 | thunder_maul (1) |
-| `goldDmg` | 1 | misers_ring (0.05) |
-| `healBlock` | 1 | templar_plate (0.3) |
-| `healOnBleed` | 1 | bloodstone_amulet (3) |
-| `hitHeal` | 1 | pilgrim_mace (2) |
-| `lowLifesteal` | 1 | soul_lantern (0.25) |
-| `poisonHeal` | 1 | grave_shroud (0.2) |
-| `poisonOnHit` | 1 | serpent_dagger (1) |
-| `quickFree` | 1 | hourglass (1) |
-| `regen` | 1 | prayer_beads (3) |
-| `startBlock` | 1 | chain_mail (8) |
-| `startPoison` | 1 | blight_kris (3) |
-| `stunDmg` | 2 | thunder_maul (6), storm_ring (10) |
-| `stunEmpower` | 1 | conductive_mail (1) |
-| `thornsAlways` | 1 | crown_of_thorns (3) |
+Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not), Hidden Paths (`fx`), Gifts and Titles (`p`), Rank perks and stat milestones (`p`), god blessings (`bless`, at 8 Favour) and enemies (`passives`, only the ones marked for enemies). Combines: how values from several sources add up. Grows: grows with your level when it comes from gear or an archetype bonus.
 
-### Hidden Path effects (`fx`)
-
-| Key | Used | Examples (value) |
-| --- | --- | --- |
-| `bleedHeal` | 1 | Butcher (0.5) |
-| `bleedPoison` | 1 | Viper Dance (2) |
-| `blockDmgPct` | 1 | Juggernaut (1) |
-| `blockStun` | 1 | Thunder Wall (0.25) |
-| `burnExec` | 1 | Funeral Pyre (0.25) |
-| `burnHeal` | 1 | Sunpriest (0.3) |
-| `doomLeech` | 1 | Soul Weaver (0.4) |
-| `flareFull` | 1 | Plague Flame (1) |
-| `healBlock` | 1 | Paladin (0.5) |
-| `healDmg` | 1 | Last Rites (0.3) |
-| `healOnBleed` | 1 | Blood Saint (3) |
-| `healPoison` | 1 | Plague Saint (3) |
-| `hitBurn` | 1 | Cinderblade (1) |
-| `multiWeaken` | 1 | Lightning Blade (1) |
-| `poisonHeal` | 1 | Plague Doctor (0.25) |
-| `quickBlock` | 1 | Spellshield (5) |
-| `quickBurn` | 1 | Spellfire (3) |
-| `quickEvade` | 1 | Shadow Dancer (1) |
-| `quickHeal` | 1 | Chronomancer (4) |
-| `quickPoison` | 1 | Apothecary (2) |
-| `quickStun` | 1 | Tempest Mage (0.25) |
-| `stunBurn` | 1 | Wildstorm (5) |
-| `stunHeal` | 1 | Inquisitor (8) |
-| `thornBurn` | 1 | Ember Wall (2) |
-| `thornMult` | 1 | Duelist (1.5) |
-| `thornPoison` | 1 | Thornbark (2) |
-| `vsDisabled` | 1 | Warlord (0.25) |
-| `weakPoison` | 1 | Hexblade (3) |
-
-### God blessings (`bless`, at 8 Favour)
-
-| Key | Used | Examples (value) |
-| --- | --- | --- |
-| `dmgPct` | 1 | The God of War (0.15) |
-| `dotPlus` | 1 | The Trickster (2) |
-| `lowHpDmg` | 1 | The Goddess of Ruin (0.3) |
+| Key | Used | Examples (value) | Shown to players as | Combines | Grows | Enemies | Theme |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `afterQuick` | 2 | apprentice_staff (0.25), Spellweaver (0.1) | After a Quick skill, your next skill deals 25% more. | add |  |  | Arcanist |
+| `arcCd` | 1 | Arcanist 2 (8) | Your other skills: 1 turn shorter cooldown for every 8 INT (minimum 1). | set |  |  | Arcanist |
+| `bleedHeal` | 1 | Butcher (0.5) | Heal 50% of the Bleed damage your opponent takes. | add |  |  | Bladedancer, Reaper |
+| `bleedMult` | 1 | Bladedancer 6 (2) | Bleed deals double damage. | set |  | rate | Bladedancer |
+| `bleedPlus` | 4 | Bladedancer 4 (2), Elf-touched (1), Thornbane (1), … | Bleed you apply +2. | add |  | flat, scales with power | Bladedancer |
+| `bleedPoison` | 1 | Viper Dance (2) | Every Bleed you apply also applies 2 Poison. | add |  |  | Bladedancer, Venom |
+| `blockDmgPct` | 1 | Juggernaut (1) | Deal 1% more damage for every 2 Block you have (up to 40%). | add |  |  | Bastion, Reaper |
+| `blockKeep` | 2 | Bastion 2 (0.25), tower_shield (0.3) | Keep 25% of your Block between turns. | add |  | rate | Bastion |
+| `blockStrike` | 1 | Bastion 6 (0.5) | Gaining Block also deals 50% of it as damage. | set |  |  | Bastion |
+| `blockStun` | 1 | Thunder Wall (0.25) | When your Block absorbs a hit, 25% chance to Stun the attacker. | add |  |  | Bastion, Stormcaller |
+| `blockThorns` | 1 | spiked_buckler (0.3) | Gaining Block also gives Thorns equal to 30% of it. | add |  |  | Bastion |
+| `burnExec` | 1 | Funeral Pyre (0.25) | +25% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
+| `burnFade` | 3 | Pyre 2 (0.15), Pyre 6 (0), Hedge Witch (0.2) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
+| `burnHeal` | 2 | cinder_robe (0.3), Sunpriest (0.3) | Heal 30% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
+| `burnPlus` | 4 | Pyre 4 (4), ember_gauntlets (2), Emberfall (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
+| `burnPoison` | 1 | plague_censer (2) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
+| `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
+| `critBonus` | 5 | duelist_rapier (0.1), Lucky Star (0.1), Mirror Breaker (0.08), … | +10% critical chance. | add |  |  |  |
+| `critMult` | 1 | Executioner (1.75) | Critical hits deal ×1.75 instead of ×1.5. | set |  |  |  |
+| `dmgPct` | 6 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
+| `dodge` | 4 | shadow_leathers (0.06), Elf-touched (0.1), Skyfall (0.05), … | +6% dodge. | add |  |  |  |
+| `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
+| `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
+| `dotPlus` | 1 | The Trickster (2) | Burn, Poison and Bleed you apply +2. | add |  | flat, scales with power |  |
+| `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
+| `execBonus` | 1 | executioner_axe (0.4) | +40% damage to opponents below 30% HP. | add |  |  | Reaper |
+| `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
+| `firstCrit` | 1 | duelist_rapier (1) | Your first hit each fight is critical. | set |  |  |  |
+| `firstEvade` | 2 | shadow_leathers (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
+| `firstFree` | 1 | Arcanist 4 (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
+| `firstHit` | 3 | First Strike (1), First Blood (0.5), Arcane Mind (0.3) | Your first damaging skill each fight deals double. | add |  |  |  |
+| `firstStun` | 1 | thunder_maul (1) | Your first damaging skill each fight Stuns. | set |  |  | Stormcaller |
+| `flareFull` | 1 | Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
+| `flatDR` | 3 | Thick Skin (2), Ser Calder (2), trait Armoured (2) | Every hit you take deals 2 less damage. | add |  | flat, scales with power |  |
+| `goldDmg` | 1 | misers_ring (0.05) | +5% damage for every 10 gold you hold when a fight starts, up to +25%. | add |  |  |  |
+| `healBlock` | 2 | templar_plate (0.3), Paladin (0.5) | Healing also gives Block equal to 30% of it. | add |  |  | Zealot, Bastion |
+| `healDmg` | 1 | Last Rites (0.3) | Your healing also deals 30% of it as damage to the opponent. | add |  |  | Reaper, Zealot |
+| `healOnBleed` | 2 | bloodstone_amulet (3), Blood Saint (3) | Heal 3 whenever you apply Bleed. | add |  |  | Bladedancer, Zealot |
+| `healPct` | 2 | Zealot 2 (0.1), Demon Blood (-0.2) | Healing +10%. | add |  | rate | Zealot |
+| `healPoison` | 1 | Plague Saint (3) | Each skill that heals you also applies 3 Poison. | add |  |  | Venom, Zealot |
+| `heartOnWin` | 1 | Reaper 6 (1) | Each win restores 1 Heart. | set |  |  | Reaper |
+| `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
+| `hitHeal` | 1 | pilgrim_mace (2) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
+| `lastWords` | 1 | Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP. | set |  |  |  |
+| `lifesteal` | 4 | Reaper 4 (0.2), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 20% of the damage you deal. | add |  | rate | Reaper |
+| `lowDR` | 1 | Comeback Kid (0.2) | Below 25% HP, take 20% less damage. | set |  | rate |  |
+| `lowHpDmg` | 2 | Berserker's Blood (0.3), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
+| `lowLifesteal` | 1 | soul_lantern (0.25) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
+| `mighty` | 1 | Mighty Frame (0.1) | Reaper and Stormcaller skills deal 10% more. | set |  |  |  |
+| `multiWeaken` | 1 | Lightning Blade (1) | Multi-hit skills Weaken the opponent for 1 turn. | add |  |  | Bladedancer, Stormcaller |
+| `overhealBlock` | 1 | Zealot 6 (1) | Overhealing becomes Block. | set |  |  | Zealot |
+| `poisonHeal` | 3 | grave_shroud (0.2), Plague Doctor (0.25), Grave Warden (0.3) | Heal 20% of Poison damage dealt (max 30% from all sources). | add |  |  | Venom |
+| `poisonMult` | 2 | Venom 6 (1.5), Hedge Witch (1.25) | Poison deals 50% more damage. | mul |  | rate | Venom |
+| `poisonOnHit` | 1 | serpent_dagger (1) | Each skill that hits also applies 1 Poison. | add |  |  | Venom |
+| `poisonPlus` | 4 | Venom 2 (1), Venom 4 (1), Bonebreaker (1), … | Poison you apply +1. | add |  | flat, scales with power | Venom |
+| `quickBlock` | 1 | Spellshield (5) | Quick skills also give 5 Block. | add |  |  | Arcanist, Bastion |
+| `quickBurn` | 1 | Spellfire (3) | Quick skills apply 3 Burn. | add |  |  | Arcanist, Pyre |
+| `quickCd` | 2 | Arcanist 2 (1), Mana Affinity (1) | Quick skills: 1 turn shorter cooldown. | add |  |  | Arcanist |
+| `quickEvade` | 1 | Shadow Dancer (1) | Each Quick skill also lets you Evade the next attack. | add |  |  | Arcanist, Bladedancer |
+| `quickFree` | 1 | hourglass (1) | Your first Quick skill each fight has no cooldown. | add |  |  | Arcanist |
+| `quickHeal` | 1 | Chronomancer (4) | Quick skills heal you 4. | add |  |  | Arcanist, Zealot |
+| `quickPoison` | 1 | Apothecary (2) | Quick skills apply 2 Poison. | add |  |  | Arcanist, Venom |
+| `quickStun` | 1 | Tempest Mage (0.25) | Damaging Quick skills have a 25% chance to Stun. | add |  |  | Arcanist, Stormcaller |
+| `quickTwice` | 1 | Arcanist 6 (1) | Quick skills cast twice. | set |  |  | Arcanist |
+| `reactHeal` | 1 | Dragon Blood (5) | Toxic Flare and Cauterise heal you 5. | set |  |  |  |
+| `reactMult` | 2 | Catalyst (1.5), Alchemist (1.2) | Reactions are 50% stronger. | mul |  |  |  |
+| `reapBlood` | 1 | Reaper 2 (0.15) | The first time you hit an opponent below half HP, heal 15% of your max HP. | set |  |  | Reaper |
+| `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
+| `regen` | 6 | Zealot 4 (2), prayer_beads (3), Tidecaller (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
+| `sluggish` | 1 | Sluggish (1) | Start every fight Weakened. | set |  |  |  |
+| `startBlock` | 6 | chain_mail (8), Legion Deserter (15), Untouched (8), … | Start each fight with 8 Block. | add | yes | flat, scales with power | Bastion |
+| `startBlockPct` | 2 | Iron Body (0.1), trait Braced (0.15) | Start each fight with Block equal to 10% of your max HP. | add |  | rate | Bastion |
+| `startPoison` | 1 | blight_kris (3) | Your opponent starts each fight with 3 Poison. | add |  |  | Venom |
+| `stormBreak` | 1 | Stormcaller 2 (1) | Your Stuns and Interrupts add your STR to their damage and shatter Block. Stopping a big attack Empowers you for 2 turns. | set |  |  | Stormcaller |
+| `stunBurn` | 1 | Wildstorm (5) | Your Stuns and Interrupts also apply 5 Burn. | add |  |  | Stormcaller, Pyre |
+| `stunDmg` | 3 | Stormcaller 2 (12), thunder_maul (6), storm_ring (10) | Your Stuns and Interrupts deal 12 damage. | add | yes |  | Stormcaller |
+| `stunEmpower` | 1 | conductive_mail (1) | Whenever you Stun or Interrupt, you are Empowered for 1 turn. | add |  |  | Stormcaller |
+| `stunHeal` | 1 | Inquisitor (8) | Your Stuns and Interrupts heal you 8. | add |  |  | Stormcaller, Zealot |
+| `stunWeaken` | 1 | Stormcaller 4 (2) | Your Stuns also Weaken for 2 turns. | set |  |  | Stormcaller |
+| `swordSaint` | 1 | Sword Saint (1) | Your basic Attack becomes S-rank: far stronger, and it ignores Block. | set |  |  |  |
+| `thornBurn` | 1 | Ember Wall (2) | Thorns also apply 2 Burn. | add |  | flat, scales with power | Bastion, Pyre |
+| `thornMult` | 1 | Duelist (1.5) | Thorns and Riposte deal 50% more. | add |  | rate | Bastion, Bladedancer |
+| `thornPoison` | 1 | Thornbark (2) | Thorns also apply 2 Poison. | add |  | flat, scales with power | Bastion, Venom |
+| `thornsAlways` | 4 | Bastion 4 (4), crown_of_thorns (3), Forgebreaker (2), … | Always have 4 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
+| `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |
+| `vsDisabled` | 1 | Warlord (0.25) | +25% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
+| `vsHalf` | 1 | Reaper 2 (0.25) | Opponents below half HP take 25% more damage from you. | add |  | rate | Reaper |
+| `vsHard` | 1 | Underdog (0.1) | +10% damage to hard opponents. | add |  |  |  |
+| `vsHigherRank` | 1 | Rank Is Just a Letter (0.1) | +10% damage to opponents of a higher rank than you. | add |  |  |  |
+| `weakPoison` | 1 | Hexblade (3) | Weaken you apply also applies 3 Poison. | add |  |  | Stormcaller, Venom |
 
 ### Enemy traits (fields on the enemy, or in its phase's set)
 
@@ -239,30 +266,4 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `forge` | 1 | The Forge King (3) |
 | `revive` | 1 | The Bone Saint (0.3) |
 | `twincast` | 1 | The Archmage Who Fell Upward (3) |
-
-### Enemy passives (`passives`, from the gear and Hidden Path keys that work on enemies)
-
-| Key | Used | Examples (value) | Scales with enemy power |
-| --- | --- | --- | --- |
-| `bleedMult` | 0 |  | no |
-| `bleedPlus` | 0 |  | yes |
-| `blockKeep` | 0 |  | no |
-| `burnPlus` | 0 |  | yes |
-| `dmgPct` | 1 | trait Savage (0.2) | no |
-| `dotPlus` | 0 |  | yes |
-| `flatDR` | 2 | Ser Calder (2), trait Armoured (2) | yes |
-| `healPct` | 0 |  | no |
-| `lifesteal` | 1 | trait Leeching (0.25) | no |
-| `lowDR` | 0 |  | no |
-| `lowHpDmg` | 0 |  | no |
-| `poisonMult` | 0 |  | no |
-| `poisonPlus` | 0 |  | yes |
-| `regen` | 2 | Seraphine Vale (2), trait Regenerating (3) | yes |
-| `startBlock` | 0 |  | yes |
-| `startBlockPct` | 1 | trait Braced (0.15) | no |
-| `thornBurn` | 0 |  | yes |
-| `thornMult` | 0 |  | no |
-| `thornPoison` | 0 |  | yes |
-| `thornsAlways` | 1 | trait Spiked (2) | yes |
-| `vsHalf` | 0 |  | no |
 <!-- effects:end -->
