@@ -4,6 +4,34 @@
 // Wording comes from release/patch-notes-draft.md in the project files; copy it as is.
 const PATCH_NOTES = [
   {
+    id: '2026-10-31', title: "[System Notice: Recalibration Update]", pages: [
+      { h: "Stats", sys: "[Experience is retired. Gold buys strength now.]", items: [
+        "[Stat points are bought with gold, one at a time. Each costs more than the last.]",
+        "[Every two points is a level. Income rises to 7 gold a round to pay for it.]",
+        "[Fast Learner: stat points cost a third less. Late Bloomer: each level is a free point.]"] },
+      { h: "Faces", sys: "[Every stat now has three faces. Power, as before.]", items: [
+        "[Finesse: STR breaks guards faster, INT shortens long cooldowns.]",
+        "[Finesse: VIT strengthens the healing you receive.]",
+        "[Resistance: each stat shrugs off one affliction. Weaken, Bleed, Burn, Poison or Stun.]"] },
+      { h: "Guard", sys: "[Every opponent now has a guard. The System recommends removing it.]", items: [
+        "[Strike past their Block and the guard cracks. Hit hard and it cracks faster.]",
+        "[Break it and they are Broken: a lost turn, and half again the damage taken.]"] },
+      { h: "Recalibration", sys: "[Entrants were enjoying themselves. The System has adjusted the arena.]", items: [
+        "[The arena has been recalibrated. Each opponent now hits harder than the last.]",
+        "[Losses cost more Hearts as the run goes on. The System sees no reason to be gentle.]",
+        "[Gatekeepers guard rounds 4 and 7. Defeat one and the System grants a stat point.]",
+        "[Each straight win makes opponents stronger. Lose a Heart and the System looks away.]"] },
+      { h: "Thunder Steppes", sys: "[A seventh world joins the tournament. The storm there never breaks.]", items: [
+        "[The Thunder Steppes are open. Stormcallers will feel at home.]",
+        "[Its Final Champion, the Storm Herald, gathers a storm before it strikes.]",
+        "[Break it first.]"] },
+      { h: "Corrections", sys: "[Several records have been corrected. The System admits nothing.]", items: [
+        "[Thorns doubles below half HP. Bastion, Forgebreaker and Spiked now admit it.]",
+        "[Hedge Witch now feeds on Bleed: +1 to Bleed you apply, heal 1 each time.]",
+        "[Zealots are no longer asked to win without healing. The System saw the problem.]"] },
+    ],
+  },
+  {
     id: '2026-10-29c', title: "[System Notice: Opposition Update]", pages: [
       { h: "Opposition", sys: "[Entrants were winning comfortably. Comfort has been withdrawn.]", items: [
         "[Opponents now carry traits. Read them before you choose who to fight.]",
