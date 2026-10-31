@@ -21,8 +21,9 @@ const TITLES = {
   thornbane: { name: 'Thornbane', cond: 'World first: defeat the Thorn Mother.', desc: 'Bleed you apply +1.', first: true, p: { bleedPlus: 1 } },
   skyfall: { name: 'Skyfall', cond: 'World first: defeat the Archmage Who Fell Upward.', desc: '+5% critical chance and +5% dodge.', first: true, p: { critBonus: 0.05, dodge: 0.05 } },
   forgebreaker: { name: 'Forgebreaker', cond: 'World first: defeat the Forge King.', desc: 'Always have 2 Thorns, doubled below half HP.', first: true, p: { thornsAlways: 2 } },
+  stormbreaker: { name: 'Stormbreaker', cond: 'World first: defeat the Storm Herald.', desc: 'Whenever you Stun or Interrupt, you are Empowered for 1 turn.', first: true, p: { stunEmpower: 1 } },
   ascendant: { name: 'Ascendant', cond: 'World first: merge a piece to ★3.', desc: '+5% damage.', first: true, p: { dmgPct: 0.05 } },
   pathfinder: { name: 'Pathfinder', cond: 'World first: unlock a Hidden Path.', desc: 'Start each fight with 5 Block and heal 1 each turn.', first: true, p: { startBlock: 5, regen: 1 } },
   unbeaten: { name: 'Unbeaten', cond: 'World first: defeat the Undefeated.', desc: '+10% damage.', first: true, p: { dmgPct: 0.1 } },
 };
-const FINAL_TITLE = { leviathan: 'tidebreaker', kharros: 'emberfall', bone_saint: 'bonebreaker', thorn_mother: 'thornbane', archmage: 'skyfall', forge_king: 'forgebreaker', undefeated: 'unbeaten' };
+const FINAL_TITLE = { leviathan: 'tidebreaker', kharros: 'emberfall', bone_saint: 'bonebreaker', thorn_mother: 'thornbane', archmage: 'skyfall', forge_king: 'forgebreaker', herald: 'stormbreaker', undefeated: 'unbeaten' };

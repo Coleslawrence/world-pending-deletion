@@ -100,6 +100,7 @@ const EFFECTS = {
   // Stun and Interrupt
   stunDmg: { lvl: true, say: v => `Your Stuns and Interrupts deal ${v} damage.`, theme: 'storm' },
   stormBreak: { how: 'set', say: () => 'Your Stuns and Interrupts add your STR to their damage and shatter Block. Stopping a big attack Empowers you for 2 turns.', theme: 'storm' },
+  breakEmpower: { how: 'set', say: v => `Breaking an opponent Empowers you for ${v} turns.`, theme: 'storm' },
   stunWeaken: { how: 'set', say: v => `Your Stuns also Weaken for ${v} turns.`, theme: 'storm' },
   every3Stun: { how: 'set', say: () => 'Every 3rd skill you use Stuns.', theme: 'storm' },
   firstStun: { how: 'set', say: () => 'Your first damaging skill each fight Stuns.', theme: 'storm' },

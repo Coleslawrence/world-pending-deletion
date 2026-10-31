@@ -123,7 +123,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | --- | --- | --- | --- | --- |
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `bleed` | 12 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 43 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 44 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 7 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `brk` | 18 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
 | `burn` | 25 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
@@ -131,12 +131,12 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `critBonus` | 1 | Precise Strike (0.5) | +50% critical chance. | no |
 | `cruel` | 3 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5) | ×2 damage if the opponent has 2 or more effects. | yes |
 | `detonate` | 3 | Ignite (2), Combust (3), Wildfire (2) | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `dmg` | 147 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 150 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `doom` | 3 | Doom (26), Swift Doom (22), Inevitable Doom (40) | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
 | `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
 | `drainPoison` | 1 | Wither (1) | Heal equal to the opponent's Poison. | no |
-| `empower` | 6 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
+| `empower` | 8 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
 | `evade` | 5 | Smoke Bomb (1), Vanish (2), Caltrops (1), … | Evade the next attack. | yes |
 | `execMult` | 6 | Execute (2.5), Soul Harvest (2), Decapitate (3), … | (works with other keys on the same skill) | yes |
 | `execute` | 6 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
@@ -165,7 +165,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `stun` | 9 | Thunderclap (1), Thunder God's Wrath (1), Stunning Bash (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
 | `stunIfWeak` | 4 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 7 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
-| `weaken` | 24 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 25 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -184,6 +184,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `blockStrike` | 1 | Bastion 6 (0.5) | Gaining Block also deals 50% of it as damage. | set |  |  | Bastion |
 | `blockStun` | 1 | Thunder Wall (0.25) | When your Block absorbs a hit, 25% chance to Stun the attacker. | add |  |  | Bastion, Stormcaller |
 | `blockThorns` | 1 | spiked_buckler (0.3) | Gaining Block also gives Thorns equal to 30% of it. | add |  |  | Bastion |
+| `breakEmpower` | 1 | Lightning Rod (2) | Breaking an opponent Empowers you for 2 turns. | set |  |  | Stormcaller |
 | `burnExec` | 1 | Funeral Pyre (0.25) | +25% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
 | `burnFade` | 2 | Pyre 2 (0.15), Pyre 6 (0) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
 | `burnHeal` | 2 | cinder_robe (0.3), Sunpriest (0.3) | Heal 30% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
@@ -249,7 +250,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `stormBreak` | 1 | Stormcaller 2 (1) | Your Stuns and Interrupts add your STR to their damage and shatter Block. Stopping a big attack Empowers you for 2 turns. | set |  |  | Stormcaller |
 | `stunBurn` | 1 | Wildstorm (5) | Your Stuns and Interrupts also apply 5 Burn. | add |  |  | Stormcaller, Pyre |
 | `stunDmg` | 3 | Stormcaller 2 (12), thunder_maul (6), storm_ring (10) | Your Stuns and Interrupts deal 12 damage. | add | yes |  | Stormcaller |
-| `stunEmpower` | 1 | conductive_mail (1) | Whenever you Stun or Interrupt, you are Empowered for 1 turn. | add |  |  | Stormcaller |
+| `stunEmpower` | 2 | conductive_mail (1), Stormbreaker (1) | Whenever you Stun or Interrupt, you are Empowered for 1 turn. | add |  |  | Stormcaller |
 | `stunHeal` | 1 | Inquisitor (8) | Your Stuns and Interrupts heal you 8. | add |  |  | Stormcaller, Zealot |
 | `stunWeaken` | 1 | Stormcaller 4 (2) | Your Stuns also Weaken for 2 turns. | set |  |  | Stormcaller |
 | `swordSaint` | 1 | Sword Saint (1) | Your basic Attack becomes S-rank: far stronger, and it ignores Block. | set |  |  |  |
@@ -307,10 +308,10 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 22 moves |
-| big | a big hit, the one to Block or Stun | 8 moves |
-| guard | Block and nothing else | 13 moves |
-| setup | a status, buff or trick with little damage | 17 moves |
+| strike | a plain hit | 23 moves |
+| big | a big hit, the one to Block or Stun | 9 moves |
+| guard | Block and nothing else | 14 moves |
+| setup | a status, buff or trick with little damage | 18 moves |
 | sustain | healing or draining | 5 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`

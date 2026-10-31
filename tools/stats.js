@@ -2,7 +2,7 @@
 //   node tools/stats.js [runs] [elite] [options]
 //   --batches B    run B batches of [runs] and report the average and the spread between batches (default 1)
 //   --seed S       seed the random numbers so a run can be repeated exactly (default: unseeded)
-//   --world T      force a world type (drowned, burning, hollow, verdant, sky, iron)
+//   --world T      force a world type (drowned, burning, hollow, verdant, sky, iron, steppes)
 //   --main A       make the bot build around archetype A (pyre, venom, blade, bastion, arcanist, zealot, reaper, storm)
 //   --unlock U     unlock U in every meta (arch_storm, arch_arcanist, ...; "all" for every unlock)
 //   --json FILE    also write the results as JSON, for comparing before and after a change

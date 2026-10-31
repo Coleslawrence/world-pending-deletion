@@ -11,6 +11,7 @@ const GIFTS = {
   hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Bleed you apply +1, and heal 1 whenever you apply Bleed.', p: { bleedPlus: 1, healOnBleed: 1 } },
   prodigy: { name: 'Arcane Prodigy', cat: 'world', cost: 1, desc: 'A 5th skill slot, but 10% less max HP.' },
   runesmith: { name: 'Runesmith', cat: 'world', cost: 1, desc: 'Your gear merges at 2 copies instead of 3.' },
+  lightningrod: { name: 'Lightning Rod', cat: 'world', cost: 1, desc: 'Breaking an opponent Empowers you for 2 turns.', p: { breakEmpower: 2 } },
   appraisal: { name: 'Absolute Appraisal', cat: 'cheat', cost: 4, desc: "See every opponent's full kit and their next 2 moves." },
   monarch: { name: "Monarch's Domain", cat: 'cheat', cost: 6, desc: 'Every archetype you have counts 1 extra piece.' },
   rewind: { name: 'Return by Death', cat: 'cheat', cost: 6, desc: 'Once per run, a loss rewinds to the start of that fight.' },

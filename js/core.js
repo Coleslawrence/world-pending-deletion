@@ -1161,6 +1161,7 @@ function addBreak(f, X, Y, v) {
   Y.brk = 0; f.tally.breaks++;
   say(f, `[${Y.name}'s guard breaks. Broken!]`, 'skill'); ev(f, { k: 'break', side: Y.side });
   stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, 2);
+  if (X.P.breakEmpower) { X.empower = Math.max(X.empower, X.P.breakEmpower + 1); say(f, `[Lightning Rod: Empowered for ${X.P.breakEmpower} turns.]`, 'skill'); }
 }
 // Resistance (STAT_FACES): how much of a status's effect a fighter shrugs off, 0 for enemies
 function resistance(X, k) { return (X.res && X.res[k]) || 0; }
