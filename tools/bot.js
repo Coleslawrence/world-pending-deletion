@@ -87,7 +87,7 @@ function shop(run, meta, opts) {
       if (G.buy(run, x.k, x.i, [])) { bought = true; break; }
     }
     if (!bought) {
-      if (run.gold >= reserve + 6 && run.level < 9 && run.gold >= 4 && opts.xp && run.gold > 24) { G.buyXp(run, []); continue; }
+      if (opts.xp && run.gold - G.pointPrice(run) >= reserve) { G.trainStat(run, trainPick(run), []); continue; }
       if (run.gold >= reserve + 4 && opts.reroll) { G.reroll(run, null, Math.random() < 0.7 ? 'skill' : 'gear'); continue; }
       break;
     }
@@ -104,6 +104,8 @@ function pending(run, meta) {
     if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
   }
 }
+// Training: 3 points in the main archetype's stat for every 2 in VIT
+function trainPick(run) { const k = G.ARCH[targets(run)[0]].stat; run.trainN = (run.trainN || 0) + 1; return run.trainN % 5 < 3 ? k : 'VIT'; }
 function stats(run) {
   const tg = targets(run); const k = G.ARCH[tg[0]].stat;
   while (run.statPts > 0) { run.stats[Math.random() < 0.6 ? k : 'VIT']++; run.statPts--; }

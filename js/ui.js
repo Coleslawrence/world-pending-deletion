@@ -37,6 +37,7 @@ let meta = migrateMeta(lsGet(META_KEY));
 bindMeta(meta);
 let run = (hot && hot.data && hot.data.run) || lsGet(RUN_KEY);
 if (run && run.v !== VERSION) run = null;
+if (run && run.bought == null) run.bought = Math.max(0, (run.level - 1) * 2);
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
 ensureRecord(run);
@@ -118,7 +119,7 @@ function archChips(counts, small) {
 function playerPower(p) { const def = moddedDef(p.id, p.mods); return skillPower(def, effStats(run), p.star) * def.powerMult; }
 function champLine() {
   const mh = maxHp(run);
-  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level} <span class="xp"><i style="width:${run.level >= 9 ? 100 : run.xp / xpNeed(run.level) * 100}%"></i></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}${run.record ? `<button class="ch-hearts" data-act="sheet" data-s="record" aria-label="Open the world record">${hearts(run.hearts, run.maxHearts)}</button>` : `<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div>`}</div></section>`;
+  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level} <span class="xp"><i style="width:${lvFill()}%"></i></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}${run.record ? `<button class="ch-hearts" data-act="sheet" data-s="record" aria-label="Open the world record">${hearts(run.hearts, run.maxHearts)}</button>` : `<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div>`}</div></section>`;
 }
 
 // ---------- World Record ----------
@@ -598,7 +599,7 @@ function shopHTML() {
   ensureShop(run);
   const counts = runCounts(run), tab = ui.shopTab || 'skill';
   const bonusHere = run.bonusSlot && (isGear(run.bonusSlot.id) ? 'gear' : 'skill') === tab;
-  const xpTile = `<button class="tile xptile" data-act="buy-xp" ${run.gold < 4 || run.level >= 9 ? 'disabled' : ''}><span class="tl-h"><b>Lv ${run.level}</b><span class="price">4g</span></span><span class="tl-n">Buy 4 XP</span><span class="xp wide"><i style="width:${run.level >= 9 ? 100 : run.xp / xpNeed(run.level) * 100}%"></i></span></button>`;
+  const xpTile = `<button class="tile xptile" data-act="sheet" data-s="stats"><span class="tl-h"><b>Lv ${run.level}</b><span class="price">${pointPrice(run)}g</span></span><span class="tl-n">Train a stat</span><span class="xp wide"><i style="width:${lvFill()}%"></i></span></button>`;
   const items = run.shop[tab].map((it, i) => shopItemTile(it, tab, i)).join('') + (bonusHere ? shopItemTile(run.bonusSlot, 'bonus', 0) : xpTile);
   const odds = oddsFor(run).map((v, i) => v ? `${['E', 'D', 'C', 'B', 'A'][i]} ${v}%` : '').filter(Boolean).join(' · ');
   const inShop = shopIds();
@@ -612,7 +613,7 @@ function shopHTML() {
     <div class="col col-a">${archChips(counts)}
     <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
     <div class="shopgrid">${items}</div>
-    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="buy-xp" ${run.gold < 4 || run.level >= 9 ? 'disabled' : ''}>XP +4 · 4g</button>` : ''}<span class="interest">Interest +${Math.min(interestCap(run), Math.floor(run.gold / 10))}g</span></div>
+    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}<span class="interest">Interest +${Math.min(interestCap(run), Math.floor(run.gold / 10))}g</span></div>
     </div><div class="col col-b"><div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
     <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
     <div class="sec-h"><span${over ? ' class="bad"' : ''}>Bench ${run.bench.length}/8</span><span class="fine">Tap to equip, swap or sell</span></div>
@@ -942,11 +943,13 @@ function resultSheet() {
   const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
   return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p><p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
+// Progress to the next level: every 2 points bought is a level
+function lvFill() { return run.level >= 9 ? 100 : (run.bought || 0) % 2 * 50; }
 function statsSheet() {
-  const s = effStats(run), p = buildPlayer(run);
-  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : '<span></span>'}</div>`).join('');
+  const s = effStats(run), p = buildPlayer(run), train = ui.screen === 'shop', pr = pointPrice(run);
+  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
   const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g] || 0} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, (run.favour[g] || 0) / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
-  const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : ''}${rows}
+  const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : train ? `<p class="sh-p">Train a stat: ${pr} gold a point, you have ${run.gold}. Every 2 points is a level: +4 Max HP and rarer pieces in the shop.</p>` : `<p class="sh-p fine">Train stats with gold in the shop.</p>`}${rows}
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
     <h4>Stat milestones</h4><ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>
     <h4>Title</h4>${titleList()}
@@ -1031,7 +1034,8 @@ function howtoSheet() {
     <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns.</li>
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
-    <li><b>Gold:</b> 5 a round, +interest of 1 per 10 gold you hold (up to 3). Reroll for 2, buy XP for 4. Higher levels see rarer pieces.</li>
+    <li><b>Gold:</b> 7 a round, +interest of 1 per 10 gold you hold (up to 3). Reroll for 2.</li>
+    <li><b>Training:</b> in the shop, buy stat points with gold. Each costs a little more than the last. Every 2 points is a level: +4 Max HP and rarer pieces.</li>
     <li><b>Reactions:</b> Burn + Poison, Burn + Bleed, Bleed + Mark, Stun + Weaken and more trigger bonus effects.</li>
     <li><b>Wagers:</b> a god bets on your next fight. Stake 5 gold for 10 and their Favour.</li>
     <li><b>Titles</b> come from feats and world firsts. Equip one for a small bonus; many unlock new Gifts.</li>
@@ -1199,7 +1203,7 @@ function onAct(el) {
     case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
-    case 'buy-xp': if (buyXp(run, msgs)) { pushMsgs(msgs); saveRun(); } return render();
+    case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs); saveRun(); } return render();
     case 'sell': { const p = findPiece(run, +d.u); const v = sell(run, +d.u); if (v) toast(`[Sold ${pieceDef(p.p.id).name} for ${v}g]`, 'loot'); ui.sheet = null; saveRun(); return render(); }
     case 'move': {
       const u = +d.u, to = d.to;
@@ -1282,7 +1286,7 @@ const COACH = [
   { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Copies get a Buy button of their own. Buy both Firebolts.', until: () => ownsStar('firebolt', 2) },
   { scr: 'shop', pos: 'bottom', hl: '[data-act="shop-tab"][data-k="gear"]', text: 'Merged! Now open the Gear shop. Gear gives stats and one passive, and counts toward archetypes too.', wait: 'shop-tab' },
   { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
-  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Buying XP levels you up, and higher levels find rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
+  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on stat points, and every 2 points is a level that finds rarer pieces. Gold you keep earns interest: +1 for every 10, up to 3.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'Damage past their Block fills the gold break bar, and big hits fill it twice as fast. Full, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },
