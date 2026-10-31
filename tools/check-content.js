@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, STATS, RANKS, ARCH, START_ARCH, WHEEL, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -46,7 +46,7 @@ try {
 
 // ---------- Ids: well formed, never removed; World Record pools only grow at the end ----------
 const ID = /^[a-z][a-z0-9_]*$/;
-const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
+const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, feats: C.FEATS, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
 const nowIds = {};
 Object.entries(lists).forEach(([kind, o]) => { nowIds[kind] = Object.keys(o); if (kind !== 'paths') nowIds[kind].filter(k => !ID.test(k)).forEach(k => err(kind + ' ' + k, 'ids are lower case letters, digits and _')); });
 nowIds.eventOptions = {}; Object.entries(C.EVENTS).forEach(([k, E]) => nowIds.eventOptions[k] = E.opts.length);
@@ -75,9 +75,10 @@ const SCHEMA = {
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives'].concat(MECHANICS)],
   gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch', 'p']],
-  titles: [C.TITLES, ['name', 'cond', 'desc'], ['first', 'p']],
+  titles: [C.TITLES, ['name', 'cond', 'desc'], ['first', 'p', 'feat', 'n']],
   effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
-  quests: [C.QUESTS, ['text', 'reward', 'goal'], ['hidden', 'by']],
+  feats: [C.FEATS, ['at', 'say', 'hit'], ['n', 'measure', 'must', 'unfairFor', 'needs', 'theme']],
+  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight']],
   chains: [C.CHAINS, ['name', 'start'], []],
@@ -187,6 +188,30 @@ Object.entries(C.GIFTS).forEach(([k, g]) => {
   if (g.lock === 'echo') ref('gifts ' + k, G.UNLOCKS['gift_' + k], `is bought with Echoes but UNLOCKS has no gift_${k}`);
 });
 Object.entries(C.QUESTS).forEach(([k, q]) => ref('quests ' + k, C.QUEST_REWARD[q.reward], `reward ${q.reward} is not in QUEST_REWARD`));
+// Feats: wagers, Trials, Titles and quests ask for feats that exist, and their words say what counts (must in feats.js)
+const featUses = {};
+const askFeat = (where, k, n, text, what) => {
+  const F = C.FEATS[k]; if (!F) return err(where, `feat ${k} isn't in js/content/feats.js`);
+  (featUses[k] = featUses[k] || []).push(what);
+  if (F.must && text != null) { const m = F.must(n != null ? n : F.n); if (!m.test(text)) err(where, `asks for the feat ${k}, so its words have to say what counts, like "${F.say(n != null ? n : F.n)}"`); }
+};
+Object.entries(C.FEATS).forEach(([k, F]) => {
+  const w = 'feats ' + k;
+  ref(w, C.FEAT_ATS.includes(F.at), `at is one of ${C.FEAT_ATS.join(', ')}, not ${F.at}`);
+  ref(w, typeof F.say === 'function' && typeof F.hit === 'function', 'needs say(n) and hit(c, n)');
+  (F.unfairFor || []).forEach(a => ref(w, isArch(a), `unfairFor ${a} is not an archetype`));
+  if (F.needs) ref(w, G.FEAT_TOOLS[F.needs], `needs ${F.needs}, which core.js has no check for (FEAT_TOOLS)`);
+  [].concat(F.theme || []).forEach(t => ref(w, isArch(t), `theme ${t} is not an archetype`));
+});
+G.WAGER_FEATS.forEach(k => askFeat('wagers', k, null, null, 'wager'));
+Object.entries(C.TITLES).forEach(([k, t]) => { if (t.feat) askFeat('titles ' + k, t.feat, t.n, t.cond, 'Title ' + t.name); else ref('titles ' + k, t.first, 'needs a feat from feats.js, unless it is a world first'); });
+Object.entries(C.QUESTS).forEach(([k, q]) => {
+  const feats = [].concat(q.feat), w = 'quests ' + k;
+  feats.forEach(f => askFeat(w, f, q.count ? q.goal : q.n, q.text, 'quest ' + k));
+  if (q.count) ref(w, feats.length === 1 && C.FEATS[feats[0]] && C.FEATS[feats[0]].measure, 'count: true needs one feat with a measure');
+  if (feats.length > 1 && feats.every(f => C.FEATS[f])) ref(w, new Set(feats.map(f => C.FEATS[f].at)).size === 1, 'feats asked together must be measured at the same moment');
+});
+Object.keys(C.FEATS).forEach(k => { if (!featUses[k]) warn('feats ' + k, 'nothing asks for it yet'); });
 Object.keys(C.HIDDEN_PATHS).forEach(k => { const [a, b] = k.split('+'); ref('paths ' + k, isArch(a) && isArch(b) && a < b, 'key must be two archetypes in alphabetical order, joined by +'); });
 archs.forEach((a, i) => archs.slice(i + 1).forEach(b => { const k = [a, b].sort().join('+'); if (!C.HIDDEN_PATHS[k]) warn('paths', `no Hidden Path for ${k}`); }));
 
@@ -318,6 +343,10 @@ function effectDoc() {
     ...sorted(C.EFFECTS).map(([k, E]) => { const who = passiveUses(k); let t = ''; try { t = E.say(who.length && typeof who[0][1] === 'number' ? who[0][1] : 1); } catch (e) { /* reported above */ } return row(k, who, ` ${t.replace(/\|/g, '\\|')} | ${E.how || 'add'} | ${E.lvl ? 'yes' : ''} | ${E.enemy ? E.enemy + (E.enemy === 'flat' ? ', scales with power' : '') : ''} | ${[].concat(E.theme || []).map(a => C.ARCH[a] ? C.ARCH[a].name : a).join(', ')} |`); }),
     '', '### Enemy traits (fields on the enemy, or in its phase\'s set)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
+    '', '### Feats (`feat`), from `js/content/feats.js`',
+    '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
+    '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',
+    ...sorted(C.FEATS).map(([k, F]) => `| \`${k}\` | ${F.at} | ${F.say(F.n).replace(/\|/g, '\\|')} | ${F.n != null ? F.n : ''} | ${F.measure ? 'yes' : ''} | ${(F.unfairFor || []).map(a => C.ARCH[a] ? C.ARCH[a].name : a).join(', ')} | ${(featUses[k] || []).join(', ')} |`),
   ].join('\n');
 }
 const START = '<!-- effects:start (written by node tools/check-content.js --write) -->', END = '<!-- effects:end -->';

@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: the effect registry (`effects.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
+All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
 
 ## Where things go
 
@@ -15,7 +15,9 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | A trait monsters and rivals can roll | `js/content/traits.js` |
 | An Undercity event | `js/content/events/undercity.js` |
 | An event chain | A new file in `js/content/events/`: its `CHAINS` entry and one event per step. The format is described at the top of `js/content/events.js` |
-| A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js`. A Gift or Title's fight effect is its `p`, from `effects.js` |
+| A Gift, Title, quest or Hidden Path | `gifts.js`, `titles.js`, `quests.js`, `paths.js`. A Gift or Title's fight effect is its `p`, from `effects.js`. A Title is earned for, and a quest asks for, a `feat` from `feats.js` |
+| A wager or Trial condition | `WAGER_FEATS` in `js/core.js`: the feats a god will bet on |
+| A new feat (a measured deed) | `js/content/feats.js`: when it is measured, its words, and how it is checked against the fight tally |
 | A new passive effect | `js/content/effects.js` (its phrase, how it combines, whether enemies can carry it), plus the code in `js/core.js` that reads it |
 
 A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`.
@@ -49,6 +51,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Event outcomes are data where they can be.** `pay`, and `then` (gold, stats, next-fight flags, the chain's next step, Favour) cover most options. Anything else goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
 - **Passive effects live in `js/content/effects.js`.** Archetype bonuses, gear, Hidden Paths, Gifts, Titles, Rank perks, stat milestones, god blessings and enemy passives all say what they do as `{ key: value }` from it. Each entry has the phrase players read, so a description says what the effect says. Where an effect has a rule players couldn't guess from its number (Thorns double below half HP), its `must` makes the checker fail any description that leaves the rule out.
+- **Feats live in `js/content/feats.js`.** A deed the player can be asked for (win within 6 turns, trigger 2 reactions, defeat a rival without healing) is declared once as a feat, and wagers, Rank Trial conditions, Titles and quests all ask for it by key, so it is measured the same way everywhere. A feat that an archetype's kit can't meet says so (`unfairFor`), and one that needs a tool says which (`needs`). The checker makes a Title's or quest's words say what counts (`must`).
 - **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
 - **Player text follows the style guide:** British spelling, no em-dashes, one name for one thing, and the length limits for one phone screen.
@@ -266,4 +269,33 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `forge` | 1 | The Forge King (3) |
 | `revive` | 1 | The Bone Saint (0.3) |
 | `twincast` | 1 | The Archmage Who Fell Upward (3) |
+
+### Feats (`feat`), from `js/content/feats.js`
+
+What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.
+
+| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |
+| --- | --- | --- | --- | --- | --- | --- |
+| `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt |
+| `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner |
+| `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
+| `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector |
+| `fast` | win | Win within 6 turns | 6 |  |  | wager, Title First Blood, quest fast3 |
+| `giant` | win | Beat an opponent with at least twice your max HP |  |  |  | Title Giant Slayer |
+| `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2 |
+| `healed` | fight | Heal 60 HP in a single fight | 60 |  |  | Title Bloodthirsty |
+| `healthy` | win | Win with more than half your HP |  |  |  | wager |
+| `masked` | win | Defeat the Masked Entrant |  |  |  | Title Mirror Breaker |
+| `merge` | merge | Merge pieces |  |  |  | quest merge4 |
+| `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal |
+| `outranked` | win | Beat an opponent 2 rank letters above your Entrant Rank | 2 |  |  | Title Rank Is Just a Letter |
+| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | quest h_overkill |
+| `path` | path | Have the System recognise your path by round 5 | 5 |  |  | quest path5 |
+| `quick` | fight | Use 3 Quick skills in a single turn | 3 |  |  | Title Spellweaver |
+| `react` | fight | Trigger 2 reactions | 2 | yes |  | wager, Title Alchemist, quest react6 |
+| `rival` | win | Defeat a rival |  |  |  | quest rival_noheal |
+| `stop` | win | Stun or Interrupt the opponent's big move |  |  |  | wager |
+| `stuns` | fight | Stun or Interrupt one opponent 3 times | 3 |  |  | quest h_stun3 |
+| `untouched` | win | Win without losing any HP |  |  |  | Title Untouched |
+| `wagers` | wager | Win 3 wagers in one run | 3 |  |  | Title High Roller |
 <!-- effects:end -->
