@@ -3,6 +3,8 @@
 //   node tools/run-report.js runs.json [out.json]   runs.json: an array of run documents, or an object keyed by document id
 //   node tools/run-report.js --sample N [out.json]  N bot runs instead, to try the dashboard before real data exists
 // Output goes to stdout without out.json. --split DIR instead of out.json writes one row table per file (the dashboard's sources).
+//   --ver wpd-v10   only runs from that release (several: --ver wpd-v9,wpd-v10). Runs posted before summaries carried
+//                   their release (wpd-v10 and older) get one from the time they finished, by the ship times below.
 const fs = require('fs');
 const G = require('../js/core.js');
 
@@ -24,7 +26,16 @@ if (args[0] === '--sample') {
   const raw = JSON.parse(fs.readFileSync(args.shift(), 'utf8'));
   runs = Array.isArray(raw) ? raw : Object.entries(raw).map(([id, d]) => Object.assign({ id }, d));
 }
-runs = runs.filter(r => r && r.outcome && r.world).sort((a, b) => a.at - b.at);
+// When each release went live (UTC). A run with no ver is put in the last release shipped before it finished; a phone
+// still running a cached older build can land one release late, so newer summaries carry their own ver instead.
+const SHIPS = [['wpd-v5', '2026-10-27T16:35Z'], ['wpd-v6', '2026-10-28T13:23Z'], ['wpd-v7', '2026-10-29T12:34Z'], ['wpd-v8', '2026-10-29T15:31Z'],
+  ['wpd-v9', '2026-10-29T23:26Z'], ['wpd-v10', '2026-10-31T09:19Z']].map(([v, t]) => [v, Date.parse(t)]);
+const verAt = at => { let v = 'wpd-v4'; SHIPS.forEach(([n, t]) => { if (at >= t) v = n; }); return v; };
+const verNum = v => +(String(v).match(/(\d+)$/) || [0, 0])[1];
+const vi = args.indexOf('--ver'), only = vi >= 0 ? args.splice(vi, 2)[1].split(',') : null;
+runs = runs.filter(r => r && r.outcome && r.world).map(r => Object.assign(r, { ver: r.ver || verAt(r.at), verGuessed: !r.ver })).sort((a, b) => a.at - b.at);
+const allRuns = runs;
+if (only) runs = runs.filter(r => only.includes(r.ver));
 
 const pct = (a, b) => b ? Math.round(100 * a / b) : null;
 const avg = xs => xs.length ? Math.round(10 * xs.reduce((a, b) => a + b, 0) / xs.length) / 10 : null;
@@ -85,7 +96,7 @@ const enders = Object.entries(fcount).map(([label, n]) => ({ label, n })).sort((
 const dayMap = {}; runs.forEach(r => { const d = dayMap[r.day] = dayMap[r.day] || { day: r.day, runs: 0, spared: 0 }; d.runs++; if (spared(r)) d.spared++; });
 const fights = runs.flatMap(r => r.fights || []);
 const out = {
-  generated: new Date().toISOString(), source,
+  generated: new Date().toISOString(), source, versions: only,
   range: total ? { from: runs[0].day, to: runs[total - 1].day } : null,
   totals: {
     runs: total, entrants: new Set(runs.map(r => String(r.id || '').split('_')[0]).filter(Boolean)).size || null,
@@ -93,20 +104,25 @@ const out = {
     pct: baseline, avgRound: avg(runs.map(r => r.round)), medMins: median(runs.map(r => r.mins).filter(m => m != null && m > 0)), avgTurns: avg(runs.map(r => r.turns)),
     hardPct: pct(fights.filter(f => f.h).length, fights.length), daily: runs.filter(r => r.mode === 'daily' || r.mode === 'replay').length,
   },
+  // Every release in the export, whatever --ver picked, so the dashboard can compare them
+  releases: Object.values(allRuns.reduce((g, r) => { const x = g[r.ver] = g[r.ver] || { key: r.ver, runs: 0, spared: 0, rounds: [], guessed: 0 };
+    x.runs++; if (spared(r)) x.spared++; x.rounds.push(r.round); if (r.verGuessed) x.guessed++; return g; }, {}))
+    .map(x => ({ key: x.key, label: x.key.replace(/^wpd-/, '') + (x.guessed === x.runs ? ' (by date)' : x.guessed ? ' (part by date)' : ''), runs: x.runs, spared: x.spared, pct: pct(x.spared, x.runs), avgRound: avg(x.rounds), guessed: x.guessed }))
+    .sort((a, b) => verNum(a.key) - verNum(b.key)),
   classes: group(r => r.path || 'none', archLabel),
   worlds: group(r => r.world, k => nameOf(G.WORLD_TYPES, k)),
   wranks: group(r => r.wrank, k => k + '-rank world').sort((a, b) => G.WORLD_RANKS.indexOf(a.key) - G.WORLD_RANKS.indexOf(b.key)),
   patrons: group(r => r.patron || 'none', k => k === 'none' ? 'No patron' : nameOf(G.GODS, k)),
   rounds, enders, moves: moves.slice(0, 16), minRuns: MIN, events, districts,
   days: Object.values(dayMap).sort((a, b) => a.day < b.day ? -1 : 1),
-  recent: runs.slice(-12).reverse().map(r => ({ day: r.day, world: nameOf(G.WORLD_TYPES, r.world), wrank: r.wrank, path: archLabel(r.path || 'none'), outcome: r.outcome, round: r.round, hearts: r.hearts, maxHearts: r.maxHearts, mins: r.mins })),
+  recent: runs.slice(-12).reverse().map(r => ({ day: r.day, ver: r.ver, world: nameOf(G.WORLD_TYPES, r.world), wrank: r.wrank, path: archLabel(r.path || 'none'), outcome: r.outcome, round: r.round, hearts: r.hearts, maxHearts: r.maxHearts, mins: r.mins })),
 };
 // --split DIR: the same numbers as flat row tables, one JSON file each, for the dashboard's datasets
 if (args[0] === '--split') {
   const dir = args[1]; fs.mkdirSync(dir, { recursive: true });
   const T = out.totals, rows = {
-    summary: [Object.assign({ source, generated: out.generated, from: out.range && out.range.from, to: out.range && out.range.to, minRuns: MIN }, T)],
-    breakdown: ['classes', 'worlds', 'wranks', 'patrons'].flatMap(g => out[g].map(x => ({ group: g, key: x.key, label: x.label, runs: x.runs, spared: x.spared, pct: x.pct, avgRound: x.avgRound }))),
+    summary: [Object.assign({ source, generated: out.generated, from: out.range && out.range.from, to: out.range && out.range.to, minRuns: MIN, versions: only ? only.join(',') : 'all' }, T)],
+    breakdown: ['releases', 'classes', 'worlds', 'wranks', 'patrons'].flatMap(g => out[g].map(x => ({ group: g, key: x.key, label: x.label, runs: x.runs, spared: x.spared, pct: x.pct, avgRound: x.avgRound }))),
     rounds: out.rounds,
     choices: [].concat(
       out.moves.map(x => ({ section: 'moved', key: x.key, kind: x.kind, label: x.label, n: x.runs, pct: x.pct, delta: x.delta })),
