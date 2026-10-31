@@ -289,7 +289,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .gitem .btn { grid-row: 1 / span 2; grid-column: 3; }
 .strow { display: grid; grid-template-columns: 40px 1fr auto 44px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--line); }
 .st-k { font-family: var(--f-d); color: var(--sys); font-size: 15px; }
-.st-n { display: grid; font-size: 15px; } .st-n small { font-size: 12px; color: var(--dim); }
+.st-n { display: grid; font-size: 15px; } .st-n small { font-size: 12px; color: var(--dim); } .st-n small.face { font-size: 11px; color: var(--sys); }
 .st-v { font-family: var(--f-m); font-size: 16px; }
 .btn.add { min-height: 34px; padding: 2px; border-color: var(--bronze); color: var(--bronze); }
 .god { display: grid; gap: 4px; }

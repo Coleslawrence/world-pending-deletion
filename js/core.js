@@ -608,10 +608,10 @@ function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), ru
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
 // The break bar (enemies only): damage that gets past Block fills it, big hits (BREAK.big of its max HP, all hits
-// together) count BREAK.heavy times, a skill's brk adds to it directly, and each point of STR adds BREAK.str. Full, the
+// together) count BREAK.heavy times, a skill's brk adds to it directly, and STR's Finesse (STAT_FACES) adds to all of it. Full, the
 // enemy is Broken: it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns.
 // The bar drains BREAK.drain of its size at the start of each of the enemy's turns.
-const BREAK = { share: 0.4, heavy: 2, big: 0.2, str: 0.04, drain: 0.15 };
+const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
 const TUNE = { late: 0.03, hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
@@ -910,6 +910,8 @@ function fighterSkills(barPieces, s, P) {
     const def = moddedDef(p.id, p.mods);
     if (P.extraHit && (def.fx.hits || 1) >= 2) def.fx.hits = def.fx.hits + 1;
     if (def.quick && P.quickCd) def.cd = Math.max(1, def.cd - P.quickCd);
+    const fin = STAT_FACES.INT.finesse; // INT's Finesse: long cooldowns shorten
+    if (!def.quick && def.cd >= fin.cdFrom) def.cd = Math.max(fin.cdMin, def.cd - Math.floor((s.INT || 0) / fin.cdEvery));
     if (!def.quick && P.arcCd && def.cd > 1) def.cd = Math.max(1, def.cd - Math.floor(s.INT / P.arcCd)); // Arcanist: INT shortens cooldowns
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
     out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0 });
@@ -923,8 +925,9 @@ function buildPlayer(run) {
   if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, P,
-    crit: 0.05 + 0.015 * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, 0.01 * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
+    crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
     breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0, str: s.STR,
+    res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
   });
 }
 function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
@@ -1038,7 +1041,7 @@ function half(X) { return X.hp < X.maxHp / 2; }
 function dmgMult(f, X, Y) {
   const P = X.P;
   let m = 1;
-  if (X.weaken > 0) m *= 0.7;
+  if (X.weaken > 0) m *= 1 - 0.3 * (1 - resistance(X, 'weaken'));
   if (X.empower > 0) m *= 1.3;
   if (f.bloodmoon) m *= 1.2;
   if (X.enrage && X.hp / X.maxHp <= X.enrage) m *= X.enrageMult;
@@ -1094,7 +1097,7 @@ function checkRevive(f, X) {
 }
 function heal(f, X, v) {
   if (v <= 0 || X.hp <= 0) return 0;
-  v = Math.round(v * (1 + (X.P.healPct || 0)));
+  v = Math.round(v * (1 + (X.P.healPct || 0) + (X.healFin || 0)));
   const b = X.hp; X.hp = Math.min(X.maxHp, X.hp + v); const h = X.hp - b;
   if (h > 0) { ev(f, { k: 'heal', side: X.side, amt: h }); if (X.isPlayer) f.tally.healed += h; }
   if (X.P.overhealBlock && v > h) X.block += v - h;
@@ -1153,14 +1156,17 @@ function applyStatus(f, X, Y, fx, p) {
 // The break bar fills from the player's side only; full, the enemy is Broken (a Stun with the Broken state)
 function addBreak(f, X, Y, v) {
   if (!X.isPlayer || !Y.breakMax || Y.hp <= 0 || v <= 0) return;
-  Y.brk += v * (1 + BREAK.str * (X.str || 0));
+  Y.brk += v * (1 + STAT_FACES.STR.finesse.brk * (X.str || 0));
   if (Y.brk < Y.breakMax) return;
   Y.brk = 0; f.tally.breaks++;
   say(f, `[${Y.name}'s guard breaks. Broken!]`, 'skill'); ev(f, { k: 'break', side: Y.side });
   stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, 2);
 }
+// Resistance (STAT_FACES): how much of a status's effect a fighter shrugs off, 0 for enemies
+function resistance(X, k) { return (X.res && X.res[k]) || 0; }
 function stunTarget(f, X, Y) {
   if (Y.hp <= 0) return;
+  if (resistance(Y, 'stun') && rnd(f.rng) < resistance(Y, 'stun')) { say(f, '[You shrug off the Stun.]', 'class'); return; }
   Y.stun = Math.max(Y.stun, 1);
   interrupt(f, X, Y, true);
   if (X.P.stunWeaken) Y.weaken = Math.max(Y.weaken, X.P.stunWeaken);
@@ -1208,7 +1214,7 @@ function useSkill(f, X, s, opt) {
   if (!opt.echo) ev(f, { k: 'use', side: X.side, name: def.name });
   if (X.bleed > 0 && !opt.echo) {
     const bm = (Y.P.bleedMult || 1) * (X.marked > 0 ? 2 : 1);
-    const bd = Math.round(X.bleed * bm); X.hp -= bd; X.bleed--; ev(f, { k: 'dot', side: X.side, amt: bd, kind: 'bleed' });
+    const bd = Math.round(X.bleed * bm * (1 - resistance(X, 'bleed'))); X.hp -= bd; X.bleed--; ev(f, { k: 'dot', side: X.side, amt: bd, kind: 'bleed' });
     if (!X.isPlayer) f.dealt['Bleed'] = (f.dealt['Bleed'] || 0) + bd; else f.tally.hurtBy['Bleed'] = (f.tally.hurtBy['Bleed'] || 0) + bd;
     if (Y.P.bleedHeal) heal(f, Y, bd * Y.P.bleedHeal); // Butcher
     if (X.hp <= 0) { checkRevive(f, X); if (X.hp <= 0) return; }
@@ -1303,13 +1309,13 @@ function startTurn(f, X, first) {
   const turns = X.isPlayer ? f.turn : (X.turns || 0);
   if (turns > 24) { const sd = Math.round(X.maxHp * 0.04 * (turns - 24)); X.hp -= sd; ev(f, { k: 'dot', side: X.side, amt: sd, kind: 'sudden' }); if (X.isPlayer && turns === 25) say(f, '[The crowd grows restless. Both fighters are worn down each turn.]', 'loss'); }
   if (X.burn > 0) {
-    const v = X.burn; X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
+    const v = Math.round(X.burn * (1 - resistance(X, 'burn'))); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
     if (Y.isPlayer) f.dealt['Burn'] = (f.dealt['Burn'] || 0) + v; else f.tally.hurtBy['Burn'] = (f.tally.hurtBy['Burn'] || 0) + v;
     if (Y.P.burnHeal) heal(f, Y, v * Y.P.burnHeal);
     const fade = X.burnFade != null ? X.burnFade : 0.3; X.burn = Math.max(0, X.burn - Math.ceil(X.burn * fade));
   }
   if (X.poison > 0) {
-    const v = Math.round(X.poison * (Y.P.poisonMult || 1));
+    const v = Math.round(X.poison * (Y.P.poisonMult || 1) * (1 - resistance(X, 'poison')));
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
     if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
@@ -1876,7 +1882,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
-  VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
+  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,

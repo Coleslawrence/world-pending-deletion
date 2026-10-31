@@ -943,11 +943,13 @@ function resultSheet() {
   const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
   return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p><p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
+// A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
+function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
 // Progress to the next level: every 2 points bought is a level
 function lvFill() { return run.level >= 9 ? 100 : (run.bought || 0) % 2 * 50; }
 function statsSheet() {
   const s = effStats(run), p = buildPlayer(run), train = ui.screen === 'shop', pr = pointPrice(run);
-  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
+  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small><small class="face">${faceTag(k, s[k])}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
   const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g] || 0} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, (run.favour[g] || 0) / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
   const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : train ? `<p class="sh-p">Train a stat: ${pr} gold a point, you have ${run.gold}. Every 2 points is a level: +4 Max HP and rarer pieces in the shop.</p>` : `<p class="sh-p fine">Train stats with gold in the shop.</p>`}${rows}
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
@@ -1041,6 +1043,7 @@ function howtoSheet() {
     <li><b>Titles</b> come from feats and world firsts. Equip one for a small bonus; many unlock new Gifts.</li>
     <li><b>System quests</b> appear each run. Some are hidden until you complete them.</li>
     <li><b>Hidden Paths:</b> reach 4 pieces in two archetypes at once for a hybrid bonus.</li>
+    <li><b>Stats</b> have three faces. Power: the archetypes whose skills they strengthen. Finesse: STR fills break bars faster, AGI adds dodge, INT shortens long cooldowns, VIT strengthens healing you receive, LUK adds crit. Resistance: each point shrugs off 4% of one status, up to 60% (STR Weaken, AGI Bleed, INT Burn, VIT Poison, LUK the chance a Stun lands).</li>
     <li><b>Stat milestones:</b> 10 in a stat grants a named perk.</li>
     <li><b>Hearts</b> are your world. Each loss erases part of it, and losses cost more later. At zero your world is erased, and its champion will return to face you.</li>
   </ul>`, `<button class="btn primary" data-act="close">Got it</button>`);
