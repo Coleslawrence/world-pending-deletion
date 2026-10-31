@@ -223,7 +223,7 @@ const UNLOCKS = {
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 25 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 15 },
   gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Cheat skill: a free reroll each round and better shop odds.', cost: 25 },
-  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, 3 stat points per level.', cost: 15 },
+  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, a free stat point each level.', cost: 15 },
   gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 1 less.", cost: 15 },
   gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs 1 less.', cost: 15 },
 };
@@ -295,7 +295,7 @@ function newRun(world, setup, meta, rng) {
   const G = setup.gifts;
   const run = {
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
-    stats: Object.assign({}, setup.stats), statPts: 0, level: 1, xp: 0,
+    stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0, notice: 0,
     gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
     favour: godZeros(), gifted: godZeros(),
@@ -310,7 +310,7 @@ function newRun(world, setup, meta, rng) {
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // System quests: two visible, every hidden one quietly active
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden), rs).slice(0, 2);
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
@@ -338,19 +338,23 @@ function effStats(run) {
   return s;
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 2 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
-const XP_NEED = [0, 2, 4, 6, 10, 14, 20, 26, 32, 999];
-function xpNeed(level) { return XP_NEED[Math.min(level, 9)]; }
-function gainXp(run, n, msgs) {
-  if (hasGift(run, 'fastlearner')) n = Math.round(n * 1.5);
-  run.xp += n;
-  while (run.level < 9 && run.xp >= xpNeed(run.level)) {
-    run.xp -= xpNeed(run.level); const before = maxHp(run); run.level++; const sp = hasGift(run, 'latebloomer') ? 3 : 2; run.statPts += sp; run.hp += maxHp(run) - before;
-    msgs && msgs.push({ t: 'level', text: `[Level up! Level ${run.level}. +${sp} stat points. Shop odds improved.]` });
-  }
-  if (run.level >= 9) run.xp = 0;
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
+// Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
+// points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
+const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
+function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)]; return hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p; }
+function levelFor(bought) { return Math.min(9, 1 + Math.floor(bought / 2)); }
+function trainStat(run, k, msgs) {
+  if (!STATS.includes(k)) return false;
+  const pr = pointPrice(run); if (run.gold < pr) return false;
+  const before = maxHp(run), lv = run.level;
+  run.gold -= pr; run.stats[k]++; run.bought = (run.bought || 0) + 1;
+  if (hasGift(run, 'latebloomer') && run.bought % 2 === 0) run.statPts++;
+  run.level = levelFor(run.bought); run.hp += maxHp(run) - before;
+  if (run.level > lv) msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. Shop odds improved.]` });
+  if (run.milestones) checkMilestones(run, msgs);
+  return true;
 }
-function buyXp(run, msgs) { if (run.gold < 4 || run.level >= 9) return false; run.gold -= 4; gainXp(run, 4, msgs); return true; }
 
 // ---------- Pool and shop ----------
 const ODDS = [[70, 25, 5, 0, 0], [45, 35, 17, 3, 0], [25, 35, 28, 10, 2], [15, 25, 32, 20, 8]];
@@ -402,8 +406,12 @@ function rerollCost(run) { return run.freeRerolls > 0 ? 0 : hasGift(run, 'f_unlu
 function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
-function interestCap(run) { return (hasGift(run, 'golden') ? 5 : 3) + (hasPerk(run, 'ledger') ? 1 : 0); }
-function income(run) { return 5 + Math.min(interestCap(run), Math.floor(run.gold / 10)) + (run.world.mod === 'golden' ? 2 : 0); }
+// Income: INCOME.base a round, plus interest of 1 for every INCOME.per gold held, up to the cap. Saving is a real choice:
+// a full bank (20 gold) earns as much as the base income again.
+const INCOME = { base: 5, per: 4, cap: 5, golden: 8 };
+function interestCap(run) { return (hasGift(run, 'golden') ? INCOME.golden : INCOME.cap) + (hasPerk(run, 'ledger') ? 1 : 0); }
+function interestOf(run) { return Math.min(interestCap(run), Math.floor(run.gold / INCOME.per)); }
+function income(run) { return INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
   let i = run.bar.findIndex(p => p && p.u === u); if (i >= 0) return { p: run.bar[i], at: 'bar', i };
@@ -560,9 +568,9 @@ function checkPath(run, msgs) {
 }
 // Stat milestones at 10
 const MILESTONES = {
-  STR: { name: 'Mighty Frame', desc: 'Reaper and Stormcaller skills deal 10% more.' },
-  AGI: { name: 'Afterimage', desc: 'Evade the first attack each fight.' },
-  INT: { name: 'Arcane Mind', desc: 'Your first damaging skill each fight deals 30% more.' },
+  STR: { name: 'Mighty Frame', desc: 'Reaper and Stormcaller skills deal 10% more.', p: { mighty: 0.1 } },
+  AGI: { name: 'Afterimage', desc: 'Evade the first attack each fight.', p: { firstEvade: 1 } },
+  INT: { name: 'Arcane Mind', desc: 'Your first damaging skill each fight deals 30% more.', p: { firstHit: 0.3 } },
   VIT: { name: 'Iron Constitution', desc: '+1 max Heart.' },
   LUK: { name: "Fortune's Favourite", desc: 'One free reroll every round.' },
 };
@@ -580,81 +588,22 @@ function checkMilestones(run, msgs) {
 // P: every passive modifier the combat engine reads.
 // x: { title, stats (effective), milestones }
 function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
-  const P = {}, add = (k, v) => P[k] = (P[k] || 0) + v, set = (k, v) => P[k] = v;
+  const P = {};
   x = x || {};
   const c = archCounts(barPieces, gearPieces, gifts), lm = 1 + 0.08 * ((lvl || 1) - 1);
-  const t = k => archTier(c[k] || 0);
-  if (t('pyre') >= 1) set('burnFade', 0.15); if (t('pyre') >= 2) add('burnPlus', 4); if (t('pyre') >= 3) set('burnFade', 0);
-  if (t('venom') >= 1) add('poisonPlus', 1); if (t('venom') >= 2) add('poisonPlus', 1); if (t('venom') >= 3) set('poisonMult', 1.5);
-  if (t('blade') >= 1) set('extraHit', 1); if (t('blade') >= 2) add('bleedPlus', 2); if (t('blade') >= 3) set('bleedMult', 2);
-  if (t('bastion') >= 1) add('blockKeep', 0.25); if (t('bastion') >= 2) add('thornsAlways', Math.round(4 * lm)); if (t('bastion') >= 3) set('blockStrike', 0.5);
-  if (t('arcanist') >= 1) { add('quickCd', 1); set('arcCd', 8); } if (t('arcanist') >= 2) set('firstFree', 1); if (t('arcanist') >= 3) set('quickTwice', 1);
-  if (t('zealot') >= 1) add('healPct', 0.1); if (t('zealot') >= 2) add('regen', Math.round(2 * lm)); if (t('zealot') >= 3) set('overhealBlock', 1);
-  if (t('reaper') >= 1) { add('vsHalf', 0.25); set('reapPierce', 1); set('reapBlood', 0.15); } if (t('reaper') >= 2) add('lifesteal', 0.2); if (t('reaper') >= 3) { set('doomFaster', 1); set('heartOnWin', 1); }
-  if (t('storm') >= 1) { add('stunDmg', Math.round(12 * lm)); set('stormBreak', 1); } if (t('storm') >= 2) set('stunWeaken', 2); if (t('storm') >= 3) set('every3Stun', 1);
-  gearPieces.filter(Boolean).forEach(g => Object.entries(gearPas(g.id, g.star)).forEach(([k, v]) => { if (k === 'firstCrit' || k === 'firstStun' || k === 'firstEvade') set(k, 1); else add(k, k === 'stunDmg' || k === 'thornsAlways' || k === 'regen' || k === 'startBlock' ? Math.round(v * lm) : v); }));
-  if (P.goldDmg) add('dmgPct', Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10))); // per 10 gold held when the fight starts, up to +25%
-  // Hidden Path
+  // Archetype bonuses, then gear (both grow with level), then everything else. Effects and how they combine: effects.js
+  ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach(p => addEffects(P, p, lm)));
+  gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(g.id, g.star), lm));
+  if (P.goldDmg) addEffects(P, { dmgPct: Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10)) }); // per 10 gold held when the fight starts, up to +25%
   const hp = hiddenPathOf(c);
-  if (hp) Object.entries(HIDDEN_PATHS[hp].fx).forEach(([k, v]) => add(k, v));
+  if (hp) addEffects(P, HIDDEN_PATHS[hp].fx);
   const G = gifts || [];
-  if (G.includes('tidecaller')) add('regen', 2);
-  if (G.includes('deserter')) add('startBlock', 15);
-  if (G.includes('warden')) add('poisonHeal', 0.3);
-  if (G.includes('hedgewitch')) { P.burnFade = Math.min(P.burnFade != null ? P.burnFade : 0.3, 0.2); P.poisonMult = (P.poisonMult || 1) * 1.25; }
-  if (G.includes('catalyst')) P.reactMult = (P.reactMult || 1) * 1.5;
-  if (G.includes('berserker')) add('lowHpDmg', 0.3);
-  if (G.includes('ironbody')) add('startBlockPct', 0.1);
-  if (G.includes('glass')) add('dmgPct', 0.3);
-  if (G.includes('lucky')) add('critBonus', 0.1);
-  if (G.includes('firststrike')) add('firstHit', 1);
-  if (G.includes('thickskin')) add('flatDR', 2);
-  if (G.includes('vampire')) add('lifesteal', 0.08);
-  if (G.includes('manaaffinity')) add('quickCd', 1);
-  if (G.includes('elf')) { add('dodge', 0.1); add('bleedPlus', 1); }
-  if (G.includes('demon')) { add('dmgPct', 0.15); add('healPct', -0.2); }
-  if (G.includes('dragon')) set('reactHeal', 5);
-  if (G.includes('lastwords')) set('lastWords', 0.25);
-  if (G.includes('f_sluggish')) set('sluggish', 1);
-  if (G.includes('swordsaint')) set('swordSaint', 1);
-  if (G.includes('copycat')) set('copycat', 1);
-  // Title
-  const T = x.title;
-  if (T === 'first_blood') add('firstHit', 0.5);
-  if (T === 'untouched') add('startBlock', 8);
-  if (T === 'giant_slayer') add('vsBigger', 0.15);
-  if (T === 'mirror_breaker') add('critBonus', 0.08);
-  if (T === 'bloodthirsty') add('lifesteal', 0.05);
-  if (T === 'spellweaver') add('afterQuick', 0.1);
-  if (T === 'underdog') add('vsHard', 0.1);
-  if (T === 'rank_is_just_a_letter') add('vsHigherRank', 0.1);
-  if (T === 'comeback') set('lowDR', 0.2);
-  if (T === 'alchemist') P.reactMult = (P.reactMult || 1) * 1.2;
-  if (T === 'executioner') set('critMult', 1.75);
-  if (T === 'tidebreaker') add('startBlock', 6);
-  if (T === 'emberfall') add('burnPlus', 1);
-  if (T === 'bonebreaker') add('poisonPlus', 1);
-  if (T === 'thornbane') add('bleedPlus', 1);
-  if (T === 'skyfall') { add('critBonus', 0.05); add('dodge', 0.05); }
-  if (T === 'forgebreaker') add('thornsAlways', 2);
-  if (T === 'ascendant') add('dmgPct', 0.05);
-  if (T === 'pathfinder') { add('startBlock', 5); add('regen', 1); }
-  if (T === 'unbeaten') add('dmgPct', 0.1);
-  // Promotion perks, about the size of a Title each
-  const K = x.perks || [];
-  if (K.includes('kindling')) add('burnPlus', 1);
-  if (K.includes('steeped')) add('poisonPlus', 1);
-  if (K.includes('whetted')) add('bleedPlus', 1);
-  if (K.includes('guard')) add('startBlock', 5);
-  if (K.includes('keen')) add('critBonus', 0.04);
-  if (K.includes('light')) add('dodge', 0.03);
-  // Stat milestones
-  const M = x.milestones || {};
-  if (M.STR) set('mighty', 0.1);
-  if (M.AGI) set('firstEvade', 1);
-  if (M.INT) add('firstHit', 0.3);
+  Object.keys(GIFTS).filter(k => G.includes(k)).forEach(k => addEffects(P, GIFTS[k].p));
+  if (TITLES[x.title]) addEffects(P, TITLES[x.title].p);
+  Object.keys(PERKS).filter(k => (x.perks || []).includes(k)).forEach(k => addEffects(P, PERKS[k].p));
+  Object.keys(MILESTONES).filter(k => (x.milestones || {})[k]).forEach(k => addEffects(P, MILESTONES[k].p));
   const F = favourTiers || {};
-  Object.keys(GODS).forEach(g => { if (F[g] >= 2) Object.entries(GODS[g].bless).forEach(([k, v]) => add(k, v)); });
+  Object.keys(GODS).forEach(g => { if (F[g] >= 2) addEffects(P, GODS[g].bless); });
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
@@ -662,12 +611,21 @@ function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), ru
 
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
-const TUNE = { late: 0.03, hp0: 1.6, hpSlope: 0.45, dmgSlope: 0.32, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08 };
+// The break bar (enemies only): damage that gets past Block fills it, big hits (BREAK.big of its max HP, all hits
+// together) count BREAK.heavy times, a skill's brk adds to it directly, and STR's Finesse (STAT_FACES) adds to all of it. Full, the
+// enemy is Broken: it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns.
+// The bar drains BREAK.drain of its size at the start of each of the enemy's turns.
+const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
+// The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
+// notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
+// gate: Gatekeepers (the hard pick at a GATES round) are this much tougher again, with an extra trait and a second phase.
+const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 1 };
+const GATES = [4, 7];
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
-const HEART_COST = [1, 1, 2, 2, 3, 3, 4, 5];
+const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
 function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
@@ -684,8 +642,10 @@ function makeChoices(run, meta, rng) {
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
   if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
+  // A Gatekeeper: at a GATES round the hard rival guards the way on, with an extra trait, a second phase and a better reward
+  if (GATES.includes(run.round) && hard.kind === 'rival' && !run.practice) hard.gate = true;
   // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
-  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : TRAIT_COUNT[run.round - 1] || 0; if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
+  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -693,6 +653,7 @@ function specName(spec) {
   if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
   if (spec.kind === 'erased' || spec.kind === 'champion') return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
+  if (spec.gate) return n + ', Gatekeeper';
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
   return n;
 }
@@ -714,6 +675,7 @@ function specReward(spec) {
   if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
   if (spec.kind === 'final') return 'Spares your world';
   if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
+  if (spec.gate) return '3 gold, a stat point, a rune and a rare shop slot';
   if (spec.hard) return '3 gold, a rune and a rare shop slot';
   return '3 gold';
 }
@@ -724,18 +686,24 @@ function chooseOpponent(run, i, wagerOn) {
 }
 function currentSpec(run) { return run.elite ? run.eliteBracket[run.eliteIdx] : run.chosen; }
 
-// ---------- Wagers ----------
-const WAGERS = {
-  fast: { text: 'Win within 6 turns', check: f => f.turn <= 6 },
-  noheal: { text: 'Win without healing', check: f => f.tally.healed <= 0 },
-  react: { text: 'Trigger 2 reactions', check: f => f.tally.reactions >= 2 },
-  stop: { text: "Stun or Interrupt the opponent's big move", check: f => f.tally.bigStopped >= 1 },
-  healthy: { text: 'Win with more than half your HP', check: f => f.A.hp > f.A.maxHp / 2 },
-};
+// ---------- Feats ----------
+// A feat (feats.js) is one measured deed. Wagers, Rank Trial conditions, Titles and quests all ask for feats by key.
+function featCtx(run, f, won, spec) { return { run, f, T: f && f.tally, A: f && f.A, B: f && f.B, won: !!won, spec, pieces: () => allPieces(run) }; }
+// Did feat k happen in context c, needing n of it (the feat's usual n when not given)? A feat measured at 'win' needs a won fight.
+function featOk(k, c, n) { const F = FEATS[k]; if (F.at === 'win' && !c.won) return false; return !!F.hit(c, n != null ? n : F.n); }
 function canStop(run) { const P = runP(run); return P.firstStun || P.every3Stun || run.bar.some(p => p && SKILLS[p.id] && (SKILLS[p.id].fx.stun || SKILLS[p.id].fx.interrupt || SKILLS[p.id].fx.stunIfWeak)); }
+const FEAT_TOOLS = { stop: canStop }; // what a feat's needs asks the run to have
+function featPossible(run, k) { const F = FEATS[k]; return !F.needs || FEAT_TOOLS[F.needs](run); }
+// A feat is fair unless the run leans on an archetype it is unfair for: the recognised path, or the home archetype before one
+function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; return !(F.unfairFor || []).includes(lead); }
+// ---------- Wagers ----------
+// The feats a god will bet on. Trials never ask one that is unfair for any archetype; wagers and quests skip it for the run that leans on one.
+const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
+const WAGERS = {};
+WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
-  const keys = Object.keys(WAGERS).filter(k => k !== 'stop' || canStop(run));
+  const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
   return { god, key: pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
@@ -830,18 +798,29 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
   if (!o) return false;
   msgs = msgs || []; const before = msgs.length, T = o.then || {}, r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
   if (o.pay) run.gold -= o.pay;
-  if (T.gold) run.gold += T.gold;
-  Object.entries(T.stats || {}).forEach(([k, v]) => run.stats[k] += v);
-  Object.assign(run.nextFlags, T.next);
+  const ctx = { run, h, msgs, chain: EVENTS[key].chain };
+  applyOutcomes(T, ctx, false);
   if (o.go) o.go(run, h);
-  const c = EVENTS[key].chain;
-  if (T.chain) run.chains[c] = typeof T.chain === 'string' ? T.chain : { step: T.chain.step, due: run.round + T.chain.after };
   notePick(run, 'e:' + key + '.' + idx);
   if (run.luck) delete run.luck[key];
   if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
-  Object.entries(T.favour || {}).forEach(([g, n]) => h.favour(g, n));
+  applyOutcomes(T, ctx, true);
   return true;
 }
+// ---------- Outcomes ----------
+// What each outcome in outcomes.js does. ctx: { run, h (an eventKit), msgs, chain (the event's chain), label (for a piece's line) }
+const OUTCOME_APPLY = {
+  gold: (v, c) => { c.run.gold += v; },
+  stats: (v, c) => Object.entries(v).forEach(([k, n]) => c.run.stats[k] += n),
+  heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
+  rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(c.run, 'loot'), null, c.run) }); },
+  piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) { c.msgs && c.msgs.push({ t: 'loot', text: `[${c.label || 'Reward'}: ${pieceDef(id).name}]` }); addPiece(c.run, id, [], c.msgs); } },
+  next: (v, c) => { Object.assign(c.run.nextFlags, v); },
+  chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
+  favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
+};
+// Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
+function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
 function applyPrefix(run, u, m) {
   const f = findPiece(run, u); if (!f || !prefixOk(f.p.id, m, f.p.mods)) return false;
@@ -850,40 +829,24 @@ function applyPrefix(run, u, m) {
 }
 
 // ---------- Quests ----------
+// Which feats each moment can measure: a fight settles both 'win' and 'fight' feats
+const QUEST_AT = { fight: ['win', 'fight'], merge: ['merge'], path: ['path'], shop: ['shop'], wager: ['wager'] };
 function questEvent(run, kind, d, msgs) {
+  const c = featCtx(run, d.f, d.won, d.spec);
   (run.quests || []).forEach(q => {
     if (q.done || q.failed) return;
-    let inc = 0; const f = d.f;
-    if (kind === 'fight' && d.won) {
-      if (q.id === 'rival_noheal' && d.spec.kind === 'rival' && f.tally.healed <= 0) inc = 1;
-      if (q.id === 'fast3' && f.turn <= 6) inc = 1;
-      if (q.id === 'hard2' && d.spec.hard) inc = 1;
-      if (q.id === 'h_overkill' && f.tally.overkill >= 30) inc = 1;
-      if (q.id === 'h_clutch' && f.A.hp <= f.A.maxHp * 0.1) inc = 1;
-    }
-    if (kind === 'fight') {
-      if (q.id === 'react6') inc = f.tally.reactions;
-      if (q.id === 'h_stun3' && f.tally.stuns >= 3) inc = 1;
-    }
-    if (kind === 'merge') {
-      if (q.id === 'merge4') inc = 1;
-      if (q.id === 'h_collector' && allPieces(run).filter(p => p.star >= 2).length >= 3) inc = 1;
-    }
-    if (kind === 'path' && q.id === 'path5' && run.round <= 5) inc = 1;
-    if (kind === 'shop' && q.id === 'h_bankrupt' && run.gold === 0) inc = 1;
+    const Q = QUESTS[q.id], feats = [].concat(Q.feat);
+    if (!feats.every(k => QUEST_AT[kind].includes(FEATS[k].at))) return;
+    const inc = Q.count ? FEATS[feats[0]].measure(c) : feats.every(k => featOk(k, c, Q.n)) ? 1 : 0;
     if (inc) { q.prog = Math.min(QUESTS[q.id].goal, q.prog + inc); if (q.prog >= QUESTS[q.id].goal) completeQuest(run, q, msgs); }
   });
 }
 function completeQuest(run, q, msgs) {
   const Q = QUESTS[q.id]; q.done = true;
   if (META) META.archive.quests[q.id] = true;
-  msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${QUEST_REWARD[Q.reward]}.]` });
-  const r = Q.reward;
-  if (r === 'rune') run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(run, 'loot'), null, run) });
-  if (r === 'gold5') run.gold += 5; if (r === 'gold6') run.gold += 6; if (r === 'gold8') run.gold += 8;
-  if (r === 'heart') { run.maxHearts++; run.hearts++; amendRecord(run, msgs, stream(run, 'record')); }
-  if (r === 'favour') addFavour(run, 'war', 2, META, msgs);
-  if (r === 'piece') { const pool = poolIds(run).filter(x => pieceDef(x).rank === 'B'); const id = pick(pool, stream(run, 'loot')); if (id) { msgs && msgs.push({ t: 'loot', text: `[Quest reward: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs); } }
+  msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${outcomeText(Q.reward)}.]` });
+  const ctx = { run, h: eventKit(run, META, undefined, msgs), msgs, label: 'Quest reward' };
+  applyOutcomes(Q.reward, ctx, false); applyOutcomes(Q.reward, ctx, true);
 }
 // ---------- Additional Gift (after round 4) ----------
 function extraGiftOffers(run, rng) {
@@ -925,7 +888,7 @@ function enterChoose(run, meta, rng, msgs) {
   run.scouted = false; run.wagerOn = false; run.chosen = null;
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
-  if (run.visit > 1) { gainXp(run, 2, msgs); refreshShop(run, stream(run, 'shop', rng)); }
+  if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
   run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
@@ -959,6 +922,8 @@ function fighterSkills(barPieces, s, P) {
     const def = moddedDef(p.id, p.mods);
     if (P.extraHit && (def.fx.hits || 1) >= 2) def.fx.hits = def.fx.hits + 1;
     if (def.quick && P.quickCd) def.cd = Math.max(1, def.cd - P.quickCd);
+    const fin = STAT_FACES.INT.finesse; // INT's Finesse: long cooldowns shorten
+    if (!def.quick && def.cd >= fin.cdFrom) def.cd = Math.max(fin.cdMin, def.cd - Math.floor((s.INT || 0) / fin.cdEvery));
     if (!def.quick && P.arcCd && def.cd > 1) def.cd = Math.max(1, def.cd - Math.floor(s.INT / P.arcCd)); // Arcanist: INT shortens cooldowns
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
     out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0 });
@@ -972,17 +937,22 @@ function buildPlayer(run) {
   if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, P,
-    crit: 0.05 + 0.015 * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, 0.01 * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
-    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0,
+    crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
+    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0, str: s.STR,
+    res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
   });
 }
 function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
-function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run); }
+// The System's notice: +TUNE.notice per straight win, never in the Elite bracket or practice
+function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
+function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
+function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
-  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha;
+  const gate = spec.gate ? TUNE.gate : 1;
+  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
   if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; return e; }
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
@@ -990,7 +960,7 @@ function buildEnemy(run, spec) {
   let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85);
   return blankFighter(Object.assign({
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
-    skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || null, P: enemyPassives(t.passives, p),
+    skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
     weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
 }
@@ -1006,6 +976,8 @@ function poolTraits(spec, t, p) {
   });
   return o;
 }
+// A Gatekeeper without a phase of its own digs in at half HP: from then on it deals 30% more damage (more if it already enrages)
+function gatePhase(t) { return { at: 0.5, say: `[${t.name} will not let you pass. The Gatekeeper digs in.]`, set: { enrage: 1, enrageMult: Math.max(1.3, t.enrageMult || 0) } }; }
 function enemyMove(x, i, power) { return { key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power, cd: 0 }; }
 // The trait library: fields on an enemy (or in its phase's set) that give it a signature. What each does is in
 // docs/CONTENT.md, "Enemy traits". Amounts that deal or block damage scale with the enemy's power, like its moves.
@@ -1017,20 +989,19 @@ function enemyTraits(t, p) {
   if (o.aura) o.aura *= p; if (o.briar) o.briar *= p; if (o.forge) o.forge = Math.round(o.forge * p);
   return o;
 }
-// Enemy passives: the same P keys as gear and Hidden Paths, for keys that work on either side. Flat amounts scale
+// Enemy passives: the effects marked enemy in effects.js, the ones that work on either side. Flat amounts scale
 // with the enemy's power; rates and multipliers don't.
-const ENEMY_PASSIVES = { regen: 'flat', thornsAlways: 'flat', startBlock: 'flat', burnPlus: 'flat', poisonPlus: 'flat', bleedPlus: 'flat', dotPlus: 'flat', thornBurn: 'flat', thornPoison: 'flat',
-  lifesteal: 'rate', dmgPct: 'rate', lowHpDmg: 'rate', vsHalf: 'rate', startBlockPct: 'rate', blockKeep: 'rate', healPct: 'rate', flatDR: 'flat', lowDR: 'rate', poisonMult: 'rate', bleedMult: 'rate', thornMult: 'rate' };
+const ENEMY_PASSIVES = {}; Object.keys(EFFECTS).filter(k => EFFECTS[k].enemy).forEach(k => ENEMY_PASSIVES[k] = EFFECTS[k].enemy);
 function enemyPassives(o, p) { const P = {}; Object.entries(o || {}).forEach(([k, v]) => P[k] = ENEMY_PASSIVES[k] === 'flat' ? Math.round(v * p) : v); return P; }
 // Boss phases: once at or below phase.at of max HP, the enemy says phase.say, learns the moves in phase.add, takes the
-// traits in phase.set and starts phase.script from its first move. The move already shown as its intent still happens
+// traits in phase.set and starts phase.script (if it has one) from its first move. The move already shown as its intent still happens
 // as shown: when the line is crossed on your turn, the new traits wait until that move is done.
 function checkPhase(f, B, playerTurn) {
   const ph = B.phase; if (!ph || B.phased || B.hp <= 0 || B.hp > B.maxHp * ph.at) return false;
   B.phased = true;
   (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
   if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
-  B.script = ph.script; B.scriptIdx = 0;
+  if (ph.script) { B.script = ph.script; B.scriptIdx = 0; }
   say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
   return true;
 }
@@ -1059,11 +1030,12 @@ function buildSnapEnemy(snap, p, hm, run) {
 function newFight(run, rng) {
   const spec = currentSpec(run);
   const A = buildPlayer(run), B = buildEnemy(run, spec);
+  B.breakMax = Math.round(B.maxHp * BREAK.share); B.brk = 0;
   // How many rank letters the opponent stands above the Entrant (Entrant Rank), for Rank Is Just a Letter
   const foeRank = !run.practice && META && META.rank && specRank(spec, META); B.rankUp = foeRank ? rankIdx(foeRank) - rankIdx(META.rank.letter) : 0;
   const f = {
     rng: stream(run, 'fight', rng) || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
-    tally: { burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
+    tally: { breaks: 0, burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && run.chains && run.chains.official === 'tip'),
   };
@@ -1087,7 +1059,7 @@ function half(X) { return X.hp < X.maxHp / 2; }
 function dmgMult(f, X, Y) {
   const P = X.P;
   let m = 1;
-  if (X.weaken > 0) m *= 0.7;
+  if (X.weaken > 0) m *= 1 - 0.3 * (1 - resistance(X, 'weaken'));
   if (X.empower > 0) m *= 1.3;
   if (f.bloodmoon) m *= 1.2;
   if (X.enrage && X.hp / X.maxHp <= X.enrage) m *= X.enrageMult;
@@ -1126,6 +1098,7 @@ function hit(f, X, Y, raw, o = {}) {
   if (X.isPlayer) { f.tally.bigHit = Math.max(f.tally.bigHit, d); if (o.src) f.dealt[o.src] = (f.dealt[o.src] || 0) + rest; if (Y.hp <= 0) f.tally.overkill = Math.max(f.tally.overkill, -Y.hp); }
   if (Y.lastWords && Y.hp > 0 && Y.hp < Y.maxHp * 0.25 && !Y.lwUsed) { Y.lwUsed = true; const b = Math.round(Y.maxHp * Y.lastWords); Y.block += b; say(f, `[Last Words: +${b} Block.]`, 'class'); }
   if (Y.P.blockStun && absorbed > 0 && !o.isThorns && X.hp > 0 && X.stunT !== f.turn && rnd(f.rng) < Y.P.blockStun) { X.stunT = f.turn; say(f, '[Thunder Wall: Stun!]', 'skill'); stunTarget(f, Y, X); }
+  if (!o.isThorns && rest > 0) addBreak(f, X, Y, rest * (o.heavy ? BREAK.heavy : 1));
   ev(f, { k: 'hit', side: Y.side, amt: rest, blocked: absorbed, crit, tag: o.tag });
   if (!o.isThorns && X.hp > 0) {
     const th = ((Y.thorns || 0) + (Y.P.thornsAlways ? Y.P.thornsAlways * (half(Y) ? 2 : 1) : 0)) * (Y.P.thornMult || 1);
@@ -1142,7 +1115,7 @@ function checkRevive(f, X) {
 }
 function heal(f, X, v) {
   if (v <= 0 || X.hp <= 0) return 0;
-  v = Math.round(v * (1 + (X.P.healPct || 0)));
+  v = Math.round(v * (1 + (X.P.healPct || 0) + (X.healFin || 0)));
   const b = X.hp; X.hp = Math.min(X.maxHp, X.hp + v); const h = X.hp - b;
   if (h > 0) { ev(f, { k: 'heal', side: X.side, amt: h }); if (X.isPlayer) f.tally.healed += h; }
   if (X.P.overhealBlock && v > h) X.block += v - h;
@@ -1198,8 +1171,21 @@ function applyStatus(f, X, Y, fx, p) {
   if (fx.weaken) { Y.weaken = Math.max(Y.weaken, fx.weaken); if (X.P.weakPoison) addStatus(f, X, Y, 'poison', X.P.weakPoison); react(f, X, Y); }
   if (fx.stun) stunTarget(f, X, Y);
 }
+// The break bar fills from the player's side only; full, the enemy is Broken (a Stun with the Broken state)
+function addBreak(f, X, Y, v) {
+  if (!X.isPlayer || !Y.breakMax || Y.hp <= 0 || v <= 0) return;
+  Y.brk += v * (1 + STAT_FACES.STR.finesse.brk * (X.str || 0));
+  if (Y.brk < Y.breakMax) return;
+  Y.brk = 0; f.tally.breaks++;
+  say(f, `[${Y.name}'s guard breaks. Broken!]`, 'skill'); ev(f, { k: 'break', side: Y.side });
+  stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, 2);
+  if (X.P.breakEmpower) { X.empower = Math.max(X.empower, X.P.breakEmpower + 1); say(f, `[Lightning Rod: Empowered for ${X.P.breakEmpower} turns.]`, 'skill'); }
+}
+// Resistance (STAT_FACES): how much of a status's effect a fighter shrugs off, 0 for enemies
+function resistance(X, k) { return (X.res && X.res[k]) || 0; }
 function stunTarget(f, X, Y) {
   if (Y.hp <= 0) return;
+  if (resistance(Y, 'stun') && rnd(f.rng) < resistance(Y, 'stun')) { say(f, '[You shrug off the Stun.]', 'class'); return; }
   Y.stun = Math.max(Y.stun, 1);
   interrupt(f, X, Y, true);
   if (X.P.stunWeaken) Y.weaken = Math.max(Y.weaken, X.P.stunWeaken);
@@ -1247,7 +1233,7 @@ function useSkill(f, X, s, opt) {
   if (!opt.echo) ev(f, { k: 'use', side: X.side, name: def.name });
   if (X.bleed > 0 && !opt.echo) {
     const bm = (Y.P.bleedMult || 1) * (X.marked > 0 ? 2 : 1);
-    const bd = Math.round(X.bleed * bm); X.hp -= bd; X.bleed--; ev(f, { k: 'dot', side: X.side, amt: bd, kind: 'bleed' });
+    const bd = Math.round(X.bleed * bm * (1 - resistance(X, 'bleed'))); X.hp -= bd; X.bleed--; ev(f, { k: 'dot', side: X.side, amt: bd, kind: 'bleed' });
     if (!X.isPlayer) f.dealt['Bleed'] = (f.dealt['Bleed'] || 0) + bd; else f.tally.hurtBy['Bleed'] = (f.tally.hurtBy['Bleed'] || 0) + bd;
     if (Y.P.bleedHeal) heal(f, Y, bd * Y.P.bleedHeal); // Butcher
     if (X.hp <= 0) { checkRevive(f, X); if (X.hp <= 0) return; }
@@ -1268,14 +1254,15 @@ function useSkill(f, X, s, opt) {
     if (fx.momentum) base += fx.momentum * p * (X.streak || 0);
     if (fx.cruel && effectCount(Y) >= 2) base *= fx.cruel;
     if (fx.execute && Y.hp / Y.maxHp <= fx.execute) base *= fx.execMult;
-    const hits = fx.hits || 1;
+    const hits = fx.hits || 1, heavy = base * m * hits >= Y.maxHp * BREAK.big;
     for (let i = 0; i < hits && Y.hp > 0; i++) {
-      dealt += hit(f, X, Y, base * m, { pierce: fx.pierce || (X.P.reapPierce && half(Y)), critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
+      dealt += hit(f, X, Y, base * m, { heavy, pierce: fx.pierce || (X.P.reapPierce && half(Y)), critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
       if (fx.perHit) applyStatus(f, X, Y, fx, p);
       if (hits >= 2 && X.P.hitBurn) addStatus(f, X, Y, 'burn', X.P.hitBurn);
     }
     if (hits >= 2 && X.P.multiWeaken && Y.hp > 0) { Y.weaken = Math.max(Y.weaken, 1); react(f, X, Y); }
   }
+  if (fx.brk && Y.hp > 0) addBreak(f, X, Y, fx.brk * p);
   if (!fx.perHit) applyStatus(f, X, Y, fx, p);
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
   if (damaging && X.P.poisonOnHit && dealt > 0) addStatus(f, X, Y, 'poison', X.P.poisonOnHit);
@@ -1341,13 +1328,13 @@ function startTurn(f, X, first) {
   const turns = X.isPlayer ? f.turn : (X.turns || 0);
   if (turns > 24) { const sd = Math.round(X.maxHp * 0.04 * (turns - 24)); X.hp -= sd; ev(f, { k: 'dot', side: X.side, amt: sd, kind: 'sudden' }); if (X.isPlayer && turns === 25) say(f, '[The crowd grows restless. Both fighters are worn down each turn.]', 'loss'); }
   if (X.burn > 0) {
-    const v = X.burn; X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
+    const v = Math.round(X.burn * (1 - resistance(X, 'burn'))); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
     if (Y.isPlayer) f.dealt['Burn'] = (f.dealt['Burn'] || 0) + v; else f.tally.hurtBy['Burn'] = (f.tally.hurtBy['Burn'] || 0) + v;
     if (Y.P.burnHeal) heal(f, Y, v * Y.P.burnHeal);
     const fade = X.burnFade != null ? X.burnFade : 0.3; X.burn = Math.max(0, X.burn - Math.ceil(X.burn * fade));
   }
   if (X.poison > 0) {
-    const v = Math.round(X.poison * (Y.P.poisonMult || 1));
+    const v = Math.round(X.poison * (Y.P.poisonMult || 1) * (1 - resistance(X, 'poison')));
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
     if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
@@ -1362,6 +1349,7 @@ function endTurn(f, X, usedKey) {
   if (X.marked > 0) { X.marked--; if (!X.marked) X.hemo = false; }
   if (X.empower > 0) X.empower--;
   if (X.brokenT > 0) X.brokenT--;
+  if (X.breakMax && X.brk > 0) X.brk = Math.max(0, X.brk - X.breakMax * BREAK.drain);
   X.skills.forEach(s => { if (s.key !== usedKey && s.cd > 0) s.cd--; });
 }
 function checkOver(f) {
@@ -1525,6 +1513,7 @@ function describe(def, p = 1) {
   if (fx.heal) r.push(`Heal ${n(fx.heal)}.`);
   if (fx.healMissing) r.push(`Heal ${fx.healMissing * 100}% of your missing HP.`);
   if (fx.drainPoison) r.push("Heal equal to the opponent's Poison.");
+  if (fx.brk) r.push(`Break ${n(fx.brk)}: fills the opponent's break bar.`);
   if (fx.empower) r.push(`Deal 30% more damage for ${fx.empower} turn${fx.empower > 1 ? 's' : ''}.`);
   if (fx.evade) r.push(`Evade the next ${fx.evade > 1 ? fx.evade + ' attacks' : 'attack'}.`);
   if (fx.nextCrit) r.push('Your next hit is a critical.');
@@ -1570,7 +1559,7 @@ function resolveFight(run, f, meta, rng) {
   if (spec.kind === 'rival' && won) meta.archive.beat[spec.id] = true;
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
-  const res = { won, gold: 0, xp: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
+  const res = { won, gold: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
   if (!won && !run.elite && hasGift(run, 'rewind') && !run.usedRewind) {
     run.usedRewind = true; run.hp = f.startHp; res.rewind = true;
     msgs.push({ t: 'class', text: '[Return by Death. The world rewinds to the start of the fight.]' });
@@ -1578,15 +1567,19 @@ function resolveFight(run, f, meta, rng) {
   }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
   run.nextFlags = {};
+  const c = featCtx(run, f, won, spec);
+  // Titles are earned for feats (titles.js); world firsts for a Final Champion come between the won-fight ones and the any-fight ones
+  const titleFeats = at => Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === at && featOk(t.feat, c, t.n)) earnTitle(run, k, msgs); });
   // Wager
   if (run.wagerOn && run.wager) {
-    const W = WAGERS[run.wager.key], ok = won && W.check(f);
+    const W = WAGERS[run.wager.key], ok = won && featOk(run.wager.key, c);
     res.wager = { ok, text: W.text, god: run.wager.god };
     if (ok) {
-      const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0);
-      run.gold += pay; run.wagersWon = (run.wagersWon || 0) + 1;
-      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); addFavour(run, run.wager.god, 2, meta, msgs, lr);
-      if (run.wagersWon >= 3) earnTitle(run, 'high_roller', msgs);
+      const pay = (hasGift(run, 'gambler') ? 15 : 10) + (run.title === 'high_roller' ? 3 : 0), prize = { gold: pay, favour: { [run.wager.god]: 2 } };
+      const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs };
+      applyOutcomes(prize, ctx, false); run.wagersWon = (run.wagersWon || 0) + 1;
+      msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); applyOutcomes(prize, ctx, true);
+      titleFeats('wager');
     }
     else msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.]` });
     run.wagerOn = false;
@@ -1595,21 +1588,11 @@ function resolveFight(run, f, meta, rng) {
   const hist = { round: curRound(run), name: f.B.name, won, turns: f.turn, hard: !!spec.hard, kind: spec.kind, hl: 0, dealt: Object.values(f.dealt).reduce((a, b) => a + b, 0) };
   run.history.push(hist);
   // Titles and world firsts
-  const T = f.tally, A = f.A;
   if (won) {
-    if (f.turn <= 2) earnTitle(run, 'first_blood', msgs);
-    if (T.taken === 0) earnTitle(run, 'untouched', msgs);
-    if (f.B.maxHp >= A.maxHp * 2) earnTitle(run, 'giant_slayer', msgs);
-    if (spec.id === 'masked') earnTitle(run, 'mirror_breaker', msgs);
-    if (spec.hard) earnTitle(run, 'underdog', msgs);
-    if (f.B.rankUp >= 2) earnTitle(run, 'rank_is_just_a_letter', msgs);
-    if (A.hp <= A.maxHp * 0.1) earnTitle(run, 'comeback', msgs);
+    titleFeats('win');
     if (FINAL_TITLE[spec.id]) worldFirst(run, 'final_' + spec.id, `has defeated ${ENEMIES[spec.id].name} in ${f.turn} turn${f.turn === 1 ? '' : 's'}.`, FINAL_TITLE[spec.id], msgs);
   }
-  if (T.healed >= 60) earnTitle(run, 'bloodthirsty', msgs);
-  if (T.maxQuick >= 3) earnTitle(run, 'spellweaver', msgs);
-  if (T.reactions >= 3) earnTitle(run, 'alchemist', msgs);
-  if (T.bigHit >= 60) earnTitle(run, 'executioner', msgs);
+  titleFeats('fight');
   questEvent(run, 'fight', { f, won, spec }, msgs);
   if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
@@ -1620,6 +1603,11 @@ function resolveFight(run, f, meta, rng) {
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr, null, run) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); }
+    if (!run.elite && !run.practice && spec.kind !== 'final') {
+      const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
+      if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${Math.round(TUNE.notice * noticeOf(run) * 100)}%.]` });
+    }
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
       run.eliteWins++;
@@ -1632,6 +1620,7 @@ function resolveFight(run, f, meta, rng) {
     else {
       const cost = heartCost(run, spec);
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
+      if (run.notice && !run.practice) { run.notice = 0; msgs.push({ t: 'class', text: '[Streak broken. The System looks away.]' }); }
       if (run.hearts <= 0) {
         run.hearts = 0; res.death = true; run.cause = f.B.name;
         // At 0 Hearts every entry left goes, then the world's name
@@ -1740,16 +1729,16 @@ function feedbackDoc(type, text, env, run, now) {
 const RANK_LADDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S', 'SS', 'SSS'];
 const RANK_RP = { E: 80, D: 300, C: 700, B: 1400, A: 2600, S: 4500, SS: 7000, SSS: 10000 }; // SS and SSS are placeholders
 const TRIAL_ROUND = { E: 3, D: 3, C: 4, B: 4, A: 5, S: 6, SS: 6, SSS: 6 };
-const TRIAL_CONDS = ['fast', 'react', 'stop', 'healthy']; // never "without healing": Zealot and Leech builds can't meet it
+const TRIAL_CONDS = WAGER_FEATS.filter(k => !FEATS[k].unfairFor); // never "without healing": Zealot and Leech builds can't meet it
 const PERKS = {
   stipend: { name: "Sponsor's Stipend", desc: '+1 starting gold.', flavour: 'A god has started sending pocket money.' },
-  kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start." },
-  steeped: { name: 'Steeped Blades', desc: 'Poison you apply +1.', flavour: 'Your edges never quite dry.' },
-  whetted: { name: 'Whetted Edge', desc: 'Bleed you apply +1.', flavour: 'Sharper than it needs to be.' },
-  guard: { name: 'Drilled Guard', desc: 'Start each fight with 5 Block.', flavour: 'Your shield is up before the bell.' },
+  kindling: { name: 'Kindling', desc: 'Burn you apply +1.', flavour: "You've learned how fires like to start.", p: { burnPlus: 1 } },
+  steeped: { name: 'Steeped Blades', desc: 'Poison you apply +1.', flavour: 'Your edges never quite dry.', p: { poisonPlus: 1 } },
+  whetted: { name: 'Whetted Edge', desc: 'Bleed you apply +1.', flavour: 'Sharper than it needs to be.', p: { bleedPlus: 1 } },
+  guard: { name: 'Drilled Guard', desc: 'Start each fight with 5 Block.', flavour: 'Your shield is up before the bell.', p: { startBlock: 5 } },
   frame: { name: 'Seasoned Frame', desc: '+8 max HP.', flavour: 'Scar tissue counts.' },
-  keen: { name: 'Keen Eye', desc: '+4% critical chance.', flavour: 'You see the gap a moment sooner.' },
-  light: { name: 'Light Feet', desc: '+3% dodge.', flavour: 'Harder to pin down than you used to be.' },
+  keen: { name: 'Keen Eye', desc: '+4% critical chance.', flavour: 'You see the gap a moment sooner.', p: { critBonus: 0.04 } },
+  light: { name: 'Light Feet', desc: '+3% dodge.', flavour: 'Harder to pin down than you used to be.', p: { dodge: 0.03 } },
   dressing: { name: 'Field Dressing', desc: 'Heal 6 more after each won fight.', flavour: 'You patch yourself up between bouts.' },
   redraft: { name: 'Second Draft', desc: 'One extra opening draft reroll.', flavour: 'The System lets you look twice.' },
   patron: { name: "Patron's Ear", desc: 'Start with +1 Favour with your Patron.', flavour: 'Your god remembers your name.' },
@@ -1765,7 +1754,7 @@ const TRIAL_TEXT = {
   SS: ['[Promotion match: ███-rank Proctor. Rank not found.{c}]', '[Promoted to SS-rank. Record updated. Record should not exist.]', '[Trial failed. Record not created.]'],
   SSS: ["[Promotion match. The Proctor has no rank. The Proctor has never lost.{c}]", '[Promoted to SSS-rank. The System has run out of letters.]', "[Trial failed. The Proctor's record remains unbroken.]"],
 };
-const COND_TEXT = { fast: 'Win within 6 turns.', react: 'Trigger 2 reactions.', stop: "Stun or Interrupt the Proctor's big move.", healthy: 'Win with more than half your HP.' };
+const COND_TEXT = {}; TRIAL_CONDS.forEach(k => COND_TEXT[k] = FEATS[k].say(FEATS[k].n).replace("the opponent's", "the Proctor's") + '.');
 function newRank() { return { letter: 'F', rp: 0, trial: null, history: [], perks: [] }; }
 function rankIdx(l) { return RANK_LADDER.indexOf(l); }
 function nextRank(l) { return RANK_LADDER[rankIdx(l) + 1] || null; }
@@ -1812,7 +1801,7 @@ function eliteRank(run, meta) {
 }
 function trialSpec(run, rng) {
   const to = run.trial.to, early = rankIdx(to) <= rankIdx('D');
-  const conds = TRIAL_CONDS.filter(k => k !== 'stop' || canStop(run));
+  const conds = TRIAL_CONDS.filter(k => featPossible(run, k));
   return { kind: 'trial', id: 'proctor', to, hard: !early, cond: early ? null : pick(conds, rng) };
 }
 // The Proctor fights at the world rank of the grade it examines: E-rank at E worlds up to S-rank (and beyond) at S
@@ -1821,7 +1810,7 @@ function trialLine(to, i, cond) { return TRIAL_TEXT[to][i].replace('{c}', cond ?
 function perkOffers(meta, rng) { return shuffle(Object.keys(PERKS).filter(k => !meta.rank.perks.includes(k)), rng).slice(0, 2); }
 // A lost fight costs the round's normal Hearts as usual. A won fight that misses the condition costs nothing. Either way the trial waits for the next run.
 function settleTrial(run, f, won, meta, msgs, rng) {
-  const spec = f.spec, ok = won && (!spec.cond || WAGERS[spec.cond].check(f));
+  const spec = f.spec, ok = won && (!spec.cond || featOk(spec.cond, featCtx(run, f, won, spec)));
   run.trial.done = true;
   if (!ok) { msgs.push({ t: 'loss', text: trialLine(spec.to, 2) }); return { ok, to: spec.to }; }
   const R = meta.rank; R.letter = spec.to; R.trial = null; run.promoted = spec.to;
@@ -1918,16 +1907,16 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
-  VERSION, STATS, STAT_INFO, RANKS, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
+  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, HEART_COST, REACTIONS, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, xpNeed, gainXp, buyXp, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
-  TITLES, FINAL_TITLE, QUESTS, QUEST_REWARD, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
+  TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

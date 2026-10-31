@@ -7,7 +7,9 @@ function choosePlayer(f) {
   let best = ready[0], bs = -1;
   ready.forEach(({ s, i }) => {
     const fx = s.def.fx, p = s.power;
-    let sc = ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) * 1.6 + (fx.poison || 0) * 2.5 + (fx.bleed || 0) * 1.5 + (fx.detonate ? B.burn * fx.detonate : 0) + (fx.malice ? fx.malice * 2 : 0) + (fx.blockDmg ? A.block * fx.blockDmg : 0)) * p;
+    let sc = ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) * 1.6 + (fx.poison || 0) * 2.5 + (fx.bleed || 0) * 1.5 + (fx.detonate ? B.burn * fx.detonate : 0) + (fx.malice ? fx.malice * 2 : 0) + (fx.blockDmg ? A.block * fx.blockDmg : 0) + (fx.brk || 0) * 0.6) * p;
+    // Press a nearly broken guard: a hit that breaks it costs the opponent its turn
+    if (B.breakMax && ((fx.dmg || 0) * (fx.hits || 1) + (fx.brk || 0)) * p >= B.breakMax - B.brk) sc += 12;
     if (fx.execute && B.hp / B.maxHp <= fx.execute) sc *= fx.execMult;
     if (fx.cruel) sc *= 1.3;
     if (fx.block) sc += fx.block * p * ((intent.kind === 'attack' || intent.kind === 'big') ? 1 : 0.25);
@@ -85,7 +87,7 @@ function shop(run, meta, opts) {
       if (G.buy(run, x.k, x.i, [])) { bought = true; break; }
     }
     if (!bought) {
-      if (run.gold >= reserve + 6 && run.level < 9 && run.gold >= 4 && opts.xp && run.gold > 24) { G.buyXp(run, []); continue; }
+      if (opts.xp && run.gold - G.pointPrice(run) >= reserve) { G.trainStat(run, trainPick(run), []); continue; }
       if (run.gold >= reserve + 4 && opts.reroll) { G.reroll(run, null, Math.random() < 0.7 ? 'skill' : 'gear'); continue; }
       break;
     }
@@ -102,6 +104,8 @@ function pending(run, meta) {
     if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
   }
 }
+// Training: 3 points in the main archetype's stat for every 2 in VIT
+function trainPick(run) { const k = G.ARCH[targets(run)[0]].stat; run.trainN = (run.trainN || 0) + 1; return run.trainN % 5 < 3 ? k : 'VIT'; }
 function stats(run) {
   const tg = targets(run); const k = G.ARCH[tg[0]].stat;
   while (run.statPts > 0) { run.stats[Math.random() < 0.6 ? k : 'VIT']++; run.statPts--; }
