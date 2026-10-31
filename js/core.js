@@ -1683,13 +1683,14 @@ function notePick(run, k) { if (!run.picks) run.picks = []; if (run.picks.length
 // Foes that are another player's champion keep only their kind, since their names are player-chosen
 const SNAP_KINDS = ['erased', 'champion', 'legend'];
 // Every number is a whole number inside the bounds firestore.rules checks, and every key a short string or null,
-// so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue
-function runSummary(run, meta, outcome, now) {
+// so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue.
+// ver: the release the run was played on (the newest What's new entry's release, e.g. 'wpd-v10'), so stats can be split by version.
+function runSummary(run, meta, outcome, now, ver) {
   now = Math.round(now == null ? Date.now() : now);
   const H = run.history || [], last = H[H.length - 1], gear = GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean);
   const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0)), key = (v, n) => v ? String(v).slice(0, n) : null;
   return {
-    day: dailyDate(now), at: now, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
+    day: dailyDate(now), at: now, ver: ver ? String(ver).slice(0, 16) : null, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
     world: String(run.world.type).slice(0, 16), wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? key(meta.rank.letter, 3) : null, path: key(run.path, 16), hidden: key(run.hiddenPath, 24),
     patron: Object.keys(GODS).includes(run.patron) ? run.patron : 'none', gifts: (run.gifts || []).slice(0, 12).map(k => String(k).slice(0, 24)), title: key(run.title, 24),
     round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), maxHearts: int(run.maxHearts || 10, 0, 20),

@@ -78,7 +78,7 @@ await check('a 25-character request name is refused', assertFails(setDoc(doc(eri
 await check('a signed-out request is refused', assertFails(setDoc(doc(anon, 'requests/erin'), { name: 'Wren', at: 1 })));
 await check('a player cannot delete their request', assertFails(deleteDoc(doc(erin, 'requests/erin'))));
 // Playtest stats: a real summary from a bot run, so the rules are checked against what the game actually sends
-const runDoc = (() => { const req = createRequire(import.meta.url), G = req('../js/core.js'), B = req('./bot.js'), m = G.newMeta(); const r = B.playRun(m, false, { noElite: true }); return G.runSummary(r.run, m, r.result === 'spared' ? 'spared' : 'erased', 1700000000000); })();
+const runDoc = (() => { const req = createRequire(import.meta.url), G = req('../js/core.js'), B = req('./bot.js'), m = G.newMeta(); const r = B.playRun(m, false, { noElite: true }); return G.runSummary(r.run, m, r.result === 'spared' ? 'spared' : 'erased', 1700000000000, 'wpd-v11'); })();
 const runRef = (db, id) => doc(db, 'runs/' + id);
 // Posts a summary the way the game does, at runs/{uid}_{at}
 const postRun = (db, uid, at, over = {}) => setDoc(runRef(db, uid + '_' + at), Object.assign({}, runDoc, { at }, over));
@@ -105,6 +105,10 @@ await check('hearts as text are refused', assertFails(postRun(alice, 'alice', 17
 await check('a 2-day run time is refused', assertFails(postRun(alice, 'alice', 1700000000013, { mins: 2880 })));
 await check('a long title is refused', assertFails(postRun(alice, 'alice', 1700000000014, { title: 'x'.repeat(25) })));
 await check('a world rank as a number is refused', assertFails(postRun(alice, 'alice', 1700000000015, { wrank: 3 })));
+await check('a run from an older build with no version is fine', assertSucceeds(setDoc(runRef(alice, 'alice_1700000000022'), (({ ver, ...d }) => Object.assign(d, { at: 1700000000022 }))(runDoc))));
+await check('a run with no known version is fine', assertSucceeds(postRun(alice, 'alice', 1700000000023, { ver: null })));
+await check('a 17-character version is refused', assertFails(postRun(alice, 'alice', 1700000000017, { ver: 'x'.repeat(17) })));
+await check('a version as a number is refused', assertFails(postRun(alice, 'alice', 1700000000018, { ver: 11 })));
 await check('maxHearts of 21 is refused', assertFails(postRun(alice, 'alice', 1700000000016, { maxHearts: 21 })));
 
 // Bug reports: a real report from the game's own builder, with and without a run attached

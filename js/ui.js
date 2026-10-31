@@ -270,7 +270,8 @@ const RUNQ_KEY = 'wpd-runq';
 function recordRunStats(outcome) {
   if (!run || run.practice || run.statsDone) return; // once per run: a spared world's Elite bracket doesn't add another
   run.statsDone = true;
-  const q = lsGet(RUNQ_KEY) || []; q.push(runSummary(run, meta, outcome)); lsSet(RUNQ_KEY, q.slice(-20));
+  const ver = typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length ? PATCH_NOTES[0].release : null;
+  const q = lsGet(RUNQ_KEY) || []; q.push(runSummary(run, meta, outcome, null, ver)); lsSet(RUNQ_KEY, q.slice(-20));
   postRuns();
 }
 async function postRuns() {
