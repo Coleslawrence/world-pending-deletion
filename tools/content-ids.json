@@ -445,7 +445,12 @@
   "amendment",
   "audit",
   "lost_property",
-  "sponsors"
+  "sponsors",
+  "rollback",
+  "seating_error",
+  "locker_zero",
+  "double_or_nothing",
+  "hotfix"
  ],
  "chains": [
   "official",
@@ -481,7 +486,12 @@
   "amendment": 3,
   "audit": 3,
   "lost_property": 3,
-  "sponsors": 4
+  "sponsors": 4,
+  "rollback": 2,
+  "seating_error": 3,
+  "locker_zero": 3,
+  "double_or_nothing": 3,
+  "hotfix": 3
  },
  "lore": {
   "drowned": {

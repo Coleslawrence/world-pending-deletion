@@ -34,3 +34,37 @@ EVENTS.sponsors = { title: 'Word From Our Sponsors', theme: 'system', text: '[We
   { label: 'Refuse on air', desc: 'Say what you really think of the product.', then: { notice: 1, favour: { war: 2 } }, reveal: '[Refusal broadcast. The ratings dip. The System takes it personally.]' },
   { roll: { stat: 'LUK' }, label: 'Drink the product', desc: 'It is very blue.', go: (run, h) => { const k = h.pick(STATS); run.stats[k] += 2; h.say(`[It works. Nobody knows why. +2 ${k}.]`); },
     fail: { then: { next: { poison: 4 } }, reveal: '[It does not work. You start your next fight with 4 Poison. Results not typical.]' } }] };
+
+// Shown only after a defeat; names the round you lost in
+EVENTS.rollback = { title: 'Rollback', theme: 'system', can: run => !!(run.lastLoss && run.lastLoss.hearts), text: run => `[Error detected in round ${run.lastLoss.round}. Rolling back.] The tunnel flickers. For a moment you are losing that fight again.`, opts: [
+  { label: 'Accept the rollback', desc: 'Undo it. All of it.', go: (run, h) => { const L = run.lastLoss; if (!L) return h.say('[Nothing to roll back. Rolling back anyway.]'); h.apply({ restore: L.hearts, summon: { spec: L.spec, traits: 1, say: '[Your opponent from the rolled-back round is back in the bracket. They remember winning.]' } }); h.say('[Rollback complete. Your opponent from that round has been restored too.]'); run.lastLoss = null; } },
+  { label: 'Decline', desc: 'What happened, happened.', go: (run, h) => { run.statPts++; run.lastLoss = null; h.say('[Error retained. Compensation issued: +1 stat point.]', 'level'); } }] };
+
+// Before the final only: the Final Champion is in the next room
+const finalName = run => ENEMIES[WORLD_TYPES[run.world.type].final].name;
+EVENTS.seating_error = { title: 'Seating Error', theme: 'system', can: run => run.round < 8, text: run => `[Seating error. Entrant and Final Champion assigned the same room.] ${finalName(run)} is eating dinner, and looks up.`, opts: [
+  { label: 'Talk to them', desc: 'Ask how they like to fight.', go: (run, h) => { run.finalTip = true; h.say(`[${finalName(run)} talks. In the final, you'll see their next 2 moves.]`); } },
+  { roll: { stat: 'AGI' }, label: 'Tamper with their armour', desc: 'While they are busy with dinner.', then: { notice: 2 }, go: (run, h) => { run.finalCut = 0.1; h.say(`[Tampered. ${finalName(run)} starts the final with 10% less HP.]`); },
+    fail: { then: { notice: 2 }, go: (run, h) => { run.finalTraits = (run.finalTraits || []).concat(h.shuffle(Object.keys(TRAIT_POOL).filter(k => !(run.finalTraits || []).includes(k))).slice(0, 1)); h.say(`[Caught. ${finalName(run)} will be ready for you: an extra trait in the final.]`, 'loss'); } } },
+  { label: 'Spar with them', desc: 'A friendly bout. Probably.', go: (run, h) => { h.lose(0.2, 'They were not being friendly.'); const top = STATS.slice().sort((a, b) => run.stats[b] - run.stats[a]).slice(0, 2); top.forEach(k => run.stats[k]++); h.say(`[You learned something. +1 ${top[0]}, +1 ${top[1]}.]`, 'level'); } }] };
+
+EVENTS.locker_zero = { title: 'Locker 0', theme: 'system', text: '[Locker 0. Access: denied. Access: granted. Access: denied.] The name plate has been scratched off. It belongs to the Undefeated.', opts: [
+  { roll: { stat: 'LUK', hard: true }, label: 'Wait for granted', desc: 'Then open it. Quickly.', then: { piece: 'A', notice: 2 }, go: (run, h) => { run.undefeatedTraits = h.shuffle(Object.keys(TRAIT_POOL)).slice(0, 1); h.say('[Something is missing from Locker 0. The Undefeated has been informed.]', 'loss'); },
+    fail: { then: { notice: 2 }, go: (run, h) => h.lose(0.1, 'Access: denied. The door closes on your hand.') } },
+  { label: 'Close it', desc: 'Some lockers are not yours.', then: { notice: -5 }, reveal: '[Compliance logged. Your record is very clean today.]' },
+  { check: { stat: 'INT', hard: true }, label: 'Read the name inside', desc: 'Someone wrote it on the inside too.', then: { notice: 1 }, go: (run, h) => {
+    if (h.meta) { h.meta.found = h.meta.found || {}; h.meta.found.locker0 = true; }
+    h.say('[Name inside Locker 0: ████████. Entrant number: ███. Record sealed. Your access has been noted.]', 'class');
+  } }] };
+
+EVENTS.double_or_nothing = { title: 'Double or Nothing', theme: 'system', text: '[Wager surplus detected. The gods are bored.] A coin spins on the tunnel floor and does not fall.', opts: [
+  { label: 'Double the stakes', desc: 'Your next fight counts twice.', then: { stakes: { win: { heart: 1, gold: 10 }, lose: { erase: 1 } } }, reveal: '[Stakes doubled. Win your next fight: +1 max Heart, +10 gold. Lose it: one more Heart erased.]' },
+  { label: 'Halve the stakes', desc: 'Your next fight counts for less.', then: { next: { heartCut: 1, noWinGold: true } }, reveal: '[Stakes halved. Your next defeat costs 1 Heart fewer. Your next win pays no gold.]' },
+  { label: 'Let the gods decide', desc: 'The coin is still spinning.', then: { favour: { trick: 1 } }, go: (run, h) => { if (h.pick([true, false])) { h.apply({ stakes: { win: { heart: 1, gold: 10 }, lose: { erase: 1 } } }); h.say('[The coin lands. Stakes doubled.]'); } else { h.apply({ next: { heartCut: 1, noWinGold: true } }); h.say('[The coin lands. Stakes halved.]'); } } }] };
+
+// Names your class, and the stat it is built on
+const hotfixOf = run => ARCH[run.arch[0]];
+EVENTS.hotfix = { title: 'Hotfix', theme: 'system', text: run => `[Hotfix incoming: ${hotfixOf(run).name} is overperforming. Patch lands after your next fight.]`, opts: [
+  { label: 'Accept the patch', desc: 'Thank them for their patience.', go: (run, h) => { const k = hotfixOf(run).stat, low = STATS.filter(s => s !== k).sort((a, b) => run.stats[a] - run.stats[b])[0]; run.stats[k] = Math.max(1, run.stats[k] - 1); run.stats[low] += 2; h.say(`[Patch applied. −1 ${k}, +2 ${low}. Thank you for your patience.]`, 'level'); } },
+  { label: 'Exploit it before it lands', desc: 'One last fight at full power.', then: { next: { empower: 3 }, notice: 1 }, go: (run, h) => { const k = hotfixOf(run).stat; run.stats[k] = Math.max(1, run.stats[k] - 1); h.say(`[You start your next fight Empowered for 3 turns. The patch lands anyway: −1 ${k}.]`); } },
+  { label: 'Appeal: pay 10 gold', desc: 'There is a form for this.', pay: 10, then: { notice: -1 }, reveal: '[Appeal upheld. Patch cancelled. Your patience is appreciated.]' }] };

@@ -320,23 +320,23 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 18 (quests, events) |
+| `gold` | 8 | 8 gold |  | 19 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 3 (events) |
-| `heart` | 1 | +1 max Heart |  | 4 (quests, events) |
+| `heart` | 1 | +1 max Heart |  | 5 (quests, events) |
 | `rune` | 1 | a rune |  | 5 (quests, events) |
-| `piece` | "B" | a free B-rank piece |  | 9 (quests, events) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 11 (events) |
+| `piece` | "B" | a free B-rank piece |  | 10 (quests, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 13 (events) |
 | `foe` | {"weaken":2} | a mark on your next opponent |  | 4 (events) |
 | `max_hp` | -0.1 | −10% max HP |  | 1 (events) |
 | `restore` | 1 | 1 Heart restored |  | 2 (events) |
-| `erase` | 1 | 1 Heart erased |  | 0 () |
-| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 2 (events) |
+| `erase` | 1 | 1 Heart erased |  | 1 (events) |
+| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 3 (events) |
 | `respec` | true | your stat points to place again |  | 1 (events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 4 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 2 (events) |
-| `notice` | 1 | the System's notice | yes | 18 (events) |
+| `notice` | 1 | the System's notice | yes | 26 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
-| `favour` | {"war":2} | 2 Favour with the God of War | yes | 7 (quests, events) |
+| `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`
 

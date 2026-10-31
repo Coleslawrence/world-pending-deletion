@@ -629,7 +629,7 @@ const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
 function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
-  if (run.round >= ROUNDS) return [{ kind: 'final', id: WORLD_TYPES[run.world.type].final }];
+  if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: WORLD_TYPES[run.world.type].final }, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
   const early = run.round <= 3;
   let pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
   // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
@@ -767,8 +767,9 @@ function eventText(run, key) { const t = EVENTS[key].text; return typeof t === '
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
   // Stand-alone events don't repeat in a run until every one has been seen
-  const fresh = Object.keys(EVENTS).filter(k => !EVENTS[k].chain && !(run.seen || []).includes(k));
-  const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(k => !EVENTS[k].chain)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
+  const open = k => !EVENTS[k].chain && (!EVENTS[k].can || EVENTS[k].can(run));
+  const fresh = Object.keys(EVENTS).filter(k => open(k) && !(run.seen || []).includes(k));
+  const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(open)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
   const w = keys.map(k => EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1);
   return wpick(keys, w, rng);
 }
@@ -871,9 +872,10 @@ const OUTCOME_APPLY = {
 // A summoned opponent: { who: 'copy' | 'erased' | a rival id, bounty?: outcomes for beating them, traits?: n }. An Erased champion
 // when there is none to send falls back to an unmet rival; summoned rivals are Veterans
 function summonSpec(run, v, rng) {
-  let spec = null;
-  if (v.who === 'copy') { const snap = snapshot(run); snap.champ = `${run.champ} (copy)`; spec = { kind: 'erased', snap, hard: true }; }
-  if (v.who === 'erased') { const pool = run.seed ? [] : (META ? META.erased : []).concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at)); if (pool.length) spec = { kind: 'erased', snap: pick(pool, rng), hard: true }; }
+  let spec = v.spec ? Object.assign({}, v.spec, { hard: true, traits: (v.spec.traits || []).concat(shuffle(Object.keys(TRAIT_POOL).filter(k => !(v.spec.traits || []).includes(k)), rng).slice(0, v.traits || 0)) }) : null;
+  if (spec && spec.kind !== 'rival' && spec.kind !== 'monster' && spec.kind !== 'erased' && spec.kind !== 'champion') spec = null;
+  if (!spec && v.who === 'copy') { const snap = snapshot(run); snap.champ = `${run.champ} (copy)`; spec = { kind: 'erased', snap, hard: true }; }
+  if (!spec && v.who === 'erased') { const pool = run.seed ? [] : (META ? META.erased : []).concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at)); if (pool.length) spec = { kind: 'erased', snap: pick(pool, rng), hard: true }; }
   if (!spec) { const id = ENEMIES[v.who] ? v.who : pick(RIVALS.filter(r => !run.met.includes(r)), rng) || pick(RIVALS, rng); spec = { kind: 'rival', id, hard: true, traits: shuffle(Object.keys(TRAIT_POOL), rng).slice(0, v.traits || 1) }; }
   spec.summoned = true; if (v.bounty) spec.bounty = v.bounty; if (v.say) spec.say = v.say;
   return spec;
@@ -998,7 +1000,7 @@ function buildPlayer(run) {
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
     crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
-    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: (P.sluggish ? 1 : 0) + (run.nextFlags.weaken || 0), lastWords: P.lastWords || 0, str: s.STR,
+    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: (P.sluggish ? 1 : 0) + (run.nextFlags.weaken || 0), empower: run.nextFlags.empower || 0, lastWords: P.lastWords || 0, str: s.STR,
     res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
   });
 }
@@ -1019,7 +1021,7 @@ function buildEnemy(run, spec) {
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
-  let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85); if (run.nextFlags.foeHp) hp = Math.max(1, Math.round(hp * run.nextFlags.foeHp));
+  let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85); if (spec.kind === 'final' && run.finalCut) hp = Math.round(hp * (1 - run.finalCut)); if (run.nextFlags.foeHp) hp = Math.max(1, Math.round(hp * run.nextFlags.foeHp));
   if (run.nextFlags.foeTraits) spec = Object.assign({}, spec, { traits: (spec.traits || []).concat(run.nextFlags.foeTraits.filter(k => !(spec.traits || []).includes(k))) });
   return blankFighter(Object.assign({
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
@@ -1100,7 +1102,7 @@ function newFight(run, rng) {
     rng: stream(run, 'fight', rng) || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
     tally: { breaks: 0, burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
-    foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && run.chains && run.chains.official === 'tip'),
+    foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && (run.finalTip || (run.chains && run.chains.official === 'tip'))),
   };
   [A, B].forEach(X => {
     const P = X.P;
@@ -1629,7 +1631,7 @@ function resolveFight(run, f, meta, rng) {
     return res;
   }
   // Stakes set on this fight by an event: outcomes for a win or a loss
-  const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'];
+  const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'], heartCut = run.nextFlags.heartCut || 0, noWinGold = !!run.nextFlags.noWinGold;
   if (stakes) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Stakes' }; applyOutcomes(stakes, ctx, false); applyOutcomes(stakes, ctx, true); }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
   run.nextFlags = {};
@@ -1663,7 +1665,7 @@ function resolveFight(run, f, meta, rng) {
   if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
     run.wins++;
-    res.gold = 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
+    res.gold = noWinGold ? 0 : 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
@@ -1686,7 +1688,8 @@ function resolveFight(run, f, meta, rng) {
   } else {
     if (run.elite) res.eliteOver = true;
     else {
-      const cost = heartCost(run, spec);
+      const cost = Math.max(0, heartCost(run, spec) - heartCut);
+      run.lastLoss = { round: run.round, hearts: cost, spec: Object.assign({}, spec, { traits: (spec.traits || []).slice() }) };
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
       if (run.notice && !run.practice) { run.notice = 0; msgs.push({ t: 'class', text: '[Streak broken. The System looks away.]' }); }
       if (run.hearts <= 0) {
@@ -1714,7 +1717,7 @@ function startElite(run, meta, rng) {
   run.elite = true; run.eliteIdx = 0;
   const champs = run.seed ? [] : meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
   const first = champs.length ? { kind: 'champion', snap: pick(champs, rng) } : { kind: 'legend', id: 'legend' };
-  run.eliteBracket = [first, { kind: 'legend', id: 'undefeated' }];
+  run.eliteBracket = [first, Object.assign({ kind: 'legend', id: 'undefeated' }, run.undefeatedTraits ? { traits: run.undefeatedTraits.slice() } : {})];
   // From A-rank the bracket gets a middle fight: another spared champion, or Varn when there isn't one
   if (!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A')) {
     const rest = champs.filter(c => !first.snap || c.at !== first.snap.at);

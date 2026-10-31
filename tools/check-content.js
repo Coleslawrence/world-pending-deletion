@@ -84,7 +84,7 @@ const SCHEMA = {
   quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme']],
   outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
-  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme']],
+  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can']],
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
   traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
 };
@@ -142,7 +142,7 @@ const outcomeOk = (where, T, what) => {
     if (k === 'max_hp') ref(where, typeof v === 'number' && v !== 0 && Math.abs(v) <= 0.5, 'max_hp is a share of max HP, like -0.1');
     if (k === 'amend') ref(where, C.AMENDMENTS && C.AMENDMENTS[v], `amend ${v} is not in AMENDMENTS (events.js)`);
     if (k === 'respec') ref(where, v === true, 'respec is true');
-    if (k === 'summon') { ref(where, v && (['copy', 'erased'].includes(v.who) || (C.ENEMIES[v.who] && C.RIVALS.includes(v.who))), `summon.who is 'copy', 'erased' or a rival's id`); if (v && v.bounty) outcomeOk(where + ' summon.bounty', v.bounty, what); }
+    if (k === 'summon') { ref(where, v && (v.spec || ['copy', 'erased'].includes(v.who) || (C.ENEMIES[v.who] && C.RIVALS.includes(v.who))), `summon.who is 'copy', 'erased' or a rival's id`); if (v && v.bounty) outcomeOk(where + ' summon.bounty', v.bounty, what); }
     if (k === 'stakes') { ref(where, v && (v.win || v.lose) && Object.keys(v).every(w => ['win', 'lose'].includes(w)), 'stakes is { win: outcomes, lose: outcomes }'); ['win', 'lose'].forEach(w => v && v[w] && outcomeOk(where + ' stakes.' + w, v[w], what)); }
     if (k === 'restore' || k === 'notice' || k === 'erase') ref(where, Number.isInteger(v) && v !== 0 && (k === 'notice' || v > 0), `${k} is a whole number${k === 'notice' ? ' (up or down)' : ' above 0'}`);
     if (k === 'erase') ref(where, Number.isInteger(v) && v > 0, 'erase is a whole number above 0');
