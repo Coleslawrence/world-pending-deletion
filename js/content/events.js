@@ -10,6 +10,7 @@
 //   only when the player qualifies, one with pay only when they can afford it. Keep one option with neither.
 //   check: { stat: 'STR', hard?: true } (6, or 10 if hard), { favour: god } (4 Favour) or { luck: true } (rolled once on LUK)
 //   pay: gold, a shown cost. The label or desc says it ("Pay 6 gold"): costs show only when paying is the action itself
+//   payHeart: Hearts, a shown cost like pay ("Pay 1 Heart"); shown only when it would leave you at least 1 Heart
 //   can(run): any other condition; an option that fails it is left out, never shown greyed out
 //   then: outcomes from outcomes.js, applied in the order listed there after pay: gold, stats { VIT: 2 }, heart, rune,
 //     piece: 'B', next (flags for the next fight, as in the existing events), chain: 'done', another end state like

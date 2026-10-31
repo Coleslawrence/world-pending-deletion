@@ -386,6 +386,10 @@
   "rune",
   "piece",
   "next",
+  "foe",
+  "max_hp",
+  "restore",
+  "notice",
   "chain",
   "favour"
  ],
