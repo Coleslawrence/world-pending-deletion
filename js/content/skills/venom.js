@@ -7,3 +7,26 @@ sk('plague_cloud', 'Plague Cloud', ['venom'], 'D', 3, { poison: 6 }, [['pestilen
 sk('malice', 'Malice', ['venom'], 'D', 1, { dmg: 4, malice: 3 }, [['spite', 'Spite', { dmg: 4, malice: 5 }], ['torment', 'Torment', { dmg: 6, malice: 3, weaken: 1 }]]);
 sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech', 'Blood Leech', { leech: 6 }], ['parasite', 'Parasite', { leech: 3, poison: 3 }]]);
 sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }]]);
+flav({
+  venom_blade: "A thin coat of green on a thin blade.",
+  viper_fang: "Bitten, not cut. The difference shows later.",
+  toxic_flurry: "Three nicks, three doses.",
+  hex: "A muttered word and a pinch of grave dust.",
+  curse_of_frailty: "Their bones ache the way old bones ache before rain.",
+  wither: "The poison feeds, and you take a share.",
+  drain_life: "You take a little of their life. They did not need all of it.",
+  soul_drain: "You drink deeper. It tastes of their world.",
+  blood_pact: "Every wound you give, you keep.",
+  plague_cloud: "A green haze that settles in the lungs and stays.",
+  pestilence: "The Hollow Kingdom buried its sick. They did not stay buried.",
+  rot: "Flesh softens. Wounds open on their own.",
+  malice: "Spite, distilled. It grows the longer they carry it.",
+  spite: "Small, petty and very patient.",
+  torment: "Each breath hurts a little more than the last.",
+  leech: "Something small and hungry, attached where they cannot reach.",
+  blood_leech: "It swells. You feel better.",
+  parasite: "It feeds, and leaves something behind.",
+  toxic_needles: "Nobody counted the needles. It felt like more than a thousand.",
+  venom_storm: "The air itself is poison now.",
+  needle_rain: "Silver needles, falling like rain. There is no shelter.",
+});
