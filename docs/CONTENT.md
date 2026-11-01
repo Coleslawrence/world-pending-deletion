@@ -65,6 +65,7 @@ Every pull request runs these (`.github/workflows/checks.yml`):
 | Check | Run it yourself | Fails when |
 | --- | --- | --- |
 | Content checker | `node tools/check-content.js` | A content file isn't loaded or uses `core.js`; an id is removed; a World Record pool is reordered; a field is unknown or missing; a reference points at nothing; an effect key isn't one the engine reads; an event could show no options, hides a cost, or loses an option; text breaks the style guide; two things share a name |
+| Entrant pool reserves | `node tools/pool-seed.js --check` | A reserve build in `js/content/pool.js` uses a skill, gear, Gift or Title that no longer exists. Rerun `node tools/pool-seed.js` to rebuild them from bot runs |
 | Smoke sim | `node tools/stats.js 200 --seed 1`, `node tools/daily.js 2026-11-01`, `node tools/record.js` | The game crashes in play, or Pending World or the World Record checks break |
 | Balance gate | `node tools/balance-gate.js BASE_DIR .` | The overall spared rate moves more than 3 points, or any archetype as the bot's main moves more than 6. Label the pull request `balance-change` when moving the numbers is the point: the gate then only reports |
 
