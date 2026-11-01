@@ -323,7 +323,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 23 (quests, events) |
+| `gold` | 8 | 8 gold |  | 24 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 5 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
 | `rune` | 1 | a rune |  | 6 (quests, events) |
@@ -336,7 +336,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 6 (events) |
 | `respec` | true | your stat points to place again |  | 1 (events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 5 (events) |
-| `amend` | "sudden" | the Amendment Sudden Death |  | 2 (events) |
+| `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
 | `ward` | 1 | a ward on your next loss |  | 7 (events) |
 | `mod` | "none" | the world modifier Clear Skies |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 4 (events) |

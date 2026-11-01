@@ -230,4 +230,21 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   run.seen = []; run.practice = true; ok(G.crisisDue(run) === null, 'never in practice');
   if (had) F.crises = had; else delete F.crises; delete G.EVENTS.__test;
 }
+
+// People customs: each changes one loop rule, only in its own world; the first payout earns the epithet
+{
+  const r = seeded(12), mk = people => { let w; do { w = G.genWorld(r); } while (w.people !== people); return G.newRun(w, { name: 'Ana', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, G.newMeta(), r); };
+  const temple = mk('temple'), council = mk('council'), msgs = [];
+  G.addFavour(temple, 'war', 2, null, msgs, r); G.addFavour(council, 'war', 2, null, [], r);
+  ok(temple.favour.war === council.favour.war + 1, 'Temple State: every Favour gain +1');
+  ok(temple.epithet === G.PEOPLES.temple.epithets[0] && temple.champ.startsWith('Ana ' + temple.epithet + ' of '), 'and the first payout earns the epithet: ' + temple.champ);
+  ok(!council.epithet && G.checkMet(temple, 'x', { favour: 'war' }) === (temple.favour.war >= 3), 'god lines at 3 Favour in a Temple State');
+  temple.freeRerolls = 0; council.freeRerolls = 0; const league = mk('league'); league.freeRerolls = 0;
+  ok(G.rerollCost(league) === G.rerollCost(council) - 1, 'Merchant League: rerolls cost 1 less');
+  const arc = mk('archive'); ok(G.enchantCount(arc) === G.enchantCount(council) + 1 && G.runeCount(arc) === 4, 'Archive: one more prefix');
+  const pil = mk('pilgrims'); pil.hp = 1; ok(G.rollDistricts(pil, r).length === 4 && G.rollDistricts(council, r).length === 3, 'Pilgrims: four districts');
+  council.round = 2; ok(G.visitDue(council) === 'council_vote' && G.visitDue(pil) === null, 'Free Council: the vote comes in round 2');
+  council.round = 3; ok(G.visitDue(council) === null, 'and only then');
+  ok(!G.undercityEvent || ![...Array(200)].some(() => ['council_vote'].concat(Object.keys(G.EVENTS).filter(k => G.EVENTS[k].crisis)).includes(G.undercityEvent(council, r))), 'visits and crises never come from the Undercity');
+}
 console.log(`record: ${checks} checks passed`);

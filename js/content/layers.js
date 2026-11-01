@@ -12,7 +12,9 @@
 //   crises            (Fates) the Fate Crisis events for rounds 3 and 5 (events/crises.js): answer the trouble or use it
 //   ends              (Fates) { lifted, sealed }: the closing line when the run ends with the Fate lifted or sealed (they follow "Velmora: ")
 //   mods              (Fates) modifier weights, e.g. { bloodmoon: 3, none: 1 }; without it the usual weights apply
-//   epithets          (Peoples) what the System may call a champion of this people in broadcasts
+//   epithets          (Peoples) what the System may call a champion of this people; the first is earned when the custom first pays out
+//   custom            (Peoples) { name, text }: the one rule about the between-round loop this People changes (read in core.js, customOf)
+//   visit             (Peoples) { at: round, event }: a People's own event that comes to everyone in that round
 //   settings          the settings it suits (['fantasy']); a world type has one setting (WORLD_TYPES[t].setting, fantasy
 //                     by default). Without a list it suits every setting. Entries may carry settings too; roles and
 //                     promises can't, so keep them true to every setting the layer suits.
@@ -97,6 +99,7 @@ const FATES = {
 const PEOPLES = {
   // roles follow "You were a ...", so each starts with a consonant sound; epithets follow a champion's name
   temple: { name: 'Temple State', line: 'Ruled by priests, who rule by omens.',
+    custom: { name: 'Omens', text: 'Every Favour you gain is 1 more, and gods speak up at 3 Favour.' },
     roles: ['temple novice', 'candle bearer'], epithets: ['the Devout', 'the Anointed'],
     entries: [
       { k: 'place', tier: 'city', name: 'The High Altar', text: 'Every law is read aloud here first, then argued about forever.' },
@@ -104,6 +107,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Hierarch', text: 'Has ruled for forty years. Claims the omens agree.' },
     ] },
   league: { name: 'Merchant League', line: 'The guilds own everything, including the weather reports.',
+    custom: { name: 'Guild rates', text: 'Shop rerolls cost 1 less gold, and selling pays 1 more.' },
     roles: ['ledger clerk', 'caravan guard'], epithets: ['the Bargainer', 'the Tallied'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Counting House', text: 'Where the guilds meet. Every chair has a price on it.' },
@@ -111,6 +115,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Guildmaster', text: 'Owns a share of everything, including you.' },
     ] },
   clans: { name: 'The Clans', line: 'Twelve clans, one old feud, and a council that never ends.',
+    custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' },
     roles: ['clan runner', 'feud keeper'], epithets: ['of the Twelve', 'the Feud-Born'],
     entries: [
       { k: 'place', tier: 'far', name: 'The Moot Stone', text: 'Where the clans swear peace. It has been re-carved many times.' },
@@ -118,6 +123,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Eldest of the Clans', text: 'Remembers why the feud started. Refuses to say.' },
     ] },
   archive: { name: 'The Archive', line: 'Scholars run everything, slowly, with footnotes.',
+    custom: { name: 'Footnotes', text: 'The Enchanter and rune picks show one more prefix.' },
     roles: ['junior scribe', 'copyist'], epithets: ['the Lettered', 'the Annotated'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Great Index', text: 'Lists every book in the world. Six volumes of it are missing.' },
@@ -125,6 +131,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Chief Librarian', text: 'Has read everything. Has opinions about all of it.' },
     ] },
   council: { name: 'Free Council', line: 'No kings. Every question goes to a vote, eventually.',
+    custom: { name: 'The Long Vote', text: 'In round 2 the Council votes on a Tournament Amendment. You get a vote.' }, visit: { at: 2, event: 'council_vote' },
     roles: ['ward speaker', 'ballot counter'], epithets: ['the Elected', 'the Free'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Council Hall', text: 'Built with a seat for everyone. Most of them stay empty.' },
@@ -132,6 +139,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Speaker', text: 'Chosen by lot. Still trying to give the job back.' },
     ] },
   crown: { name: 'The Old Crown', line: 'A dynasty older than the maps, and still in charge.',
+    custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' },
     roles: ['palace page', 'royal taster'], epithets: ['the Loyal', 'the Crown-Sworn'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Throne Room', text: 'The throne is older than the palace built around it.' },
@@ -139,6 +147,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Old Monarch', text: 'Has reigned so long the coins show them at three ages.' },
     ] },
   exiles: { name: 'Exiles', line: 'Descended from refugees of a world already erased.',
+    custom: { name: 'Kin of the erased', text: 'Beat an Erased champion or a filed record and get a Heart back.' },
     roles: ['refugee scout', 'name keeper'], epithets: ['the Displaced', 'of No Shore'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Landing', text: 'Where the first refugees arrived. Their boats are kept as a monument.' },
@@ -146,6 +155,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Last Witness', text: 'Was born in the old world. Never describes it the same way twice.' },
     ] },
   pilgrims: { name: 'Pilgrims', line: 'A people who never stay anywhere longer than a season.',
+    custom: { name: 'The road', text: 'Four districts to pick from each round instead of three.' },
     roles: ['road cook', 'pathfinder'], epithets: ['the Wanderer', 'of the Road'],
     entries: [
       { k: 'place', tier: 'far', name: 'The Waystones', text: 'Mark the old pilgrim road. Nobody remembers where it ends.' },

@@ -126,10 +126,10 @@ function champLine() {
 // ---------- World Record ----------
 // A lost entry is a black bar the width of the words it hides
 function redact(text) { return `<span class="redact" role="img" aria-label="erased entry"><span aria-hidden="true">${esc(text)}</span></span>`; }
-// A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... The Long Night: the sun..."
+// A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... Guild rates: ... The Long Night: the sun..."
 function layerSentences(w) {
   const F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix], low = t => t.charAt(0).toLowerCase() + t.slice(1);
-  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (C ? ` The ${esc(C.name)} press in.` : '');
+  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (P && P.custom ? ` <b>${esc(P.custom.name)}</b>: ${esc(low(P.custom.text))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (F && F.crises ? ' Its crisis comes in rounds 3 and 5.' : '') + (C ? ` The ${esc(C.name)} press in.` : '');
 }
 function bioHTML(rec, type, worldName, champ) { return bioParts(rec, type, worldName, champ).map(p => p.gone ? redact(p.t) : esc(p.t)).join(''); }
 function recLine(e) { return e.line.map(w => w.gone ? redact(w.t) : esc(w.t)).join(' '); }
@@ -463,7 +463,7 @@ function worldsHTML() {
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
       <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
-      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>
+      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
       <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
       <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: ${esc(ENEMIES[T.final].name)}</span></div>
@@ -644,7 +644,7 @@ function distFull(k) { return k === 'infirmary' && run.hp >= maxHp(run) && run.d
 function districtDesc(k) {
   if (!districtUp(run, k)) return DISTRICTS[k].desc;
   const tag = `[${DISTRICT_STAT[k]} ${STAT_EASY}] `;
-  return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: 'Carve a prefix into one of your skills, from 4.' }[k] || DISTRICTS[k].desc);
+  return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: `Carve a prefix into one of your skills, from ${enchantCount(run)}.` }[k] || DISTRICTS[k].desc);
 }
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage !== 'district';
@@ -1238,7 +1238,7 @@ function onAct(el) {
       if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
-      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(districtUp(run, 'enchanter') ? 4 : 3, null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
+      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(enchantCount(run), null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
       saveRun(); return render();
     }
     case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i); if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }

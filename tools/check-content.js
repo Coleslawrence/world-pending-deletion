@@ -37,7 +37,7 @@ try { const any = new Proxy({}, { get: () => 2 }); Object.entries(vm.runInContex
 // Event and reply functions run against a stand-in run and helpers; only a name content can't see is reported
 const stub = () => new Proxy(function () { }, { get: (_, k) => k === Symbol.toPrimitive ? () => 2 : k === 'filter' ? () => [] : stub(), set: () => true, apply: () => stub() });
 // Run twice with helpers that answer differently, so both sides of a simple if are tried
-const kits = [false, true].map(yes => ({ say() { }, favour() { }, lose() { }, piece() { }, eraseRecord() { }, maxHp: () => 100, hasGift: () => yes, pick: l => l[yes ? l.length - 1 : 0], shuffle: l => l, meta: yes ? {} : null }));
+const kits = [false, true].map(yes => ({ say() { }, favour() { }, lose() { }, piece() { }, eraseRecord() { }, custom() { }, heal() { }, apply() { }, maxHp: () => 100, hasGift: () => yes, pick: l => l[yes ? l.length - 1 : 0], shuffle: l => l, meta: yes ? {} : null }));
 const outside = (where, f) => { try { f(); } catch (e) { if (e && e.name === 'ReferenceError') err(where, 'uses something outside js/content/ (use the h helpers): ' + e.message); } };
 try {
   Object.entries(vm.runInContext('EVENTS', box)).forEach(([k, E]) => {
@@ -78,7 +78,7 @@ const SCHEMA = {
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting']],
   fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends']],
-  peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings']],
+  peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
   gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch', 'p', 'theme']],
@@ -88,7 +88,7 @@ const SCHEMA = {
   quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme']],
   outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
-  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis']],
+  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit']],
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
   traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
 };
@@ -207,6 +207,10 @@ Object.entries(C.FATES).forEach(([k, F]) => {
 Object.entries(C.EVENTS).forEach(([k, E]) => {
   [['fate', C.FATES], ['people', C.PEOPLES]].forEach(([f, L]) => { if (E[f] != null) ref('event ' + k, [].concat(E[f]).every(x => L[x]), `${f} ${E[f]} is not in ${f === 'fate' ? 'FATES' : 'PEOPLES'} (layers.js)`); });
   if (E.crisis) ref('event ' + k, !E.chain && E.fate && !Array.isArray(E.fate) && C.FATES[E.fate] && (C.FATES[E.fate].crises || []).includes(k), 'a crisis event names its one fate, which lists it in crises');
+});
+Object.entries(C.PEOPLES).forEach(([k, P]) => {
+  ref('peoples ' + k, P.custom && P.custom.name && P.custom.text, 'needs a custom: { name, text }, the loop rule it changes');
+  if (P.visit) ref('peoples ' + k, Number.isInteger(P.visit.at) && C.EVENTS[P.visit.event] && C.EVENTS[P.visit.event].visit && C.EVENTS[P.visit.event].people === k, `visit is { at: round, event }, an event with visit: true and people: '${k}'`);
 });
 // Layers: entries have a kind and tier, Fates bring real modifiers, a pool fits its number range, settings are lists
 const KINDS = ['place', 'person', 'custom'], TIERS = ['far', 'city', 'home'];
