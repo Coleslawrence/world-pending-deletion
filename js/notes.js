@@ -18,9 +18,9 @@ const PATCH_NOTES = [
         "[Some Undercity choices now depend on where you are from.]"] },
       { h: "Corrections", sys: "[Minor faults have been corrected. The System admits nothing.]", items: [
         "[Every skill, item, Gift and Title now has a history. Read the italics.]",
-        "[Skip a tutorial step and the tutorial moves on. It no longer sulks.]",
-        "[Stun with Weaken now Breaks the target, the same as a shattered guard.]",
-        "[Zeros now look like zeros.]"] },
+        "[The tutorial no longer abandons you for skipping ahead. It sulks instead.]",
+        "[Stun a Weakened opponent and they are Broken. Same as a full break bar.]",
+        "[Zeros now look like zeros. The System regrets the confusion.]"] },
     ],
   },
   {
