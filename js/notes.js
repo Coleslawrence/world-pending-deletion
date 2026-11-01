@@ -5,6 +5,21 @@
 // The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
+    id: '2026-11-02', release: 'wpd-v12', title: "[System Notice: Customs Update]", pages: [
+      { h: "Fates", sys: "[Your world's trouble is now your problem. It was always your problem.]", items: [
+        "[In rounds 3 and 5, your world's Fate demands an answer. Answer it, or use it.]",
+        "[Answer twice and the Fate is lifted. Use it twice and it is sealed.]",
+        "[Lifted worlds get something back. Sealed worlds are remembered too.]",
+        "[New Title: Fatebreaker. The System did not expect to need it.]"] },
+      { h: "Peoples", sys: "[Every world has its customs. They now apply to you.]", items: [
+        "[Each People changes one rule between rounds. Read the world card.]",
+        "[The Clans never forget who beat you. Neither does the bracket.]",
+        "[Help your people and they will give you a name. You may keep it.]",
+        "[Some Undercity choices now depend on where you are from.]"] },
+      { h: "Histories", sys: "[Every skill, item, Gift and Title now has a history. Read the italics.]", items: [] },
+    ],
+  },
+  {
     id: '2026-11-01', release: 'wpd-v11', title: "[System Notice: Judgement Update]", pages: [
       { h: "Living worlds", sys: "[Worlds are no longer issued from a template. Each one is now a little different.]", items: [
         "[Every world has a people and a fate. Neither was the System's idea.]",
