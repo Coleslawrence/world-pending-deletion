@@ -16,7 +16,11 @@ const PATCH_NOTES = [
         "[The Clans never forget who beat you. Neither does the bracket.]",
         "[Help your people and they will give you a name. You may keep it.]",
         "[Some Undercity choices now depend on where you are from.]"] },
-      { h: "Histories", sys: "[Every skill, item, Gift and Title now has a history. Read the italics.]", items: [] },
+      { h: "Corrections", sys: "[Minor faults have been corrected. The System admits nothing.]", items: [
+        "[Every skill, item, Gift and Title now has a history. Read the italics.]",
+        "[The tutorial no longer abandons you for skipping ahead. It sulks instead.]",
+        "[Stun a Weakened opponent and they are Broken. Same as a full break bar.]",
+        "[Zeros now look like zeros. The System regrets the confusion.]"] },
     ],
   },
   {
