@@ -205,8 +205,8 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   G.moveFate(run, 5, msgs); ok(run.fateTrack === G.FATE_TRACK.max && G.fateEnd(run).end === 'lifted', 'the track stops at its top, lifted');
   G.moveFate(run, -9, msgs); ok(run.fateTrack === G.FATE_TRACK.min && G.fateEnd(run).end === 'sealed', 'and at its bottom, sealed');
   // A lifted Fate in a spared world brings one entry back
-  run.fateTrack = G.FATE_TRACK.max; run.record.lost = 3; const out = [];
-  G.closeFate(run, out, true); ok(run.fateEnd === 'lifted' && bits(run.record.lost) === 1 && bits(run.record.partial) === 1, 'lifted: one entry back, partial');
+  run.fateTrack = G.FATE_TRACK.max; run.record.lost = 3; run.hearts = run.maxHearts - 2; const out = [], hb = run.hearts;
+  G.closeFate(run, out, true); ok(run.fateEnd === 'lifted' && run.hearts === hb + 1 && bits(run.record.lost) === 1 && bits(run.record.partial) === 1, 'lifted: a Heart back, its entry partial');
   // Outcomes
   const kit = { favour() { } }, ap = T => { const c = { run, h: kit, msgs }; G.applyOutcomes(T, c, false); G.applyOutcomes(T, c, true); };
   run.fateTrack = 0; ap({ fate: -1 }); ok(run.fateTrack === -1, 'outcome fate');
