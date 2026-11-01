@@ -126,6 +126,11 @@ function champLine() {
 // ---------- World Record ----------
 // A lost entry is a black bar the width of the words it hides
 function redact(text) { return `<span class="redact" role="img" aria-label="erased entry"><span aria-hidden="true">${esc(text)}</span></span>`; }
+// A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... The Long Night: the sun..."
+function layerSentences(w) {
+  const F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix], low = t => t.charAt(0).toLowerCase() + t.slice(1);
+  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (C ? ` The ${esc(C.name)} press in.` : '');
+}
 function bioHTML(rec, type, worldName, champ) { return bioParts(rec, type, worldName, champ).map(p => p.gone ? redact(p.t) : esc(p.t)).join(''); }
 function recLine(e) { return e.line.map(w => w.gone ? redact(w.t) : esc(w.t)).join(' '); }
 // The record sheet: from the current run, or from a Halls card (third person)
@@ -453,13 +458,15 @@ function titleHTML() {
 }
 function worldsHTML() {
   const cards = ui.worlds.map((w, i) => {
-    const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod];
+    const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod], F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix];
+    const classes = w.v >= 2 ? worldArch(w, meta.unlocks) : [T.home];
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
       <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
-      <div class="pk-sub">${esc(T.name)} · ${esc(T.flavour)}</div>
-      <div class="pk-row"><span class="tagn a-${T.home}">${ARCH[T.home].name}</span><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)}</span></div>
+      <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
+      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>
+      <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
       <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
-      <div class="pk-row"><span class="pk-mut">Final: ${esc(ENEMIES[T.final].name)}</span></div>
+      <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: ${esc(ENEMIES[T.final].name)}</span></div>
     </button>`;
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
@@ -926,7 +933,7 @@ function runCard(s, opts) {
   const strip = H.length ? `<div class="hstrip">${H.map(h => `<span class="hc ${h.won ? 'w' : 'l'}" title="${esc(h.name)}">${label(h)}${h.won ? '' : h.hl ? ` −${h.hl}♥` : ''}</span>`).join('')}</div>` : '';
   const best = H.filter(h => h.won).sort((a, b) => a.turns - b.turns || b.dealt - a.dealt)[0];
   const lost = H.reduce((a, h) => a + (h.hl || 0), 0);
-  return `<div class="runcard ${opts.erased ? 'erased' : ''}"><div class="rc-h">${crest(s.champ, opts.erased ? 'erased' : 'champion', !!opts.big, { sigil: s.sigil, color: s.color }, s.rank)}<div><div class="ch-name">${esc(s.champ)}</div><div class="ch-sub">${s.entrant ? 'Entrant ' + s.entrant + ' · ' : ''}${s.path ? esc(ARCH[s.path].path) + ' · ' : ''}Lv ${s.level}${s.title && TITLES[s.title] ? ' · ' + esc(TITLES[s.title].name) : ''}</div></div></div>
+  return `<div class="runcard ${opts.erased ? 'erased' : ''}"><div class="rc-h">${crest(s.champ, opts.erased ? 'erased' : 'champion', !!opts.big, { sigil: s.sigil, color: s.color }, s.rank)}<div><div class="ch-name">${esc(s.champ)}</div><div class="ch-sub">${s.entrant ? 'Entrant ' + s.entrant + ' · ' : ''}${s.path ? esc(ARCH[s.path].path) + ' · ' : ''}Lv ${s.level}${s.title && TITLES[s.title] ? ' · ' + esc(TITLES[s.title].name) : ''}</div>${layerNames(snapLayers(s)) ? `<div class="ch-sub">${esc(layerNames(snapLayers(s)))}</div>` : ''}</div></div>
     ${strip}
     ${s.rec ? `<p class="rc-bio">${bioHTML(s.rec, s.worldType, s.worldName, s.name || s.champ)}</p><button class="rc-l rc-rec" data-act="rec-snap" data-at="${s.at}"><span>Record</span>${recLeft(s.rec)} of ${s.rec.ids.length} entries survive ›</button>` : ''}
     <div class="rc-l"><span>Skills</span>${s.bar.map(x => esc(SKILLS[x.id] ? SKILLS[x.id].name : x.id) + (x.star > 1 ? ' ★' + x.star : '')).join(' · ') || '–'}</div>
@@ -965,7 +972,7 @@ function statsSheet() {
     <h4>System quests</h4>${questList()}
     ${run.hiddenPath ? `<h4>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</h4><p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>` : ''}
     <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
-    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}. ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}</p>
+    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}</p>
     <h4>Sponsors</h4>${gods}`;
   return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);
 }

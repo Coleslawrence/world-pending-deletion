@@ -79,6 +79,10 @@ const LAYER_BASE = { f: 100, p: 200, c: 300 }, LAYER_TAKE = { f: 2, p: 2, c: CON
 const layerSrc = (k, id) => id == null ? null : k === 'f' ? FATES[id] : k === 'p' ? PEOPLES[id] : LORE[id];
 // The layers a record carries, from a world ({ fate, people, mix }) or a record ({ f, p, c })
 function layersOf(x) { const o = {}; if (!x) return o; const f = x.fate || x.f, p = x.people || x.p, c = x.mix || x.c; if (FATES[f]) o.f = f; if (PEOPLES[p]) o.p = p; if (LORE[c]) o.c = c; return o; }
+// A snapshot's layers (worldFate, worldPeople, worldMix), or else the ones its record carries
+function snapLayers(x) { return x ? Object.assign(layersOf(x.rec), layersOf({ fate: x.worldFate, people: x.worldPeople, mix: x.worldMix })) : {}; }
+// The words for a world's layers: "Merchant League · The Long Night · with the Iron Hold"
+function layerNames(Ls) { return [Ls.p && PEOPLES[Ls.p].name, Ls.f && FATES[Ls.f].name, Ls.c && 'with the ' + WORLD_TYPES[Ls.c].name].filter(Boolean).join(' · '); }
 const loreCache = {};
 // { entries, roles, promises }: objects from number to entry or text. Keys come back in number order.
 function recLore(rec, type) {
@@ -95,13 +99,14 @@ const loreIds = o => Object.keys(o).map(Number);
 // suits, and without a list it suits them all. A world only draws layers and entries that suit its type.
 const settingOf = type => (WORLD_TYPES[type] && WORLD_TYPES[type].setting) || 'fantasy';
 const suits = (x, type) => !x || !x.settings || x.settings.includes(settingOf(type));
-// layers: the world's layers, if any. Each layer present files LAYER_TAKE entries; the type files the rest.
+// layers: the world's layers, if any. Each layer present files LAYER_TAKE entries (a Confluence type's never its home
+// ones, which belong to someone else's home); the type files the rest.
 function buildRecord(type, rng, layers) {
   const Ls = layersOf(layers), W = recLore(Ls, type), E = W.entries, all = loreIds(E), own = all.filter(i => i < 100);
   const of = (k, tier) => own.filter(i => E[i].k === k && E[i].tier === tier);
   const home = pick(of('place', 'home'), rng), person = pick(of('person', 'home'), rng);
   const ids = [home, person], need = { place: 3, person: 2, custom: 2 };
-  Object.keys(LAYER_BASE).forEach(k => { if (Ls[k]) shuffle(all.filter(i => i >= LAYER_BASE[k] && i < LAYER_BASE[k] + 100 && (k === 'c' || suits(E[i], type))), rng).slice(0, LAYER_TAKE[k]).forEach(i => ids.push(i)); });
+  Object.keys(LAYER_BASE).forEach(k => { if (Ls[k]) shuffle(all.filter(i => i >= LAYER_BASE[k] && i < LAYER_BASE[k] + 100 && (k === 'c' ? E[i].tier !== 'home' : suits(E[i], type))), rng).slice(0, LAYER_TAKE[k]).forEach(i => ids.push(i)); });
   shuffle(own, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
   shuffle(own, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
   const key = i => i === person ? 9 : TIER_ORDER[E[i].tier];
@@ -131,7 +136,7 @@ function restoreRecord(run, n, msgs) {
   if (k && msgs) msgs.push({ t: 'sys', text: `[Restoring from backup… ${k} record${k > 1 ? 's' : ''} recovered. Partial.]` });
   return k;
 }
-// An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Past 14 entries, extra Hearts go unrecorded.
+// An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Once every entry the world has is filed (up to REC_MAX), extra Hearts go unrecorded.
 function amendRecord(run, msgs, rng) {
   const R = run.record; if (!R || R.ids.length >= REC_MAX) return false;
   const E = recLore(R, run.world.type).entries, unused = loreIds(E).filter(i => !R.ids.includes(i));
@@ -349,7 +354,35 @@ function worldArch(world, U) {
   });
   return out;
 }
-function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng, cap); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
+// No-repeat memory: meta.recent holds the last RECENT_MAX worlds you fought for (newest first). Offers never repeat one of
+// their names or Fate + People pairs, and skip the types of the last RECENT_TYPES where they can. Pending World ignores it.
+const RECENT_MAX = 10, RECENT_TYPES = 2;
+function staleWorld(meta, w) {
+  const R = meta.recent || [];
+  if (R.some(r => r.n === w.name || (w.fate && r.f === w.fate && r.p === w.people))) return 2;
+  return R.slice(0, RECENT_TYPES).some(r => r.t === w.type) ? 1 : 0;
+}
+function offerWorlds(meta, rng) {
+  const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0;
+  while (out.length < n && guard++ < 80) {
+    const w = genWorld(rng, cap), st = staleWorld(meta, w);
+    if ((seen.has(w.type) && guard < 50) || (st === 2 && guard < 70) || (st === 1 && guard < 40)) continue;
+    seen.add(w.type); out.push(w);
+  }
+  return out;
+}
+// World Pulse: one System line about your world at the start of each round from round 2. In rounds 3 and 5 the Fate's
+// trouble grows (its stages); otherwise it is about an entry still standing, and how your last fight went. Words only.
+function worldPulse(run, rng) {
+  if (!run || run.practice || run.elite || run.round < 2 || !run.record) return null;
+  const w = run.world.name, F = FATES[run.world.fate], at = PULSE.stageAt.indexOf(run.round);
+  if (F && F.stages && at >= 0 && F.stages[at]) return `[${w}: ${F.stages[at]}]`;
+  const last = (run.history || []).slice(-1)[0], left = recEntries(run.record, run.world.type).filter(e => !e.lost);
+  if (!last || !left.length) return null;
+  const e = pick(left, rng), E = recLore(run.record, run.world.type).entries[e.i];
+  return '[' + pick(PULSE[last.won ? 'win' : 'loss'][e.k], rng).replace('{w}', w).replace('{e}', loreName(E)) + ']';
+}
+function rememberWorld(meta, w) { meta.recent = [{ t: w.type, n: w.name, f: w.fate || null, p: w.people || null }].concat(meta.recent || []).slice(0, RECENT_MAX); }
 
 // ---------- Run ----------
 // setup: { name, sigil, color, stats, gifts:[], patron: a GODS id or 'none' }
@@ -386,6 +419,7 @@ function newRun(world, setup, meta, rng) {
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
   // Entrant Rank: promotion perks and a waiting Rank Trial. Pending World and practice runs use neither.
   run.perks = [];
+  if (!setup.seed && !run.practice) rememberWorld(meta, world);
   if (!setup.seed && !run.practice && meta.rank) {
     run.perks = meta.rank.perks.filter(k => PERKS[k]);
     if (run.perks.includes('stipend')) run.gold += 1;
@@ -596,6 +630,7 @@ function sanitizeSnap(x, owner) {
   const history = (Array.isArray(x.history) ? x.history : []).slice(0, 12).map(h => ({ round: num(h.round, 1, 12, 1), name: str(h.name, 40), won: !!h.won, turns: num(h.turns, 1, 99, 1), hl: num(h.hl, 0, 9, 0), kind: str(h.kind, 10), dealt: num(h.dealt, 0, 99999, 0) }));
   return {
     champ: str(x.champ, 60) || 'Nameless', name: str(x.name, 20), sigil: num(x.sigil, 0, 5, 0), color: num(x.color, 0, 5, 0), worldName: str(x.worldName, 30), worldType: WORLD_TYPES[x.worldType] ? x.worldType : 'drowned',
+    worldFate: FATES[x.worldFate] ? x.worldFate : null, worldPeople: PEOPLES[x.worldPeople] ? x.worldPeople : null, worldMix: LORE[x.worldMix] && x.worldMix !== x.worldType ? x.worldMix : null,
     path: ARCH[x.path] ? x.path : null, stats, level: num(x.level, 1, 9, 1), maxHp: num(x.maxHp, 20, 700, 80), round: num(x.round, 1, 8, 1), gifts, title: TITLES[x.title] ? x.title : null, milestones: ms,
     bar, gear, history, cause: str(x.cause, 60) || null, hearts: num(x.hearts, 0, 20, 0), maxHearts: num(x.maxHearts, 1, 20, 10), wins: num(x.wins, 0, 20, 0), elite: num(x.elite, 0, 4, 0), entrant: num(x.entrant, 0, 99999, 0),
     hiddenPath: HIDDEN_PATHS[x.hiddenPath] ? x.hiddenPath : null, at: num(x.at, 0, 1e15, 0), owner: owner || null, shared: !!owner,
@@ -1027,6 +1062,7 @@ function enterChoose(run, meta, rng, msgs) {
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
+  if (run.pulsed !== run.round) { run.pulsed = run.round; const pulse = worldPulse(run, stream(run, 'pulse', rng)); if (pulse) { run.log.push({ t: 'sys', text: pulse }); msgs && msgs.push({ t: 'sys', text: pulse }); } }
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
@@ -1147,12 +1183,12 @@ function phaseTraits(B) { Object.assign(B, enemyTraits(B.phase.set || {}, B.powe
 function snapshot(run) {
   const s = effStats(run), R = run.record;
   const snap = {
-    champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, path: run.path,
+    champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, worldFate: run.world.fate || null, worldPeople: run.world.people || null, worldMix: run.world.mix || null, path: run.path,
     stats: s, level: run.level, maxHp: maxHp(run), round: run.round, gifts: run.gifts.filter(k => GIFTS[k].cat !== 'flaw' && k !== 'copycat'), title: run.title, milestones: run.milestones,
     history: (run.history || []).slice(), cause: run.cause || null, hearts: run.hearts, maxHearts: run.maxHearts, wins: run.wins, elite: run.eliteWins || 0, entrant: run.entrant, hiddenPath: run.hiddenPath,
     bar: run.bar.filter(Boolean).map(p => ({ id: p.id, star: p.star, mods: p.mods.slice() })), gear: GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean).map(p => ({ id: p.id, star: p.star })), at: Date.now() + Math.floor(Math.random() * 1000),
   };
-  if (R) snap.rec = { w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) };
+  if (R) snap.rec = Object.assign({ w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) }, layersOf(R));
   return snap;
 }
 
@@ -1170,7 +1206,7 @@ function poolSlot(rng) { return 1 + Math.floor(rnd(rng) * POOL_SIZE); }
 function poolId(round, slot) { return round + '_' + slot; }
 // What the pool keeps of a build: what it fights with, plus its champion's name, crest and rank letter. No fight
 // history, World Record or account details.
-const POOL_KEYS = ['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'];
+const POOL_KEYS = ['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'worldFate', 'worldPeople', 'worldMix', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'];
 function poolSnap(run) {
   const x = snapshot(run), o = {};
   if (META && META.rank) x.rank = META.rank.letter;
@@ -1183,7 +1219,7 @@ function poolReserve(round, slot) {
   if (!b) return null;
   const stats = {}; STATS.forEach((k, i) => stats[k] = b.s[i]);
   const milestones = {}; (b.m || []).forEach(k => milestones[k] = true);
-  const snap = sanitizeSnap({ champ: b.n + ' of ' + b.w, name: b.n, sigil: slot % 6, color: (slot * 5) % 6, worldName: b.w, worldType: b.wt, path: b.p || null, stats, level: b.l, maxHp: b.hp, round,
+  const snap = sanitizeSnap({ champ: b.n + ' of ' + b.w, name: b.n, sigil: slot % 6, color: (slot * 5) % 6, worldName: b.w, worldType: b.wt, worldFate: b.wf, worldPeople: b.wp, worldMix: b.wx, path: b.p || null, stats, level: b.l, maxHp: b.hp, round,
     gifts: b.g || [], title: b.t || null, milestones, hiddenPath: b.h || null, entrant: 1000 + round * 100 + slot,
     bar: b.b.map(([id, star, mods]) => ({ id, star, mods: mods || [] })), gear: b.e.map(([id, star]) => ({ id, star })), at: round * 100 + slot });
   snap.reserve = true;
@@ -2145,8 +2181,8 @@ if (typeof module !== 'undefined') module.exports = {
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
-  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

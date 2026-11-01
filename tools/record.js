@@ -54,13 +54,14 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   ok(G.amendRecord(run, m3) && m3[0].text === '[Record amended: 1 entry added.]', 'amend line');
   ok(run.record.ids.length === 11 && run.record.ids[3] === first && run.record.lost === 3 && run.record.partial === 8, 'inserted at the front of the queue, masks shifted');
   ok(standing(run) === run.hearts, 'entries match Hearts after an extra Heart');
-  for (let i = 0; i < 3; i++) G.amendRecord(run); ok(run.record.ids.length === 14 && !G.amendRecord(run), 'past 14 entries extra Hearts go unrecorded');
+  const pool = Object.keys(G.recLore(run.record, run.world.type).entries).length; while (G.amendRecord(run));
+  ok(run.record.ids.length === Math.min(G.REC_MAX, pool), `once the world's ${pool} entries are all filed, extra Hearts go unrecorded`);
   // snapshot and sanitiser
   const snap = G.snapshot(run), json = JSON.parse(JSON.stringify(snap));
-  ok(JSON.stringify(json.rec).length < 160, 'snapshot record is small: ' + JSON.stringify(json.rec).length + ' bytes');
+  ok(JSON.stringify(json.rec).length < 260, 'snapshot record is small: ' + JSON.stringify(json.rec).length + ' bytes');
   const clean = G.sanitizeSnap(json, 'someone');
   ok(JSON.stringify(clean.rec) === JSON.stringify(json.rec), 'sanitiser keeps a good record');
-  const bad = [x => x.ids.push(99), x => x.ids[0] = x.ids[1], x => x.lost = -1, x => x.lost = 1 << 20, x => x.bio.person = 99, x => x.bio.role = 9, x => x.w = 'iron' === json.worldType ? 'sky' : 'iron', x => x.ids = 'nope'];
+  const bad = [x => x.ids[0] = 99, x => x.ids[0] = x.ids[1], x => x.lost = -1, x => x.lost = 1 << 20, x => x.bio.person = 99, x => x.bio.role = 9, x => x.w = 'iron' === json.worldType ? 'sky' : 'iron', x => x.ids = 'nope'];
   bad.forEach((f, i) => { const j = JSON.parse(JSON.stringify(json)); f(j.rec); ok(G.sanitizeSnap(j, 'x').rec === null, 'sanitiser drops malformed record ' + i); });
   const old = JSON.parse(JSON.stringify(json)); delete old.rec; ok(G.sanitizeSnap(old, 'x').rec === null, 'old cards have no record');
 }
@@ -155,5 +156,40 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   const was = G.WORLD_GEN.from; G.WORLD_GEN.from = '2026-11-02';
   ok(!G.dailyWorld('2026-11-01').v && G.dailyWorld('2026-11-02').v === 2 && JSON.stringify(G.dailyWorld('2026-11-03')) === JSON.stringify(G.dailyWorld('2026-11-03')), 'from the cut-off, Pending World is layered and the same for everyone');
   G.WORLD_GEN.from = was;
+}
+{
+  // No-repeat memory: offers skip the last 2 types where they can, and never repeat a recent name or Fate + People pair
+  const r = seeded(31), meta = G.newMeta(); let typeHits = 0, offers = 0;
+  for (let t = 0; t < 400; t++) {
+    const W = G.offerWorlds(meta, r); offers++;
+    W.forEach(w => { ok(G.staleWorld(meta, w) < 2, `offer ${w.name} repeats a recent name or Fate + People pair`); if (G.staleWorld(meta, w)) typeHits++; });
+    ok(W.length === 3 && new Set(W.map(w => w.type)).size === 3, 'three different types on offer');
+    G.rememberWorld(meta, W[t % 3]);
+  }
+  ok(meta.recent.length === G.RECENT_MAX, 'memory keeps the last 10');
+  ok(typeHits === 0, `recent types skipped (${typeHits} slipped through)`);
+  const m2 = G.newMeta(), w = G.offerWorlds(m2, seeded(2))[0];
+  G.newRun(w, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, m2, seeded(2));
+  ok(m2.recent[0].n === w.name, 'starting a run remembers its world');
+  const dw = G.dailyWorld('2026-11-01'); G.newRun(dw, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[dw.type].gift], patron: 'war', seed: G.dailySeed('2026-11-01'), daily: '2026-11-01' }, m2);
+  ok(m2.recent.length === 1, 'Pending World is not remembered');
+}
+{
+  // World Pulse: a line from round 2, about an entry still standing; Fate stages in rounds 3 and 5; short enough to read
+  const r = seeded(41); let n = 0, longest = '';
+  for (let t = 0; t < 600; t++) {
+    const meta = G.newMeta(), w = G.offerWorlds(meta, r)[0];
+    const run = G.newRun(w, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, meta, r);
+    ok(G.worldPulse(run, r) === null, 'no pulse before the first fight');
+    run.round = 2 + (t % 6); run.history = [{ round: run.round - 1, won: t % 2 === 0, hl: t % 2 ? 1 : 0 }];
+    if (t % 4 === 3) run.record.lost = (1 << run.record.ids.length) - 2;
+    const p = G.worldPulse(run, r);
+    if ((run.round === 3 || run.round === 5) && G.FATES[w.fate]) { ok(p === `[${w.name}: ${G.FATES[w.fate].stages[run.round === 3 ? 0 : 1]}]`, 'Fate stage in rounds 3 and 5'); continue; }
+    ok(p && p.startsWith('[' + w.name + ': ') && p.endsWith(']') && !/[{}]/.test(p), 'pulse names the world: ' + p);
+    const left = G.recEntries(run.record, w.type).filter(e => !e.lost).map(e => G.loreName(G.recLore(run.record, w.type).entries[e.i]));
+    ok(left.some(x => p.includes(x)), 'pulse is about an entry still standing: ' + p);
+    if (p.length > longest.length) longest = p; n++;
+  }
+  ok(n > 300 && longest.length <= 90, `pulses stay short (longest ${longest.length}: ${longest})`);
 }
 console.log(`record: ${checks} checks passed`);
