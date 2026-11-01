@@ -122,7 +122,7 @@ service cloud.firestore {
     }
     function poolSnap(x, round) {
       return x is map
-        && x.keys().hasOnly(['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'])
+        && x.keys().hasOnly(['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'worldFate', 'worldPeople', 'worldMix', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'])
         && x.keys().hasAll(['champ', 'stats', 'level', 'maxHp', 'round', 'bar'])
         && x.champ is string && x.champ.size() <= 60
         && x.round == round
@@ -132,6 +132,7 @@ service cloud.firestore {
         && (!('gear' in x) || (x.gear is list && x.gear.size() <= 3))
         && (!('gifts' in x) || (x.gifts is list && x.gifts.size() <= 12))
         && (!('name' in x) || runKey(x.name, 24)) && (!('worldName' in x) || runKey(x.worldName, 30))
+        && (!('worldFate' in x) || runKey(x.worldFate, 16)) && (!('worldPeople' in x) || runKey(x.worldPeople, 16)) && (!('worldMix' in x) || runKey(x.worldMix, 16))
         && (!('rank' in x) || runKey(x.rank, 3));
     }
 
