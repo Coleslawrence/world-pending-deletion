@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Thunder Steppes =====
 'use strict';
-WORLD_TYPES.steppes = { name: 'Thunder Steppes', flavour: 'Endless grasslands under a storm that never breaks.', home: 'storm', gift: 'lightningrod', final: 'herald', names: [['Bra', 'Kes', 'Vol', 'Rhu', 'Ost', 'Zan'], ['mak', 'ven', 'dra', 'gal', 'ruk', 'esh']], champs: ['Taran', 'Odra', 'Vesna', 'Halvard', 'Iskra', 'Doran'] };
+WORLD_TYPES.steppes = { name: 'Thunder Steppes', flavour: 'Endless grasslands under a storm that never breaks.', home: 'storm', guest: 'blade', gift: 'lightningrod', final: 'herald', names: [['Bra', 'Kes', 'Vol', 'Rhu', 'Ost', 'Zan', 'Tor', 'Ark', 'Sar', 'Yur'], ['mak', 'ven', 'dra', 'gal', 'ruk', 'esh', 'an', 'ost', 'ir', 'tai']], mids: ['a', 'u', 'ar'], champs: ['Taran', 'Odra', 'Vesna', 'Halvard', 'Iskra', 'Doran', 'Arslan', 'Bogdan', 'Daria', 'Ilya', 'Kasim', 'Milena', 'Nadia', 'Oleg', 'Radka', 'Stanko', 'Temir', 'Ulana', 'Vadim', 'Yara', 'Zarina', 'Boran', 'Kira', 'Mirko'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.steppes = {
   roles: ['rod-keeper', 'herd rider', 'storm reader', 'tent-weaver', 'clan runner'],

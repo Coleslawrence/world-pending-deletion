@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -49,11 +49,13 @@ try {
 
 // ---------- Ids: well formed, never removed; World Record pools only grow at the end ----------
 const ID = /^[a-z][a-z0-9_]*$/;
-const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, feats: C.FEATS, outcomes: C.OUTCOMES, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
+const lists = { skills: C.SKILLS, gear: C.GEAR, archetypes: C.ARCH, gods: C.GODS, worlds: C.WORLD_TYPES, modifiers: C.MODIFIERS, fates: C.FATES, peoples: C.PEOPLES, enemies: C.ENEMIES, gifts: C.GIFTS, titles: C.TITLES, quests: C.QUESTS, feats: C.FEATS, outcomes: C.OUTCOMES, paths: C.HIDDEN_PATHS, events: C.EVENTS, chains: C.CHAINS, traitPool: C.TRAIT_POOL };
 const nowIds = {};
 Object.entries(lists).forEach(([kind, o]) => { nowIds[kind] = Object.keys(o); if (kind !== 'paths') nowIds[kind].filter(k => !ID.test(k)).forEach(k => err(kind + ' ' + k, 'ids are lower case letters, digits and _')); });
 nowIds.eventOptions = {}; Object.entries(C.EVENTS).forEach(([k, E]) => nowIds.eventOptions[k] = E.opts.length);
 nowIds.lore = {}; Object.entries(C.LORE).forEach(([w, L]) => nowIds.lore[w] = { roles: L.roles, promises: L.promises, entries: L.entries.map(e => e.name) });
+// Layer pools are stored by position the same way (records number them from LAYER_BASE)
+[['fate', C.FATES], ['people', C.PEOPLES]].forEach(([kind, o]) => Object.entries(o).forEach(([k, L]) => nowIds.lore[kind + ' ' + k] = { roles: L.roles || [], promises: L.promises || [], entries: (L.entries || []).map(e => e.name) }));
 const saved = fs.existsSync(path.join(ROOT, IDS_FILE)) ? JSON.parse(read(IDS_FILE)) : null;
 if (saved) {
   Object.keys(lists).forEach(kind => (saved[kind] || []).filter(k => !nowIds[kind].includes(k)).forEach(k => err(kind + ' ' + k, 'was removed or renamed. Ids are permanent: saves, shared champions and the Halls store them. Change the name, keep the id')));
@@ -74,7 +76,9 @@ const SCHEMA = {
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text'], ['fix']],
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
-  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], []],
+  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting']],
+  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages']],
+  peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
   gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch', 'p', 'theme']],
@@ -188,7 +192,19 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   ref(w, C.LORE[k] && C.LORE[k].entries.length >= 14, 'needs a World Record pool of at least 14 entries in LORE');
   ref(w, t.names.length === 2 && t.names.every(a => a.length >= 4), 'names needs two lists of syllables');
   ref(w, t.champs.length >= 4, 'needs at least 4 champion names');
+  ref(w, t.guest == null || (isArch(t.guest) && t.guest !== t.home && !C.themeNear(t.home).includes(t.guest)), `guest ${t.guest} must be an archetype other than the home class and its two wheel neighbours`);
+  ref(w, !t.mids || t.mids.every(m => typeof m === 'string' && m.length <= 3), 'mids are short middle syllables');
 });
+// Layers: entries have a kind and tier, Fates bring real modifiers, a pool fits its number range, settings are lists
+const KINDS = ['place', 'person', 'custom'], TIERS = ['far', 'city', 'home'];
+[['fates', C.FATES], ['peoples', C.PEOPLES]].forEach(([kind, o]) => Object.entries(o).forEach(([k, L]) => {
+  const w = kind + ' ' + k;
+  (L.entries || []).forEach(e => ref(w, KINDS.includes(e.k) && TIERS.includes(e.tier) && e.name && e.text && (e.tier !== 'home' || (e.k === 'place' ? e.near : e.k === 'person' ? e.rel : true)), `entry ${e.name} needs k, tier, name and text (a home place a near, a home person a rel)`));
+  ['entries', 'roles', 'promises'].forEach(a => ref(w, !L[a] || L[a].length < 100, `${a} can hold at most 99 (records number each layer in its own 100s)`));
+  ref(w, !L.mods || Object.keys(L.mods).every(m => C.MODIFIERS[m] && L.mods[m] > 0), 'mods are modifier ids with weights above 0');
+  ref(w, !L.settings || (Array.isArray(L.settings) && L.settings.length), 'settings is a list of setting names');
+}));
+ref('layers', C.CONFLUENCE.chance >= 0 && C.CONFLUENCE.chance < 1, 'CONFLUENCE.chance is a share between 0 and 1');
 Object.entries(C.ENEMIES).forEach(([k, e]) => e.script.forEach(i => ref('enemies ' + k, Number.isInteger(i) && e.skills[i], `script move ${i} does not exist`)));
 // Traits: the numbers make sense; phases point at real moves; passives are ones that work on enemies; the trait pool too
 const share = v => typeof v === 'number' && v > 0 && v < 1, every = v => Number.isInteger(v) && v >= 2;
@@ -369,6 +385,10 @@ Object.entries(C.TRAIT_POOL).forEach(([k, T]) => { say('trait pool ' + k, T.name
 Object.entries(C.WORLD_TYPES).forEach(([k, t]) => { say('worlds ' + k, t.name); say('worlds ' + k + ' flavour', t.flavour, 10); });
 Object.entries(C.MODIFIERS).forEach(([k, m]) => [m.name, m.desc].forEach(s => say('modifiers ' + k, s)));
 Object.entries(C.LORE).forEach(([w, L]) => L.entries.forEach(e => [e.name, e.text, e.near].forEach(s => say(`World Record ${w} ${e.name}`, s))));
+[['fates', C.FATES], ['peoples', C.PEOPLES]].forEach(([kind, o]) => Object.entries(o).forEach(([k, L]) => {
+  [L.name, L.line].concat(L.roles || [], L.promises || [], L.epithets || [], L.stages || []).forEach(s => say(kind + ' ' + k, s));
+  (L.entries || []).forEach(e => [e.name, e.text, e.near].forEach(s => say(`World Record ${kind} ${k} ${e.name}`, s)));
+}));
 Object.entries(C.FINAL_GREET).forEach(([k, s]) => say('greeting ' + k, s));
 Object.entries(C.ENEMIES).forEach(([k, e]) => { say('enemies ' + k, e.name); say('enemies ' + k + ' style', e.style, 14); e.skills.concat(e.phase && e.phase.add || []).forEach(m => say('enemies ' + k, m.n)); if (e.phase) say('enemies ' + k + ' phase', e.phase.say, 20); });
 Object.entries(C.RIVAL_LINES).forEach(([k, L]) => Object.values(L).forEach(s => say('rival lines ' + k, s)));

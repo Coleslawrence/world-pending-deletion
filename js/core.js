@@ -72,27 +72,52 @@ const loreName = e => e.name.replace(/^(The|Your) /, m => m.toLowerCase()); // m
 const loreWho = e => e.name.replace(/^Your \S+ /, ''); // a person in the Halls: "Ilsa"
 // Pick 10 entries: at least 3 places, 2 people and 2 customs, always including the bio's home place and person.
 // ids is in deletion order (far, city, home, with the bio's person last); lost and partial are bitmasks over ids.
-function buildRecord(type, rng) {
-  const L = LORE[type], E = L.entries, all = E.map((_, i) => i);
-  const of = (k, tier) => all.filter(i => E[i].k === k && E[i].tier === tier);
+// A world's lore is its type's pool plus its layers' pools (js/content/layers.js). Records store numbers, and each source
+// keeps its own range, so a record made before layers existed still points at the same words: the type's own entries,
+// roles and promises are 0 to 99, the Fate's from 100, the People's from 200, a Confluence type's from 300.
+const LAYER_BASE = { f: 100, p: 200, c: 300 }, LAYER_TAKE = { f: 2, p: 2, c: CONFLUENCE.take };
+const layerSrc = (k, id) => id == null ? null : k === 'f' ? FATES[id] : k === 'p' ? PEOPLES[id] : LORE[id];
+// The layers a record carries, from a world ({ fate, people, mix }) or a record ({ f, p, c })
+function layersOf(x) { const o = {}; if (!x) return o; const f = x.fate || x.f, p = x.people || x.p, c = x.mix || x.c; if (FATES[f]) o.f = f; if (PEOPLES[p]) o.p = p; if (LORE[c]) o.c = c; return o; }
+const loreCache = {};
+// { entries, roles, promises }: objects from number to entry or text. Keys come back in number order.
+function recLore(rec, type) {
+  const Ls = layersOf(rec), key = [type, Ls.f, Ls.p, Ls.c].join('|');
+  if (loreCache[key]) return loreCache[key];
+  const out = { entries: {}, roles: {}, promises: {} };
+  const add = (src, base, only) => src && (only || ['entries', 'roles', 'promises']).forEach(a => (src[a] || []).forEach((x, i) => { out[a][base + i] = x; }));
+  add(LORE[type], 0);
+  Object.keys(LAYER_BASE).forEach(k => add(layerSrc(k, Ls[k]), LAYER_BASE[k], k === 'c' ? ['entries'] : null));
+  return loreCache[key] = out;
+}
+const loreIds = o => Object.keys(o).map(Number);
+// Settings: a world type has one (fantasy unless it says otherwise); a layer or a layer entry may list the settings it
+// suits, and without a list it suits them all. A world only draws layers and entries that suit its type.
+const settingOf = type => (WORLD_TYPES[type] && WORLD_TYPES[type].setting) || 'fantasy';
+const suits = (x, type) => !x || !x.settings || x.settings.includes(settingOf(type));
+// layers: the world's layers, if any. Each layer present files LAYER_TAKE entries; the type files the rest.
+function buildRecord(type, rng, layers) {
+  const Ls = layersOf(layers), W = recLore(Ls, type), E = W.entries, all = loreIds(E), own = all.filter(i => i < 100);
+  const of = (k, tier) => own.filter(i => E[i].k === k && E[i].tier === tier);
   const home = pick(of('place', 'home'), rng), person = pick(of('person', 'home'), rng);
   const ids = [home, person], need = { place: 3, person: 2, custom: 2 };
-  shuffle(all, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
-  shuffle(all, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
+  Object.keys(LAYER_BASE).forEach(k => { if (Ls[k]) shuffle(all.filter(i => i >= LAYER_BASE[k] && i < LAYER_BASE[k] + 100 && (k === 'c' || suits(E[i], type))), rng).slice(0, LAYER_TAKE[k]).forEach(i => ids.push(i)); });
+  shuffle(own, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
+  shuffle(own, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
   const key = i => i === person ? 9 : TIER_ORDER[E[i].tier];
-  const bio = { role: Math.floor(rnd(rng) * L.roles.length), home, person, promise: Math.floor(rnd(rng) * L.promises.length) };
-  return { ids: shuffle(ids, rng).sort((a, b) => key(a) - key(b)), lost: 0, partial: 0, bio };
+  const bio = { role: pick(loreIds(W.roles), rng), home, person, promise: pick(loreIds(W.promises), rng) };
+  return Object.assign({ ids: shuffle(ids, rng).sort((a, b) => key(a) - key(b)), lost: 0, partial: 0, bio }, Ls);
 }
 // Saves from before the record get one that matches the Hearts they have left
 function ensureRecord(run, rng) {
   if (!run || run.record || run.practice || !LORE[run.world.type]) return;
-  run.record = buildRecord(run.world.type, rng);
+  run.record = buildRecord(run.world.type, rng, run.world);
   run.record.lost = (1 << Math.max(0, Math.min(REC_SIZE, run.maxHearts - run.hearts))) - 1;
 }
 // Erase the next n entries that are still standing. Returns their positions in ids.
 function eraseRecord(run, n, msgs) {
   const R = run.record, out = []; if (!R) return out;
-  const E = LORE[run.world.type].entries;
+  const E = recLore(R, run.world.type).entries;
   for (let i = 0; i < R.ids.length && out.length < n; i++) if (!(R.lost & 1 << i)) {
     R.lost |= 1 << i; R.partial &= ~(1 << i); out.push(i);
     msgs && msgs.push({ t: 'loss', text: `[Erasing: ${loreName(E[R.ids[i]])}… done.]` });
@@ -109,7 +134,7 @@ function restoreRecord(run, n, msgs) {
 // An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Past 14 entries, extra Hearts go unrecorded.
 function amendRecord(run, msgs, rng) {
   const R = run.record; if (!R || R.ids.length >= REC_MAX) return false;
-  const E = LORE[run.world.type].entries, unused = E.map((_, i) => i).filter(i => !R.ids.includes(i));
+  const E = recLore(R, run.world.type).entries, unused = loreIds(E).filter(i => !R.ids.includes(i));
   if (!unused.length) return false;
   const low = Math.min(...unused.map(i => TIER_ORDER[E[i].tier]));
   const id = pick(unused.filter(i => TIER_ORDER[E[i].tier] === low), rng);
@@ -125,7 +150,7 @@ function recWorldGone(rec) { return recLeft(rec) === 0; }
 // A partial entry has one or two words of its line barred, picked from the entry index so every device shows the same ones
 function partialWords(i, n) { const a = (i * 7 + 3) % n; return n > 6 ? [a, (a + 3) % n] : [a]; }
 function recEntries(rec, type, halls) {
-  const E = LORE[type].entries;
+  const E = recLore(rec, type).entries;
   return rec.ids.map((i, p) => {
     const e = E[i], lost = !!(rec.lost & 1 << p), partial = !lost && !!(rec.partial & 1 << p);
     const words = e.text.split(' '), bar = partial ? partialWords(i, words.length) : [];
@@ -134,7 +159,7 @@ function recEntries(rec, type, halls) {
 }
 // The bio as text pieces; erased pieces have gone set. champ gives the third-person Halls voice.
 function bioParts(rec, type, worldName, champ) {
-  const L = LORE[type], E = L.entries, b = rec.bio;
+  const L = recLore(rec, type), E = L.entries, b = rec.bio;
   const gone = i => !!(rec.lost & 1 << rec.ids.indexOf(i));
   const home = E[b.home], who = E[b.person], wgone = recWorldGone(rec);
   const key = home.name.replace(/^The /, '').toLowerCase(), at = home.near.toLowerCase().indexOf(key);
@@ -148,20 +173,22 @@ function bioParts(rec, type, worldName, champ) {
 }
 // What a returning Erased champion remembers: the last entry still standing, or else the last one to go
 function recFragment(rec, type) {
-  const E = LORE[type].entries; let p = -1;
+  const E = recLore(rec, type).entries; let p = -1;
   rec.ids.forEach((_, j) => { if (!(rec.lost & 1 << j)) p = j; });
   if (p < 0) p = rec.ids.length - 1;
   const e = E[rec.ids[p]]; return e.k === 'person' ? loreWho(e) : loreName(e);
 }
 // Shared records are untrusted: indexes must exist in the pool, masks must fit, and the bio must point into ids
+// Layers must name real ones (and a Confluence another type); an unknown layer fails the record rather than dropping words.
 function sanitizeRec(r, type) {
-  const L = LORE[type]; if (!L || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
-  const ids = r.ids.slice(0, REC_MAX), n = L.entries.length, b = r.bio || {};
-  const idx = (v, len) => Number.isInteger(v) && v >= 0 && v < len;
+  if (!LORE[type] || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
+  const Ls = layersOf(r); if (['f', 'p', 'c'].some(k => r[k] != null && !Ls[k]) || Ls.c === type) return null;
+  const L = recLore(Ls, type), ids = r.ids.slice(0, REC_MAX), b = r.bio || {};
+  const has = (o, v) => Number.isInteger(v) && o[v] !== undefined;
   const mask = v => Number.isInteger(v) && v >= 0 && v < 1 << ids.length;
-  if (!ids.length || !ids.every(i => idx(i, n)) || new Set(ids).size !== ids.length || !mask(r.lost) || !mask(r.partial)) return null;
-  if (!idx(b.role, L.roles.length) || !idx(b.promise, L.promises.length) || !ids.includes(b.home) || !ids.includes(b.person)) return null;
-  return { w: type, ids, lost: r.lost, partial: r.partial, bio: { role: b.role, home: b.home, person: b.person, promise: b.promise } };
+  if (!ids.length || !ids.every(i => has(L.entries, i)) || new Set(ids).size !== ids.length || !mask(r.lost) || !mask(r.partial)) return null;
+  if (!has(L.roles, b.role) || !has(L.promises, b.promise) || !ids.includes(b.home) || !ids.includes(b.person)) return null;
+  return Object.assign({ w: type, ids, lost: r.lost, partial: r.partial, bio: { role: b.role, home: b.home, person: b.person, promise: b.promise } }, Ls);
 }
 
 // ---------- Gifts ----------
@@ -253,8 +280,12 @@ function stream(run, purpose, rng) { return rng || (run && run.seed ? runRng(run
 const DAY_OFFSET = 9.5 * 3600 * 1000;
 function dailyDate(now) { return new Date((now == null ? Date.now() : now) + DAY_OFFSET).toISOString().slice(0, 10); }
 function dailySeed(date) { return 'wpd:' + date; }
-function dailyWorld(date) { return genWorld(seedRng(dailySeed(date) + ':world')); }
-function dailyRecord(date, type) { return buildRecord(type, seedRng(dailySeed(date) + ':record')); }
+// Pending World days before WORLD_GEN.from keep the world the old generator made, so shipping layered worlds never
+// changes a day already under way. SHIP STEP: set from to the game day after the release that ships layered worlds.
+const WORLD_GEN = { from: '2099-01-01' };
+function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'); return date >= WORLD_GEN.from ? genWorld(rng) : genWorldV1(rng); }
+// w: the day's world (or just its type, for a world without layers)
+function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w); }
 // Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
 function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {} }); }
 // Leaderboard score: round reached, then Hearts left, then fewest turns, in one sortable number
@@ -274,12 +305,49 @@ function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k
 
 // ---------- Worlds ----------
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
+const MOD_W = [30, 15, 15, 15, 15];
+const worldRank = (rng, cap) => cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
+const pickKey = (o, rng, type) => { const k = Object.keys(o).filter(x => suits(o[x], type)); return k.length ? pick(k, rng) : null; };
+// Syllables join cleanly: two vowels meeting lose the second, and no letter appears three times running
+function joinName(parts) {
+  const n = parts.reduce((a, b) => /[aeiouy]$/i.test(a) && /^[aeiou]/i.test(b) ? a + b.slice(1) : a + b, '').replace(/(.)\1\1/g, '$1$1');
+  return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
+}
+// A start and an end from the type's lists (a Confluence type lends the start), with a middle syllable 1 time in 4
+function worldName(T, C, rng) {
+  const a = pick((C || T).names[0], rng), mid = T.mids && rnd(rng) < 0.25 ? pick(T.mids, rng) : '', b = pick(T.names[1], rng);
+  return joinName([a, mid, b]);
+}
+// A world (v 2): type, name, rank, its layers, the modifier its Fate brings, and a champion name for the Awakening.
+// cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
 function genWorld(rng, cap) {
+  const types = Object.keys(WORLD_TYPES), type = pick(types, rng), T = WORLD_TYPES[type];
+  const mix = CONFLUENCE.chance && rnd(rng) < CONFLUENCE.chance ? pick(types.filter(k => k !== type && settingOf(k) === settingOf(type)), rng) || null : null;
+  const name = worldName(T, mix && WORLD_TYPES[mix], rng), rank = worldRank(rng, cap);
+  const fate = pickKey(FATES, rng, type), people = pickKey(PEOPLES, rng, type), M = fate && FATES[fate].mods;
+  const mod = M ? wpick(Object.keys(M), Object.values(M), rng) : wpick(Object.keys(MODIFIERS), MOD_W, rng);
+  const w = { v: 2, type, name, rank, mod, champ: pick(T.champs, rng) };
+  if (fate) w.fate = fate; if (people) w.people = people; if (mix) w.mix = mix;
+  return w;
+}
+// The generator before layers, kept for Pending World days before WORLD_GEN.from: the first 6 syllables and names only
+function genWorldV1(rng, cap) {
   const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
-  const name = pick(T.names[0], rng) + pick(T.names[1], rng);
-  const rank = cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
-  const mod = wpick(Object.keys(MODIFIERS), [30, 15, 15, 15, 15], rng);
-  return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs, rng) };
+  const name = pick(T.names[0].slice(0, 6), rng) + pick(T.names[1].slice(0, 6), rng);
+  const rank = worldRank(rng, cap), mod = wpick(Object.keys(MODIFIERS), MOD_W, rng);
+  return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs.slice(0, 6), rng) };
+}
+// A world's class pool: its home, the home's two wheel neighbours and the type's fixed guest. A Confluence world takes
+// both homes and both guests instead. The home always comes; any other class not unlocked yet (or already in) gives way
+// to its nearest free unlocked class on the wheel. Worlds from before v 2 kept a random fourth class (newRun).
+function worldArch(world, U) {
+  const T = WORLD_TYPES[world.type], C = world.mix && WORLD_TYPES[world.mix], n = WHEEL.length;
+  const want = C ? [C.home, T.guest, C.guest] : alliesOf(T.home).concat(T.guest), open = unlockedArch({ unlocks: U }), out = [T.home];
+  want.forEach(k => {
+    const i = WHEEL.indexOf(k);
+    for (let d = 0; d < n; d++) { const c = [WHEEL[(i + d) % n], WHEEL[(i + n - d) % n]].find(x => open.includes(x) && !out.includes(x)); if (c) { out.push(c); break; } }
+  });
+  return out;
 }
 function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng, cap); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
 
@@ -290,7 +358,7 @@ function newRun(world, setup, meta, rng) {
   const U = setup.seed ? {} : meta.unlocks, rs = rng || (setup.seed ? seedRng(setup.seed + ':setup') : undefined);
   const home = WORLD_TYPES[world.type].home;
   const pool = unlockedArch({ unlocks: U }).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
-  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
+  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : world.v >= 2 ? worldArch(world, U).slice(1) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer, setup.sysBonus);
   const G = setup.gifts;
   const run = {
@@ -314,7 +382,7 @@ function newRun(world, setup, meta, rng) {
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
-  else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
+  else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng, world); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
   // Entrant Rank: promotion perks and a waiting Rank Trial. Pending World and practice runs use neither.
   run.perks = [];
@@ -2077,7 +2145,7 @@ if (typeof module !== 'undefined') module.exports = {
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
-  LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,

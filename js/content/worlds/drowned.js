@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Drowned Isles =====
 'use strict';
-WORLD_TYPES.drowned = { name: 'Drowned Isles', flavour: 'Island kingdoms sinking into the sea.', home: 'zealot', gift: 'tidecaller', final: 'leviathan', names: [['Vel', 'Mar', 'Thal', 'Ner', 'Cor', 'Ys'], ['mora', 'mere', 'thys', 'una', 'aven', 'rith']], champs: ['Aldric', 'Maren', 'Isolde', 'Corin', 'Nerys', 'Talwyn'] };
+WORLD_TYPES.drowned = { name: 'Drowned Isles', flavour: 'Island kingdoms sinking into the sea.', home: 'zealot', guest: 'storm', gift: 'tidecaller', final: 'leviathan', names: [['Vel', 'Mar', 'Thal', 'Ner', 'Cor', 'Ys', 'Lyr', 'Ond', 'Sael', 'Myr'], ['mora', 'mere', 'thys', 'una', 'aven', 'rith', 'wen', 'oth', 'ara', 'esse']], mids: ['a', 'e', 'o'], champs: ['Aldric', 'Maren', 'Isolde', 'Corin', 'Nerys', 'Talwyn', 'Bryn', 'Cael', 'Delyth', 'Eira', 'Kerra', 'Jory', 'Lowen', 'Merin', 'Nia', 'Oswin', 'Perrin', 'Rhoswen', 'Tamsin', 'Ysella', 'Gwenna', 'Hywel', 'Ione', 'Morvah'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.drowned = {
   roles: ['lamplighter', 'pearl diver', 'tide priest', 'net mender', 'harbour runner'],

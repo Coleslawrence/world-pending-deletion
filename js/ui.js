@@ -148,7 +148,7 @@ function findSnap(at) { at = String(at); return meta.erased.concat(meta.champion
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function eraseSteps(r) {
   const R = run && run.record; if (!R || !r.erased || !r.erased.length) return [];
-  const E = LORE[run.world.type].entries;
+  const E = recLore(R, run.world.type).entries;
   const out = r.erased.map(p => ({ name: E[R.ids[p]].name, line: `[Erasing: ${loreName(E[R.ids[p]])}… done.]` }));
   if (r.death) out.push({ name: run.world.name, line: `[World: ${'█'.repeat(run.world.name.length)}. Status: erased.]`, world: true });
   return out;
@@ -201,7 +201,8 @@ function skylineSVG() {
   const E = LORE[run.world.type].entries, places = E.map((e, i) => i).filter(i => E[i].k === 'place');
   const slots = recEntries(R, run.world.type).filter(e => e.k === 'place');
   if (!slots.length) return '';
-  const paths = slots.map((e, k) => { const d = SKYLINE[run.world.type][places.indexOf(e.i) % 6]; return `<path transform="translate(${k * SKY_W} 0)" d="${d}" class="${e.lost ? 'gone' : ''}"/>`; }).join('');
+  // A place from a layer borrows one of the type's six silhouettes
+  const paths = slots.map((e, k) => { const at = places.indexOf(e.i), d = SKYLINE[run.world.type][(at >= 0 ? at : e.i) % 6]; return `<path transform="translate(${k * SKY_W} 0)" d="${d}" class="${e.lost ? 'gone' : ''}"/>`; }).join('');
   return `<svg class="skyline" viewBox="0 0 ${slots.length * SKY_W} 48" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${paths}</svg>`;
 }
 
@@ -244,7 +245,7 @@ function cleanScore(uid, d, date) {
   const r = { uid, name: String(d.name || 'Entrant').slice(0, 24), sigil: int(d.sigil, SIGILS.length - 1), color: int(d.color, SIGIL_COLS.length - 1), wins: int(d.wins, 12), hearts: int(d.hearts, 20), turns: int(d.turns, 999) };
   r.score = 100000 * r.wins + 1000 * r.hearts + (999 - r.turns); r.spared = r.wins >= 8; r.rank = rankIdx(d.rank) >= 0 ? d.rank : null;
   r.player = typeof d.player === 'string' ? d.player.slice(0, 24) : '';
-  r.rec = d.rec ? sanitizeRec(Object.assign({}, d.rec, { w: type }), type) : null;
+  r.rec = d.rec ? sanitizeRec(Object.assign({}, d.rec, { w: type }, layersOf(dailyWorld(date))), type) : null;
   return r;
 }
 // Posts today's ranked result once. A score made offline posts at the next sync, as long as it's still the same game day.
@@ -471,7 +472,7 @@ function worldsHTML() {
 // ---------- Awakening ----------
 // In Pending World the record and the System Offer come from the day's seed, and Echo unlocks don't count
 function newAw(w, date) {
-  return { record: date ? dailyRecord(date, w.type) : buildRecord(w.type, awRng('record')), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
+  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
     offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta, awRng('offer')), title: null };
 }
 // Everything the System draws at an Awakening comes from a seed: the day's in Pending World, otherwise one drawn when

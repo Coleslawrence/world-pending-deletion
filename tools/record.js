@@ -1,4 +1,4 @@
-// World Record checks: picking rules, erasing and restoring, extra Hearts, snapshots and the sanitiser.
+// World Record checks: layers (Fates, Peoples, settings), names, class pools, the Pending World cut-off, picking rules, erasing and restoring, extra Hearts, snapshots and the sanitiser.
 //   node tools/record.js
 const G = require('../js/core.js');
 const assert = require('assert');
@@ -93,5 +93,67 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   R.lost = (1 << 10) - 1; ok(txt(G.bioParts(R, 'drowned', 'Velmere', 'Maren')) === 'Maren was a lamplighter of #, raised in the shadow of the #. Maren swore to # to bring back dry land.', 'erased world bio');
   ok(G.recFragment(R, 'drowned') === 'Ilsa', 'fragment: the last entry to go');
   R.lost = 0; R.partial = 1; const e = G.recEntries(R, 'drowned')[0]; ok(e.partial && e.line.filter(w => w.gone).length === 2, 'partial entry bars two words');
+}
+{
+  // Layers: a Fate and a People file their own entries in their own number ranges; old records read as before
+  const ent = (k, tier, name, x) => Object.assign({ k, tier, name, text: name + ' stands.' }, x || {});
+  G.FATES.test_fate = { name: 'Test Fate', line: 'Something is wrong.', mods: { bloodmoon: 1 }, promises: ['end the test'], entries: [ent('place', 'city', 'Fate Hall'), ent('custom', 'far', 'Fate Rite'), ent('person', 'city', 'Fate Keeper')] };
+  G.PEOPLES.test_people = { name: 'Test People', line: 'They live here.', roles: ['tester'], entries: [ent('place', 'far', 'People Hall'), ent('custom', 'city', 'People Rite'), ent('place', 'city', 'Far Only', { settings: ['far_future'] })] };
+  const r = seeded(21), W = { type: 'drowned', fate: 'test_fate', people: 'test_people' };
+  let roles = new Set(), promises = new Set();
+  for (let t = 0; t < 2000; t++) {
+    const R = G.buildRecord('drowned', r, W), E = G.recLore(R, 'drowned').entries;
+    ok(R.f === 'test_fate' && R.p === 'test_people' && !R.c, 'record carries its layers');
+    ok(R.ids.length === 10 && new Set(R.ids).size === 10, 'ten different entries with layers');
+    ok(R.ids.filter(i => i >= 100 && i < 200).length === 2 && R.ids.filter(i => i >= 200 && i < 300).length === 2, 'two Fate and two People entries');
+    ok(!R.ids.includes(202), 'an entry that does not suit the setting is never filed');
+    ok(R.ids.every(i => E[i]) && R.bio.home < 100 && R.bio.person < 100, 'every id resolves; home and person are the type\'s');
+    const k = x => R.ids.filter(i => E[i].k === x).length; ok(k('place') >= 3 && k('person') >= 2 && k('custom') >= 2, 'minimums met with layers');
+    roles.add(R.bio.role); promises.add(R.bio.promise);
+    const S = G.sanitizeRec(JSON.parse(JSON.stringify(Object.assign({ w: 'drowned' }, R))), 'drowned');
+    ok(S && S.f === 'test_fate' && JSON.stringify(S.ids) === JSON.stringify(R.ids), 'a layered record survives the sanitiser');
+  }
+  ok(roles.has(200) && promises.has(100), 'People roles and Fate promises reach the bio');
+  const R = G.buildRecord('drowned', seeded(3), W);
+  ok(G.sanitizeRec(Object.assign({ w: 'drowned' }, R, { f: 'no_such_fate' }), 'drowned') === null, 'an unknown layer fails the record');
+  ok(G.sanitizeRec(Object.assign({ w: 'drowned' }, R, { f: undefined }), 'drowned') === null, 'a Fate entry without its Fate fails the record');
+  ok(G.sanitizeRec(Object.assign({ w: 'drowned' }, R, { c: 'drowned' }), 'drowned') === null, 'a Confluence of the same type fails');
+  const bio = G.bioParts(Object.assign({}, R, { bio: Object.assign({}, R.bio, { role: 200, promise: 100 }) }), 'drowned', 'Velmere').map(p => p.t).join('');
+  ok(/You were a tester of Velmere\./.test(bio) && /you would end the test\./.test(bio), 'layer role and promise read in the bio');
+  // Old records (no layers) pick exactly as before layers existed
+  const a = G.buildRecord('drowned', seeded(9)), b = G.buildRecord('drowned', seeded(9), { type: 'drowned' });
+  ok(JSON.stringify(a) === JSON.stringify(b) && !('f' in a), 'no layers, no change');
+  // Worlds roll layers, and the Fate picks the modifier
+  const wr = seeded(5); let n = 0;
+  for (let t = 0; t < 300; t++) { const w = G.offerWorlds(G.newMeta(), wr)[0]; ok(w.v === 2 && w.fate && w.people, 'worlds roll layers'); if (w.fate === 'test_fate') { n++; ok(w.mod === 'bloodmoon', 'the Fate sets the modifier'); } }
+  ok(n > 0, 'the test Fate came up');
+  G.WORLD_TYPES.drowned.setting = 'far_future';
+  let far = 0; for (let t = 0; t < 200; t++) if (G.buildRecord('drowned', wr, W).ids.includes(202)) far++;
+  ok(far > 0, 'a world whose setting the entry suits can file it');
+  G.FATES.test_fate.settings = ['fantasy'];
+  for (let t = 0; t < 300; t++) { const w = G.offerWorlds(G.newMeta(), wr)[0]; ok(!(w.type === 'drowned' && w.fate === 'test_fate'), 'a Fate only comes to worlds whose setting it suits'); }
+  delete G.WORLD_TYPES.drowned.setting; delete G.FATES.test_fate; delete G.PEOPLES.test_people;
+}
+{
+  // Names, class pools and Pending World
+  const r = seeded(4);
+  for (let t = 0; t < 2000; t++) { const w = G.offerWorlds(G.newMeta(), r)[0]; ok(/^[A-Z][a-z]{2,13}$/.test(w.name) && !/(.)\1\1/.test(w.name), `world name ${w.name}`); }
+  ok(G.joinName(['Vey', 'ora']) === 'Veyra' && G.joinName(['thal', 'a', 'aven']) === 'Thalaven', 'syllables join cleanly');
+  Object.entries(G.WORLD_TYPES).forEach(([k, T]) => {
+    const A = G.worldArch({ type: k }, { arch_arcanist: true, arch_storm: true });
+    ok(A.length === 4 && new Set(A).size === 4 && A[0] === T.home && A.includes(T.guest), `${k} class pool is home, neighbours and guest`);
+    const L = G.worldArch({ type: k }, {}); ok(L.length === 4 && new Set(L).size === 4 && L[0] === T.home && L.slice(1).every(a => G.START_ARCH.includes(a)), `${k} pool swaps locked classes`);
+    Object.keys(G.WORLD_TYPES).filter(m => m !== k).forEach(m => { const C = G.worldArch({ type: k, mix: m }, {}); ok(C.length === 4 && new Set(C).size === 4 && C[0] === T.home, `${k} + ${m} Confluence pool`); });
+  });
+  const meta = G.newMeta(), w = G.offerWorlds(meta, seeded(8))[0];
+  const run = G.newRun(w, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, meta, seeded(8));
+  ok(JSON.stringify(run.arch) === JSON.stringify(G.worldArch(w, meta.unlocks)), 'a new run uses its world\'s class pool');
+  // Before WORLD_GEN.from, Pending World is the world the old generator made
+  const old = date => { const rng = G.seedRng(G.dailySeed(date) + ':world'), T0 = Object.keys(G.WORLD_TYPES), type = G.pick(T0, rng), T = G.WORLD_TYPES[type];
+    const name = G.pick(T.names[0].slice(0, 6), rng) + G.pick(T.names[1].slice(0, 6), rng); rng(); rng(); return { type, name: name[0].toUpperCase() + name.slice(1), champ: G.pick(T.champs.slice(0, 6), rng) }; };
+  ['2026-11-01', '2026-11-02', '2026-12-25'].forEach(d => { const a = G.dailyWorld(d), b = old(d); ok(!a.v && a.type === b.type && a.name === b.name && a.champ === b.champ, `Pending World ${d} unchanged`); });
+  const was = G.WORLD_GEN.from; G.WORLD_GEN.from = '2026-11-02';
+  ok(!G.dailyWorld('2026-11-01').v && G.dailyWorld('2026-11-02').v === 2 && JSON.stringify(G.dailyWorld('2026-11-03')) === JSON.stringify(G.dailyWorld('2026-11-03')), 'from the cut-off, Pending World is layered and the same for everyone');
+  G.WORLD_GEN.from = was;
 }
 console.log(`record: ${checks} checks passed`);

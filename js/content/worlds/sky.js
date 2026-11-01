@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Sky Reaches =====
 'use strict';
-WORLD_TYPES.sky = { name: 'Sky Reaches', flavour: 'Floating cities ruled by mages.', home: 'arcanist', gift: 'prodigy', final: 'archmage', names: [['Aer', 'Cel', 'Zeph', 'Ast', 'Lum', 'Vey'], ['ia', 'ora', 'ion', 'ara', 'elle', 'is']], champs: ['Cassian', 'Lyra', 'Orin', 'Vela', 'Theron', 'Mira'] };
+WORLD_TYPES.sky = { name: 'Sky Reaches', flavour: 'Floating cities ruled by mages.', home: 'arcanist', guest: 'venom', gift: 'prodigy', final: 'archmage', names: [['Aer', 'Cel', 'Zeph', 'Ast', 'Lum', 'Vey', 'Ori', 'Cae', 'Vael', 'Ith'], ['ia', 'ora', 'ion', 'ara', 'elle', 'is', 'eon', 'yra', 'ael', 'essa']], mids: ['ar', 'el', 'i'], champs: ['Cassian', 'Lyra', 'Orin', 'Vela', 'Theron', 'Mira', 'Aster', 'Caelum', 'Corvin', 'Dione', 'Elara', 'Halcyon', 'Ilia', 'Leander', 'Oriana', 'Phaedra', 'Rhea', 'Selene', 'Soren', 'Thalia', 'Vael', 'Xanthe', 'Zephyr', 'Auren'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.sky = {
   roles: ['spell-mechanic', 'chain-walker', 'academy student', 'skyship deckhand', 'cartographer'],
