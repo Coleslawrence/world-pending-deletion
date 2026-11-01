@@ -328,7 +328,7 @@ async function loadBoard() {
     let mine = null;
     if (!rows.some(x => x.uid === own)) {
       const snap = await cloud.db.doc(`daily/${date}/scores/${own}`).get();
-      if (snap.exists) { mine = cleanScore(own, snap.data(), date); mine.rank = col.count ? 1 + await col.count({ where: ['score', '>', mine.score] }) : null; }
+      if (snap.exists) { mine = cleanScore(own, snap.data(), date); mine.pos = col.count ? 1 + await col.count({ where: ['score', '>', mine.score] }) : null; }
     }
     Object.assign(ui.board, { rows, mine, loading: false, t: Date.now(), error: null });
   } catch (e) { Object.assign(ui.board, { loading: false, error: true, t: Date.now() }); cloudFail('board', 'load scores', e); }
@@ -357,7 +357,7 @@ function dailySheet() {
     ui.boardList = B.rows.concat(B.mine ? [B.mine] : []);
     rows = B.rows.map((x, i) => resultRow(x, i + 1, x.uid === own, i)).join('');
     if (!B.rows.length) rows = '<p class="sh-p fine">No outcomes recorded yet today.</p>';
-    if (B.mine) rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(B.mine, B.mine.rank, true, B.rows.length);
+    if (B.mine) rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(B.mine, B.mine.pos, true, B.rows.length);
     else if (r && !meta.daily.posted && !B.rows.some(x => x.uid === own)) { rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(r, null, true); note = cloud.tester === false ? `${PENDING} Your score stays on this device until you are approved.` : 'Your score posts at the next sync today.'; }
   } else if (cloud.on) {
     rows = B && B.error ? '<p class="sh-p fine">[Observations unavailable. Try again later.]</p>' : '<p class="sh-p fine">[Retrieving observations…]</p>';
@@ -613,7 +613,7 @@ function shopHTML() {
   const bonusHere = run.bonusSlot && (isGear(run.bonusSlot.id) ? 'gear' : 'skill') === tab;
   const xpTile = `<button class="tile xptile" data-act="sheet" data-s="stats"><span class="tl-h"><b>Lv ${run.level}</b><span class="price">${pointPrice(run)}g</span></span><span class="tl-n">Train a stat</span><span class="xp wide"><i style="width:${lvFill()}%"></i></span></button>`;
   const items = run.shop[tab].map((it, i) => shopItemTile(it, tab, i)).join('') + (bonusHere ? shopItemTile(run.bonusSlot, 'bonus', 0) : xpTile);
-  const odds = oddsFor(run).map((v, i) => v ? `${['E', 'D', 'C', 'B', 'A'][i]} ${v}%` : '').filter(Boolean).join(' · ');
+  const odds = oddsFor(run).map((v, i) => v ? `<span class="nw">${['E', 'D', 'C', 'B', 'A'][i]} ${v}%</span>` : '').filter(Boolean).join(' · ');
   const inShop = shopIds();
   const bar = run.bar.map((p, i) => p ? pieceTile(p, 'own', '', inShop) : `<div class="tile empty">Skill ${i + 1}</div>`).join('');
   const gear = GEAR_SLOTS.map(sl => run.gear[sl] ? pieceTile(run.gear[sl], 'own', '', inShop) : `<div class="tile empty gear">${sl}</div>`).join('');
@@ -1346,6 +1346,10 @@ function coachHTML() {
   if (!ui.coach) return '';
   let st = coachStep();
   while (st && st.until && st.until() && ui.screen === st.scr) { coachAdvance(); st = coachStep(); }
+  // Left the screen without doing what the step asked (e.g. tapped Awaken before opening Gifts): drop that screen's
+  // remaining steps, or the tutorial waits there forever and never shows again
+  if (st && st.scr === ui.screen) ui.coach.shown = ui.coach.i;
+  else if (st && ui.coach.shown === ui.coach.i) { const left = st.scr; while (st && st.scr === left) { coachAdvance(); st = coachStep(); } }
   const skipBtn = ui.coach.confirmSkip ? `<button class="link danger-t" data-act="coach-skip-yes">Yes, end the practice run</button>` : `<button class="link" data-act="coach-skip">Skip tutorial</button>`;
   if (!st || st.scr !== ui.screen || (ui.sheet && ui.sheet.type !== 'menu') || (run && run.pending.length && ['choose', 'shop', 'district'].includes(ui.screen))) return ui.coach.confirmSkip ? `<div class="coach pos-bottom"><p>End the practice run?</p><div class="co-f">${skipBtn}<button class="link" data-act="coach-skip-no">Keep going</button></div></div>` : '';
   if (ui.coach.min) return `<button class="coach-pill" data-act="coach-max">[Tutorial] ▴</button>`;
