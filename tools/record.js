@@ -152,8 +152,9 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   // Before WORLD_GEN.from, Pending World is the world the old generator made
   const old = date => { const rng = G.seedRng(G.dailySeed(date) + ':world'), T0 = Object.keys(G.WORLD_TYPES), type = G.pick(T0, rng), T = G.WORLD_TYPES[type];
     const name = G.pick(T.names[0].slice(0, 6), rng) + G.pick(T.names[1].slice(0, 6), rng); rng(); rng(); return { type, name: name[0].toUpperCase() + name.slice(1), champ: G.pick(T.champs.slice(0, 6), rng) }; };
+  const was = G.WORLD_GEN.from; G.WORLD_GEN.from = '2099-01-01';
   ['2026-11-01', '2026-11-02', '2026-12-25'].forEach(d => { const a = G.dailyWorld(d), b = old(d); ok(!a.v && a.type === b.type && a.name === b.name && a.champ === b.champ, `Pending World ${d} unchanged`); });
-  const was = G.WORLD_GEN.from; G.WORLD_GEN.from = '2026-11-02';
+  G.WORLD_GEN.from = '2026-11-02';
   ok(!G.dailyWorld('2026-11-01').v && G.dailyWorld('2026-11-02').v === 2 && JSON.stringify(G.dailyWorld('2026-11-03')) === JSON.stringify(G.dailyWorld('2026-11-03')), 'from the cut-off, Pending World is layered and the same for everyone');
   G.WORLD_GEN.from = was;
 }
