@@ -1864,7 +1864,7 @@ const REACTIONS = {
   flare: { name: 'Toxic Flare', pair: 'Burn + Poison', text: 'Applying Burn to a Poisoned target ignites the Poison for half its value as damage. Once per turn.' },
   cauterise: { name: 'Cauterise', pair: 'Burn + Bleed', text: 'Bleed is seared away and Burn doubles.' },
   hemorrhage: { name: 'Haemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
-  broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'The target takes 50% more damage until the end of their next turn.' },
+  broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'Breaks the target, the same as a full break bar: 50% more damage for 2 turns.' },
   blight: { name: 'Blight', pair: 'Poison + Leech', text: 'Leech drains double, but heals only the normal amount.' },
   hastened: { name: 'Hastened Doom', pair: 'Doom + 2 other effects', text: 'Doom lands a turn sooner.' },
 };
