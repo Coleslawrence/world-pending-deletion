@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Hollow Kingdom =====
 'use strict';
-WORLD_TYPES.hollow = { name: 'Hollow Kingdom', flavour: "A land where the dead won't rest.", home: 'venom', gift: 'warden', final: 'bone_saint', names: [['Mor', 'Gra', 'Duns', 'Ves', 'Ul', 'Kar'], ['vale', 'hollow', 'grave', 'mire', 'thorn', 'dun']], champs: ['Ebon', 'Lira', 'Mordecai', 'Wren', 'Silas', 'Ysolde'] };
+WORLD_TYPES.hollow = { name: 'Hollow Kingdom', flavour: "A land where the dead won't rest.", home: 'venom', guest: 'zealot', gift: 'warden', final: 'bone_saint', names: [['Mor', 'Gra', 'Duns', 'Ves', 'Ul', 'Kar', 'Nec', 'Hal', 'Wyth', 'Bel'], ['vale', 'hollow', 'grave', 'mire', 'thorn', 'dun', 'moor', 'fell', 'barrow', 'mourn']], mids: ['en', 'a', 'e'], champs: ['Ebon', 'Lira', 'Mordecai', 'Wren', 'Silas', 'Ysolde', 'Abel', 'Agnes', 'Ambrose', 'Cedric', 'Edda', 'Hester', 'Ivo', 'Lenore', 'Morwen', 'Nell', 'Osric', 'Prudence', 'Quill', 'Lazarus', 'Sable', 'Thea', 'Vesper', 'Mercy'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.hollow = {
   roles: ['lantern warden', 'gravedigger', 'candle-maker', 'bone-setter', 'chapel keeper'],

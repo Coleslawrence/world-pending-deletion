@@ -9,7 +9,8 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | A skill | `js/content/skills/<archetype>.js`: one `sk()` line with its two ★3 evolutions |
 | Gear | `js/content/gear.js` |
 | An archetype | `js/content/archetypes.js` (the entry, the wheel), its skills file, a colour in `css/style.css`, a Hidden Path for every pair, `STAT_INFO` in `base.js` |
-| A world type | A new pack in `js/content/worlds/` (the world, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
+| A world type | A new pack in `js/content/worlds/` (the world with its `guest` class and optional `setting`, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
+| A Fate or a People (world layers) | `js/content/layers.js`: its name, card line, record entries, roles and promises; a Fate's modifier weights, a People's epithets. Ids sit in their own number range in records, so each list holds at most 99 |
 | A god | `js/content/gods.js` (its archetypes, blessing and rival reply line) and a `chosen_<id>` divine Gift in `gifts.js` |
 | An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS`. Its moves play roles (strike, big hit, guard, setup, sustain) with numbers from its tier in `moves.js`; boss mechanics are fields from the enemy mechanics list below |
 | A trait monsters and rivals can roll | `js/content/traits.js` |
@@ -47,7 +48,8 @@ This whole process, from an outside source to Draft cards with previews, is call
 
 - **Content uses only content.** Files in `js/content/` may use each other and `base.js`, never anything from `js/core.js`. They load before it.
 - **Ids are permanent.** Saves, shared champions and the Halls store them. Rename the display name freely; never change or remove an id.
-- **World Record pools only grow at the end.** Runs store pool positions, so never reorder, edit or delete an entry, a role or a promise.
+- **World Record pools only grow at the end.** Runs store pool positions, so never reorder, edit or delete an entry, a role or a promise. The same goes for the pools of Fates and Peoples.
+- **A world is a type plus layers.** The type decides everything mechanical (home class and `guest`, World Gift, Final Champion); Fates and Peoples only add writing and pick the modifier. Write layers so they fit every world type of their setting; a layer or entry that only suits some settings lists them in `settings`.
 - **Event options keep their places.** Run summaries store the option picked by its position, so add new options at the end and never remove one.
 - **Outcomes live in `js/content/outcomes.js`.** Whatever an event option gives (`then`), a quest pays (`reward`) or a wager pays is a set of outcomes, `{ gold: 8, favour: { war: 2 } }`, applied and worded by one piece of code. An event option that needs more goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
@@ -65,6 +67,7 @@ Every pull request runs these (`.github/workflows/checks.yml`):
 | Check | Run it yourself | Fails when |
 | --- | --- | --- |
 | Content checker | `node tools/check-content.js` | A content file isn't loaded or uses `core.js`; an id is removed; a World Record pool is reordered; a field is unknown or missing; a reference points at nothing; an effect key isn't one the engine reads; an event could show no options, hides a cost, or loses an option; text breaks the style guide; two things share a name |
+| Entrant pool reserves | `node tools/pool-seed.js --check` | A reserve build in `js/content/pool.js` uses a skill, gear, Gift or Title that no longer exists. Rerun `node tools/pool-seed.js` to rebuild them from bot runs |
 | Smoke sim | `node tools/stats.js 200 --seed 1`, `node tools/daily.js 2026-11-01`, `node tools/record.js` | The game crashes in play, or Pending World or the World Record checks break |
 | Balance gate | `node tools/balance-gate.js BASE_DIR .` | The overall spared rate moves more than 3 points, or any archetype as the bot's main moves more than 6. Label the pull request `balance-change` when moving the numbers is the point: the gate then only reports |
 
@@ -320,13 +323,22 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 8 (quests, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 2 (events) |
-| `heart` | 1 | +1 max Heart |  | 2 (quests) |
-| `rune` | 1 | a rune |  | 3 (quests) |
-| `piece` | "B" | a free B-rank piece |  | 1 (quests) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 5 (events) |
-| `chain` | "done" | the story goes on |  | 28 (events) |
+| `gold` | 8 | 8 gold |  | 19 (quests, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 3 (events) |
+| `heart` | 1 | +1 max Heart |  | 5 (quests, events) |
+| `rune` | 1 | a rune |  | 5 (quests, events) |
+| `piece` | "B" | a free B-rank piece |  | 10 (quests, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 13 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 4 (events) |
+| `max_hp` | -0.1 | −10% max HP |  | 1 (events) |
+| `restore` | 1 | 1 Heart restored |  | 2 (events) |
+| `erase` | 1 | 1 Heart erased |  | 1 (events) |
+| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 3 (events) |
+| `respec` | true | your stat points to place again |  | 1 (events) |
+| `summon` | {"who":"copy"} | a visitor in your bracket |  | 4 (events) |
+| `amend` | "sudden" | the Amendment Sudden Death |  | 2 (events) |
+| `notice` | 1 | the System's notice | yes | 26 (events) |
+| `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`

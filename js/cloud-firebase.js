@@ -12,8 +12,9 @@
     id: path.split('/').pop(), path,
     get: async () => { try { const s = await api.getDoc(api.doc(api.fs, path)); return { id: s.id, exists: s.exists(), data: () => s.data() }; } catch (e) { throw mapErr(e); } },
     set: async d => {
-      // Other players read this name, so it is the name the player chose in game, never one from their account
-      if (/^(champions|rests|inbox)\//.test(path) && me) d = Object.assign({}, d, { name: publicName() });
+      // Other players read this name, so it is the name the player chose in game, never one from their account.
+      // A pool record keeps its owner's name when someone else takes one of its Hearts.
+      if (me && (/^(champions|rests|inbox)\//.test(path) || (/^pool\//.test(path) && d.owner === me.uid))) d = Object.assign({}, d, { name: publicName() });
       try { await api.setDoc(api.doc(api.fs, path), d); } catch (e) { throw mapErr(e); }
     },
   });

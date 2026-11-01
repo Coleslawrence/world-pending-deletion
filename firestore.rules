@@ -47,16 +47,19 @@ service cloud.firestore {
     // "Laid to rest" notes, one per document in the champion owner's inbox. Only the owner reads them;
     // any other tester can add a note signed with their own id, never edit one.
     // won: true means the owner's shared champion beat the sender (champion rank); at names the champion.
+    // pool: a filed record's round (Entrant pool): with won, the record beat the sender; with gone, the sender erased it.
     match /inbox/{owner}/notes/{noteId} {
       allow read, delete: if request.auth != null && request.auth.uid == owner;
       allow create: if isTester() && request.auth.uid != owner
         && noteId.matches(request.auth.uid + '_[0-9]+')
-        && request.resource.data.keys().hasOnly(['by', 'champ', 't', 'name', 'at', 'won', 'rank'])
+        && request.resource.data.keys().hasOnly(['by', 'champ', 't', 'name', 'at', 'won', 'rank', 'pool', 'gone'])
         && request.resource.data.by == request.auth.uid
         && request.resource.data.champ is string && request.resource.data.champ.size() <= 60
         && request.resource.data.t is number
         && (!('at' in request.resource.data) || request.resource.data.at is number)
         && (!('won' in request.resource.data) || request.resource.data.won is bool)
+        && (!('pool' in request.resource.data) || runInt(request.resource.data.pool, 1, 7))
+        && (!('gone' in request.resource.data) || request.resource.data.gone is bool)
         && (!('rank' in request.resource.data) || (request.resource.data.rank is string && request.resource.data.rank.size() <= 3))
         && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 24));
     }
@@ -95,11 +98,49 @@ service cloud.firestore {
           && request.resource.data.rec.ids is list && request.resource.data.rec.ids.size() <= 20));
     }
 
+    // The Entrant pool: 30 filed records for each of rounds 1 to 7, one document per slot (pool/{round}_{slot}), with r its
+    // round and hearts how many more defeats it survives. Any signed-in player reads a slot, or lists one round (30 at most).
+    // A tester files their own build over any slot of a round, with 3 Hearts: replacing a record is the design. Any other
+    // tester who beats a record takes exactly one of its Hearts and changes nothing else. At 0 the record is erased.
+    // The champion name and the name shown are player-chosen game text.
+    match /pool/{slot} {
+      allow get: if request.auth != null;
+      allow list: if request.auth != null && request.query.limit <= 30;
+      allow create, update: if isTester() && slot.matches('[1-7]_([1-9]|[12][0-9]|30)')
+        && request.resource.data.keys().hasOnly(['snap', 'owner', 'at', 'name', 'hearts', 'r'])
+        && request.resource.data.keys().hasAll(['snap', 'owner', 'at', 'hearts', 'r'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.at is int
+        && request.resource.data.hearts == 3
+        && request.resource.data.r == int(slot.split('_')[0])
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 24))
+        && poolSnap(request.resource.data.snap, int(slot.split('_')[0]));
+      allow update: if isTester() && resource.data.owner != request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hearts'])
+        && resource.data.hearts is int && resource.data.hearts > 0
+        && request.resource.data.hearts == resource.data.hearts - 1;
+    }
+    function poolSnap(x, round) {
+      return x is map
+        && x.keys().hasOnly(['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'worldFate', 'worldPeople', 'worldMix', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'])
+        && x.keys().hasAll(['champ', 'stats', 'level', 'maxHp', 'round', 'bar'])
+        && x.champ is string && x.champ.size() <= 60
+        && x.round == round
+        && runInt(x.level, 1, 9) && runInt(x.maxHp, 1, 2000)
+        && x.stats is map && x.stats.size() <= 8
+        && x.bar is list && x.bar.size() <= 5
+        && (!('gear' in x) || (x.gear is list && x.gear.size() <= 3))
+        && (!('gifts' in x) || (x.gifts is list && x.gifts.size() <= 12))
+        && (!('name' in x) || runKey(x.name, 24)) && (!('worldName' in x) || runKey(x.worldName, 30))
+        && (!('worldFate' in x) || runKey(x.worldFate, 16)) && (!('worldPeople' in x) || runKey(x.worldPeople, 16)) && (!('worldMix' in x) || runKey(x.worldMix, 16))
+        && (!('rank' in x) || runKey(x.rank, 3));
+    }
+
     // Playtest stats: one anonymous summary per finished run, for the stats dashboard. Game keys and numbers only, never
     // names. Each tester creates their own (runs/{uid}_{time}); nobody reads them in game, only the console and exports.
     match /runs/{runId} {
       allow create: if isTester() && runId == request.auth.uid + '_' + string(request.resource.data.at)
-        && request.resource.data.keys().hasOnly(['day', 'at', 'outcome', 'mode', 'world', 'wrank', 'rank', 'path', 'hidden', 'patron', 'gifts', 'title', 'round', 'wins', 'hearts', 'maxHearts', 'level', 'turns', 'mins', 'fights', 'picks', 'bar', 'gear', 'foe'])
+        && request.resource.data.keys().hasOnly(['day', 'at', 'ver', 'outcome', 'mode', 'world', 'wrank', 'rank', 'path', 'hidden', 'patron', 'gifts', 'title', 'round', 'wins', 'hearts', 'maxHearts', 'level', 'turns', 'mins', 'fights', 'picks', 'bar', 'gear', 'foe'])
         && request.resource.data.keys().hasAll(['day', 'at', 'outcome', 'world', 'round', 'wins', 'hearts'])
         && runFields(request.resource.data);
     }
@@ -127,6 +168,7 @@ service cloud.firestore {
     function runFields(d) {
       return d.day is string && d.day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
         && d.at is int && d.at > 0
+        && (!('ver' in d) || runKey(d.ver, 16))
         && d.outcome in ['spared', 'erased', 'abandoned']
         && d.world is string && d.world.size() <= 16
         && runInt(d.round, 0, 20) && runInt(d.wins, 0, 20) && runInt(d.hearts, 0, 20)

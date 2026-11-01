@@ -23,6 +23,7 @@ The web version uses Firebase for sign-in, cloud saves and shared champions. Wit
 | `inbox/{uid}/notes/{id}` | "Laid to rest" and champion-win notes addressed to that player | Only that player | Any other tester, once per note |
 | `daily/{date}/scores/{uid}` | One Pending World score per player per game day | Signed-in players | Only that player, if a tester, once |
 | `rests/{uid}` | Old "laid to rest" lists from earlier versions | Signed-in players | Only that player, if a tester |
+| `pool/{round}_{slot}` | The Entrant pool: one filed build per slot, 30 slots for each of rounds 1 to 7, with its owner's id and the name they chose in game | Signed-in players, one slot at a time | Any tester, their own build over any slot |
 | `testers/{uid}` | One document per approved playtester | Only that player (to check) | Nobody: console only |
 | `requests/{uid}` | An access request: the name the player chose in game and when | Only that player | Only that player |
 | `runs/{uid}_{time}` | One anonymous summary per finished run, for the stats dashboard: world, class, round, Hearts, picks. No names | Nobody in game: console and exports only | Only that player, if a tester, once |

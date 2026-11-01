@@ -72,27 +72,57 @@ const loreName = e => e.name.replace(/^(The|Your) /, m => m.toLowerCase()); // m
 const loreWho = e => e.name.replace(/^Your \S+ /, ''); // a person in the Halls: "Ilsa"
 // Pick 10 entries: at least 3 places, 2 people and 2 customs, always including the bio's home place and person.
 // ids is in deletion order (far, city, home, with the bio's person last); lost and partial are bitmasks over ids.
-function buildRecord(type, rng) {
-  const L = LORE[type], E = L.entries, all = E.map((_, i) => i);
-  const of = (k, tier) => all.filter(i => E[i].k === k && E[i].tier === tier);
+// A world's lore is its type's pool plus its layers' pools (js/content/layers.js). Records store numbers, and each source
+// keeps its own range, so a record made before layers existed still points at the same words: the type's own entries,
+// roles and promises are 0 to 99, the Fate's from 100, the People's from 200, a Confluence type's from 300.
+const LAYER_BASE = { f: 100, p: 200, c: 300 }, LAYER_TAKE = { f: 2, p: 2, c: CONFLUENCE.take };
+const layerSrc = (k, id) => id == null ? null : k === 'f' ? FATES[id] : k === 'p' ? PEOPLES[id] : LORE[id];
+// The layers a record carries, from a world ({ fate, people, mix }) or a record ({ f, p, c })
+function layersOf(x) { const o = {}; if (!x) return o; const f = x.fate || x.f, p = x.people || x.p, c = x.mix || x.c; if (FATES[f]) o.f = f; if (PEOPLES[p]) o.p = p; if (LORE[c]) o.c = c; return o; }
+// A snapshot's layers (worldFate, worldPeople, worldMix), or else the ones its record carries
+function snapLayers(x) { return x ? Object.assign(layersOf(x.rec), layersOf({ fate: x.worldFate, people: x.worldPeople, mix: x.worldMix })) : {}; }
+// The words for a world's layers: "Merchant League · The Long Night · with the Iron Hold"
+function layerNames(Ls) { return [Ls.p && PEOPLES[Ls.p].name, Ls.f && FATES[Ls.f].name, Ls.c && 'with the ' + WORLD_TYPES[Ls.c].name].filter(Boolean).join(' · '); }
+const loreCache = {};
+// { entries, roles, promises }: objects from number to entry or text. Keys come back in number order.
+function recLore(rec, type) {
+  const Ls = layersOf(rec), key = [type, Ls.f, Ls.p, Ls.c].join('|');
+  if (loreCache[key]) return loreCache[key];
+  const out = { entries: {}, roles: {}, promises: {} };
+  const add = (src, base, only) => src && (only || ['entries', 'roles', 'promises']).forEach(a => (src[a] || []).forEach((x, i) => { out[a][base + i] = x; }));
+  add(LORE[type], 0);
+  Object.keys(LAYER_BASE).forEach(k => add(layerSrc(k, Ls[k]), LAYER_BASE[k], k === 'c' ? ['entries'] : null));
+  return loreCache[key] = out;
+}
+const loreIds = o => Object.keys(o).map(Number);
+// Settings: a world type has one (fantasy unless it says otherwise); a layer or a layer entry may list the settings it
+// suits, and without a list it suits them all. A world only draws layers and entries that suit its type.
+const settingOf = type => (WORLD_TYPES[type] && WORLD_TYPES[type].setting) || 'fantasy';
+const suits = (x, type) => !x || !x.settings || x.settings.includes(settingOf(type));
+// layers: the world's layers, if any. Each layer present files LAYER_TAKE entries (a Confluence type's never its home
+// ones, which belong to someone else's home); the type files the rest.
+function buildRecord(type, rng, layers) {
+  const Ls = layersOf(layers), W = recLore(Ls, type), E = W.entries, all = loreIds(E), own = all.filter(i => i < 100);
+  const of = (k, tier) => own.filter(i => E[i].k === k && E[i].tier === tier);
   const home = pick(of('place', 'home'), rng), person = pick(of('person', 'home'), rng);
   const ids = [home, person], need = { place: 3, person: 2, custom: 2 };
-  shuffle(all, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
-  shuffle(all, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
+  Object.keys(LAYER_BASE).forEach(k => { if (Ls[k]) shuffle(all.filter(i => i >= LAYER_BASE[k] && i < LAYER_BASE[k] + 100 && (k === 'c' ? E[i].tier !== 'home' : suits(E[i], type))), rng).slice(0, LAYER_TAKE[k]).forEach(i => ids.push(i)); });
+  shuffle(own, rng).forEach(i => { if (!ids.includes(i) && ids.filter(j => E[j].k === E[i].k).length < need[E[i].k]) ids.push(i); });
+  shuffle(own, rng).forEach(i => { if (ids.length < REC_SIZE && !ids.includes(i)) ids.push(i); });
   const key = i => i === person ? 9 : TIER_ORDER[E[i].tier];
-  const bio = { role: Math.floor(rnd(rng) * L.roles.length), home, person, promise: Math.floor(rnd(rng) * L.promises.length) };
-  return { ids: shuffle(ids, rng).sort((a, b) => key(a) - key(b)), lost: 0, partial: 0, bio };
+  const bio = { role: pick(loreIds(W.roles), rng), home, person, promise: pick(loreIds(W.promises), rng) };
+  return Object.assign({ ids: shuffle(ids, rng).sort((a, b) => key(a) - key(b)), lost: 0, partial: 0, bio }, Ls);
 }
 // Saves from before the record get one that matches the Hearts they have left
 function ensureRecord(run, rng) {
   if (!run || run.record || run.practice || !LORE[run.world.type]) return;
-  run.record = buildRecord(run.world.type, rng);
+  run.record = buildRecord(run.world.type, rng, run.world);
   run.record.lost = (1 << Math.max(0, Math.min(REC_SIZE, run.maxHearts - run.hearts))) - 1;
 }
 // Erase the next n entries that are still standing. Returns their positions in ids.
 function eraseRecord(run, n, msgs) {
   const R = run.record, out = []; if (!R) return out;
-  const E = LORE[run.world.type].entries;
+  const E = recLore(R, run.world.type).entries;
   for (let i = 0; i < R.ids.length && out.length < n; i++) if (!(R.lost & 1 << i)) {
     R.lost |= 1 << i; R.partial &= ~(1 << i); out.push(i);
     msgs && msgs.push({ t: 'loss', text: `[Erasing: ${loreName(E[R.ids[i]])}… done.]` });
@@ -106,10 +136,10 @@ function restoreRecord(run, n, msgs) {
   if (k && msgs) msgs.push({ t: 'sys', text: `[Restoring from backup… ${k} record${k > 1 ? 's' : ''} recovered. Partial.]` });
   return k;
 }
-// An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Past 14 entries, extra Hearts go unrecorded.
+// An extra max Heart adds an unused entry at the front of the queue, so it is the next to go. Once every entry the world has is filed (up to REC_MAX), extra Hearts go unrecorded.
 function amendRecord(run, msgs, rng) {
   const R = run.record; if (!R || R.ids.length >= REC_MAX) return false;
-  const E = LORE[run.world.type].entries, unused = E.map((_, i) => i).filter(i => !R.ids.includes(i));
+  const E = recLore(R, run.world.type).entries, unused = loreIds(E).filter(i => !R.ids.includes(i));
   if (!unused.length) return false;
   const low = Math.min(...unused.map(i => TIER_ORDER[E[i].tier]));
   const id = pick(unused.filter(i => TIER_ORDER[E[i].tier] === low), rng);
@@ -125,7 +155,7 @@ function recWorldGone(rec) { return recLeft(rec) === 0; }
 // A partial entry has one or two words of its line barred, picked from the entry index so every device shows the same ones
 function partialWords(i, n) { const a = (i * 7 + 3) % n; return n > 6 ? [a, (a + 3) % n] : [a]; }
 function recEntries(rec, type, halls) {
-  const E = LORE[type].entries;
+  const E = recLore(rec, type).entries;
   return rec.ids.map((i, p) => {
     const e = E[i], lost = !!(rec.lost & 1 << p), partial = !lost && !!(rec.partial & 1 << p);
     const words = e.text.split(' '), bar = partial ? partialWords(i, words.length) : [];
@@ -134,7 +164,7 @@ function recEntries(rec, type, halls) {
 }
 // The bio as text pieces; erased pieces have gone set. champ gives the third-person Halls voice.
 function bioParts(rec, type, worldName, champ) {
-  const L = LORE[type], E = L.entries, b = rec.bio;
+  const L = recLore(rec, type), E = L.entries, b = rec.bio;
   const gone = i => !!(rec.lost & 1 << rec.ids.indexOf(i));
   const home = E[b.home], who = E[b.person], wgone = recWorldGone(rec);
   const key = home.name.replace(/^The /, '').toLowerCase(), at = home.near.toLowerCase().indexOf(key);
@@ -148,20 +178,22 @@ function bioParts(rec, type, worldName, champ) {
 }
 // What a returning Erased champion remembers: the last entry still standing, or else the last one to go
 function recFragment(rec, type) {
-  const E = LORE[type].entries; let p = -1;
+  const E = recLore(rec, type).entries; let p = -1;
   rec.ids.forEach((_, j) => { if (!(rec.lost & 1 << j)) p = j; });
   if (p < 0) p = rec.ids.length - 1;
   const e = E[rec.ids[p]]; return e.k === 'person' ? loreWho(e) : loreName(e);
 }
 // Shared records are untrusted: indexes must exist in the pool, masks must fit, and the bio must point into ids
+// Layers must name real ones (and a Confluence another type); an unknown layer fails the record rather than dropping words.
 function sanitizeRec(r, type) {
-  const L = LORE[type]; if (!L || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
-  const ids = r.ids.slice(0, REC_MAX), n = L.entries.length, b = r.bio || {};
-  const idx = (v, len) => Number.isInteger(v) && v >= 0 && v < len;
+  if (!LORE[type] || !r || typeof r !== 'object' || r.w !== type || !Array.isArray(r.ids)) return null;
+  const Ls = layersOf(r); if (['f', 'p', 'c'].some(k => r[k] != null && !Ls[k]) || Ls.c === type) return null;
+  const L = recLore(Ls, type), ids = r.ids.slice(0, REC_MAX), b = r.bio || {};
+  const has = (o, v) => Number.isInteger(v) && o[v] !== undefined;
   const mask = v => Number.isInteger(v) && v >= 0 && v < 1 << ids.length;
-  if (!ids.length || !ids.every(i => idx(i, n)) || new Set(ids).size !== ids.length || !mask(r.lost) || !mask(r.partial)) return null;
-  if (!idx(b.role, L.roles.length) || !idx(b.promise, L.promises.length) || !ids.includes(b.home) || !ids.includes(b.person)) return null;
-  return { w: type, ids, lost: r.lost, partial: r.partial, bio: { role: b.role, home: b.home, person: b.person, promise: b.promise } };
+  if (!ids.length || !ids.every(i => has(L.entries, i)) || new Set(ids).size !== ids.length || !mask(r.lost) || !mask(r.partial)) return null;
+  if (!has(L.roles, b.role) || !has(L.promises, b.promise) || !ids.includes(b.home) || !ids.includes(b.person)) return null;
+  return Object.assign({ w: type, ids, lost: r.lost, partial: r.partial, bio: { role: b.role, home: b.home, person: b.person, promise: b.promise } }, Ls);
 }
 
 // ---------- Gifts ----------
@@ -253,8 +285,12 @@ function stream(run, purpose, rng) { return rng || (run && run.seed ? runRng(run
 const DAY_OFFSET = 9.5 * 3600 * 1000;
 function dailyDate(now) { return new Date((now == null ? Date.now() : now) + DAY_OFFSET).toISOString().slice(0, 10); }
 function dailySeed(date) { return 'wpd:' + date; }
-function dailyWorld(date) { return genWorld(seedRng(dailySeed(date) + ':world')); }
-function dailyRecord(date, type) { return buildRecord(type, seedRng(dailySeed(date) + ':record')); }
+// Pending World days before WORLD_GEN.from keep the world the old generator made, so shipping layered worlds never
+// changes a day already under way. SHIP STEP: set from to the game day after the release that ships layered worlds.
+const WORLD_GEN = { from: '2026-11-02' };
+function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'); return date >= WORLD_GEN.from ? genWorld(rng) : genWorldV1(rng); }
+// w: the day's world (or just its type, for a world without layers)
+function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w); }
 // Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
 function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {} }); }
 // Leaderboard score: round reached, then Hearts left, then fewest turns, in one sortable number
@@ -274,14 +310,79 @@ function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k
 
 // ---------- Worlds ----------
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
-function genWorld(rng, cap) {
-  const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
-  const name = pick(T.names[0], rng) + pick(T.names[1], rng);
-  const rank = cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
-  const mod = wpick(Object.keys(MODIFIERS), [30, 15, 15, 15, 15], rng);
-  return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs, rng) };
+const MOD_W = [30, 15, 15, 15, 15];
+const worldRank = (rng, cap) => cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
+const pickKey = (o, rng, type) => { const k = Object.keys(o).filter(x => suits(o[x], type)); return k.length ? pick(k, rng) : null; };
+// Syllables join cleanly: two vowels meeting lose the second, and no letter appears three times running
+function joinName(parts) {
+  const n = parts.reduce((a, b) => /[aeiouy]$/i.test(a) && /^[aeiou]/i.test(b) ? a + b.slice(1) : a + b, '').replace(/(.)\1\1/g, '$1$1');
+  return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
 }
-function offerWorlds(meta, rng) { const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0; while (out.length < n && guard++ < 60) { const w = genWorld(rng, cap); if (seen.has(w.type) && guard < 40) continue; seen.add(w.type); out.push(w); } return out; }
+// A start and an end from the type's lists (a Confluence type lends the start), with a middle syllable 1 time in 4
+function worldName(T, C, rng) {
+  const a = pick((C || T).names[0], rng), mid = T.mids && rnd(rng) < 0.25 ? pick(T.mids, rng) : '', b = pick(T.names[1], rng);
+  return joinName([a, mid, b]);
+}
+// A world (v 2): type, name, rank, its layers, the modifier its Fate brings, and a champion name for the Awakening.
+// cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
+function genWorld(rng, cap) {
+  const types = Object.keys(WORLD_TYPES), type = pick(types, rng), T = WORLD_TYPES[type];
+  const mix = CONFLUENCE.chance && rnd(rng) < CONFLUENCE.chance ? pick(types.filter(k => k !== type && settingOf(k) === settingOf(type)), rng) || null : null;
+  const name = worldName(T, mix && WORLD_TYPES[mix], rng), rank = worldRank(rng, cap);
+  const fate = pickKey(FATES, rng, type), people = pickKey(PEOPLES, rng, type), M = fate && FATES[fate].mods;
+  const mod = M ? wpick(Object.keys(M), Object.values(M), rng) : wpick(Object.keys(MODIFIERS), MOD_W, rng);
+  const w = { v: 2, type, name, rank, mod, champ: pick(T.champs, rng) };
+  if (fate) w.fate = fate; if (people) w.people = people; if (mix) w.mix = mix;
+  return w;
+}
+// The generator before layers, kept for Pending World days before WORLD_GEN.from: the first 6 syllables and names only
+function genWorldV1(rng, cap) {
+  const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
+  const name = pick(T.names[0].slice(0, 6), rng) + pick(T.names[1].slice(0, 6), rng);
+  const rank = worldRank(rng, cap), mod = wpick(Object.keys(MODIFIERS), MOD_W, rng);
+  return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs.slice(0, 6), rng) };
+}
+// A world's class pool: its home, the home's two wheel neighbours and the type's fixed guest. A Confluence world takes
+// both homes and both guests instead. The home always comes; any other class not unlocked yet (or already in) gives way
+// to its nearest free unlocked class on the wheel. Worlds from before v 2 kept a random fourth class (newRun).
+function worldArch(world, U) {
+  const T = WORLD_TYPES[world.type], C = world.mix && WORLD_TYPES[world.mix], n = WHEEL.length;
+  const want = C ? [C.home, T.guest, C.guest] : alliesOf(T.home).concat(T.guest), open = unlockedArch({ unlocks: U }), out = [T.home];
+  want.forEach(k => {
+    const i = WHEEL.indexOf(k);
+    for (let d = 0; d < n; d++) { const c = [WHEEL[(i + d) % n], WHEEL[(i + n - d) % n]].find(x => open.includes(x) && !out.includes(x)); if (c) { out.push(c); break; } }
+  });
+  return out;
+}
+// No-repeat memory: meta.recent holds the last RECENT_MAX worlds you fought for (newest first). Offers never repeat one of
+// their names or Fate + People pairs, and skip the types of the last RECENT_TYPES where they can. Pending World ignores it.
+const RECENT_MAX = 10, RECENT_TYPES = 2;
+function staleWorld(meta, w) {
+  const R = meta.recent || [];
+  if (R.some(r => r.n === w.name || (w.fate && r.f === w.fate && r.p === w.people))) return 2;
+  return R.slice(0, RECENT_TYPES).some(r => r.t === w.type) ? 1 : 0;
+}
+function offerWorlds(meta, rng) {
+  const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0;
+  while (out.length < n && guard++ < 80) {
+    const w = genWorld(rng, cap), st = staleWorld(meta, w);
+    if ((seen.has(w.type) && guard < 50) || (st === 2 && guard < 70) || (st === 1 && guard < 40)) continue;
+    seen.add(w.type); out.push(w);
+  }
+  return out;
+}
+// World Pulse: one System line about your world at the start of each round from round 2. In rounds 3 and 5 the Fate's
+// trouble grows (its stages); otherwise it is about an entry still standing, and how your last fight went. Words only.
+function worldPulse(run, rng) {
+  if (!run || run.practice || run.elite || run.round < 2 || !run.record) return null;
+  const w = run.world.name, F = FATES[run.world.fate], at = PULSE.stageAt.indexOf(run.round);
+  if (F && F.stages && at >= 0 && F.stages[at]) return `[${w}: ${F.stages[at]}]`;
+  const last = (run.history || []).slice(-1)[0], left = recEntries(run.record, run.world.type).filter(e => !e.lost);
+  if (!last || !left.length) return null;
+  const e = pick(left, rng), E = recLore(run.record, run.world.type).entries[e.i];
+  return '[' + pick(PULSE[last.won ? 'win' : 'loss'][e.k], rng).replace('{w}', w).replace('{e}', loreName(E)) + ']';
+}
+function rememberWorld(meta, w) { meta.recent = [{ t: w.type, n: w.name, f: w.fate || null, p: w.people || null }].concat(meta.recent || []).slice(0, RECENT_MAX); }
 
 // ---------- Run ----------
 // setup: { name, sigil, color, stats, gifts:[], patron: a GODS id or 'none' }
@@ -290,7 +391,7 @@ function newRun(world, setup, meta, rng) {
   const U = setup.seed ? {} : meta.unlocks, rs = rng || (setup.seed ? seedRng(setup.seed + ':setup') : undefined);
   const home = WORLD_TYPES[world.type].home;
   const pool = unlockedArch({ unlocks: U }).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
-  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
+  const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : world.v >= 2 ? worldArch(world, U).slice(1) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer, setup.sysBonus);
   const G = setup.gifts;
   const run = {
@@ -314,10 +415,11 @@ function newRun(world, setup, meta, rng) {
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
-  else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
+  else { run.record = setup.record ? JSON.parse(JSON.stringify(setup.record)) : buildRecord(world.type, rng, world); run.log.push({ t: 'sys', text: `[Filing world record: ${world.name}. ${run.record.ids.length} entries.]` }); }
   if (setup.patron && setup.patron !== 'none') run.favour[setup.patron] = 2;
   // Entrant Rank: promotion perks and a waiting Rank Trial. Pending World and practice runs use neither.
   run.perks = [];
+  if (!setup.seed && !run.practice) rememberWorld(meta, world);
   if (!setup.seed && !run.practice && meta.rank) {
     run.perks = meta.rank.perks.filter(k => PERKS[k]);
     if (run.perks.includes('stipend')) run.gold += 1;
@@ -338,7 +440,7 @@ function effStats(run) {
   return s;
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts)); }
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0))); }
 // Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
 // points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
 const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
@@ -528,6 +630,7 @@ function sanitizeSnap(x, owner) {
   const history = (Array.isArray(x.history) ? x.history : []).slice(0, 12).map(h => ({ round: num(h.round, 1, 12, 1), name: str(h.name, 40), won: !!h.won, turns: num(h.turns, 1, 99, 1), hl: num(h.hl, 0, 9, 0), kind: str(h.kind, 10), dealt: num(h.dealt, 0, 99999, 0) }));
   return {
     champ: str(x.champ, 60) || 'Nameless', name: str(x.name, 20), sigil: num(x.sigil, 0, 5, 0), color: num(x.color, 0, 5, 0), worldName: str(x.worldName, 30), worldType: WORLD_TYPES[x.worldType] ? x.worldType : 'drowned',
+    worldFate: FATES[x.worldFate] ? x.worldFate : null, worldPeople: PEOPLES[x.worldPeople] ? x.worldPeople : null, worldMix: LORE[x.worldMix] && x.worldMix !== x.worldType ? x.worldMix : null,
     path: ARCH[x.path] ? x.path : null, stats, level: num(x.level, 1, 9, 1), maxHp: num(x.maxHp, 20, 700, 80), round: num(x.round, 1, 8, 1), gifts, title: TITLES[x.title] ? x.title : null, milestones: ms,
     bar, gear, history, cause: str(x.cause, 60) || null, hearts: num(x.hearts, 0, 20, 0), maxHearts: num(x.maxHearts, 1, 20, 10), wins: num(x.wins, 0, 20, 0), elite: num(x.elite, 0, 4, 0), entrant: num(x.entrant, 0, 99999, 0),
     hiddenPath: HIDDEN_PATHS[x.hiddenPath] ? x.hiddenPath : null, at: num(x.at, 0, 1e15, 0), owner: owner || null, shared: !!owner,
@@ -619,7 +722,9 @@ const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
 // The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
 // notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
 // gate: Gatekeepers (the hard pick at a GATES round) are this much tougher again, with an extra trait and a second phase.
-const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 1 };
+const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 1, poolDmg: 1, poolHp: 1, poolFragment: 1 };
+// poolDmg, poolHp: multipliers on Entrant pool builds, which otherwise fight at their own strength; poolFragment: Hearts a
+// win over a filed record takes back (all left at 1 until the balance pass)
 const GATES = [4, 7];
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
@@ -629,7 +734,7 @@ const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
 function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
-  if (run.round >= ROUNDS) return [{ kind: 'final', id: WORLD_TYPES[run.world.type].final }];
+  if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: WORLD_TYPES[run.world.type].final }, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
   const early = run.round <= 3;
   let pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
   // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
@@ -641,17 +746,22 @@ function makeChoices(run, meta, rng) {
   // Pending World never draws other champions, so every player faces the same fights
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
+  // The Entrant pool: the hard monster or rival becomes another Entrant's build for this round (Gatekeeper rounds keep theirs)
+  if (poolOn(run) && (hard.kind === 'monster' || hard.kind === 'rival') && !GATES.includes(run.round)) hard = poolSpec(run.round, poolSlot(rng));
   if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
+  // Someone an event sent for (a copy of you, an Erased champion, an auditor) takes the hard slot on the round they are due
+  const due = (run.summons || []).findIndex(x => x.round <= run.round);
+  if (due >= 0 && !(run.trial && !run.trial.done && run.round === run.trial.round)) { hard = run.summons[due].spec; run.summons.splice(due, 1); }
   // A Gatekeeper: at a GATES round the hard rival guards the way on, with an extra trait, a second phase and a better reward
   if (GATES.includes(run.round) && hard.kind === 'rival' && !run.practice) hard.gate = true;
   // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
-  [easy, hard].forEach(c => { const n = run.practice || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
+  [easy, hard].forEach(c => { const n = run.practice || c.summoned || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
 function specName(spec) {
   if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
-  if (spec.kind === 'erased' || spec.kind === 'champion') return spec.snap.champ;
+  if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
   if (spec.gate) return n + ', Gatekeeper';
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
@@ -669,6 +779,7 @@ function specStyle(spec) {
   if (spec.kind === 'trial') return "The System's examiner. Pass the condition to be promoted";
   if (spec.kind === 'erased') return `Erased. Fell in round ${spec.snap.round} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   if (spec.kind === 'champion') return `Saved ${spec.snap.worldName} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
+  if (spec.kind === 'entrant') return poolStyle(spec);
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
@@ -709,6 +820,7 @@ function makeWager(run, rng) {
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
 function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); return o; }
 function addFavour(run, god, n, meta, msgs, rng) {
+  if (n < 0) { const b = run.favour[god] || 0; run.favour[god] = Math.max(0, b + n); if (b > run.favour[god]) msgs && msgs.push({ t: 'loss', text: `[${GODS[god].name} is displeased. Favour −${b - run.favour[god]}.]` }); return; }
   run.favour[god] = (run.favour[god] || 0) + n;
   msgs && msgs.push({ t: 'favour', text: `[${GODS[god].name} is pleased. Favour +${n}.]` });
   if (run.favour[god] >= 4 && !(run.gifted[god] >= 1)) {
@@ -749,16 +861,23 @@ function merchantPiece(run, rng, msgs, tries) {
 }
 // What an option's go(run, h) can use, since content cannot call the rules directly
 function eventKit(run, meta, rng, msgs) {
-  return {
+  const kit = {
     meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
     lose: (f, text) => lose(run, f, msgs, text), piece: tries => merchantPiece(run, rng, msgs, tries), eraseRecord: n => eraseRecord(run, n, msgs),
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
+    apply: T => { const ctx = { run, h: kit, msgs }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
+    heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
+    sellLowest: mult => { const p = run.bench.slice().sort((a, b) => sellValue(a) - sellValue(b))[0]; if (!p) return 0; const v = sellValue(p) * (mult || 1); removePiece(run, p.u); run.gold += v; msgs.push({ t: 'loot', text: `[Sold: ${pieceDef(baseId(p.id)).name}. +${v} gold.]` }); return v; },
   };
+  return kit;
 }
 function eventText(run, key) { const t = EVENTS[key].text; return typeof t === 'function' ? t(run) : t; }
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
-  const keys = Object.keys(EVENTS).filter(k => !EVENTS[k].chain).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
+  // Stand-alone events don't repeat in a run until every one has been seen
+  const open = k => !EVENTS[k].chain && (!EVENTS[k].can || EVENTS[k].can(run));
+  const fresh = Object.keys(EVENTS).filter(k => open(k) && !(run.seen || []).includes(k));
+  const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(open)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
   const w = keys.map(k => EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1);
   return wpick(keys, w, rng);
 }
@@ -778,16 +897,25 @@ function checkMet(run, key, c) {
   return !!(c.luck && run.luck && run.luck[key]);
 }
 function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : '[LUK]'; }
+// Chance options ({ roll: { stat, hard? } }): always shown, with the odds on the button. ROLL_BASE (ROLL_HARD if hard) + ROLL_PER per
+// point of the stat + ROLL_LUK per point of LUK, kept between ROLL_MIN and ROLL_MAX. The roll is made when the event appears and kept
+// with the run, so reloading never changes it; a failed roll takes the option's fail branch, which always does something.
+const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, ROLL_MAX = 95;
+function rollChance(run, r) { const s = effStats(run); return Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0)))); }
+function rollTag(run, r) { return `[${r.stat} ${rollChance(run, r)}%]`; }
 function pushEvent(run, key, rng) {
   run.pending.push({ type: 'event', key });
+  run.seen = run.seen || []; if (!run.seen.includes(key)) run.seen.push(key);
+  if (EVENTS[key] && EVENTS[key].opts.some(o => o.roll)) { run.rolls = run.rolls || {}; run.rolls[key] = rnd(stream(run, 'event', rng)) * 100; }
   if (EVENTS[key] && EVENTS[key].opts.some(o => o.check && o.check.luck)) { run.luck = run.luck || {}; run.luck[key] = rnd(stream(run, 'event', rng)) < LUCK_LINE * effStats(run).LUK; }
 }
-// The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines (hard and god lines first)
+// The options the player sees, by index: those they can take, with at most MAX_STAT_LINES stat lines and chance options together
+// (chance options first, then hard and god lines), so the sheet fits one screen
 function eventOpts(run, key) {
   const E = EVENTS[key]; if (!E) return [];
-  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && (!o.check || checkMet(run, key, o.check)); });
-  const w = c => c.hard || c.favour ? 2 : c.luck ? 1 : 0;
-  const lines = ok.filter(i => E.opts[i].check).sort((a, b) => w(E.opts[b].check) - w(E.opts[a].check));
+  const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && !(o.payHeart >= run.hearts) && (!o.check || checkMet(run, key, o.check)); });
+  const w = o => o.roll ? 3 : o.check.hard || o.check.favour ? 2 : o.check.luck ? 1 : 0; // a chance option is always shown, so it is never the one cut
+  const lines = ok.filter(i => E.opts[i].check || E.opts[i].roll).sort((a, b) => w(E.opts[b]) - w(E.opts[a]));
   const cut = lines.slice(MAX_STAT_LINES);
   return ok.filter(i => !cut.includes(i));
 }
@@ -796,14 +924,24 @@ function eventOpt(run, key, idx) { return eventOpts(run, key).includes(idx) ? EV
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
-  msgs = msgs || []; const before = msgs.length, T = o.then || {}, r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
+  msgs = msgs || []; const r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
   if (o.pay) run.gold -= o.pay;
+  if (o.payHeart) { run.hearts -= o.payHeart; msgs.push({ t: 'loss', text: `[Paid: ${o.payHeart} Heart${o.payHeart > 1 ? 's' : ''}, ${run.hearts} left.]` }); eraseRecord(run, o.payHeart, msgs); }
+  // A chance option: the roll made when the event appeared decides which branch happens
+  let B = o;
+  if (o.roll) {
+    const ch = rollChance(run, o.roll), got = run.rolls && run.rolls[key] != null ? run.rolls[key] : rnd(r) * 100, won = got < ch;
+    msgs.push({ t: won ? 'class' : 'loss', text: `[${o.roll.stat} check: ${ch}%. ${won ? 'Success' : 'Failed'}.]` });
+    if (!won) B = o.fail;
+    if (run.rolls) delete run.rolls[key];
+  }
+  const before = msgs.length, T = B.then || {};
   const ctx = { run, h, msgs, chain: EVENTS[key].chain };
   applyOutcomes(T, ctx, false);
-  if (o.go) o.go(run, h);
+  if (B.go) B.go(run, h);
   notePick(run, 'e:' + key + '.' + idx);
   if (run.luck) delete run.luck[key];
-  if (o.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof o.reveal === 'function' ? o.reveal(run) : o.reveal });
+  if (B.reveal && msgs.length === before) msgs.push({ t: 'sys', text: typeof B.reveal === 'function' ? B.reveal(run) : B.reveal });
   applyOutcomes(T, ctx, true);
   return true;
 }
@@ -816,9 +954,40 @@ const OUTCOME_APPLY = {
   rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(3, stream(c.run, 'loot'), null, c.run) }); },
   piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) { c.msgs && c.msgs.push({ t: 'loot', text: `[${c.label || 'Reward'}: ${pieceDef(id).name}]` }); addPiece(c.run, id, [], c.msgs); } },
   next: (v, c) => { Object.assign(c.run.nextFlags, v); },
+  foe: (v, c) => {
+    const F = c.run.nextFlags;
+    if (v.weaken) F.foeWeaken = (F.foeWeaken || 0) + v.weaken;
+    if (v.poison) F.foePoison = (F.foePoison || 0) + v.poison;
+    if (v.burn) F.foeBurn = (F.foeBurn || 0) + v.burn;
+    if (v.hp) F.foeHp = (F.foeHp || 1) * (1 + v.hp);
+    if (v.trait) { const have = F.foeTraits || [], add = shuffle(Object.keys(TRAIT_POOL).filter(k => !have.includes(k)), stream(c.run, 'opps')).slice(0, v.trait); F.foeTraits = have.concat(add); }
+  },
+  max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
+  erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
+  stakes: (v, c) => { const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
+  respec: (v, c) => { const pts = STATS.reduce((n, k) => n + Math.max(0, c.run.stats[k] - 1), 0); STATS.forEach(k => c.run.stats[k] = Math.min(c.run.stats[k], 1)); c.run.statPts += pts; c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: 'level', text: `[Stats reset. ${pts} stat points to place again.]` }); },
+  summon: (v, c) => { const s = summonSpec(c.run, v, stream(c.run, 'opps')); if (!s) return; (c.run.summons = c.run.summons || []).push({ round: c.run.round + 1, spec: s }); },
+  amend: (v, c) => { c.run.amend = v; c.msgs.push({ t: 'class', text: `[Amendment passed: ${AMENDMENTS[v].name}. ${AMENDMENTS[v].say}]` }); },
+  restore: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.min(c.run.maxHearts, c.run.hearts + v); const k = c.run.hearts - b; if (k) { c.msgs.push({ t: 'loot', text: `[+${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); restoreRecord(c.run, k, c.msgs); } },
+  notice: (v, c) => {
+    const was = noticeOf(c.run); c.run.notice = Math.max(0, Math.min(TUNE.noticeMax, (c.run.notice || 0) + v)); const now = noticeOf(c.run);
+    if (now > was) c.msgs.push({ t: 'class', text: `[The System takes notice. Opponents +${noticePct(c.run)}%.]` });
+    else if (now < was) c.msgs.push({ t: 'sys', text: now ? `[The System looks elsewhere. Opponents +${noticePct(c.run)}%.]` : '[The System looks elsewhere. Notice cleared.]' });
+  },
   chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
   favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
 };
+// A summoned opponent: { who: 'copy' | 'erased' | a rival id, bounty?: outcomes for beating them, traits?: n }. An Erased champion
+// when there is none to send falls back to an unmet rival; summoned rivals are Veterans
+function summonSpec(run, v, rng) {
+  let spec = v.spec ? Object.assign({}, v.spec, { hard: true, traits: (v.spec.traits || []).concat(shuffle(Object.keys(TRAIT_POOL).filter(k => !(v.spec.traits || []).includes(k)), rng).slice(0, v.traits || 0)) }) : null;
+  if (spec && spec.kind !== 'rival' && spec.kind !== 'monster' && spec.kind !== 'erased' && spec.kind !== 'champion') spec = null;
+  if (!spec && v.who === 'copy') { const snap = snapshot(run); snap.champ = `${run.champ} (copy)`; spec = { kind: 'erased', snap, hard: true }; }
+  if (!spec && v.who === 'erased') { const pool = run.seed ? [] : (META ? META.erased : []).concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at)); if (pool.length) spec = { kind: 'erased', snap: pick(pool, rng), hard: true }; }
+  if (!spec) { const id = ENEMIES[v.who] ? v.who : pick(RIVALS.filter(r => !run.met.includes(r)), rng) || pick(RIVALS, rng); spec = { kind: 'rival', id, hard: true, traits: shuffle(Object.keys(TRAIT_POOL), rng).slice(0, v.traits || 1) }; }
+  spec.summoned = true; if (v.bounty) spec.bounty = v.bounty; if (v.say) spec.say = v.say;
+  return spec;
+}
 // Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
 function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -893,12 +1062,14 @@ function enterChoose(run, meta, rng, msgs) {
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
+  if (run.pulsed !== run.round) { run.pulsed = run.round; const pulse = worldPulse(run, stream(run, 'pulse', rng)); if (pulse) { run.log.push({ t: 'sys', text: pulse }); msgs && msgs.push({ t: 'sys', text: pulse }); } }
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
+  const sm = run.choices.find(c => c.summoned && c.say); if (sm) msgs && msgs.push({ t: 'class', text: sm.say });
   run.wager = makeWager(run, stream(run, 'opps', rng));
   run.stage = 'choose';
 }
@@ -936,9 +1107,9 @@ function buildPlayer(run) {
   const s = effStats(run), P = runP(run), mh = maxHp(run);
   if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
-    side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, P,
+    side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
     crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
-    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: P.sluggish ? 1 : 0, lastWords: P.lastWords || 0, str: s.STR,
+    breath: hasGift(run, 'breath') && !run.usedBreath, weaken: (P.sluggish ? 1 : 0) + (run.nextFlags.weaken || 0), empower: run.nextFlags.empower || 0, lastWords: P.lastWords || 0, str: s.STR,
     res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
   });
 }
@@ -946,22 +1117,25 @@ function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.
 // The System's notice: +TUNE.notice per straight win, never in the Elite bracket or practice
 function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
 function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
-function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run); }
-function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run); }
+function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); }
+function amendOf(run) { return run.amend && !run.elite && !run.practice ? AMENDMENTS[run.amend] || {} : {}; }
+function enemyPower(run) { return roundPower(curRound(run)) * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1); }
+function enemyHpMul(run) { return roundHp(curRound(run)) * rankMul(run) * (amendOf(run).foeHp || 1); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
   const gate = spec.gate ? TUNE.gate : 1;
   const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
-  if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; return e; }
+  if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') { const e = buildSnapEnemy(spec.snap, p, hm, run, spec.kind === 'entrant'); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0; if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp)); return e; }
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
-  let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85);
+  let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85); if (spec.kind === 'final' && run.finalCut) hp = Math.round(hp * (1 - run.finalCut)); if (run.nextFlags.foeHp) hp = Math.max(1, Math.round(hp * run.nextFlags.foeHp));
+  if (run.nextFlags.foeTraits) spec = Object.assign({}, spec, { traits: (spec.traits || []).concat(run.nextFlags.foeTraits.filter(k => !(spec.traits || []).includes(k))) });
   return blankFighter(Object.assign({
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
     skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
-    weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0,
+    weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0, burn: run.nextFlags.foeBurn || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
 }
 // A spec's traits from the pool, on top of the enemy's own: passives add up; for a trait it already has, the
@@ -1009,17 +1183,101 @@ function phaseTraits(B) { Object.assign(B, enemyTraits(B.phase.set || {}, B.powe
 function snapshot(run) {
   const s = effStats(run), R = run.record;
   const snap = {
-    champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, path: run.path,
+    champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, worldFate: run.world.fate || null, worldPeople: run.world.people || null, worldMix: run.world.mix || null, path: run.path,
     stats: s, level: run.level, maxHp: maxHp(run), round: run.round, gifts: run.gifts.filter(k => GIFTS[k].cat !== 'flaw' && k !== 'copycat'), title: run.title, milestones: run.milestones,
     history: (run.history || []).slice(), cause: run.cause || null, hearts: run.hearts, maxHearts: run.maxHearts, wins: run.wins, elite: run.eliteWins || 0, entrant: run.entrant, hiddenPath: run.hiddenPath,
     bar: run.bar.filter(Boolean).map(p => ({ id: p.id, star: p.star, mods: p.mods.slice() })), gear: GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean).map(p => ({ id: p.id, star: p.star })), at: Date.now() + Math.floor(Math.random() * 1000),
   };
-  if (R) snap.rec = { w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) };
+  if (R) snap.rec = Object.assign({ w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) }, layersOf(R));
   return snap;
 }
-function buildSnapEnemy(snap, p, hm, run) {
-  const scale = Math.max(1, p / roundPower(snap.round || 1));
-  const hscale = Math.max(1, hm / roundHp(snap.round || 1));
+
+// ---------- Entrant pool ----------
+// Async opponents in the style of Oaken Tower. The pool holds POOL_SIZE builds for each of rounds 1 to POOL_ROUNDS. Each
+// round the hard opponent is drawn from it: the game rolls a slot from 1 to 30 for your round and you fight the build
+// saved there, at its own strength. After the fight, your build as it walked into that round replaces a random slot for
+// the round (ui.js poolUpload, firestore.rules pool/{round}_{slot}). A slot no player has filled yet holds the System's
+// reserve build (js/content/pool.js), so there is always someone to fight. Pending World (every Entrant faces the same
+// fights), practice runs and the elite bracket never use the pool.
+const POOL_SIZE = 30, POOL_ROUNDS = 7;
+const POOL = { off: false }; // tools/pool-seed.js turns it off to make the reserves
+function poolOn(run) { return !POOL.off && !run.seed && !run.practice && !run.script && !run.elite && run.round >= 1 && run.round <= POOL_ROUNDS; }
+function poolSlot(rng) { return 1 + Math.floor(rnd(rng) * POOL_SIZE); }
+function poolId(round, slot) { return round + '_' + slot; }
+// What the pool keeps of a build: what it fights with, plus its champion's name, crest and rank letter. No fight
+// history, World Record or account details.
+const POOL_KEYS = ['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'worldFate', 'worldPeople', 'worldMix', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'];
+function poolSnap(run) {
+  const x = snapshot(run), o = {};
+  if (META && META.rank) x.rank = META.rank.letter;
+  POOL_KEYS.forEach(k => { if (x[k] != null) o[k] = x[k]; });
+  return o;
+}
+// The System's reserve for a slot, from js/content/pool.js. Its at (round × 100 + slot) can't clash with a real build's time.
+function poolReserve(round, slot) {
+  const b = (POOL_SEED[round - 1] || [])[slot - 1] || (POOL_SEED[round - 1] || [])[0];
+  if (!b) return null;
+  const stats = {}; STATS.forEach((k, i) => stats[k] = b.s[i]);
+  const milestones = {}; (b.m || []).forEach(k => milestones[k] = true);
+  const snap = sanitizeSnap({ champ: b.n + ' of ' + b.w, name: b.n, sigil: slot % 6, color: (slot * 5) % 6, worldName: b.w, worldType: b.wt, worldFate: b.wf, worldPeople: b.wp, worldMix: b.wx, path: b.p || null, stats, level: b.l, maxHp: b.hp, round,
+    gifts: b.g || [], title: b.t || null, milestones, hiddenPath: b.h || null, entrant: 1000 + round * 100 + slot,
+    bar: b.b.map(([id, star, mods]) => ({ id, star, mods: mods || [] })), gear: b.e.map(([id, star]) => ({ id, star })), at: round * 100 + slot });
+  snap.reserve = true;
+  return snap;
+}
+// The hard opponent for a round: the reserve stands in until the page reads the slot (poolFill) and finds a player's build
+function poolSpec(round, slot) { return { kind: 'entrant', hard: true, round, slot, snap: poolReserve(round, slot) }; }
+// A player's build read from the pool. Untrusted, so it goes through sanitizeSnap, and it always fights in its own round.
+function poolFill(spec, data, me) {
+  if (!data || !data.snap || !data.owner || data.owner === me || data.hearts === 0) return false; // an erased record leaves its slot to a reserve
+  const snap = sanitizeSnap(data.snap, String(data.owner).slice(0, 128));
+  if (!snap || !snap.bar.length) return false;
+  snap.round = spec.round;
+  spec.snap = snap; spec.fileAt = Number(data.at) || 0;
+  spec.hearts = Math.max(1, Math.min(POOL_HEARTS, Math.round(Number(data.hearts)) || POOL_HEARTS));
+  return true;
+}
+// Worlds trade fragments. Beat a record and you take a fragment of its world: a lost Heart back (with its World Record
+// entry), or, at full Hearts, one of its pieces. Lose and its world takes a piece of yours (the Hearts you lose anyway).
+// A player's record also loses one of its POOL_HEARTS; at zero it is erased from the pool and its owner is told (ui.js).
+// res.poolHit: you beat a player's record. res.poolWon: a player's record beat you, which earns its owner Echoes.
+const POOL_HEARTS = 3;
+function poolResolve(run, spec, won, res, msgs, lr) {
+  const s = spec.snap, world = s.worldName || 'another world', real = !s.reserve && s.owner;
+  if (won) {
+    if (run.hearts < run.maxHearts && TUNE.poolFragment) {
+      const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + TUNE.poolFragment); restoreRecord(run, run.hearts - b);
+      msgs.push({ t: 'loot', text: s.reserve ? `[You salvaged a fragment of ${world}, erased long ago. ${run.world.name} endures a little longer: +${run.hearts - b} Heart, ${run.hearts} left.]` : `[You took a fragment of ${world}. ${run.world.name} endures a little longer: +${run.hearts - b} Heart, ${run.hearts} left.]` });
+    } else {
+      const p = pick(s.bar.concat(s.gear), lr), id = p && baseId(p.id);
+      if (id && pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[You took a fragment of ${world}: ${pieceDef(id).name}.]` }); addPiece(run, id, p.mods || [], msgs); }
+    }
+    if (real) res.poolHit = { owner: s.owner, champ: s.champ, round: spec.round, slot: spec.slot, at: spec.fileAt || 0, hearts: spec.hearts == null ? POOL_HEARTS : spec.hearts };
+  } else {
+    msgs.push({ t: 'loss', text: `[${s.reserve ? 'The record of an erased world' : world + "'s record"} took a piece of ${run.world.name}.]` });
+    if (real) res.poolWon = { owner: s.owner, champ: s.champ, round: spec.round };
+  }
+}
+// The choice screen's line for a filed record. by: the name its owner chose to show other players, when the page has it.
+// The lore: there are more worlds than the System has time for, so worlds at the same stage are judged by their
+// champions' records. A reserve is the record of a champion whose world was already erased.
+function poolStyle(spec, by) {
+  const s = spec.snap, as = s.path ? `Builds as a ${ARCH[s.path].path}` : 'No Path yet';
+  if (s.reserve) return `Record of an erased world's champion, round ${spec.round}. ${as}`;
+  const h = spec.hearts == null ? POOL_HEARTS : spec.hearts;
+  return `${s.worldName}'s round ${spec.round} record${by ? ` (${by})` : ''}, ${h} Heart${h === 1 ? '' : 's'} left. ${as}`;
+}
+// What the System says as a filed record enters the arena
+function poolIntro(spec) {
+  const s = spec.snap;
+  if (s.reserve) return `[Judgement by record, round ${spec.round}. No living record on file. Issuing the record of an erased world's champion.]`;
+  return `[Judgement by record, round ${spec.round}. ${s.worldName}'s champion cannot attend. Their round ${spec.round} record will fight in their place.]`;
+}
+// A returning champion is scaled up to the round it meets you in. An Entrant from the pool (asIs) was saved at this very
+// round, so it fights at its own strength with its own max HP.
+function buildSnapEnemy(snap, p, hm, run, asIs) {
+  const scale = asIs ? TUNE.poolDmg : Math.max(1, p / roundPower(snap.round || 1));
+  const hscale = asIs ? TUNE.poolHp / 1.15 : Math.max(1, hm / roundHp(snap.round || 1));
   const P = buildP(snap.bar, snap.gear, snap.gifts, {}, snap.level, { title: snap.title, milestones: snap.milestones });
   const skills = fighterSkills(snap.bar, snap.stats, P).map(x => { x.def = Object.assign({}, x.def, { quick: false }); x.power *= scale; return x; });
   const mh = Math.round(snap.maxHp * hscale * 1.15);
@@ -1030,6 +1288,8 @@ function buildSnapEnemy(snap, p, hm, run) {
 function newFight(run, rng) {
   const spec = currentSpec(run);
   const A = buildPlayer(run), B = buildEnemy(run, spec);
+  // The page uploads this to the Entrant pool once the fight is over (ui.js poolUpload)
+  if (poolOn(run)) run.poolUp = { round: run.round, snap: poolSnap(run) };
   B.breakMax = Math.round(B.maxHp * BREAK.share); B.brk = 0;
   // How many rank letters the opponent stands above the Entrant (Entrant Rank), for Rank Is Just a Letter
   const foeRank = !run.practice && META && META.rank && specRank(spec, META); B.rankUp = foeRank ? rankIdx(foeRank) - rankIdx(META.rank.letter) : 0;
@@ -1037,7 +1297,7 @@ function newFight(run, rng) {
     rng: stream(run, 'fight', rng) || Math.random, turn: 1, A, B, phase: 'player', over: false, winner: null, events: [], log: [], useCounts: {}, lastPlayerSkill: null, dealt: {},
     tally: { breaks: 0, burn: 0, maxPoison: 0, bigHit: 0, blocked: 0, turns: 0, healed: 0, reactions: 0, bigStopped: 0, mostUsed: null, hurtBy: {}, taken: 0, stuns: 0, quickTurn: 0, maxQuick: 0, overkill: 0 },
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
-    foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && run.chains && run.chains.official === 'tip'),
+    foresight: hasGift(run, 'appraisal') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && (run.finalTip || (run.chains && run.chains.official === 'tip'))),
   };
   [A, B].forEach(X => {
     const P = X.P;
@@ -1565,6 +1825,9 @@ function resolveFight(run, f, meta, rng) {
     msgs.push({ t: 'class', text: '[Return by Death. The world rewinds to the start of the fight.]' });
     return res;
   }
+  // Stakes set on this fight by an event: outcomes for a win or a loss
+  const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'], heartCut = run.nextFlags.heartCut || 0, noWinGold = !!run.nextFlags.noWinGold;
+  if (stakes) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Stakes' }; applyOutcomes(stakes, ctx, false); applyOutcomes(stakes, ctx, true); }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
   run.nextFlags = {};
   const c = featCtx(run, f, won, spec);
@@ -1597,16 +1860,18 @@ function resolveFight(run, f, meta, rng) {
   if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
     run.wins++;
-    res.gold = 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
+    res.gold = noWinGold ? 0 : 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(3, lr, null, run) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); }
+    if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
+    if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
       const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
-      if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${Math.round(TUNE.notice * noticeOf(run) * 100)}%.]` });
+      if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${noticePct(run)}%.]` });
     }
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
@@ -1618,7 +1883,8 @@ function resolveFight(run, f, meta, rng) {
   } else {
     if (run.elite) res.eliteOver = true;
     else {
-      const cost = heartCost(run, spec);
+      const cost = Math.max(0, heartCost(run, spec) - heartCut);
+      run.lastLoss = { round: run.round, hearts: cost, spec: Object.assign({}, spec, { traits: (spec.traits || []).slice() }) };
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
       if (run.notice && !run.practice) { run.notice = 0; msgs.push({ t: 'class', text: '[Streak broken. The System looks away.]' }); }
       if (run.hearts <= 0) {
@@ -1635,9 +1901,11 @@ function resolveFight(run, f, meta, rng) {
       }
     }
   }
-  if (won && spec.snap && spec.snap.owner) res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
+  if (spec.kind === 'entrant') poolResolve(run, spec, won, res, msgs, lr);
+  // A pool record's owner hears through poolResolve instead: the build is a copy from one round, not a champion in their Halls
+  if (won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
   // A shared champion that beats you earns its owner's champion RP (see champWin)
-  if (!won && spec.snap && spec.snap.owner) res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
+  if (!won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
   if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
   return res;
@@ -1646,7 +1914,7 @@ function startElite(run, meta, rng) {
   run.elite = true; run.eliteIdx = 0;
   const champs = run.seed ? [] : meta.champions.concat(SHARED.spared).filter(c => c.at !== run._snapAt);
   const first = champs.length ? { kind: 'champion', snap: pick(champs, rng) } : { kind: 'legend', id: 'legend' };
-  run.eliteBracket = [first, { kind: 'legend', id: 'undefeated' }];
+  run.eliteBracket = [first, Object.assign({ kind: 'legend', id: 'undefeated' }, run.undefeatedTraits ? { traits: run.undefeatedTraits.slice() } : {})];
   // From A-rank the bracket gets a middle fight: another spared champion, or Varn when there isn't one
   if (!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A')) {
     const rest = champs.filter(c => !first.snap || c.at !== first.snap.at);
@@ -1681,15 +1949,16 @@ function endRun(run, meta, outcome) {
 const PICKS_MAX = 60;
 function notePick(run, k) { if (!run.picks) run.picks = []; if (run.picks.length < PICKS_MAX) run.picks.push(k); }
 // Foes that are another player's champion keep only their kind, since their names are player-chosen
-const SNAP_KINDS = ['erased', 'champion', 'legend'];
+const SNAP_KINDS = ['erased', 'champion', 'legend', 'entrant'];
 // Every number is a whole number inside the bounds firestore.rules checks, and every key a short string or null,
-// so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue
-function runSummary(run, meta, outcome, now) {
+// so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue.
+// ver: the release the run was played on (the newest What's new entry's release, e.g. 'wpd-v10'), so stats can be split by version.
+function runSummary(run, meta, outcome, now, ver) {
   now = Math.round(now == null ? Date.now() : now);
   const H = run.history || [], last = H[H.length - 1], gear = GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean);
   const int = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(+v) || 0)), key = (v, n) => v ? String(v).slice(0, n) : null;
   return {
-    day: dailyDate(now), at: now, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
+    day: dailyDate(now), at: now, ver: ver ? String(ver).slice(0, 16) : null, outcome, mode: run.daily ? (run.ranked ? 'daily' : 'replay') : 'world',
     world: String(run.world.type).slice(0, 16), wrank: WORLD_RANKS[run.world.rank] || null, rank: meta && meta.rank ? key(meta.rank.letter, 3) : null, path: key(run.path, 16), hidden: key(run.hiddenPath, 24),
     patron: Object.keys(GODS).includes(run.patron) ? run.patron : 'none', gifts: (run.gifts || []).slice(0, 12).map(k => String(k).slice(0, 24)), title: key(run.title, 24),
     round: int(curRound(run), 0, 20), wins: int(run.wins, 0, 20), hearts: int(run.hearts, 0, 20), maxHearts: int(run.maxHearts || 10, 0, 20),
@@ -1909,14 +2178,14 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
-  LORE, REC_SIZE, REC_MAX, loreName, loreWho, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

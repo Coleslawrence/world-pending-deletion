@@ -236,6 +236,26 @@
   "golden",
   "restless"
  ],
+ "fates": [
+  "longnight",
+  "plague",
+  "hunger",
+  "civilwar",
+  "silence",
+  "lastgen",
+  "sundering",
+  "goldenage"
+ ],
+ "peoples": [
+  "temple",
+  "league",
+  "clans",
+  "archive",
+  "council",
+  "crown",
+  "exiles",
+  "pilgrims"
+ ],
  "enemies": [
   "goblin",
   "golem",
@@ -386,6 +406,15 @@
   "rune",
   "piece",
   "next",
+  "foe",
+  "max_hp",
+  "restore",
+  "erase",
+  "stakes",
+  "respec",
+  "summon",
+  "amend",
+  "notice",
   "chain",
   "favour"
  ],
@@ -431,7 +460,17 @@
   "poisoner_found",
   "letter_1",
   "letter_map",
-  "letter_cache"
+  "letter_cache",
+  "clerical_error",
+  "amendment",
+  "audit",
+  "lost_property",
+  "sponsors",
+  "rollback",
+  "seating_error",
+  "locker_zero",
+  "double_or_nothing",
+  "hotfix"
  ],
  "chains": [
   "official",
@@ -451,18 +490,28 @@
   "braced"
  ],
  "eventOptions": {
-  "merchant": 4,
+  "merchant": 5,
   "crowd": 4,
   "large_chest": 4,
   "field_test": 3,
-  "official_1": 4,
+  "official_1": 5,
   "official_bribed": 4,
   "official_refused": 1,
   "poisoner_1": 6,
   "poisoner_found": 4,
   "letter_1": 3,
   "letter_map": 6,
-  "letter_cache": 1
+  "letter_cache": 3,
+  "clerical_error": 3,
+  "amendment": 3,
+  "audit": 3,
+  "lost_property": 3,
+  "sponsors": 4,
+  "rollback": 2,
+  "seating_error": 3,
+  "locker_zero": 3,
+  "double_or_nothing": 3,
+  "hotfix": 3
  },
  "lore": {
   "drowned": {
@@ -673,6 +722,198 @@
     "The windbreak wall",
     "Your mother Ilse",
     "Your rival Brun"
+   ]
+  },
+  "fate longnight": {
+   "roles": [],
+   "promises": [
+    "bring back the sun",
+    "see one more dawn"
+   ],
+   "entries": [
+    "The Lamp Ward",
+    "The Last Sunrise",
+    "The Dawn Watcher"
+   ]
+  },
+  "fate plague": {
+   "roles": [],
+   "promises": [
+    "find a cure",
+    "outlive the plague"
+   ],
+   "entries": [
+    "The Quarantine Wall",
+    "The Grey Mark",
+    "The Plague Doctor"
+   ]
+  },
+  "fate hunger": {
+   "roles": [],
+   "promises": [
+    "fill the granaries again",
+    "bring home bread"
+   ],
+   "entries": [
+    "The Empty Granary",
+    "The Ration Bell",
+    "The Seed Keeper"
+   ]
+  },
+  "fate civilwar": {
+   "roles": [],
+   "promises": [
+    "end the war",
+    "bring both sides to one table"
+   ],
+   "entries": [
+    "The Divided Bridge",
+    "The Ceasefire Feast",
+    "The Turncoat Captain"
+   ]
+  },
+  "fate silence": {
+   "roles": [],
+   "promises": [
+    "make the gods answer",
+    "learn why the gods went quiet"
+   ],
+   "entries": [
+    "The Unanswered Temple",
+    "The Listening Hour",
+    "The Last Oracle"
+   ]
+  },
+  "fate lastgen": {
+   "roles": [],
+   "promises": [
+    "hear a child laugh again",
+    "make sure someone comes after us"
+   ],
+   "entries": [
+    "The Silent Nursery",
+    "The Naming Stone",
+    "The Youngest"
+   ]
+  },
+  "fate sundering": {
+   "roles": [],
+   "promises": [
+    "hold the world together",
+    "mend the great crack"
+   ],
+   "entries": [
+    "The Great Rift",
+    "Crossing Day",
+    "The Rift Surveyor"
+   ]
+  },
+  "fate goldenage": {
+   "roles": [],
+   "promises": [
+    "keep things exactly as they are",
+    "come home in time for the festival"
+   ],
+   "entries": [
+    "The Festival Square",
+    "The Long Peace",
+    "The Retired General"
+   ]
+  },
+  "people temple": {
+   "roles": [
+    "temple novice",
+    "candle bearer"
+   ],
+   "promises": [],
+   "entries": [
+    "The High Altar",
+    "The Omen Count",
+    "The Hierarch"
+   ]
+  },
+  "people league": {
+   "roles": [
+    "ledger clerk",
+    "caravan guard"
+   ],
+   "promises": [],
+   "entries": [
+    "The Counting House",
+    "The Guild Seal",
+    "The Guildmaster"
+   ]
+  },
+  "people clans": {
+   "roles": [
+    "clan runner",
+    "feud keeper"
+   ],
+   "promises": [],
+   "entries": [
+    "The Moot Stone",
+    "The Blood Tally",
+    "The Eldest of the Clans"
+   ]
+  },
+  "people archive": {
+   "roles": [
+    "junior scribe",
+    "copyist"
+   ],
+   "promises": [],
+   "entries": [
+    "The Great Index",
+    "Examination Day",
+    "The Chief Librarian"
+   ]
+  },
+  "people council": {
+   "roles": [
+    "ward speaker",
+    "ballot counter"
+   ],
+   "promises": [],
+   "entries": [
+    "The Council Hall",
+    "The Long Vote",
+    "The Speaker"
+   ]
+  },
+  "people crown": {
+   "roles": [
+    "palace page",
+    "royal taster"
+   ],
+   "promises": [],
+   "entries": [
+    "The Throne Room",
+    "The Royal Line",
+    "The Old Monarch"
+   ]
+  },
+  "people exiles": {
+   "roles": [
+    "refugee scout",
+    "name keeper"
+   ],
+   "promises": [],
+   "entries": [
+    "The Landing",
+    "The Old Tongue",
+    "The Last Witness"
+   ]
+  },
+  "people pilgrims": {
+   "roles": [
+    "road cook",
+    "pathfinder"
+   ],
+   "promises": [],
+   "entries": [
+    "The Waystones",
+    "The Leaving Feast",
+    "The Road Elder"
    ]
   }
  },
