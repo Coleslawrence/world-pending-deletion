@@ -25,6 +25,8 @@ jobs:
           node-version: 22
       - name: Content checker
         run: node tools/check-content.js
+      - name: Entrant pool reserves
+        run: node tools/pool-seed.js --check
       - name: Smoke sim (200 seeded bot runs)
         run: node tools/stats.js 200 --seed 1
       - name: Pending World checks

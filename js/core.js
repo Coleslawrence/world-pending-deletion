@@ -619,7 +619,9 @@ const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
 // The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
 // notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
 // gate: Gatekeepers (the hard pick at a GATES round) are this much tougher again, with an extra trait and a second phase.
-const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 1 };
+const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 1, poolDmg: 1, poolHp: 1, poolFragment: 1 };
+// poolDmg, poolHp: multipliers on Entrant pool builds, which otherwise fight at their own strength; poolFragment: Hearts a
+// win over a filed record takes back (all left at 1 until the balance pass)
 const GATES = [4, 7];
 function roundPower(round) { return 1 + TUNE.dmgSlope * (round - 1); }
 function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
@@ -641,6 +643,8 @@ function makeChoices(run, meta, rng) {
   // Pending World never draws other champions, so every player faces the same fights
   const erased = run.seed ? [] : meta.erased.concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at));
   if (run.round >= 4 && erased.length && rnd(rng) < chance) hard = { kind: 'erased', snap: pick(erased, rng), hard: true };
+  // The Entrant pool: the hard monster or rival becomes another Entrant's build for this round (Gatekeeper rounds keep theirs)
+  if (poolOn(run) && (hard.kind === 'monster' || hard.kind === 'rival') && !GATES.includes(run.round)) hard = poolSpec(run.round, poolSlot(rng));
   if (run.trial && !run.trial.done && run.round === run.trial.round) hard = trialSpec(run, rng);
   // Someone an event sent for (a copy of you, an Erased champion, an auditor) takes the hard slot on the round they are due
   const due = (run.summons || []).findIndex(x => x.round <= run.round);
@@ -654,7 +658,7 @@ function makeChoices(run, meta, rng) {
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
 function specName(spec) {
   if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
-  if (spec.kind === 'erased' || spec.kind === 'champion') return spec.snap.champ;
+  if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
   if (spec.gate) return n + ', Gatekeeper';
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
@@ -672,6 +676,7 @@ function specStyle(spec) {
   if (spec.kind === 'trial') return "The System's examiner. Pass the condition to be promoted";
   if (spec.kind === 'erased') return `Erased. Fell in round ${spec.snap.round} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   if (spec.kind === 'champion') return `Saved ${spec.snap.worldName} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
+  if (spec.kind === 'entrant') return poolStyle(spec);
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
@@ -1017,7 +1022,7 @@ function buildEnemy(run, spec) {
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
   const gate = spec.gate ? TUNE.gate : 1;
   const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
-  if (spec.kind === 'erased' || spec.kind === 'champion') { const e = buildSnapEnemy(spec.snap, p, hm, run); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0; if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp)); return e; }
+  if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') { const e = buildSnapEnemy(spec.snap, p, hm, run, spec.kind === 'entrant'); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0; if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp)); return e; }
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
@@ -1082,9 +1087,93 @@ function snapshot(run) {
   if (R) snap.rec = { w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) };
   return snap;
 }
-function buildSnapEnemy(snap, p, hm, run) {
-  const scale = Math.max(1, p / roundPower(snap.round || 1));
-  const hscale = Math.max(1, hm / roundHp(snap.round || 1));
+
+// ---------- Entrant pool ----------
+// Async opponents in the style of Oaken Tower. The pool holds POOL_SIZE builds for each of rounds 1 to POOL_ROUNDS. Each
+// round the hard opponent is drawn from it: the game rolls a slot from 1 to 30 for your round and you fight the build
+// saved there, at its own strength. After the fight, your build as it walked into that round replaces a random slot for
+// the round (ui.js poolUpload, firestore.rules pool/{round}_{slot}). A slot no player has filled yet holds the System's
+// reserve build (js/content/pool.js), so there is always someone to fight. Pending World (every Entrant faces the same
+// fights), practice runs and the elite bracket never use the pool.
+const POOL_SIZE = 30, POOL_ROUNDS = 7;
+const POOL = { off: false }; // tools/pool-seed.js turns it off to make the reserves
+function poolOn(run) { return !POOL.off && !run.seed && !run.practice && !run.script && !run.elite && run.round >= 1 && run.round <= POOL_ROUNDS; }
+function poolSlot(rng) { return 1 + Math.floor(rnd(rng) * POOL_SIZE); }
+function poolId(round, slot) { return round + '_' + slot; }
+// What the pool keeps of a build: what it fights with, plus its champion's name, crest and rank letter. No fight
+// history, World Record or account details.
+const POOL_KEYS = ['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'];
+function poolSnap(run) {
+  const x = snapshot(run), o = {};
+  if (META && META.rank) x.rank = META.rank.letter;
+  POOL_KEYS.forEach(k => { if (x[k] != null) o[k] = x[k]; });
+  return o;
+}
+// The System's reserve for a slot, from js/content/pool.js. Its at (round × 100 + slot) can't clash with a real build's time.
+function poolReserve(round, slot) {
+  const b = (POOL_SEED[round - 1] || [])[slot - 1] || (POOL_SEED[round - 1] || [])[0];
+  if (!b) return null;
+  const stats = {}; STATS.forEach((k, i) => stats[k] = b.s[i]);
+  const milestones = {}; (b.m || []).forEach(k => milestones[k] = true);
+  const snap = sanitizeSnap({ champ: b.n + ' of ' + b.w, name: b.n, sigil: slot % 6, color: (slot * 5) % 6, worldName: b.w, worldType: b.wt, path: b.p || null, stats, level: b.l, maxHp: b.hp, round,
+    gifts: b.g || [], title: b.t || null, milestones, hiddenPath: b.h || null, entrant: 1000 + round * 100 + slot,
+    bar: b.b.map(([id, star, mods]) => ({ id, star, mods: mods || [] })), gear: b.e.map(([id, star]) => ({ id, star })), at: round * 100 + slot });
+  snap.reserve = true;
+  return snap;
+}
+// The hard opponent for a round: the reserve stands in until the page reads the slot (poolFill) and finds a player's build
+function poolSpec(round, slot) { return { kind: 'entrant', hard: true, round, slot, snap: poolReserve(round, slot) }; }
+// A player's build read from the pool. Untrusted, so it goes through sanitizeSnap, and it always fights in its own round.
+function poolFill(spec, data, me) {
+  if (!data || !data.snap || !data.owner || data.owner === me || data.hearts === 0) return false; // an erased record leaves its slot to a reserve
+  const snap = sanitizeSnap(data.snap, String(data.owner).slice(0, 128));
+  if (!snap || !snap.bar.length) return false;
+  snap.round = spec.round;
+  spec.snap = snap; spec.fileAt = Number(data.at) || 0;
+  spec.hearts = Math.max(1, Math.min(POOL_HEARTS, Math.round(Number(data.hearts)) || POOL_HEARTS));
+  return true;
+}
+// Worlds trade fragments. Beat a record and you take a fragment of its world: a lost Heart back (with its World Record
+// entry), or, at full Hearts, one of its pieces. Lose and its world takes a piece of yours (the Hearts you lose anyway).
+// A player's record also loses one of its POOL_HEARTS; at zero it is erased from the pool and its owner is told (ui.js).
+// res.poolHit: you beat a player's record. res.poolWon: a player's record beat you, which earns its owner Echoes.
+const POOL_HEARTS = 3;
+function poolResolve(run, spec, won, res, msgs, lr) {
+  const s = spec.snap, world = s.worldName || 'another world', real = !s.reserve && s.owner;
+  if (won) {
+    if (run.hearts < run.maxHearts && TUNE.poolFragment) {
+      const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + TUNE.poolFragment); restoreRecord(run, run.hearts - b);
+      msgs.push({ t: 'loot', text: s.reserve ? `[You salvaged a fragment of ${world}, erased long ago. ${run.world.name} endures a little longer: +${run.hearts - b} Heart, ${run.hearts} left.]` : `[You took a fragment of ${world}. ${run.world.name} endures a little longer: +${run.hearts - b} Heart, ${run.hearts} left.]` });
+    } else {
+      const p = pick(s.bar.concat(s.gear), lr), id = p && baseId(p.id);
+      if (id && pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[You took a fragment of ${world}: ${pieceDef(id).name}.]` }); addPiece(run, id, p.mods || [], msgs); }
+    }
+    if (real) res.poolHit = { owner: s.owner, champ: s.champ, round: spec.round, slot: spec.slot, at: spec.fileAt || 0, hearts: spec.hearts == null ? POOL_HEARTS : spec.hearts };
+  } else {
+    msgs.push({ t: 'loss', text: `[${s.reserve ? 'The record of an erased world' : world + "'s record"} took a piece of ${run.world.name}.]` });
+    if (real) res.poolWon = { owner: s.owner, champ: s.champ, round: spec.round };
+  }
+}
+// The choice screen's line for a filed record. by: the name its owner chose to show other players, when the page has it.
+// The lore: there are more worlds than the System has time for, so worlds at the same stage are judged by their
+// champions' records. A reserve is the record of a champion whose world was already erased.
+function poolStyle(spec, by) {
+  const s = spec.snap, as = s.path ? `Builds as a ${ARCH[s.path].path}` : 'No Path yet';
+  if (s.reserve) return `Record of an erased world's champion, round ${spec.round}. ${as}`;
+  const h = spec.hearts == null ? POOL_HEARTS : spec.hearts;
+  return `${s.worldName}'s round ${spec.round} record${by ? ` (${by})` : ''}, ${h} Heart${h === 1 ? '' : 's'} left. ${as}`;
+}
+// What the System says as a filed record enters the arena
+function poolIntro(spec) {
+  const s = spec.snap;
+  if (s.reserve) return `[Judgement by record, round ${spec.round}. No living record on file. Issuing the record of an erased world's champion.]`;
+  return `[Judgement by record, round ${spec.round}. ${s.worldName}'s champion cannot attend. Their round ${spec.round} record will fight in their place.]`;
+}
+// A returning champion is scaled up to the round it meets you in. An Entrant from the pool (asIs) was saved at this very
+// round, so it fights at its own strength with its own max HP.
+function buildSnapEnemy(snap, p, hm, run, asIs) {
+  const scale = asIs ? TUNE.poolDmg : Math.max(1, p / roundPower(snap.round || 1));
+  const hscale = asIs ? TUNE.poolHp / 1.15 : Math.max(1, hm / roundHp(snap.round || 1));
   const P = buildP(snap.bar, snap.gear, snap.gifts, {}, snap.level, { title: snap.title, milestones: snap.milestones });
   const skills = fighterSkills(snap.bar, snap.stats, P).map(x => { x.def = Object.assign({}, x.def, { quick: false }); x.power *= scale; return x; });
   const mh = Math.round(snap.maxHp * hscale * 1.15);
@@ -1095,6 +1184,8 @@ function buildSnapEnemy(snap, p, hm, run) {
 function newFight(run, rng) {
   const spec = currentSpec(run);
   const A = buildPlayer(run), B = buildEnemy(run, spec);
+  // The page uploads this to the Entrant pool once the fight is over (ui.js poolUpload)
+  if (poolOn(run)) run.poolUp = { round: run.round, snap: poolSnap(run) };
   B.breakMax = Math.round(B.maxHp * BREAK.share); B.brk = 0;
   // How many rank letters the opponent stands above the Entrant (Entrant Rank), for Rank Is Just a Letter
   const foeRank = !run.practice && META && META.rank && specRank(spec, META); B.rankUp = foeRank ? rankIdx(foeRank) - rankIdx(META.rank.letter) : 0;
@@ -1706,9 +1797,11 @@ function resolveFight(run, f, meta, rng) {
       }
     }
   }
-  if (won && spec.snap && spec.snap.owner) res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
+  if (spec.kind === 'entrant') poolResolve(run, spec, won, res, msgs, lr);
+  // A pool record's owner hears through poolResolve instead: the build is a copy from one round, not a champion in their Halls
+  if (won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
   // A shared champion that beats you earns its owner's champion RP (see champWin)
-  if (!won && spec.snap && spec.snap.owner) res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
+  if (!won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
   if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
   return res;
@@ -1752,7 +1845,7 @@ function endRun(run, meta, outcome) {
 const PICKS_MAX = 60;
 function notePick(run, k) { if (!run.picks) run.picks = []; if (run.picks.length < PICKS_MAX) run.picks.push(k); }
 // Foes that are another player's champion keep only their kind, since their names are player-chosen
-const SNAP_KINDS = ['erased', 'champion', 'legend'];
+const SNAP_KINDS = ['erased', 'champion', 'legend', 'entrant'];
 // Every number is a whole number inside the bounds firestore.rules checks, and every key a short string or null,
 // so an odd save (a missing field, a NaN) still posts instead of sitting refused in the queue.
 // ver: the release the run was played on (the newest What's new entry's release, e.g. 'wpd-v10'), so stats can be split by version.
@@ -1990,5 +2083,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

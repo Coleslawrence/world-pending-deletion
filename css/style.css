@@ -157,6 +157,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .crest.k-rival { border-color: var(--bronze); color: #ffd99b; }
 .crest.k-final { border-color: var(--foe); color: #ffc0b8; box-shadow: 0 0 16px rgba(225,91,82,.3); }
 .crest.k-erased { border-color: var(--sys); color: var(--sys); }
+.crest.k-entrant { border-color: var(--sys); color: var(--sys); border-style: dashed; }
 .crest.k-legend, .crest.k-champion { border-color: #ffb257; color: #ffd28a; box-shadow: 0 0 16px rgba(255,178,87,.3); }
 .inter { flex: 1; display: grid; gap: 7px; align-content: start; }
 .in-h { display: flex; justify-content: space-between; font-family: var(--f-m); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--sys); }

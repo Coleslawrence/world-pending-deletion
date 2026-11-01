@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, orderBy, limit, getDocs, getCountFromServer } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, getCountFromServer } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({ projectId: 'demo-wpd', firestore: { rules: readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8') } });
 const day = '2026-10-25';
@@ -137,6 +137,46 @@ await check('11 log lines are refused', assertFails(postFb(alice, 'alice', 17000
 await check('an extra run field is refused', assertFails(postFb(alice, 'alice', 1700000000012, { run: Object.assign({}, fbDoc().run, { name: 'Wren' }) })));
 await check('a 201-character device line is refused', assertFails(postFb(alice, 'alice', 1700000000013, { ua: 'x'.repeat(201) })));
 
+// The Entrant pool: a real filed build from a bot run, through the game's own poolSnap
+const poolBuild = (() => { const req = createRequire(import.meta.url), B = req('./bot.js'), m = G2.newMeta(); let snap = null; B.playRun(m, false, { noElite: true, snap: (st, r) => { if (st === 'shop' && r.round === 3 && !snap) snap = G2.poolSnap(r); } }); return JSON.parse(JSON.stringify(snap)); })();
+const poolRef = (db, id) => doc(db, 'pool/' + id);
+const filed = (uid, o = {}) => Object.assign({ snap: poolBuild, owner: uid, at: 1700000000000, name: 'Wren', hearts: 3, r: 3 }, o);
+await check('a tester files a build', assertSucceeds(setDoc(poolRef(alice, '3_17'), filed('alice'))));
+await check('another tester files over it', assertSucceeds(setDoc(poolRef(bob, '3_17'), filed('bob'))));
+await check('signed-in players read a slot', assertSucceeds(getDoc(poolRef(erin, '3_17'))));
+await check('signed out reads are refused', assertFails(getDoc(poolRef(anon, '3_17'))));
+await check('listing a round is fine', assertSucceeds(getDocs(query(collection(erin, 'pool'), where('r', '==', 3), limit(30)))));
+await check('listing more than 30 is refused', assertFails(getDocs(query(collection(erin, 'pool'), limit(31)))));
+await check('signed out listing is refused', assertFails(getDocs(query(collection(anon, 'pool'), limit(5)))));
+await check('a non-tester cannot file', assertFails(setDoc(poolRef(erin, '3_18'), filed('erin'))));
+await check('filing under someone else is refused', assertFails(setDoc(poolRef(bob, '3_18'), filed('alice'))));
+await check('slot 31 is refused', assertFails(setDoc(poolRef(alice, '3_31'), filed('alice'))));
+await check('round 8 is refused', assertFails(setDoc(poolRef(alice, '8_1'), filed('alice', { r: 8 }))));
+await check('slot 30 is fine', assertSucceeds(setDoc(poolRef(alice, '3_30'), filed('alice'))));
+await check('a build from another round is refused', assertFails(setDoc(poolRef(alice, '4_1'), filed('alice', { r: 4 }))));
+await check('a round field that does not match the slot is refused', assertFails(setDoc(poolRef(alice, '3_1'), filed('alice', { r: 4 }))));
+await check('filing with 4 Hearts is refused', assertFails(setDoc(poolRef(alice, '3_6'), filed('alice', { hearts: 4 }))));
+await check('a build with its history is refused', assertFails(setDoc(poolRef(alice, '3_2'), filed('alice', { snap: Object.assign({}, poolBuild, { history: [] }) }))));
+await check('a 6-skill bar is refused', assertFails(setDoc(poolRef(alice, '3_3'), filed('alice', { snap: Object.assign({}, poolBuild, { bar: Array(6).fill(poolBuild.bar[0]) }) }))));
+await check('an extra field is refused', assertFails(setDoc(poolRef(alice, '3_4'), filed('alice', { admin: true }))));
+await check('a 25-character name is refused', assertFails(setDoc(poolRef(alice, '3_5'), filed('alice', { name: 'x'.repeat(25) }))));
+await check('deleting a slot is refused', assertFails(deleteDoc(poolRef(bob, '3_17'))));
+// Taking Hearts: bob's record sits in 3_17 with 3 Hearts
+await check('another tester takes one Heart', assertSucceeds(updateDoc(poolRef(alice, '3_17'), { hearts: 2 })));
+await check('taking two at once is refused', assertFails(updateDoc(poolRef(alice, '3_17'), { hearts: 0 })));
+await check('taking a Heart and changing the build is refused', assertFails(updateDoc(poolRef(alice, '3_17'), { hearts: 1, name: 'Alice' })));
+await check('a non-tester cannot take a Heart', assertFails(updateDoc(poolRef(erin, '3_17'), { hearts: 1 })));
+await check('the owner cannot take their own record\'s Heart', assertFails(updateDoc(poolRef(bob, '3_17'), { hearts: 1 })));
+await check('adding a Heart back is refused', assertFails(updateDoc(poolRef(carol, '3_17'), { hearts: 3 })));
+await check('the next Heart', assertSucceeds(updateDoc(poolRef(carol, '3_17'), { hearts: 1 })));
+await check('the last Heart erases it', assertSucceeds(updateDoc(poolRef(alice, '3_17'), { hearts: 0 })));
+await check('an erased record has no Hearts to take', assertFails(updateDoc(poolRef(carol, '3_17'), { hearts: -1 })));
+await check('a tester files over an erased record', assertSucceeds(setDoc(poolRef(carol, '3_17'), filed('carol'))));
+// Inbox notes about filed records
+const poolNoteRef = (db, owner, uid, t) => doc(db, `inbox/${owner}/notes/${uid}_${t}`);
+await check('a record-held note', assertSucceeds(setDoc(poolNoteRef(alice, 'bob', 'alice', 1700000000100), { by: 'alice', champ: 'Maren of Velmere', t: 1700000000100, pool: 3, won: true })));
+await check('a record-erased note', assertSucceeds(setDoc(poolNoteRef(alice, 'bob', 'alice', 1700000000101), { by: 'alice', champ: 'Maren of Velmere', t: 1700000000101, pool: 3, gone: true })));
+await check('a note for round 8 is refused', assertFails(setDoc(poolNoteRef(alice, 'bob', 'alice', 1700000000102), { by: 'alice', champ: 'Maren of Velmere', t: 1700000000102, pool: 8 })));
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);
