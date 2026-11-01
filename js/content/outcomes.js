@@ -19,6 +19,10 @@
 //   summon: { who, bounty?, traits? }   someone takes the hard opponent's place next round: who is 'copy' (you, as you are now),
 //                      'erased' (an Erased champion) or a rival's id; bounty: outcomes for beating them
 //   amend: id          a Tournament Amendment (AMENDMENTS in events.js) for the rest of the run, replacing any other
+//   ward: n           your next n losses cost no Heart (so erase no World Record entries)
+//   mod: id           the world's modifier (MODIFIERS in worlds.js) becomes this one for the rest of the run
+//   always: { next: {…}, foe: {…} }   next and foe marks that go on every fight for the rest of the run, not just the next
+//   fate: n           your world's Fate track: +1 eases the Fate, -1 worsens it (lifted at +2, sealed at -2 when the run ends). Announced after the reveal
 //   notice: n          the System's notice up or down (0 to its cap); each step makes opponents stronger or weaker. Announced after the reveal
 //   chain: 'done', or { step, after }   where the event chain goes next (events only); applied late, so an option's go still sees the chain's state
 //   favour: { war: 2 } Favour with gods, announced last
@@ -37,6 +41,10 @@ const OUTCOMES = {
   respec: { say: () => 'your stat points to place again' },
   summon: { say: () => 'a visitor in your bracket' },
   amend: { say: v => `the Amendment ${AMENDMENTS[v].name}` },
+  ward: { say: n => `a ward on your next ${n === 1 ? 'loss' : n + ' losses'}` },
+  mod: { say: v => `the world modifier ${MODIFIERS[v].name}` },
+  always: { say: () => 'a mark on every fight from now on' },
+  fate: { say: n => n > 0 ? 'your world\'s Fate eased' : 'your world\'s Fate worsened', late: true },
   notice: { say: n => n > 0 ? "the System's notice" : 'the System looking elsewhere', late: true },
   chain: { say: () => 'the story goes on', late: true },
   favour: { say: o => Object.entries(o).map(([g, n]) => `${n} Favour with ${GODS[g].name.replace(/^The /, 'the ')}`).join(', '), late: true },

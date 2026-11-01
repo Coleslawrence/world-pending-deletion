@@ -337,6 +337,10 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `respec` | true | your stat points to place again |  | 1 (events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 4 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 2 (events) |
+| `ward` | 1 | a ward on your next loss |  | 0 () |
+| `mod` | "none" | the world modifier Clear Skies |  | 0 () |
+| `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 0 () |
+| `fate` | 1 | your world's Fate eased | yes | 0 () |
 | `notice` | 1 | the System's notice | yes | 26 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |

@@ -875,12 +875,15 @@ function eventText(run, key) { const t = EVENTS[key].text; return typeof t === '
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
   // Stand-alone events don't repeat in a run until every one has been seen
-  const open = k => !EVENTS[k].chain && (!EVENTS[k].can || EVENTS[k].can(run));
+  const open = k => !EVENTS[k].chain && !EVENTS[k].crisis && (!EVENTS[k].can || EVENTS[k].can(run));
   const fresh = Object.keys(EVENTS).filter(k => open(k) && !(run.seen || []).includes(k));
   const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(open)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
-  const w = keys.map(k => EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1);
+  const w = keys.map(k => (EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1) * (worldTagged(run, EVENTS[k]) ? WORLD_LEAN : 1));
   return wpick(keys, w, rng);
 }
+// An event tagged with a Fate or People (fate: id, people: id, or lists of them) turns up WORLD_LEAN times as often in a world that has it
+const WORLD_LEAN = 3;
+function worldTagged(run, E) { const has = (x, v) => x != null && [].concat(x).includes(v); return has(E.fate, run.world.fate) || has(E.people, run.world.people); }
 function dueChainEvents(run) {
   const out = [];
   Object.entries(run.chains || {}).forEach(([c, st]) => { if (st && typeof st === 'object' && st.due <= run.round) out.push(c + '_' + st.step); });
@@ -894,9 +897,11 @@ function checkNeed(c) { return c.hard ? STAT_HARD : STAT_EASY; }
 function checkMet(run, key, c) {
   if (c.stat) return effStats(run)[c.stat] >= checkNeed(c);
   if (c.favour) return run.favour[c.favour] >= FAVOUR_LINE;
+  if (c.fate) return run.world.fate === c.fate;
+  if (c.people) return run.world.people === c.people;
   return !!(c.luck && run.luck && run.luck[key]);
 }
-function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : '[LUK]'; }
+function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : c.fate ? `[${FATES[c.fate].name}]` : c.people ? `[${PEOPLES[c.people].name}]` : '[LUK]'; }
 // Chance options ({ roll: { stat, hard? } }): always shown, with the odds on the button. ROLL_BASE (ROLL_HARD if hard) + ROLL_PER per
 // point of the stat + ROLL_LUK per point of LUK, kept between ROLL_MIN and ROLL_MAX. The roll is made when the event appears and kept
 // with the run, so reloading never changes it; a failed roll takes the option's fail branch, which always does something.
@@ -914,7 +919,7 @@ function pushEvent(run, key, rng) {
 function eventOpts(run, key) {
   const E = EVENTS[key]; if (!E) return [];
   const ok = E.opts.map((o, i) => i).filter(i => { const o = E.opts[i]; return (!o.can || o.can(run)) && !(o.pay > run.gold) && !(o.payHeart >= run.hearts) && (!o.check || checkMet(run, key, o.check)); });
-  const w = o => o.roll ? 3 : o.check.hard || o.check.favour ? 2 : o.check.luck ? 1 : 0; // a chance option is always shown, so it is never the one cut
+  const w = o => o.roll ? 3 : o.check.hard || o.check.favour || o.check.fate || o.check.people ? 2 : o.check.luck ? 1 : 0; // a chance option is always shown, so it is never the one cut
   const lines = ok.filter(i => E.opts[i].check || E.opts[i].roll).sort((a, b) => w(E.opts[b]) - w(E.opts[a]));
   const cut = lines.slice(MAX_STAT_LINES);
   return ok.filter(i => !cut.includes(i));
@@ -974,6 +979,10 @@ const OUTCOME_APPLY = {
     if (now > was) c.msgs.push({ t: 'class', text: `[The System takes notice. Opponents +${noticePct(c.run)}%.]` });
     else if (now < was) c.msgs.push({ t: 'sys', text: now ? `[The System looks elsewhere. Opponents +${noticePct(c.run)}%.]` : '[The System looks elsewhere. Notice cleared.]' });
   },
+  fate: (v, c) => moveFate(c.run, v, c.msgs),
+  ward: (v, c) => { c.run.ward = (c.run.ward || 0) + v; c.msgs.push({ t: 'loot', text: `[Warded: your next ${c.run.ward === 1 ? 'loss costs' : c.run.ward + ' losses cost'} no Heart.]` }); },
+  mod: (v, c) => { if (!MODIFIERS[v] || c.run.world.mod === v) return; c.run.world.mod = v; c.msgs.push({ t: 'class', text: `[World modifier changed: ${MODIFIERS[v].name}. ${MODIFIERS[v].desc}]` }); },
+  always: (v, c) => { const A = c.run.always = c.run.always || {}; ['next', 'foe'].forEach(k => { if (!v[k]) return; A[k] = Object.assign({}, A[k]); Object.entries(v[k]).forEach(([f, n]) => A[k][f] = typeof n === 'number' && typeof A[k][f] === 'number' ? A[k][f] + n : n); OUTCOME_APPLY[k](v[k], c); }); },
   chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
   favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
 };
@@ -988,6 +997,36 @@ function summonSpec(run, v, rng) {
   spec.summoned = true; if (v.bounty) spec.bounty = v.bounty; if (v.say) spec.say = v.say;
   return spec;
 }
+// The Fate track: how your world's Fate is going, from FATE_TRACK.min (worsened) to FATE_TRACK.max (eased). Fate Crises and
+// events move it (the outcome fate); at the end of the run the Fate is lifted at max, sealed at min (fateEnd)
+const FATE_TRACK = { min: -2, max: 2 };
+function moveFate(run, v, msgs) {
+  const F = FATES[run.world.fate]; if (!F) return;
+  const was = run.fateTrack || 0; run.fateTrack = Math.max(FATE_TRACK.min, Math.min(FATE_TRACK.max, was + v));
+  if (run.fateTrack !== was && msgs) msgs.push({ t: run.fateTrack > was ? 'loot' : 'loss', text: `[${run.world.name}: ${F.name} ${run.fateTrack > was ? 'eases' : 'worsens'}. Fate: ${fateState(run)}.]` });
+}
+function fateState(run) { const t = run.fateTrack || 0; return t >= FATE_TRACK.max ? 'Lifted' : t <= FATE_TRACK.min ? 'Sealed' : t > 0 ? 'Easing' : t < 0 ? 'Worsening' : 'Holding'; }
+// How the Fate ended: 'lifted', 'sealed' or null, and the Fate's closing line for it (FATES[x].ends), if it has one
+function fateEnd(run) {
+  const F = FATES[run.world.fate], t = run.fateTrack || 0; if (!F) return null;
+  const end = t >= FATE_TRACK.max ? 'lifted' : t <= FATE_TRACK.min ? 'sealed' : null;
+  return end && { end, text: F.ends && F.ends[end] ? `[${run.world.name}: ${F.ends[end]}]` : null };
+}
+// Fate Crises: in the rounds where the Fate's trouble grows (PULSE.stageAt), the Fate's crisis event for that stage (FATES[x].crises)
+// comes to everyone before the shop. Not in practice or the Elite bracket
+function crisisDue(run) {
+  const F = FATES[run.world.fate], at = PULSE.stageAt.indexOf(run.round);
+  if (!F || !F.crises || at < 0 || run.practice || run.elite) return null;
+  const k = F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
+}
+// The run is decided: say how the Fate ended. A lifted Fate in a spared world brings one erased entry back, partial
+function closeFate(run, msgs, spared) {
+  const E = fateEnd(run); if (!E) return; run.fateEnd = E.end;
+  if (E.text) msgs.push({ t: E.end === 'lifted' ? 'loot' : 'loss', text: E.text });
+  if (spared && E.end === 'lifted' && run.record && run.record.lost) restoreRecord(run, 1, msgs);
+}
+// Marks that last the run (the outcome always) go on every fight, as next and foe marks do on one
+function applyAlways(run) { const A = run.always; if (!A) return; const c = { run, msgs: [] }; ['next', 'foe'].forEach(k => A[k] && OUTCOME_APPLY[k](A[k], c)); }
 // Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
 function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
@@ -1066,6 +1105,7 @@ function enterChoose(run, meta, rng, msgs) {
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
+  const crisis = crisisDue(run); if (crisis && !run.pending.some(p => p.type === 'event' && p.key === crisis)) pushEvent(run, crisis, rng);
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
@@ -1829,7 +1869,7 @@ function resolveFight(run, f, meta, rng) {
   const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'], heartCut = run.nextFlags.heartCut || 0, noWinGold = !!run.nextFlags.noWinGold;
   if (stakes) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Stakes' }; applyOutcomes(stakes, ctx, false); applyOutcomes(stakes, ctx, true); }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
-  run.nextFlags = {};
+  run.nextFlags = {}; applyAlways(run);
   const c = featCtx(run, f, won, spec);
   // Titles are earned for feats (titles.js); world firsts for a Final Champion come between the won-fight ones and the any-fight ones
   const titleFeats = at => Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === at && featOk(t.feat, c, t.n)) earnTitle(run, k, msgs); });
@@ -1878,12 +1918,13 @@ function resolveFight(run, f, meta, rng) {
       run.eliteWins++;
       if (run.eliteIdx >= run.eliteBracket.length - 1) { res.eliteOver = true; res.eliteCleared = true; }
       else run.eliteIdx++;
-    } else if (spec.kind === 'final') res.spared = true;
+    } else if (spec.kind === 'final') { res.spared = true; closeFate(run, msgs, true); }
     else run.round++;
   } else {
     if (run.elite) res.eliteOver = true;
     else {
-      const cost = Math.max(0, heartCost(run, spec) - heartCut);
+      let cost = Math.max(0, heartCost(run, spec) - heartCut);
+      if (cost && run.ward > 0 && !run.practice) { run.ward--; cost = 0; msgs.push({ t: 'loot', text: `[Ward holds. No Heart lost.${run.ward ? ` ${run.ward} ward${run.ward > 1 ? 's' : ''} left.` : ''}]` }); }
       run.lastLoss = { round: run.round, hearts: cost, spec: Object.assign({}, spec, { traits: (spec.traits || []).slice() }) };
       run.losses++; run.hearts -= cost; res.heartsLost = cost; hist.hl = cost;
       if (run.notice && !run.practice) { run.notice = 0; msgs.push({ t: 'class', text: '[Streak broken. The System looks away.]' }); }
@@ -1892,6 +1933,7 @@ function resolveFight(run, f, meta, rng) {
         // At 0 Hearts every entry left goes, then the world's name
         res.erased = eraseRecord(run, REC_MAX, msgs);
         if (run.record) msgs.push({ t: 'loss', text: `[World: ${'█'.repeat(run.world.name.length)}. Status: erased.]` });
+        closeFate(run, msgs, false);
       } else {
         run.hp = Math.max(run.hp, Math.round(maxHp(run) * 0.5));
         msgs.push({ t: 'loss', text: `[Defeat. A piece of ${run.world.name} is erased. −${cost} Heart${cost > 1 ? 's' : ''}, ${run.hearts} left.]` });
@@ -2182,7 +2224,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
