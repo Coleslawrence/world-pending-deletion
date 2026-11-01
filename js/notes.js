@@ -5,6 +5,30 @@
 // The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
+    id: '2026-11-01', release: 'wpd-v11', title: "[System Notice: Judgement Update]", pages: [
+      { h: "Living worlds", sys: "[Worlds are no longer issued from a template. Each one is now a little different.]", items: [
+        "[Every world has a people and a fate. Neither was the System's idea.]",
+        "[Each kind of world now fields its own four classes. Some worlds field two kinds.]",
+        "[Your world will now send word between rounds. It cannot help it.]",
+        "[Worlds you fought for recently will not be offered again so soon.]"] },
+      { h: "Judgement by record", sys: "[There are more worlds than time. Worlds will now be judged by record.]", items: [
+        "[Each round, the harder opponent is another Entrant's record from that round.]",
+        "[Beat a record: take a fragment of its world. Lose: it takes a piece of yours.]",
+        "[Records survive three defeats. After that, their world is no longer pending.]",
+        "[Your records fight on without you. Even after your world is gone.]"] },
+      { h: "Undercity", sys: "[The Undercity has been reorganised. Every choice now costs something real.]", items: [
+        "[Some actions now show their odds. The odds are honest. Mostly.]",
+        "[A failed attempt is still an attempt. Something happens either way.]",
+        "[Events no longer repeat within a run. The tunnels have more to say.]"] },
+      { h: "System events", sys: "[The System now runs ten events of its own. Do not ask why.]", items: [
+        "[Shady choices draw the System's notice. Compliance draws it away.]",
+        "[Records may be duplicated, audited, amended or rolled back. This is normal.]",
+        "[Locker 0 is not yours. Please stop opening it.]"] },
+      { h: "Records", sys: "[The System now notes which version of reality each run was played in.]", items: [
+        "[For accuracy. Not for blame.]"] },
+    ],
+  },
+  {
     id: '2026-10-31', release: 'wpd-v10', title: "[System Notice: Recalibration Update]", pages: [
       { h: "Stats", sys: "[Experience is retired. Gold buys strength now.]", items: [
         "[Stat points are bought with gold, one at a time. Each costs more than the last.]",

@@ -287,7 +287,7 @@ function dailyDate(now) { return new Date((now == null ? Date.now() : now) + DAY
 function dailySeed(date) { return 'wpd:' + date; }
 // Pending World days before WORLD_GEN.from keep the world the old generator made, so shipping layered worlds never
 // changes a day already under way. SHIP STEP: set from to the game day after the release that ships layered worlds.
-const WORLD_GEN = { from: '2099-01-01' };
+const WORLD_GEN = { from: '2026-11-02' };
 function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'); return date >= WORLD_GEN.from ? genWorld(rng) : genWorldV1(rng); }
 // w: the day's world (or just its type, for a world without layers)
 function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w); }
