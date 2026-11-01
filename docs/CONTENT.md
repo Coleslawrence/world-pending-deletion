@@ -58,6 +58,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Content sits on the wheel.** Every skill, piece of gear, enemy, world, god and event chain is tagged with one archetype or two neighbours, and uses what they own (see Archetypes and the wheel).
 - **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
+- **Every skill, piece of gear, Gift and Title has a flavour line** (`flavour`; skills and their evolutions get theirs from the `flav({ ... })` block at the end of their archetype's file). It is the world's voice under the rules, or one whole System line in [brackets]: up to 16 words, no numbers, its own line (no two alike). The game shows it in italics under the description.
 - **Player text follows the style guide:** British spelling, no em-dashes, one name for one thing, and the length limits for one phone screen.
 
 ## Checks

@@ -423,6 +423,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .acts { display: flex; flex-wrap: wrap; gap: 6px; } .acts .btn { flex: 1 1 auto; }
 .sr-meta { display: flex; flex-wrap: wrap; gap: 3px; text-transform: none; letter-spacing: 0; }
 .sr-next { font-size: 12.5px; color: var(--dim); font-style: italic; }
+.flav { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.35; color: var(--dim); font-style: italic; }
 .archrow { border-left: 3px solid var(--sc); padding: 4px 0 4px 10px; display: grid; gap: 3px; }
 .ar-h { display: flex; gap: 8px; align-items: baseline; } .ar-h b { color: var(--sc); font-family: var(--f-d); font-weight: 400; font-size: 17px; } .ar-n { margin-left: auto; font-family: var(--f-d); font-size: 18px; }
 .ar-b { display: flex; gap: 8px; font-size: 13.5px; color: var(--dim); } .ar-b span { font-family: var(--f-m); width: 14px; flex: none; } .ar-b.on { color: var(--text); } .ar-b.on span { color: var(--sc); }

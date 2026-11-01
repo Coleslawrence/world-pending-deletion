@@ -7,3 +7,26 @@ sk('retribution', 'Retribution', ['bastion'], 'D', 3, { block: 6, thorns: 8 }, [
 sk('riposte', 'Riposte', ['bastion', 'blade'], 'C', 3, { block: 6, riposte: 1.5 }, [['perfect_riposte', 'Perfect Riposte', { block: 10, riposte: 2.5 }], ['parry_master', 'Parry Master', { block: 6, riposte: 1.5, evade: 1 }]]);
 sk('unbreakable', 'Unbreakable', ['bastion'], 'B', 4, { block: 20, cleanse: 1 }, [['immovable', 'Immovable', { block: 30, cleanse: 1 }], ['iron_skin', 'Iron Skin', { block: 18, cleanse: 1, thorns: 6 }]]);
 sk('bulwark_slam', 'Bulwark Slam', ['bastion'], 'A', 3, { dmg: 4, blockDmg: 1.2 }, [['titan_slam', 'Titan Slam', { dmg: 6, blockDmg: 1.6 }], ['shield_quake', 'Shield Quake', { dmg: 4, blockDmg: 1.2, stun: 1 }, 4]]);
+flav({
+  iron_guard: "Feet planted, shield up. The oldest lesson in the Iron Hold.",
+  fortress: "They hit the shield. The shield does not notice.",
+  spiked_guard: "A shield studded with nails, for opponents who lean on it.",
+  shield_bash: "A shield is a door. Sometimes you open it into their face.",
+  tower_bash: "The whole wall moves at once, and so do they.",
+  stunning_bash: "A ringing blow. They will hear it for a while.",
+  smite: "The harder they hit your shield, the harder it hits them.",
+  judgement: "Your shield weighs everything done to it, and returns it.",
+  righteous_smite: "Struck with a clear conscience, which turns out to be restorative.",
+  retribution: "Every blow they land costs them something.",
+  vengeance: "You keep a careful count, and repay it with interest.",
+  iron_retort: "Iron answers iron, and iron always has the last word.",
+  riposte: "You let them commit. Then you correct them.",
+  perfect_riposte: "The best answer to a sword is the moment just after it.",
+  parry_master: "You were never quite where their blade arrived.",
+  unbreakable: "Curses and blows slide off you alike. The crowd starts to worry for them.",
+  immovable: "Mountains have tried to move you. Mountains lost.",
+  iron_skin: "Your skin rings like a bell when they strike it.",
+  bulwark_slam: "Everything you have stopped, delivered all at once.",
+  titan_slam: "The arena floor remembers this one.",
+  shield_quake: "The ground jumps. So do they, and they land badly.",
+});

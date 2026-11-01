@@ -92,6 +92,8 @@ function styleOf(spec) {
   if (spec.snap && spec.snap.owner) return spec.kind === 'champion' ? `Saved ${spec.snap.worldName} in ${ownerName(spec.snap.owner)}'s tournament` : `Fell in ${ownerName(spec.snap.owner)}'s tournament, round ${spec.snap.round}`;
   return specStyle(spec);
 }
+// A flavour line (skills, gear, Gifts, Titles): the world's voice under the rules, never instead of them.
+function flavHTML(f) { return f ? `<span class="flav">${esc(f)}</span>` : ''; }
 function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · <span class="nw">${r}-rank</span>` : ''; }
 function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
@@ -496,7 +498,7 @@ function giftRow(k, a, w) {
   // Adding a Gift overrules the System, so it has to fit without the System's bonus points
   const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
   const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
-  return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}</span></button>`;
+  return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}${unlocked ? flavHTML(g.flavour) : ''}</span></button>`;
 }
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
@@ -528,7 +530,7 @@ function awakenHTML() {
     body = `<p class="sh-p">Pledge to a god for 2 Favour with them; their wagers come up more often. Win wagers to reach 4 Favour (a free B-rank piece) and 8 (a blessing for the run).</p>` +
       Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b></span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
       `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>` +
-      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
+      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
   }
   const ready = a.name.trim() && a.pts === 0 && a.patron && chk.ok;
   const why = !a.name.trim() ? 'Name your champion' : a.pts ? `Place ${a.pts} stat point${a.pts > 1 ? 's' : ''}` : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
@@ -841,12 +843,12 @@ function pieceBody(id, star, mods, power) {
   if (isGear(id)) {
     const g = GEAR[id];
     return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${esc(g.name)}</span>${stars(star)}${rk(g.rank)}</div><div class="sr-meta">${tagNames(id)}<span class="tagn">${g.slot}</span></div>
-      <div class="sr-desc"><b>${Object.entries(gearStats(id, star)).map(([k, v]) => `+${v} ${k}`).join(', ')}.</b> ${esc(gearText(id, star))}</div>${star < 3 ? `<div class="sr-next">At ★${star + 1}: ${esc(gearText(id, star + 1))}</div>` : ''}</div>`;
+      <div class="sr-desc"><b>${Object.entries(gearStats(id, star)).map(([k, v]) => `+${v} ${k}`).join(', ')}.</b> ${esc(gearText(id, star))}${flavHTML(g.flavour)}</div>${star < 3 ? `<div class="sr-next">At ★${star + 1}: ${esc(gearText(id, star + 1))}</div>` : ''}</div>`;
   }
   const d = moddedDef(id, mods);
   const p = power || skillPower(d, effStats(run), star) * d.powerMult;
   return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${mods.length ? `<em class="pfx">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em> ` : ''}${esc(d.name)}</span>${stars(star)}${rk(effRank(id, mods))}</div>
-    <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}</div>
+    <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}${flavHTML(SKILLS[id].flavour)}</div>
     ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${SKILLS[id].evo.map(e => esc(SKILLS[e].name)).join(' or ')}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
 }
 function pieceSheet() {
@@ -891,7 +893,7 @@ function pendingSheet() {
     return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
-    return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
+    return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'perk') {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
@@ -971,7 +973,7 @@ function statsSheet() {
     <h4>Title</h4>${titleList()}
     <h4>System quests</h4>${questList()}
     ${run.hiddenPath ? `<h4>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</h4><p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>` : ''}
-    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
+    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
     <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>
     <h4>Sponsors</h4>${gods}`;
   return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);
@@ -979,7 +981,7 @@ function statsSheet() {
 function titleList() {
   const ts = Object.keys(TITLES).filter(k => meta.titles[k]);
   if (!ts.length) return '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena.</p>';
-  return `<div class="tlist">${ts.map(k => `<button class="gift ${run.title === k ? 'on' : ''}" data-act="equip-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b>${run.title === k ? '<span class="tagn q">Equipped</span>' : ''}</span><span class="gf-d">${esc(TITLES[k].desc)}</span></button>`).join('')}</div><p class="sh-p fine">One Title at a time. Tap to equip or remove.</p>`;
+  return `<div class="tlist">${ts.map(k => `<button class="gift ${run.title === k ? 'on' : ''}" data-act="equip-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b>${run.title === k ? '<span class="tagn q">Equipped</span>' : ''}</span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('')}</div><p class="sh-p fine">One Title at a time. Tap to equip or remove.</p>`;
 }
 function questList() {
   const qs = run.quests.filter(q => !QUESTS[q.id].hidden || q.done);
@@ -1068,7 +1070,7 @@ function howtoSheet() {
 function archiveSheet() {
   const A = meta.archive;
   if (run && !run.ended && hasGift(run, 'f_amnesia')) return sheetWrap('Tournament Archive', '<p class="sh-p big">[Access denied. Entrant memory is corrupted.]</p><p class="sh-p fine">Amnesia seals the Archive for this run.</p>', `<button class="btn primary" data-act="close">Close</button>`);
-  const titles = Object.entries(TITLES).map(([k, T]) => meta.titles[k] ? `<li><b>${esc(T.name)}</b>: ${esc(T.desc)} <small>${esc(T.cond)}</small></li>` : `<li class="unk">${T.first ? '' : 'Title: '}<small>${esc(T.cond)}</small></li>`).join('');
+  const titles = Object.entries(TITLES).map(([k, T]) => meta.titles[k] ? `<li><b>${esc(T.name)}</b>: ${esc(T.desc)} <small>${esc(T.cond)}</small>${flavHTML(T.flavour)}</li>` : `<li class="unk">${T.first ? '' : 'Title: '}<small>${esc(T.cond)}</small></li>`).join('');
   const hidden = Object.entries(HIDDEN_PATHS).filter(([k]) => A.hidden && A.hidden[k]).map(([k, H]) => `<li><b>${esc(H.name)}</b> (${k.split('+').map(x => ARCH[x].name).join(' + ')}): ${esc(H.desc)}</li>`).join('');
   const nh = Object.keys(HIDDEN_PATHS).length, fh = Object.keys(A.hidden || {}).length;
   const quests = Object.entries(QUESTS).filter(([k, Q]) => Q.hidden).map(([k, Q]) => A.quests && A.quests[k] ? `<li><b>${esc(Q.text)}</b></li>` : '<li class="unk">Hidden quest: ???</li>').join('');

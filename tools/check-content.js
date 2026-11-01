@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -72,8 +72,8 @@ if (saved) {
 // ---------- Fields: required ones present, nothing unknown (a typo is an unknown field) ----------
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
-  skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks']],
-  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text'], ['fix']],
+  skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks']],
+  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix']],
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting']],
@@ -81,8 +81,8 @@ const SCHEMA = {
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
-  gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc'], ['lock', 'arch', 'p', 'theme']],
-  titles: [C.TITLES, ['name', 'cond', 'desc'], ['first', 'p', 'feat', 'n', 'theme']],
+  gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc', 'flavour'], ['lock', 'arch', 'p', 'theme']],
+  titles: [C.TITLES, ['name', 'cond', 'desc', 'flavour'], ['first', 'p', 'feat', 'n', 'theme']],
   effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
   feats: [C.FEATS, ['at', 'say', 'hit'], ['n', 'measure', 'must', 'unfairFor', 'needs', 'theme']],
   quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme']],
@@ -415,6 +415,18 @@ Object.entries(C.GIFTS).forEach(([k, g]) => [g.name, g.desc].forEach(s => say('g
 Object.entries(C.TITLES).forEach(([k, t]) => [t.name, t.cond, t.desc].forEach(s => say('titles ' + k, s)));
 Object.entries(C.QUESTS).forEach(([k, q]) => say('quests ' + k, q.text));
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => [h.name, h.desc].forEach(s => say('paths ' + k, s)));
+// Flavour lines (skills, gear, Gifts, Titles): the world's voice, or one whole System line in [brackets]. No numbers: rules go in desc.
+const flavours = [['skills', C.SKILLS], ['gear', C.GEAR], ['gifts', C.GIFTS], ['titles', C.TITLES]].flatMap(([kind, o]) => Object.entries(o).map(([k, d]) => [`${kind} ${k} flavour`, d.flavour]));
+flavours.forEach(([w, f]) => {
+  if (typeof f !== 'string') return;
+  say(w, f, 16);
+  if (/\d/.test(f)) err(w, `flavour has a number in it ("${f}"); numbers and rules go in the description, flavour only sets the scene`);
+  if (/[[\]]/.test(f) && !/^\[[^[\]]+\]$/.test(f)) err(w, `flavour is either the world's voice (no brackets) or one whole System line in [brackets]: "${f}"`);
+  if (!/[.!?\]"]$/.test(f)) err(w, `flavour ends without a full stop: "${f}"`);
+});
+(C.FLAVOUR_ORPHANS || []).forEach(id => err('skills flavour', `flav() names ${id}, which isn't a skill`));
+const seenFlavour = {};
+flavours.forEach(([w, f]) => { if (typeof f !== 'string') return; if (seenFlavour[f] && !w.startsWith('gifts aff_')) err(w, `same flavour as ${seenFlavour[f]}: give each its own line`); seenFlavour[f] = seenFlavour[f] || w; });
 Object.entries(G.EVENTS).forEach(([k, E]) => {
   say(`event ${k} title`, E.title, 4);
   try { say(`event ${k} text`, G.eventText(sampleRun, k), 35); } catch (e) { /* text that needs a real run is checked in play */ }
