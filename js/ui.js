@@ -1546,6 +1546,7 @@ async function shareChampion(snap, kind) {
 // The hard opponent each round is a filed record: the System's reserve until the slot is read, then the player build
 // filed there, if there is one. Reading needs any sign-in; filing your own record needs an approved tester.
 const poolBusy = {};
+const POOL_ECHOES = 2; // Echoes for each time one of your filed records beats another Entrant
 function poolLoad() {
   if (!run || !run.choices || !cloud.on || !cloud.db || !cloud.uid || cloud.poolOff) return;
   run.choices.forEach(spec => {
@@ -1567,15 +1568,48 @@ async function poolRead(spec, r, retry) {
   if (data && data.name && data.owner) cloud.names[data.owner] = String(data.name).slice(0, 24);
   if (poolFill(spec, data, cloud.uid)) { saveRun(); if (ui.screen === 'choose') render(); } else saveRun();
 }
-// After a fight in a pool round, the build that walked into it replaces a random slot for that round
+// After a fight in a pool round: settle what the fight did to the record you fought (poolResolve), then file the build that
+// walked into the round. It takes a free slot (never filed, or its record erased) when the round has one, else a random one.
 function poolFile(res) {
-  const up = run && run.poolUp; if (!up || res.rewind) return;
+  if (res.rewind || !run) return;
+  if (canShare() && cloud.uid && !cloud.poolOff) {
+    if (res.poolHit) poolHit(res.poolHit, res.msgs);
+    if (res.poolWon) poolNote(res.poolWon, { won: true });
+  }
+  const up = run.poolUp; if (!up) return;
   delete run.poolUp;
   if (!canShare() || !cloud.uid || cloud.poolOff) return;
   if (!run.poolFiled) { run.poolFiled = true; res.msgs.push({ t: 'sys', text: `[Your round ${up.round} record has been filed. It will fight for ${run.world.name} in other Entrants' tournaments. You will not be compensated.]` }); }
-  const slot = 1 + Math.floor(Math.random() * POOL_SIZE);
-  cloud.db.doc('pool/' + poolId(up.round, slot)).set({ snap: jsonSafe(up.snap), owner: cloud.uid, at: Date.now() })
-    .catch(e => { if (e && e.code === 'invalid_argument') cloud.poolOff = true; cloudFail('pool', 'file pool record', e); });
+  (async () => {
+    let slot = 1 + Math.floor(Math.random() * POOL_SIZE);
+    try {
+      const qs = await cloud.db.collection('pool').query({ where: ['r', '==', up.round], limit: POOL_SIZE });
+      const taken = new Set(qs.docs.filter(d => (d.data() || {}).hearts > 0).map(d => d.id));
+      const free = []; for (let i = 1; i <= POOL_SIZE; i++) if (!taken.has(poolId(up.round, i))) free.push(i);
+      if (free.length) slot = free[Math.floor(Math.random() * free.length)];
+    } catch (e) { console.warn('[cloud] list pool failed:', e && e.code, e); }
+    await cloud.db.doc('pool/' + poolId(up.round, slot)).set({ snap: jsonSafe(up.snap), owner: cloud.uid, at: Date.now(), hearts: POOL_HEARTS, r: up.round });
+  })().catch(e => { if (e && e.code === 'invalid_argument') cloud.poolOff = true; cloudFail('pool', 'file pool record', e); });
+}
+// You beat a player's record: it loses a Heart, unless it was filed over or erased since you drew it. At zero it is erased
+// and its owner is told.
+function poolHit(h, msgs) {
+  const left = Math.max(0, h.hearts - 1);
+  msgs.push(left ? { t: 'sys', text: `[${h.champ}'s round ${h.round} record loses a Heart. ${left} left.]` } : { t: 'broadcast', text: `[${h.champ}'s round ${h.round} record has been erased. One fewer world pending.]` });
+  const ref = cloud.db.doc('pool/' + poolId(h.round, h.slot));
+  (async () => {
+    const d = await ref.get(), data = d.exists ? d.data() : null;
+    if (!data || data.owner !== h.owner || data.at !== h.at || !(data.hearts > 0)) return;
+    await ref.set(Object.assign({}, data, { hearts: data.hearts - 1 }));
+    if (data.hearts === 1) poolNote(h, { gone: true });
+  })().catch(e => cloudFail('pool', 'hit pool record', e));
+}
+// A note in the record owner's inbox: their record beat someone (won), or was erased (gone)
+function poolNote(h, extra) {
+  if (!h.owner || h.owner === cloud.uid) return;
+  const t = Date.now();
+  cloud.db.doc(`inbox/${h.owner}/notes/${cloud.uid}_${t}`).set(Object.assign({ by: cloud.uid, champ: String(h.champ).slice(0, 60), t, pool: h.round }, extra))
+    .catch(e => cloudFail('pool', 'pool note', e));
 }
 // "Laid to rest" notes go straight into the champion owner's inbox, so each player reads only notes addressed to them
 async function recordRest(r) {
@@ -1610,11 +1644,15 @@ async function checkRests() {
     const seen = meta.restSeen || 0, col = cloud.db.collection(`inbox/${cloud.uid}/notes`);
     const qs = col.query ? await col.query({ where: ['t', '>', seen], orderBy: 't', limit: 30 }) : await col.get();
     const notes = [];
-    qs.docs.forEach(d => { const e = d.data() || {}; if (e.by && e.by !== cloud.uid && Number(e.t) > seen) notes.push({ by: e.by, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t), at: Number(e.at) || 0, won: e.won === true, rank: rankIdx(e.rank) >= 0 ? e.rank : null }); });
+    qs.docs.forEach(d => { const e = d.data() || {}; if (e.by && e.by !== cloud.uid && Number(e.t) > seen) notes.push({ by: e.by, champ: String(e.champ || 'Your champion').slice(0, 60), t: Number(e.t), at: Number(e.at) || 0, won: e.won === true, rank: rankIdx(e.rank) >= 0 ? e.rank : null, pool: Number(e.pool) || 0, gone: e.gone === true }); });
     if (!notes.length) return;
-    await resolveNames(notes.filter(n => !n.won).map(n => n.by));
+    await resolveNames(notes.filter(n => !n.won || n.pool).map(n => n.by));
     const ranked = [];
+    // Filed records: wins are added up into one line, erasures each get their own
+    const held = notes.filter(n => n.pool && n.won);
+    if (held.length) { meta.echoes += POOL_ECHOES * held.length; logToast(`[Your filed records held their worlds ${held.length === 1 ? 'once' : held.length + ' times'} in other Entrants' tournaments. +${POOL_ECHOES * held.length} Echoes.]`); }
     notes.sort((a, b) => a.t - b.t).forEach(n => {
+      if (n.pool) { if (n.gone) logToast(`[${n.champ}'s round ${n.pool} record was erased by ${ownerName(n.by)}.]`); return; }
       if (n.won) {
         const sp = meta.champions.find(s => s.at === n.at), s = sp || meta.erased.find(x => x.at === n.at); if (!s) return;
         const before = s.rank, line = champWin(s, !!sp); if (line) logToast(line);
