@@ -1019,11 +1019,11 @@ function crisisDue(run) {
   if (!F || !F.crises || at < 0 || run.practice || run.elite) return null;
   const k = F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
 }
-// The run is decided: say how the Fate ended. A lifted Fate in a spared world brings one erased entry back, partial
+// The run is decided: say how the Fate ended. A lifted Fate in a spared world gives a Heart back, and its entry comes back partial
 function closeFate(run, msgs, spared) {
   const E = fateEnd(run); if (!E) return; run.fateEnd = E.end;
   if (E.text) msgs.push({ t: E.end === 'lifted' ? 'loot' : 'loss', text: E.text });
-  if (spared && E.end === 'lifted' && run.record && run.record.lost) restoreRecord(run, 1, msgs);
+  if (spared && E.end === 'lifted') OUTCOME_APPLY.restore(1, { run, msgs });
 }
 // Marks that last the run (the outcome always) go on every fight, as next and foe marks do on one
 function applyAlways(run) { const A = run.always; if (!A) return; const c = { run, msgs: [] }; ['next', 'foe'].forEach(k => A[k] && OUTCOME_APPLY[k](A[k], c)); }

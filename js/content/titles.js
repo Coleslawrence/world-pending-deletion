@@ -12,6 +12,7 @@ const TITLES = {
   high_roller: { name: 'High Roller', cond: 'Win 3 wagers in one run.', feat: 'wagers', desc: 'Winning a wager pays 3 more gold.' },
   underdog: { name: 'Underdog', cond: 'Beat a hard opponent.', feat: 'hard', desc: '+10% damage to hard opponents.', p: { vsHard: 0.1 } },
   rank_is_just_a_letter: { name: 'Rank Is Just a Letter', cond: 'Beat an opponent two rank letters above your Entrant Rank.', feat: 'outranked', desc: '+10% damage to opponents of a higher rank than you.', p: { vsHigherRank: 0.1 } },
+  fatebreaker: { name: 'Fatebreaker', cond: "Lift your world's Fate (answer its crisis both times), then beat the Final Champion.", feat: 'fatelifted', desc: 'Your healing is 10% stronger.', p: { healPct: 0.1 } },
   comeback: { name: 'Comeback Kid', cond: 'Win a fight with 10% HP or less.', feat: 'clutch', desc: 'Below 25% HP, take 20% less damage.', p: { lowDR: 0.2 } },
   alchemist: { name: 'Alchemist', cond: 'Trigger 3 reactions in a single fight.', feat: 'react', n: 3, desc: 'Reactions are 20% stronger.', p: { reactMult: 1.2 } },
   executioner: { name: 'Executioner', cond: 'Land a single hit of 60 or more.', feat: 'bighit', desc: 'Critical hits deal ×1.75 instead of ×1.5.', p: { critMult: 1.75 } },
