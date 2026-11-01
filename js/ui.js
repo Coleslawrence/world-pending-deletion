@@ -80,13 +80,14 @@ function pushMsgs(msgs, logged) {
 function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ui.sheet.type === 'result')) return; ui.sheet = { type: 'syslog' }; render(); }
 
 // ---------- Small helpers ----------
-const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial' };
+const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial', entrant: 'Filed record' };
 function initials(name) { const w = name.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(x => x && !['the', 'of'].includes(x.toLowerCase())); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
 function crest(name, kind, big, sig, rank) {
   const inner = sig ? `<span class="sig" style="color:${SIGIL_COLS[sig.color] || '#fff'}">${SIGILS[sig.sigil] || '✦'}</span>` : `<span>${esc(initials(name))}</span>`;
   return `<div class="crest k-${kind}${big ? ' big' : ''}" aria-hidden="true">${inner}${rank ? `<b class="crest-rk">${esc(rank)}</b>` : ''}</div>`;
 }
 function styleOf(spec) {
+  if (spec.kind === 'entrant') return poolStyle(spec, spec.snap.owner ? ownerName(spec.snap.owner) : null);
   if (spec.kind === 'trial') return spec.cond ? 'Condition: ' + COND_TEXT[spec.cond] : 'No condition. Win to be promoted.';
   if (spec.snap && spec.snap.owner) return spec.kind === 'champion' ? `Saved ${spec.snap.worldName} in ${ownerName(spec.snap.owner)}'s tournament` : `Fell in ${ownerName(spec.snap.owner)}'s tournament, round ${spec.snap.round}`;
   return specStyle(spec);
@@ -546,8 +547,9 @@ function draftHTML() {
 
 // ---------- Choose opponent ----------
 function chooseHTML() {
+  poolLoad();
   const cards = run.choices.map((spec, i) => `<button class="opp ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
-      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.gate ? 'Gatekeeper' : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${traitsHTML(spec)}
+      ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.gate ? 'Gatekeeper' : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : spec.kind === 'entrant' ? 'Filed record · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${traitsHTML(spec)}
       <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
@@ -768,6 +770,7 @@ function startFightUI() {
   intro.forEach(l => say2(f, l.text, l.t));
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
   if (f.spec.kind === 'erased') say2(f, f.spec.snap.rec ? `[The System has returned a champion of an erased world. They remember: "${recFragment(f.spec.snap.rec, f.spec.snap.worldType)}."]` : '[The System has returned a champion of an erased world. They remember you.]', 'loss');
+  if (f.spec.kind === 'entrant') say2(f, poolIntro(f.spec), 'sys');
   if (f.spec.kind === 'final') say2(f, `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
   render(); playEvents(f); updateFight();
@@ -799,6 +802,7 @@ async function onUse(i) {
 function finishFight() {
   const f = ui.fight;
   const res = resolveFight(run, f, run.practice ? META : meta);
+  poolFile(res);
   // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
   const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
@@ -807,7 +811,7 @@ function finishFight() {
   if (res.practiceDone) { ui.practiceAfter = true; }
   if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.fell) recordWin(res.fell);
-  if (res.death) { const out = endRun(run, meta, 'erased'); recordRunStats('erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; lsDel(RUN_KEY); }
+  if (res.death) { const out = endRun(run, meta, 'erased'); recordRunStats('erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false), filed: !!run.poolFiled }; lsDel(RUN_KEY); }
   else if (res.spared) { const out = endRun(run, meta, 'spared'); recordRunStats('spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
   else if (res.eliteOver) { ui.end = { kind: res.eliteCleared ? 'elite-clear' : 'elite-fall', echoes: 8 * run.eliteWins }; }
   saveMeta(); if (!res.death) saveRun();
@@ -1095,7 +1099,7 @@ function shareBlock(s, erased) {
 function endHTML() {
   const e = ui.end, s = e.snap;
   const erased = e.kind === 'erased';
-  const lines = (e.observed ? [e.observed] : []).concat(erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`].concat(e.opened ? [] : ['[Next world.]']) : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`], e.opened ? [`[Rank Trial unlocked: ${e.opened}-rank. It waits in your next world.]`] : []);
+  const lines = (e.observed ? [e.observed] : []).concat(erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`].concat(e.filed ? [`[${s.worldName}'s records remain on file.]`] : []).concat(e.opened ? [] : ['[Next world.]']) : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`], e.opened ? [`[Rank Trial unlocked: ${e.opened}-rank. It waits in your next world.]`] : []);
   return `<main class="screen title end"><div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
     ${runCard(s, { erased, big: true })}</div>
@@ -1195,7 +1199,7 @@ function onAct(el) {
     case 'share': { const s = ui.end && ui.end.snap; if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared with other entrants.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
     case 'share-hall': { const list = d.k === 'erased' ? meta.erased : meta.champions; const s = list.find(x => String(x.at) === d.at); if (!s) return; el.disabled = true; shareChampion(s, d.k).then(ok => { toast(ok ? `[${s.champ} has been shared.]` : '[Sharing is not available for your access level.]', ok ? 'class' : 'loss'); render(); }); return; }
     case 'abandon': ui.confirmAbandon = true; return render();
-    case 'abandon-yes': { if (run.practice) return endPractice(false); const out = endRun(run, meta, 'erased'); recordRunStats('abandoned'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial, observed: finishDaily(false) }; saveMeta(); lsDel(RUN_KEY); ui.fight = null; ui.confirmAbandon = false; return go('end'); }
+    case 'abandon-yes': { if (run.practice) return endPractice(false); const out = endRun(run, meta, 'erased'); recordRunStats('abandoned'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial, observed: finishDaily(false), filed: !!run.poolFiled }; saveMeta(); lsDel(RUN_KEY); ui.fight = null; ui.confirmAbandon = false; return go('end'); }
   }
   if (!run) return;
   const msgs = [];
@@ -1442,7 +1446,7 @@ async function cloudInit() {
   } catch (e) { cloud.status = 'local'; cloudFail('sync', 'connect', e); }
 }
 // Cloud errors: always logged; the player sees one notice per kind per session, so friends can report it
-const CLOUD_FAIL_TEXT = { sync: 'Cloud save failed. Your progress is kept on this device.', share: 'Shared champions could not be reached.', board: 'Pending World scores could not be reached.' };
+const CLOUD_FAIL_TEXT = { sync: 'Cloud save failed. Your progress is kept on this device.', share: 'Shared champions could not be reached.', pool: 'Filed records could not be reached.', board: 'Pending World scores could not be reached.' };
 function cloudFail(kind, where, e) {
   const code = (e && e.code) || 'unknown';
   console.warn(`[cloud] ${where} failed:`, code, e);
@@ -1537,6 +1541,41 @@ async function shareChampion(snap, kind) {
     meta.shared = meta.shared || {}; meta.shared[snap.at] = true; saveMeta();
     return true;
   } catch (e) { if (e && e.code === 'invalid_argument') cloud.shareOff = true; cloudFail('share', 'share champion', e); return false; }
+}
+// ---------- Entrant pool (core.js "Entrant pool", firestore.rules pool/{round}_{slot}) ----------
+// The hard opponent each round is a filed record: the System's reserve until the slot is read, then the player build
+// filed there, if there is one. Reading needs any sign-in; filing your own record needs an approved tester.
+const poolBusy = {};
+function poolLoad() {
+  if (!run || !run.choices || !cloud.on || !cloud.db || !cloud.uid || cloud.poolOff) return;
+  run.choices.forEach(spec => {
+    if (spec.kind !== 'entrant' || spec.read) return;
+    const key = spec.round + '_' + spec.slot; if (poolBusy[key]) return;
+    poolBusy[key] = true;
+    poolRead(spec, run).finally(() => { delete poolBusy[key]; });
+  });
+}
+async function poolRead(spec, r, retry) {
+  let data = null;
+  try { const d = await cloud.db.doc('pool/' + poolId(spec.round, spec.slot)).get(); data = d.exists ? d.data() : null; }
+  catch (e) { if (e && e.code === 'invalid_argument') cloud.poolOff = true; console.warn('[cloud] read pool failed:', e && e.code, e); return; }
+  // Only while the player is still choosing: a record never swaps under an opponent already picked
+  if (run !== r || r.stage !== 'choose' || !r.choices.includes(spec)) return;
+  // Never your own record: look one slot on, once
+  if (data && data.owner === cloud.uid && !retry) { spec.slot = spec.slot % POOL_SIZE + 1; spec.snap = poolReserve(spec.round, spec.slot); return poolRead(spec, r, true); }
+  spec.read = true;
+  if (data && data.name && data.owner) cloud.names[data.owner] = String(data.name).slice(0, 24);
+  if (poolFill(spec, data, cloud.uid)) { saveRun(); if (ui.screen === 'choose') render(); } else saveRun();
+}
+// After a fight in a pool round, the build that walked into it replaces a random slot for that round
+function poolFile(res) {
+  const up = run && run.poolUp; if (!up || res.rewind) return;
+  delete run.poolUp;
+  if (!canShare() || !cloud.uid || cloud.poolOff) return;
+  if (!run.poolFiled) { run.poolFiled = true; res.msgs.push({ t: 'sys', text: `[Your round ${up.round} record has been filed. It will fight for ${run.world.name} in other Entrants' tournaments. You will not be compensated.]` }); }
+  const slot = 1 + Math.floor(Math.random() * POOL_SIZE);
+  cloud.db.doc('pool/' + poolId(up.round, slot)).set({ snap: jsonSafe(up.snap), owner: cloud.uid, at: Date.now() })
+    .catch(e => { if (e && e.code === 'invalid_argument') cloud.poolOff = true; cloudFail('pool', 'file pool record', e); });
 }
 // "Laid to rest" notes go straight into the champion owner's inbox, so each player reads only notes addressed to them
 async function recordRest(r) {

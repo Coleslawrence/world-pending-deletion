@@ -137,6 +137,27 @@ await check('11 log lines are refused', assertFails(postFb(alice, 'alice', 17000
 await check('an extra run field is refused', assertFails(postFb(alice, 'alice', 1700000000012, { run: Object.assign({}, fbDoc().run, { name: 'Wren' }) })));
 await check('a 201-character device line is refused', assertFails(postFb(alice, 'alice', 1700000000013, { ua: 'x'.repeat(201) })));
 
+// The Entrant pool: a real filed build from a bot run, through the game's own poolSnap
+const poolBuild = (() => { const req = createRequire(import.meta.url), B = req('./bot.js'), m = G2.newMeta(); let snap = null; B.playRun(m, false, { noElite: true, snap: (st, r) => { if (st === 'shop' && r.round === 3 && !snap) snap = G2.poolSnap(r); } }); return JSON.parse(JSON.stringify(snap)); })();
+const poolRef = (db, id) => doc(db, 'pool/' + id);
+const filed = (uid, o = {}) => Object.assign({ snap: poolBuild, owner: uid, at: 1700000000000, name: 'Wren' }, o);
+await check('a tester files a build', assertSucceeds(setDoc(poolRef(alice, '3_17'), filed('alice'))));
+await check('another tester files over it', assertSucceeds(setDoc(poolRef(bob, '3_17'), filed('bob'))));
+await check('signed-in players read a slot', assertSucceeds(getDoc(poolRef(erin, '3_17'))));
+await check('signed out reads are refused', assertFails(getDoc(poolRef(anon, '3_17'))));
+await check('listing the pool is refused', assertFails(getDocs(query(collection(erin, 'pool'), limit(5)))));
+await check('a non-tester cannot file', assertFails(setDoc(poolRef(erin, '3_18'), filed('erin'))));
+await check('filing under someone else is refused', assertFails(setDoc(poolRef(bob, '3_18'), filed('alice'))));
+await check('slot 31 is refused', assertFails(setDoc(poolRef(alice, '3_31'), filed('alice'))));
+await check('round 8 is refused', assertFails(setDoc(poolRef(alice, '8_1'), filed('alice'))));
+await check('slot 30 is fine', assertSucceeds(setDoc(poolRef(alice, '3_30'), filed('alice'))));
+await check('a build from another round is refused', assertFails(setDoc(poolRef(alice, '4_1'), filed('alice'))));
+await check('a build with its history is refused', assertFails(setDoc(poolRef(alice, '3_2'), filed('alice', { snap: Object.assign({}, poolBuild, { history: [] }) }))));
+await check('a 6-skill bar is refused', assertFails(setDoc(poolRef(alice, '3_3'), filed('alice', { snap: Object.assign({}, poolBuild, { bar: Array(6).fill(poolBuild.bar[0]) }) }))));
+await check('an extra field is refused', assertFails(setDoc(poolRef(alice, '3_4'), filed('alice', { admin: true }))));
+await check('a 25-character name is refused', assertFails(setDoc(poolRef(alice, '3_5'), filed('alice', { name: 'x'.repeat(25) }))));
+await check('deleting a slot is refused', assertFails(deleteDoc(poolRef(bob, '3_17'))));
+
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);

@@ -95,6 +95,34 @@ service cloud.firestore {
           && request.resource.data.rec.ids is list && request.resource.data.rec.ids.size() <= 20));
     }
 
+    // The Entrant pool: 30 filed builds for each of rounds 1 to 7, one document per slot (pool/{round}_{slot}). Any
+    // signed-in player reads one slot at a time (no listing). A tester files their own build over any slot of a round:
+    // replacing someone else's record is the design. The champion name and the name shown are player-chosen game text.
+    match /pool/{slot} {
+      allow get: if request.auth != null;
+      allow create, update: if isTester() && slot.matches('[1-7]_([1-9]|[12][0-9]|30)')
+        && request.resource.data.keys().hasOnly(['snap', 'owner', 'at', 'name'])
+        && request.resource.data.keys().hasAll(['snap', 'owner', 'at'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.at is int
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 24))
+        && poolSnap(request.resource.data.snap, int(slot.split('_')[0]));
+    }
+    function poolSnap(x, round) {
+      return x is map
+        && x.keys().hasOnly(['champ', 'name', 'sigil', 'color', 'worldName', 'worldType', 'path', 'stats', 'level', 'maxHp', 'round', 'gifts', 'title', 'milestones', 'hiddenPath', 'entrant', 'bar', 'gear', 'at', 'rank'])
+        && x.keys().hasAll(['champ', 'stats', 'level', 'maxHp', 'round', 'bar'])
+        && x.champ is string && x.champ.size() <= 60
+        && x.round == round
+        && runInt(x.level, 1, 9) && runInt(x.maxHp, 1, 2000)
+        && x.stats is map && x.stats.size() <= 8
+        && x.bar is list && x.bar.size() <= 5
+        && (!('gear' in x) || (x.gear is list && x.gear.size() <= 3))
+        && (!('gifts' in x) || (x.gifts is list && x.gifts.size() <= 12))
+        && (!('name' in x) || runKey(x.name, 24)) && (!('worldName' in x) || runKey(x.worldName, 30))
+        && (!('rank' in x) || runKey(x.rank, 3));
+    }
+
     // Playtest stats: one anonymous summary per finished run, for the stats dashboard. Game keys and numbers only, never
     // names. Each tester creates their own (runs/{uid}_{time}); nobody reads them in game, only the console and exports.
     match /runs/{runId} {
