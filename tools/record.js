@@ -193,4 +193,58 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   }
   ok(n > 300 && longest.length <= 90, `pulses stay short (longest ${longest.length}: ${longest})`);
 }
+
+// Fate track, wards, run-long marks, world lines and crises (the engine for Fate Crises; content may add none yet)
+{
+  const r = seeded(11), meta = G.newMeta();
+  let w; do { w = G.genWorld(r); } while (!w.fate || !w.people);
+  const run = G.newRun(w, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, meta, r);
+  const msgs = [], F = G.FATES[w.fate];
+  ok(G.fateState(run) === 'Holding' && G.fateEnd(run) === null, 'a Fate starts holding');
+  G.moveFate(run, 1, msgs); ok(G.fateState(run) === 'Easing' && msgs.pop().text.includes(F.name + ' eases'), 'fate +1 eases');
+  G.moveFate(run, 5, msgs); ok(run.fateTrack === G.FATE_TRACK.max && G.fateEnd(run).end === 'lifted', 'the track stops at its top, lifted');
+  G.moveFate(run, -9, msgs); ok(run.fateTrack === G.FATE_TRACK.min && G.fateEnd(run).end === 'sealed', 'and at its bottom, sealed');
+  // A lifted Fate in a spared world brings one entry back
+  run.fateTrack = G.FATE_TRACK.max; run.record.lost = 3; run.hearts = run.maxHearts - 2; const out = [], hb = run.hearts;
+  G.closeFate(run, out, true); ok(run.fateEnd === 'lifted' && run.hearts === hb + 1 && bits(run.record.lost) === 1 && bits(run.record.partial) === 1, 'lifted: a Heart back, its entry partial');
+  // Outcomes
+  const kit = { favour() { } }, ap = T => { const c = { run, h: kit, msgs }; G.applyOutcomes(T, c, false); G.applyOutcomes(T, c, true); };
+  run.fateTrack = 0; ap({ fate: -1 }); ok(run.fateTrack === -1, 'outcome fate');
+  ap({ ward: 2 }); ok(run.ward === 2, 'outcome ward');
+  ap({ mod: 'famine' }); ok(run.world.mod === 'famine', 'outcome mod');
+  run.nextFlags = {}; ap({ always: { foe: { poison: 2 }, next: { bleed: 3 } } });
+  ok(run.nextFlags.foePoison === 2 && run.nextFlags.bleed === 3, 'always marks the next fight at once');
+  run.nextFlags = {}; G.applyAlways(run); ok(run.nextFlags.foePoison === 2 && run.nextFlags.bleed === 3, 'and every fight after');
+  ap({ always: { foe: { poison: 1 } } }); run.nextFlags = {}; G.applyAlways(run); ok(run.nextFlags.foePoison === 3, 'run-long marks add up');
+  // World lines: shown only in a world that has the layer, with the layer's name as the tag
+  G.EVENTS.__test = { title: 'Test', text: 't', fate: w.fate, opts: [{ label: 'A', desc: 'a', check: { fate: w.fate } }, { label: 'B', desc: 'b', check: { people: w.people } }, { label: 'C', desc: 'c' }] };
+  ok(G.eventOpts(run, '__test').length === 3 && G.checkTag({ fate: w.fate }) === `[${F.name}]`, 'world lines show in their world');
+  const other = Object.keys(G.FATES).find(k => k !== w.fate); G.EVENTS.__test.opts[0].check = { fate: other };
+  ok(!G.eventOpts(run, '__test').includes(0), 'and not in another');
+  ok(G.worldTagged(run, G.EVENTS.__test) && !G.worldTagged(run, { fate: other }), 'events lean to the world they are tagged for');
+  // Crises: due in stage rounds, once, never in practice
+  G.EVENTS.__test.crisis = true; const had = F.crises; F.crises = ['__test'];
+  run.round = 3; run.seen = []; ok(G.crisisDue(run) === '__test', 'a crisis is due in round 3');
+  run.round = 4; ok(G.crisisDue(run) === null, 'not in round 4');
+  run.round = 3; run.seen = ['__test']; ok(G.crisisDue(run) === null, 'and only once');
+  run.seen = []; run.practice = true; ok(G.crisisDue(run) === null, 'never in practice');
+  if (had) F.crises = had; else delete F.crises; delete G.EVENTS.__test;
+}
+
+// People customs: each changes one loop rule, only in its own world; the first payout earns the epithet
+{
+  const r = seeded(12), mk = people => { let w; do { w = G.genWorld(r); } while (w.people !== people); return G.newRun(w, { name: 'Ana', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, G.newMeta(), r); };
+  const temple = mk('temple'), council = mk('council'), msgs = [];
+  G.addFavour(temple, 'war', 2, null, msgs, r); G.addFavour(council, 'war', 2, null, [], r);
+  ok(temple.favour.war === council.favour.war + 1, 'Temple State: every Favour gain +1');
+  ok(temple.epithet === G.PEOPLES.temple.epithets[0] && temple.champ.startsWith('Ana ' + temple.epithet + ' of '), 'and the first payout earns the epithet: ' + temple.champ);
+  ok(!council.epithet && G.checkMet(temple, 'x', { favour: 'war' }) === (temple.favour.war >= 3), 'god lines at 3 Favour in a Temple State');
+  temple.freeRerolls = 0; council.freeRerolls = 0; const league = mk('league'); league.freeRerolls = 0;
+  ok(G.rerollCost(league) === G.rerollCost(council) - 1, 'Merchant League: rerolls cost 1 less');
+  const arc = mk('archive'); ok(G.enchantCount(arc) === G.enchantCount(council) + 1 && G.runeCount(arc) === 4, 'Archive: one more prefix');
+  const pil = mk('pilgrims'); pil.hp = 1; ok(G.rollDistricts(pil, r).length === 4 && G.rollDistricts(council, r).length === 3, 'Pilgrims: four districts');
+  council.round = 2; ok(G.visitDue(council) === 'council_vote' && G.visitDue(pil) === null, 'Free Council: the vote comes in round 2');
+  council.round = 3; ok(G.visitDue(council) === null, 'and only then');
+  ok(!G.undercityEvent || ![...Array(200)].some(() => ['council_vote'].concat(Object.keys(G.EVENTS).filter(k => G.EVENTS[k].crisis)).includes(G.undercityEvent(council, r))), 'visits and crises never come from the Undercity');
+}
 console.log(`record: ${checks} checks passed`);

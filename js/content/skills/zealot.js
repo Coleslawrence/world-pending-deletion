@@ -7,3 +7,26 @@ sk('purify', 'Purify', ['zealot'], 'D', 4, { cleanse: 1, heal: 6, brk: 4 }, [['s
 sk('second_wind', 'Second Wind', ['zealot'], 'D', 4, { healMissing: 0.25, brk: 4 }, [['last_breath', 'Last Breath', { healMissing: 0.4, brk: 6 }], ['rally', 'Rally', { healMissing: 0.25, empower: 1, brk: 4 }]]);
 sk('consecrate', 'Consecrate', ['zealot'], 'C', 4, { regen: 4, brk: 4 }, [['hallowed_ground', 'Hallowed Ground', { regen: 7, brk: 6 }], ['holy_fire', 'Holy Fire', { regen: 4, burn: 4, brk: 6 }]]);
 sk('miracle', 'Miracle', ['zealot'], 'A', 6, { healMissing: 0.5, cleanse: 1, block: 10, brk: 10 }, [['resurrection', 'Resurrection', { healMissing: 0.7, cleanse: 1, block: 12, brk: 10 }], ['divine_wrath', 'Divine Wrath', { healMissing: 0.4, dmg: 15, brk: 14 }]]);
+flav({
+  penance: "Every blow a prayer. Every prayer a blow.",
+  atonement: "You strike once for every sin of theirs you can name.",
+  zeal: "Faith, delivered twice, at speed.",
+  holy_light: "Warm light falls on your wounds and closes them.",
+  radiance: "The cheap seats shade their eyes.",
+  purifying_light: "The light burns the curses out of you.",
+  shield_of_faith: "Belief, held up like a shield. It works more often than it should.",
+  aegis: "The old prayer for protection, said all the way through.",
+  blessed_shield: "Nothing unclean lands on it.",
+  purify: "You breathe out, and the poison goes with it.",
+  sanctuary: "A circle of quiet. No curse crosses it.",
+  reversal: "You send their curses home to them.",
+  second_wind: "You were done. Your body disagrees.",
+  last_breath: "You have nearly died before. You were bad at it.",
+  rally: "Up again, and angrier.",
+  consecrate: "You bless the sand under your feet. It mends you slowly.",
+  hallowed_ground: "The tide temples of the Drowned Isles pray for ground like this.",
+  holy_fire: "Holy ground, with opinions about trespassers.",
+  miracle: "The System logs it as an error. The crowd calls it a miracle.",
+  resurrection: "You stand up. The healers had already left.",
+  divine_wrath: "Mercy, then judgement, in that order.",
+});

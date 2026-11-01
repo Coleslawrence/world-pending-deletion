@@ -22,6 +22,7 @@ const FEATS = {
   untouched: { at: 'win', say: () => 'Win without losing any HP', hit: c => c.T.taken === 0, must: () => /without losing/ },
   giant: { at: 'win', say: () => 'Beat an opponent with at least twice your max HP', hit: c => c.B.maxHp >= c.A.maxHp * 2, must: () => /twice/ },
   masked: { at: 'win', say: () => 'Defeat the Masked Entrant', hit: c => c.spec.id === 'masked', must: () => /Masked Entrant/ },
+  fatelifted: { at: 'win', say: () => "Beat the Final Champion with your world's Fate lifted", hit: c => c.spec.kind === 'final' && (c.run.fateTrack || 0) >= 2, must: () => /Fate/ },
   hard: { at: 'win', say: () => 'Beat a hard opponent', hit: c => !!c.spec.hard, must: () => /hard opponent/ },
   rival: { at: 'win', say: () => 'Defeat a rival', hit: c => c.spec.kind === 'rival', must: () => /rival/ },
   outranked: { at: 'win', say: n => `Beat an opponent ${n} rank letters above your Entrant Rank`, hit: (c, n) => c.B.rankUp >= n, n: 2, must: n => new RegExp(`\\b${num(n)} rank letters?`) },

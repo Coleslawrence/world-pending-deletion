@@ -4,6 +4,11 @@
 // archetypes sits in one of their files. Load order is shop order, so add new skills at the end of a file.
 const SKILLS = {};
 const SHOP_SKILLS = [];
+// flav() gives skills their flavour line (voice 2 of the style guide, or a whole System line in [brackets]): one per skill
+// and one per evolution, kept at the end of each archetype's file. An id that isn't a skill lands in FLAVOUR_ORPHANS for
+// the checker to report.
+const FLAVOUR_ORPHANS = [];
+function flav(lines) { Object.entries(lines).forEach(([id, s]) => { if (SKILLS[id]) SKILLS[id].flavour = s; else FLAVOUR_ORPHANS.push(id); }); }
 function sk(id, name, tags, rank, cd, fx, evos, extra) {
   const d = Object.assign({ id, name, tags, rank, cd, fx, kind: 'skill' }, extra || {});
   SKILLS[id] = d;

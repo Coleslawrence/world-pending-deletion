@@ -4,36 +4,42 @@
 // Favour for your Patron, or for a god picked for you when you are Faithless
 const patronOf = (run, h) => GODS[run.patron] ? run.patron : h.pick(Object.keys(GODS));
 
-EVENTS.clerical_error = { title: 'Clerical Error', theme: 'system', text: '[Notice: Entrant record duplicated. One copy will be deleted.] A second you stands in the tunnel, looking equally annoyed.', opts: [
+EVENTS.clerical_error = { fate: 'lastgen', title: 'Clerical Error', theme: 'system', text: '[Notice: Entrant record duplicated. One copy will be deleted.] A second you stands in the tunnel, looking equally annoyed.', opts: [
   { label: 'Delete the copy', desc: 'It is probably the copy.', then: { gold: 8 }, reveal: '[Copy deleted. Refund issued for the inconvenience. +8 gold.]' },
   { label: 'Delete the original', desc: 'Let the copy carry on. It seems keen.', then: { respec: true }, go: (run, h) => h.say('[Original deleted. The copy is you now. It stands a little differently.]') },
-  { label: 'Keep both', desc: 'Two of you is better. Probably.', then: { summon: { who: 'copy', bounty: { restore: 2 }, say: '[Your copy has entered the bracket. It knows everything you know.]' } }, reveal: '[Duplicate retained. It will be in touch.]' }] };
+  { label: 'Keep both', desc: 'Two of you is better. Probably.', then: { summon: { who: 'copy', bounty: { restore: 2 }, say: '[Your copy has entered the bracket. It knows everything you know.]' } }, reveal: '[Duplicate retained. It will be in touch.]' },
+  { check: { fate: 'lastgen' }, label: 'Send the copy home', desc: 'Your world could use one more person.', then: { ward: 1, fate: 1 }, go: (run, h) => h.say('[The copy goes home. The Youngest finally has someone to ask questions.]') }] };
 
-EVENTS.amendment = { title: 'Tournament Amendment', theme: 'system', text: '[Amendment proposed. Entrants may vote. Votes are binding. Results are final.] The ballot box has no slot.', opts: [
+EVENTS.amendment = { people: 'clans', title: 'Tournament Amendment', theme: 'system', text: '[Amendment proposed. Entrants may vote. Votes are binding. Results are final.] The ballot box has no slot.', opts: [
   { label: 'Vote for Sudden Death', desc: 'Shorter fights. Sharper ones.', then: { amend: 'sudden' } },
   { label: 'Vote for Extended Bouts', desc: 'Longer fights. Better paid.', then: { amend: 'extended' } },
-  { label: 'Abstain', desc: 'Let someone else decide.', then: { gold: 5 }, go: (run, h) => { h.say('[Abstention noted. The System votes on your behalf. +5 gold.]'); h.apply({ amend: h.pick(Object.keys(AMENDMENTS)) }); } }] };
+  { label: 'Abstain', desc: 'Let someone else decide.', then: { gold: 5 }, go: (run, h) => { h.say('[Abstention noted. The System votes on your behalf. +5 gold.]'); h.apply({ amend: h.pick(Object.keys(AMENDMENTS)) }); } },
+  { check: { people: 'clans' }, label: 'Settle it by duel', desc: 'The Clans settle everything this way.', then: { summon: { who: 'grukk', bounty: { piece: 'A' }, say: '[The vote will be settled by duel. Grukk the Unbroken accepts.]' } }, go: (run, h) => h.say('[Duel accepted. The ballot box is relieved.]') }] };
 
-EVENTS.audit = { title: 'The Audit', theme: 'system', text: 'A clerk with no face opens a ledger with your name on every page. [Routine audit. Please declare all earnings.]', opts: [
+EVENTS.audit = { people: 'crown', title: 'The Audit', theme: 'system', text: 'A clerk with no face opens a ledger with your name on every page. [Routine audit. Please declare all earnings.]', opts: [
   { label: 'Declare everything', desc: 'Honesty is a policy.', then: { notice: -5 }, go: (run, h) => { const d = Math.floor(run.gold / 2); run.gold -= d; h.say(`[Declared. Half your gold is retained for processing. −${d} gold.]`, 'loss'); } },
   { label: 'Declare nothing', desc: 'What earnings?', then: { notice: 2 }, reveal: '[Declaration received: nothing. The clerk writes that down.]' },
   { roll: { stat: 'INT' }, label: 'Cook the books', desc: 'Numbers are only suggestions.', then: { gold: 6, notice: -1, summon: { who: 'calder', bounty: { gold: 15, piece: 'B' }, say: '[Ser Calder has been assigned to review your case. He fights by the book.]' } }, reveal: '[The books balance. For now. +6 gold. The case stays open.]',
-    fail: { then: { notice: 2, summon: { who: 'calder', bounty: { gold: 15, piece: 'B' }, say: '[Ser Calder has been assigned to review your case. He fights by the book.]' } }, go: (run, h) => { const d = Math.floor(run.gold / 3); run.gold -= d; h.say(`[Irregularities found. −${d} gold. A reviewer has been assigned.]`, 'loss'); } } }] };
+    fail: { then: { notice: 2, summon: { who: 'calder', bounty: { gold: 15, piece: 'B' }, say: '[Ser Calder has been assigned to review your case. He fights by the book.]' } }, go: (run, h) => { const d = Math.floor(run.gold / 3); run.gold -= d; h.say(`[Irregularities found. −${d} gold. A reviewer has been assigned.]`, 'loss'); } } },
+  { check: { people: 'crown' }, label: 'Claim royal exemption', desc: 'The Crown has paperwork older than the System.', then: { notice: -2, gold: 5 }, go: (run, h) => h.say('[Exemption verified. The clerk did not know that form still existed. +5 gold.]') }] };
 
-EVENTS.lost_property = { title: 'Lost Property', theme: 'system', text: '[Lost property: one Heart. Owner: a world that no longer exists.] It is warm, and it is still beating.', opts: [
+EVENTS.lost_property = { fate: 'longnight', title: 'Lost Property', theme: 'system', text: '[Lost property: one Heart. Owner: a world that no longer exists.] It is warm, and it is still beating.', opts: [
   { label: 'Keep it', desc: 'Finders keepers.', then: { heart: 1, summon: { who: 'erased', bounty: { gold: 10 }, say: '[An Erased champion has entered the bracket. They want something back.]' } }, go: (run, h) => h.say('[Heart retained. Its owner has been notified.]') },
   { label: 'Return it to the Hall', desc: 'The Hall of the Erased keeps such things.', go: (run, h) => {
     if (h.meta) { h.meta.found = h.meta.found || {}; h.meta.found.returned = true; }
     h.say('[Returned. Thank you, Entrant. The Hall will remember this.]'); h.favour(patronOf(run, h), 3);
   } },
-  { check: { stat: 'STR' }, label: 'Crush it', desc: 'Whatever is inside is yours now.', then: { stats: { STR: 2 }, notice: 1 }, go: (run, h) => { run.hp = h.maxHp(); h.say('[Crushed. Fully healed. +2 STR. Somewhere, nothing notices.]'); } }] };
+  { check: { stat: 'STR' }, label: 'Crush it', desc: 'Whatever is inside is yours now.', then: { stats: { STR: 2 }, notice: 1 }, go: (run, h) => { run.hp = h.maxHp(); h.say('[Crushed. Fully healed. +2 STR. Somewhere, nothing notices.]'); } },
+  { check: { fate: 'longnight' }, label: 'Use it as a lamp', desc: 'It is warm, and it glows.', then: { ward: 1, fate: 1 }, go: (run, h) => h.say('[It lights the Lamp Ward for a whole night.]') }] };
 
-EVENTS.sponsors = { title: 'Word From Our Sponsors', theme: 'system', text: '[We will return after a word from our sponsors.] Someone hands you a script and a bottle of something blue.', opts: [
+EVENTS.sponsors = { fate: ['goldenage', 'silence'], title: 'Word From Our Sponsors', theme: 'system', text: '[We will return after a word from our sponsors.] Someone hands you a script and a bottle of something blue.', opts: [
   { label: 'Read the advert', desc: 'It is only a few lines.', then: { gold: 12, next: { weaken: 1 } }, reveal: '[Advert aired. +12 gold. You start your next fight Weakened: you are still holding the product.]' },
   { label: 'Endorse your Patron', desc: 'Say their name like you mean it.', go: (run, h) => { const g = patronOf(run, h); h.favour(g, 3); Object.keys(GODS).filter(o => o !== g).forEach(o => h.favour(o, -2)); } },
   { label: 'Refuse on air', desc: 'Say what you really think of the product.', then: { notice: 1, favour: { war: 2 } }, reveal: '[Refusal broadcast. The ratings dip. The System takes it personally.]' },
   { roll: { stat: 'LUK' }, label: 'Drink the product', desc: 'It is very blue.', go: (run, h) => { const k = h.pick(STATS); run.stats[k] += 2; h.say(`[It works. Nobody knows why. +2 ${k}.]`); },
-    fail: { then: { next: { poison: 4 } }, reveal: '[It does not work. You start your next fight with 4 Poison. Results not typical.]' } }] };
+    fail: { then: { next: { poison: 4 } }, reveal: '[It does not work. You start your next fight with 4 Poison. Results not typical.]' } },
+  { check: { fate: 'goldenage' }, label: 'Advertise the festival', desc: 'Your world is lovely this time of year.', then: { gold: 10, notice: 1, fate: 1 }, go: (run, h) => h.say('[Advert aired. Visitors are coming. So is an inspector. +10 gold.]') },
+  { check: { fate: 'silence' }, label: 'Thank the silent gods', desc: 'Someone should, on air.', then: { fate: 1 }, go: (run, h) => Object.keys(GODS).forEach(g => h.favour(g, 1)) }] };
 
 // Shown only after a defeat; names the round you lost in
 EVENTS.rollback = { title: 'Rollback', theme: 'system', can: run => !!(run.lastLoss && run.lastLoss.hearts), text: run => `[Error detected in round ${run.lastLoss.round}. Rolling back.] The tunnel flickers. For a moment you are losing that fight again.`, opts: [
@@ -64,7 +70,8 @@ EVENTS.double_or_nothing = { title: 'Double or Nothing', theme: 'system', text: 
 
 // Names your class, and the stat it is built on
 const hotfixOf = run => ARCH[run.arch[0]];
-EVENTS.hotfix = { title: 'Hotfix', theme: 'system', text: run => `[Hotfix incoming: ${hotfixOf(run).name} is overperforming. Patch lands after your next fight.]`, opts: [
+EVENTS.hotfix = { people: 'pilgrims', title: 'Hotfix', theme: 'system', text: run => `[Hotfix incoming: ${hotfixOf(run).name} is overperforming. Patch lands after your next fight.]`, opts: [
   { label: 'Accept the patch', desc: 'Thank them for their patience.', go: (run, h) => { const k = hotfixOf(run).stat, low = STATS.filter(s => s !== k).sort((a, b) => run.stats[a] - run.stats[b])[0]; run.stats[k] = Math.max(1, run.stats[k] - 1); run.stats[low] += 2; h.say(`[Patch applied. −1 ${k}, +2 ${low}. Thank you for your patience.]`, 'level'); } },
   { label: 'Exploit it before it lands', desc: 'One last fight at full power.', then: { next: { empower: 3 }, notice: 1 }, go: (run, h) => { const k = hotfixOf(run).stat; run.stats[k] = Math.max(1, run.stats[k] - 1); h.say(`[You start your next fight Empowered for 3 turns. The patch lands anyway: −1 ${k}.]`); } },
-  { label: 'Appeal: pay 10 gold', desc: 'There is a form for this.', pay: 10, then: { notice: -1 }, reveal: '[Appeal upheld. Patch cancelled. Your patience is appreciated.]' }] };
+  { label: 'Appeal: pay 10 gold', desc: 'There is a form for this.', pay: 10, then: { notice: -1 }, reveal: '[Appeal upheld. Patch cancelled. Your patience is appreciated.]' },
+  { check: { people: 'pilgrims' }, label: 'Leave before it lands', desc: 'Pilgrims never stay long.', then: { gold: 5, notice: -1 }, go: (run, h) => h.say('[You are three districts away when the patch lands. +5 gold.]') }] };

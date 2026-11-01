@@ -58,6 +58,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Content sits on the wheel.** Every skill, piece of gear, enemy, world, god and event chain is tagged with one archetype or two neighbours, and uses what they own (see Archetypes and the wheel).
 - **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
+- **Every skill, piece of gear, Gift and Title has a flavour line** (`flavour`; skills and their evolutions get theirs from the `flav({ ... })` block at the end of their archetype's file). It is the world's voice under the rules, or one whole System line in [brackets]: up to 16 words, no numbers, its own line (no two alike). The game shows it in italics under the description.
 - **Player text follows the style guide:** British spelling, no em-dashes, one name for one thing, and the length limits for one phone screen.
 
 ## Checks
@@ -215,7 +216,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `healBlock` | 2 | templar_plate (0.3), Paladin (0.5) | Healing also gives Block equal to 30% of it. | add |  |  | Zealot, Bastion |
 | `healDmg` | 1 | Last Rites (0.3) | Your healing also deals 30% of it as damage to the opponent. | add |  |  | Reaper, Zealot |
 | `healOnBleed` | 3 | bloodstone_amulet (3), Blood Saint (3), Hedge Witch (1) | Heal 3 whenever you apply Bleed. | add |  |  | Bladedancer, Zealot |
-| `healPct` | 2 | Zealot 2 (0.1), Demon Blood (-0.2) | Healing +10%. | add |  | rate | Zealot |
+| `healPct` | 3 | Zealot 2 (0.1), Demon Blood (-0.2), Fatebreaker (0.1) | Healing +10%. | add |  | rate | Zealot |
 | `healPoison` | 1 | Plague Saint (3) | Each skill that heals you also applies 3 Poison. | add |  |  | Venom, Zealot |
 | `heartOnWin` | 1 | Reaper 6 (1) | Each win restores 1 Heart. | set |  |  | Reaper |
 | `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
@@ -323,21 +324,25 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 19 (quests, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 3 (events) |
-| `heart` | 1 | +1 max Heart |  | 5 (quests, events) |
-| `rune` | 1 | a rune |  | 5 (quests, events) |
-| `piece` | "B" | a free B-rank piece |  | 10 (quests, events) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 13 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 4 (events) |
-| `max_hp` | -0.1 | −10% max HP |  | 1 (events) |
-| `restore` | 1 | 1 Heart restored |  | 2 (events) |
-| `erase` | 1 | 1 Heart erased |  | 1 (events) |
-| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 3 (events) |
+| `gold` | 8 | 8 gold |  | 28 (quests, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 5 (events) |
+| `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
+| `rune` | 1 | a rune |  | 7 (quests, events) |
+| `piece` | "B" | a free B-rank piece |  | 19 (quests, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 18 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 10 (events) |
+| `max_hp` | -0.1 | −10% max HP |  | 6 (events) |
+| `restore` | 1 | 1 Heart restored |  | 8 (events) |
+| `erase` | 1 | 1 Heart erased |  | 5 (events) |
+| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 6 (events) |
 | `respec` | true | your stat points to place again |  | 1 (events) |
-| `summon` | {"who":"copy"} | a visitor in your bracket |  | 4 (events) |
-| `amend` | "sudden" | the Amendment Sudden Death |  | 2 (events) |
-| `notice` | 1 | the System's notice | yes | 26 (events) |
+| `summon` | {"who":"copy"} | a visitor in your bracket |  | 6 (events) |
+| `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
+| `ward` | 1 | a ward on your next loss |  | 9 (events) |
+| `mod` | "none" | the world modifier Clear Skies |  | 2 (events) |
+| `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 4 (events) |
+| `fate` | 1 | your world's Fate eased | yes | 56 (events) |
+| `notice` | 1 | the System's notice | yes | 43 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
@@ -352,6 +357,7 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
 | `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector |
 | `fast` | win | Win within 6 turns | 6 |  |  | wager, Title First Blood, quest fast3 |
+| `fatelifted` | win | Beat the Final Champion with your world's Fate lifted |  |  |  | Title Fatebreaker |
 | `giant` | win | Beat an opponent with at least twice your max HP |  |  |  | Title Giant Slayer |
 | `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2 |
 | `healed` | fight | Heal 60 HP in a single fight | 60 |  |  | Title Bloodthirsty |

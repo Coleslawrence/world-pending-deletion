@@ -92,6 +92,8 @@ function styleOf(spec) {
   if (spec.snap && spec.snap.owner) return spec.kind === 'champion' ? `Saved ${spec.snap.worldName} in ${ownerName(spec.snap.owner)}'s tournament` : `Fell in ${ownerName(spec.snap.owner)}'s tournament, round ${spec.snap.round}`;
   return specStyle(spec);
 }
+// A flavour line (skills, gear, Gifts, Titles): the world's voice under the rules, never instead of them.
+function flavHTML(f) { return f ? `<span class="flav">${esc(f)}</span>` : ''; }
 function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · <span class="nw">${r}-rank</span>` : ''; }
 function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
@@ -126,10 +128,10 @@ function champLine() {
 // ---------- World Record ----------
 // A lost entry is a black bar the width of the words it hides
 function redact(text) { return `<span class="redact" role="img" aria-label="erased entry"><span aria-hidden="true">${esc(text)}</span></span>`; }
-// A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... The Long Night: the sun..."
+// A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... Guild rates: ... The Long Night: the sun..."
 function layerSentences(w) {
   const F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix], low = t => t.charAt(0).toLowerCase() + t.slice(1);
-  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (C ? ` The ${esc(C.name)} press in.` : '');
+  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (P && P.custom ? ` <b>${esc(P.custom.name)}</b>: ${esc(low(P.custom.text))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (F && F.crises ? ' Its crisis comes in rounds 3 and 5.' : '') + (C ? ` The ${esc(C.name)} press in.` : '');
 }
 function bioHTML(rec, type, worldName, champ) { return bioParts(rec, type, worldName, champ).map(p => p.gone ? redact(p.t) : esc(p.t)).join(''); }
 function recLine(e) { return e.line.map(w => w.gone ? redact(w.t) : esc(w.t)).join(' '); }
@@ -328,7 +330,7 @@ async function loadBoard() {
     let mine = null;
     if (!rows.some(x => x.uid === own)) {
       const snap = await cloud.db.doc(`daily/${date}/scores/${own}`).get();
-      if (snap.exists) { mine = cleanScore(own, snap.data(), date); mine.rank = col.count ? 1 + await col.count({ where: ['score', '>', mine.score] }) : null; }
+      if (snap.exists) { mine = cleanScore(own, snap.data(), date); mine.pos = col.count ? 1 + await col.count({ where: ['score', '>', mine.score] }) : null; }
     }
     Object.assign(ui.board, { rows, mine, loading: false, t: Date.now(), error: null });
   } catch (e) { Object.assign(ui.board, { loading: false, error: true, t: Date.now() }); cloudFail('board', 'load scores', e); }
@@ -357,7 +359,7 @@ function dailySheet() {
     ui.boardList = B.rows.concat(B.mine ? [B.mine] : []);
     rows = B.rows.map((x, i) => resultRow(x, i + 1, x.uid === own, i)).join('');
     if (!B.rows.length) rows = '<p class="sh-p fine">No outcomes recorded yet today.</p>';
-    if (B.mine) rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(B.mine, B.mine.rank, true, B.rows.length);
+    if (B.mine) rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(B.mine, B.mine.pos, true, B.rows.length);
     else if (r && !meta.daily.posted && !B.rows.some(x => x.uid === own)) { rows += `<div class="br-gap" aria-hidden="true">···</div>` + resultRow(r, null, true); note = cloud.tester === false ? `${PENDING} Your score stays on this device until you are approved.` : 'Your score posts at the next sync today.'; }
   } else if (cloud.on) {
     rows = B && B.error ? '<p class="sh-p fine">[Observations unavailable. Try again later.]</p>' : '<p class="sh-p fine">[Retrieving observations…]</p>';
@@ -463,7 +465,7 @@ function worldsHTML() {
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
       <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
-      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>
+      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
       <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
       <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: ${esc(ENEMIES[T.final].name)}</span></div>
@@ -496,7 +498,7 @@ function giftRow(k, a, w) {
   // Adding a Gift overrules the System, so it has to fit without the System's bonus points
   const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
   const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
-  return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}</span></button>`;
+  return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}${unlocked ? flavHTML(g.flavour) : ''}</span></button>`;
 }
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
@@ -528,7 +530,7 @@ function awakenHTML() {
     body = `<p class="sh-p">Pledge to a god for 2 Favour with them; their wagers come up more often. Win wagers to reach 4 Favour (a free B-rank piece) and 8 (a blessing for the run).</p>` +
       Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b></span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
       `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>` +
-      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
+      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
   }
   const ready = a.name.trim() && a.pts === 0 && a.patron && chk.ok;
   const why = !a.name.trim() ? 'Name your champion' : a.pts ? `Place ${a.pts} stat point${a.pts > 1 ? 's' : ''}` : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
@@ -613,7 +615,7 @@ function shopHTML() {
   const bonusHere = run.bonusSlot && (isGear(run.bonusSlot.id) ? 'gear' : 'skill') === tab;
   const xpTile = `<button class="tile xptile" data-act="sheet" data-s="stats"><span class="tl-h"><b>Lv ${run.level}</b><span class="price">${pointPrice(run)}g</span></span><span class="tl-n">Train a stat</span><span class="xp wide"><i style="width:${lvFill()}%"></i></span></button>`;
   const items = run.shop[tab].map((it, i) => shopItemTile(it, tab, i)).join('') + (bonusHere ? shopItemTile(run.bonusSlot, 'bonus', 0) : xpTile);
-  const odds = oddsFor(run).map((v, i) => v ? `${['E', 'D', 'C', 'B', 'A'][i]} ${v}%` : '').filter(Boolean).join(' · ');
+  const odds = oddsFor(run).map((v, i) => v ? `<span class="nw">${['E', 'D', 'C', 'B', 'A'][i]} ${v}%</span>` : '').filter(Boolean).join(' · ');
   const inShop = shopIds();
   const bar = run.bar.map((p, i) => p ? pieceTile(p, 'own', '', inShop) : `<div class="tile empty">Skill ${i + 1}</div>`).join('');
   const gear = GEAR_SLOTS.map(sl => run.gear[sl] ? pieceTile(run.gear[sl], 'own', '', inShop) : `<div class="tile empty gear">${sl}</div>`).join('');
@@ -644,7 +646,7 @@ function distFull(k) { return k === 'infirmary' && run.hp >= maxHp(run) && run.d
 function districtDesc(k) {
   if (!districtUp(run, k)) return DISTRICTS[k].desc;
   const tag = `[${DISTRICT_STAT[k]} ${STAT_EASY}] `;
-  return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: 'Carve a prefix into one of your skills, from 4.' }[k] || DISTRICTS[k].desc);
+  return tag + ({ infirmary: `Restore ${run.world.mod === 'famine' ? 40 : 65}% of your max HP.`, enchanter: `Carve a prefix into one of your skills, from ${enchantCount(run)}.` }[k] || DISTRICTS[k].desc);
 }
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage !== 'district';
@@ -841,12 +843,12 @@ function pieceBody(id, star, mods, power) {
   if (isGear(id)) {
     const g = GEAR[id];
     return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${esc(g.name)}</span>${stars(star)}${rk(g.rank)}</div><div class="sr-meta">${tagNames(id)}<span class="tagn">${g.slot}</span></div>
-      <div class="sr-desc"><b>${Object.entries(gearStats(id, star)).map(([k, v]) => `+${v} ${k}`).join(', ')}.</b> ${esc(gearText(id, star))}</div>${star < 3 ? `<div class="sr-next">At ★${star + 1}: ${esc(gearText(id, star + 1))}</div>` : ''}</div>`;
+      <div class="sr-desc"><b>${Object.entries(gearStats(id, star)).map(([k, v]) => `+${v} ${k}`).join(', ')}.</b> ${esc(gearText(id, star))}${flavHTML(g.flavour)}</div>${star < 3 ? `<div class="sr-next">At ★${star + 1}: ${esc(gearText(id, star + 1))}</div>` : ''}</div>`;
   }
   const d = moddedDef(id, mods);
   const p = power || skillPower(d, effStats(run), star) * d.powerMult;
   return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${mods.length ? `<em class="pfx">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em> ` : ''}${esc(d.name)}</span>${stars(star)}${rk(effRank(id, mods))}</div>
-    <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}</div>
+    <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}${flavHTML(SKILLS[id].flavour)}</div>
     ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${SKILLS[id].evo.map(e => esc(SKILLS[e].name)).join(' or ')}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
 }
 function pieceSheet() {
@@ -887,11 +889,11 @@ function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
-    const chainTag = E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
+    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
-    return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}</div></button>`).join(''), false, 'sys');
+    return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'perk') {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
@@ -971,15 +973,15 @@ function statsSheet() {
     <h4>Title</h4>${titleList()}
     <h4>System quests</h4>${questList()}
     ${run.hiddenPath ? `<h4>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</h4><p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>` : ''}
-    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
-    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}</p>
+    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
+    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>
     <h4>Sponsors</h4>${gods}`;
   return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function titleList() {
   const ts = Object.keys(TITLES).filter(k => meta.titles[k]);
   if (!ts.length) return '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena.</p>';
-  return `<div class="tlist">${ts.map(k => `<button class="gift ${run.title === k ? 'on' : ''}" data-act="equip-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b>${run.title === k ? '<span class="tagn q">Equipped</span>' : ''}</span><span class="gf-d">${esc(TITLES[k].desc)}</span></button>`).join('')}</div><p class="sh-p fine">One Title at a time. Tap to equip or remove.</p>`;
+  return `<div class="tlist">${ts.map(k => `<button class="gift ${run.title === k ? 'on' : ''}" data-act="equip-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b>${run.title === k ? '<span class="tagn q">Equipped</span>' : ''}</span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('')}</div><p class="sh-p fine">One Title at a time. Tap to equip or remove.</p>`;
 }
 function questList() {
   const qs = run.quests.filter(q => !QUESTS[q.id].hidden || q.done);
@@ -1048,7 +1050,7 @@ function howtoSheet() {
     <li><b>Each round:</b> choose your opponent, shop, visit one district, then fight.</li>
     <li><b>Fights:</b> pick one skill a turn. The opponent's next move is always shown. Quick skills don't end your turn.</li>
     <li><b>Stun and Interrupt</b> cancel the opponent's telegraphed move and put it on cooldown.</li>
-    <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns.</li>
+    <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns. Stunning a Weakened opponent Breaks them too.</li>
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
     <li><b>Gold:</b> 5 a round, +interest of 1 per 4 gold you hold (up to 5, so a 20-gold bank doubles your income). Reroll for 2.</li>
@@ -1068,7 +1070,7 @@ function howtoSheet() {
 function archiveSheet() {
   const A = meta.archive;
   if (run && !run.ended && hasGift(run, 'f_amnesia')) return sheetWrap('Tournament Archive', '<p class="sh-p big">[Access denied. Entrant memory is corrupted.]</p><p class="sh-p fine">Amnesia seals the Archive for this run.</p>', `<button class="btn primary" data-act="close">Close</button>`);
-  const titles = Object.entries(TITLES).map(([k, T]) => meta.titles[k] ? `<li><b>${esc(T.name)}</b>: ${esc(T.desc)} <small>${esc(T.cond)}</small></li>` : `<li class="unk">${T.first ? '' : 'Title: '}<small>${esc(T.cond)}</small></li>`).join('');
+  const titles = Object.entries(TITLES).map(([k, T]) => meta.titles[k] ? `<li><b>${esc(T.name)}</b>: ${esc(T.desc)} <small>${esc(T.cond)}</small>${flavHTML(T.flavour)}</li>` : `<li class="unk">${T.first ? '' : 'Title: '}<small>${esc(T.cond)}</small></li>`).join('');
   const hidden = Object.entries(HIDDEN_PATHS).filter(([k]) => A.hidden && A.hidden[k]).map(([k, H]) => `<li><b>${esc(H.name)}</b> (${k.split('+').map(x => ARCH[x].name).join(' + ')}): ${esc(H.desc)}</li>`).join('');
   const nh = Object.keys(HIDDEN_PATHS).length, fh = Object.keys(A.hidden || {}).length;
   const quests = Object.entries(QUESTS).filter(([k, Q]) => Q.hidden).map(([k, Q]) => A.quests && A.quests[k] ? `<li><b>${esc(Q.text)}</b></li>` : '<li class="unk">Hidden quest: ???</li>').join('');
@@ -1238,7 +1240,7 @@ function onAct(el) {
       if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
-      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(districtUp(run, 'enchanter') ? 4 : 3, null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
+      if (k === 'enchanter') { ui.enchantMods = rollPrefixes(enchantCount(run), null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
       saveRun(); return render();
     }
     case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i); if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }
@@ -1346,6 +1348,10 @@ function coachHTML() {
   if (!ui.coach) return '';
   let st = coachStep();
   while (st && st.until && st.until() && ui.screen === st.scr) { coachAdvance(); st = coachStep(); }
+  // Left the screen without doing what the step asked (e.g. tapped Awaken before opening Gifts): drop that screen's
+  // remaining steps, or the tutorial waits there forever and never shows again
+  if (st && st.scr === ui.screen) ui.coach.shown = ui.coach.i;
+  else if (st && ui.coach.shown === ui.coach.i) { const left = st.scr; while (st && st.scr === left) { coachAdvance(); st = coachStep(); } }
   const skipBtn = ui.coach.confirmSkip ? `<button class="link danger-t" data-act="coach-skip-yes">Yes, end the practice run</button>` : `<button class="link" data-act="coach-skip">Skip tutorial</button>`;
   if (!st || st.scr !== ui.screen || (ui.sheet && ui.sheet.type !== 'menu') || (run && run.pending.length && ['choose', 'shop', 'district'].includes(ui.screen))) return ui.coach.confirmSkip ? `<div class="coach pos-bottom"><p>End the practice run?</p><div class="co-f">${skipBtn}<button class="link" data-act="coach-skip-no">Keep going</button></div></div>` : '';
   if (ui.coach.min) return `<button class="coach-pill" data-act="coach-max">[Tutorial] ▴</button>`;
