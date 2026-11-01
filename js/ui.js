@@ -1048,7 +1048,7 @@ function howtoSheet() {
     <li><b>Each round:</b> choose your opponent, shop, visit one district, then fight.</li>
     <li><b>Fights:</b> pick one skill a turn. The opponent's next move is always shown. Quick skills don't end your turn.</li>
     <li><b>Stun and Interrupt</b> cancel the opponent's telegraphed move and put it on cooldown.</li>
-    <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns.</li>
+    <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns. Stunning a Weakened opponent Breaks them too.</li>
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
     <li><b>Gold:</b> 5 a round, +interest of 1 per 4 gold you hold (up to 5, so a 20-gold bank doubles your income). Reroll for 2.</li>
