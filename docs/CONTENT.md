@@ -9,7 +9,8 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | A skill | `js/content/skills/<archetype>.js`: one `sk()` line with its two ★3 evolutions |
 | Gear | `js/content/gear.js` |
 | An archetype | `js/content/archetypes.js` (the entry, the wheel), its skills file, a colour in `css/style.css`, a Hidden Path for every pair, `STAT_INFO` in `base.js` |
-| A world type | A new pack in `js/content/worlds/` (the world, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
+| A world type | A new pack in `js/content/worlds/` (the world with its `guest` class and optional `setting`, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
+| A Fate or a People (world layers) | `js/content/layers.js`: its name, card line, record entries, roles and promises; a Fate's modifier weights, a People's epithets. Ids sit in their own number range in records, so each list holds at most 99 |
 | A god | `js/content/gods.js` (its archetypes, blessing and rival reply line) and a `chosen_<id>` divine Gift in `gifts.js` |
 | An enemy | `js/content/enemies.js`, and `MONSTERS` or `RIVALS`. Its moves play roles (strike, big hit, guard, setup, sustain) with numbers from its tier in `moves.js`; boss mechanics are fields from the enemy mechanics list below |
 | A trait monsters and rivals can roll | `js/content/traits.js` |
@@ -47,7 +48,8 @@ This whole process, from an outside source to Draft cards with previews, is call
 
 - **Content uses only content.** Files in `js/content/` may use each other and `base.js`, never anything from `js/core.js`. They load before it.
 - **Ids are permanent.** Saves, shared champions and the Halls store them. Rename the display name freely; never change or remove an id.
-- **World Record pools only grow at the end.** Runs store pool positions, so never reorder, edit or delete an entry, a role or a promise.
+- **World Record pools only grow at the end.** Runs store pool positions, so never reorder, edit or delete an entry, a role or a promise. The same goes for the pools of Fates and Peoples.
+- **A world is a type plus layers.** The type decides everything mechanical (home class and `guest`, World Gift, Final Champion); Fates and Peoples only add writing and pick the modifier. Write layers so they fit every world type of their setting; a layer or entry that only suits some settings lists them in `settings`.
 - **Event options keep their places.** Run summaries store the option picked by its position, so add new options at the end and never remove one.
 - **Outcomes live in `js/content/outcomes.js`.** Whatever an event option gives (`then`), a quest pays (`reward`) or a wager pays is a set of outcomes, `{ gold: 8, favour: { war: 2 } }`, applied and worded by one piece of code. An event option that needs more goes in `go(run, h)`, which reaches the rules only through the helpers in `h`.
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.

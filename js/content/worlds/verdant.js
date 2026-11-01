@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Verdant Wilds =====
 'use strict';
-WORLD_TYPES.verdant = { name: 'Verdant Wilds', flavour: 'Fey forests that eat travellers.', home: 'blade', gift: 'hedgewitch', final: 'thorn_mother', names: [['Syl', 'Fae', 'Bri', 'Ald', 'Thorn', 'Wy'], ['wood', 'glade', 'mere', 'wyn', 'holt', 'bryn']], champs: ['Rowan', 'Elowen', 'Bramble', 'Faye', 'Linden', 'Oriel'] };
+WORLD_TYPES.verdant = { name: 'Verdant Wilds', flavour: 'Fey forests that eat travellers.', home: 'blade', guest: 'reaper', gift: 'hedgewitch', final: 'thorn_mother', names: [['Syl', 'Fae', 'Bri', 'Ald', 'Thorn', 'Wy', 'Lin', 'Bram', 'Elm', 'Rue'], ['wood', 'glade', 'mere', 'wyn', 'holt', 'bryn', 'dell', 'shaw', 'ley', 'fold']], mids: ['en', 'a', 'i'], champs: ['Rowan', 'Elowen', 'Bramble', 'Faye', 'Linden', 'Oriel', 'Alder', 'Bracken', 'Clover', 'Fern', 'Hazel', 'Holly', 'Ivy', 'Juniper', 'Lark', 'Moss', 'Nettle', 'Reed', 'Robin', 'Sage', 'Sorrel', 'Tansy', 'Willow', 'Yarrow'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.verdant = {
   roles: ['woodcutter', 'lantern-keeper', "hedge witch's apprentice", 'trapper', 'miller'],

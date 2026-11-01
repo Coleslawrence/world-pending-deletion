@@ -1,6 +1,10 @@
 // ===== [World Pending Deletion] — content: worlds =====
 'use strict';
 // Each world type is a pack in worlds/: its entry here, its World Record pool and its Final Champion's greeting.
+// setting: optional, 'fantasy' unless it says otherwise; layers and their entries only come to worlds whose setting they suit.
+// guest: the class that joins the home class and its two wheel neighbours in this world's class pool.
+// names: syllable starts and ends (the first 6 of each are the original lists, kept for old Pending World days); mids: optional middles.
+// champs: champion names offered at the Awakening (the first 6 are the originals).
 // Its Final Champion fights in enemies.js, its World Gift is in gifts.js and its world-first Title in titles.js.
 const WORLD_TYPES = {};
 // Each run files 10 entries about its world, one per Heart, plus a bio for the champion. Losing Hearts erases entries.

@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Burning Empire =====
 'use strict';
-WORLD_TYPES.burning = { name: 'Burning Empire', flavour: 'An empire that never stopped fighting.', home: 'pyre', gift: 'deserter', final: 'kharros', names: [['Khar', 'Vor', 'Ash', 'Ign', 'Sol', 'Pyr'], ['ros', 'kai', 'heim', 'gard', 'onis', 'ath']], champs: ['Varro', 'Kaela', 'Dax', 'Seren', 'Ignis', 'Tor'] };
+WORLD_TYPES.burning = { name: 'Burning Empire', flavour: 'An empire that never stopped fighting.', home: 'pyre', guest: 'bastion', gift: 'deserter', final: 'kharros', names: [['Khar', 'Vor', 'Ash', 'Ign', 'Sol', 'Pyr', 'Tar', 'Cind', 'Mag', 'Rax'], ['ros', 'kai', 'heim', 'gard', 'onis', 'ath', 'ium', 'or', 'ax', 'ene']], mids: ['a', 'i', 'en'], champs: ['Varro', 'Kaela', 'Dax', 'Seren', 'Ignis', 'Tor', 'Aurel', 'Cato', 'Drusa', 'Fausta', 'Galen', 'Hadria', 'Junia', 'Lucan', 'Marius', 'Nerva', 'Octa', 'Quint', 'Rufa', 'Severa', 'Tullia', 'Valens', 'Zenon', 'Calla'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.burning = {
   roles: ['legionnaire', "smith's apprentice", 'standard-bearer', 'field medic', 'courier'],

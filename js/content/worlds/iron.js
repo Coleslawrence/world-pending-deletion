@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: world pack: Iron Hold =====
 'use strict';
-WORLD_TYPES.iron = { name: 'Iron Hold', flavour: 'Mountain forges under siege.', home: 'bastion', gift: 'runesmith', final: 'forge_king', names: [['Dur', 'Gor', 'Bal', 'Kaz', 'Thra', 'Grim'], ['ak', 'heim', 'dur', 'mund', 'hold', 'rak']], champs: ['Brann', 'Helga', 'Tormund', 'Sigrun', 'Durek', 'Ingrid'] };
+WORLD_TYPES.iron = { name: 'Iron Hold', flavour: 'Mountain forges under siege.', home: 'bastion', guest: 'pyre', gift: 'runesmith', final: 'forge_king', names: [['Dur', 'Gor', 'Bal', 'Kaz', 'Thra', 'Grim', 'Skar', 'Hel', 'Bron', 'Vik'], ['ak', 'heim', 'dur', 'mund', 'hold', 'rak', 'gard', 'stad', 'borg', 'nar']], mids: ['en', 'a', 'ar'], champs: ['Brann', 'Helga', 'Tormund', 'Sigrun', 'Durek', 'Ingrid', 'Arne', 'Astrid', 'Bjorn', 'Dagny', 'Eirik', 'Frida', 'Gunnar', 'Hakon', 'Gudrun', 'Ivar', 'Jorunn', 'Knut', 'Ragna', 'Solveig', 'Torvald', 'Ulla', 'Vigdis', 'Yrsa'] };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.iron = {
   roles: ['smith', 'miner', 'gate guard', 'tunnel runner', 'rune carver'],
