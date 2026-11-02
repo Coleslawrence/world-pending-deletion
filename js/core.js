@@ -382,6 +382,18 @@ function worldPulse(run, rng) {
   const e = pick(left, rng), E = recLore(run.record, run.world.type).entries[e.i];
   return '[' + pick(PULSE[last.won ? 'win' : 'loss'][e.k], rng).replace('{w}', w).replace('{e}', loreName(E)) + ']';
 }
+// The paired final: the System judges worlds in pairs. Each run's world is paired with another pending world of a
+// different type (same setting). In the final you fight for yours against that world's finalist: a player's round-8
+// build from a world of that type, carrying its Final Champion's mechanic, or that Final Champion itself when no
+// finalist is on file (and always in Pending World and practice). Win, and your world is spared; theirs is not.
+function genPair(world, rng) {
+  const types = Object.keys(WORLD_TYPES).filter(k => k !== world.type && settingOf(k) === settingOf(world.type));
+  if (!types.length) return { type: world.type, name: world.name };
+  const type = pick(types, rng); return { type, name: worldName(WORLD_TYPES[type], null, rng) };
+}
+// Saves from before the paired final have no pair: their final stays their own world's
+function pairOf(run) { return run.pair && WORLD_TYPES[run.pair.type] ? run.pair : { type: run.world.type, name: run.world.name }; }
+function finalId(run) { return WORLD_TYPES[pairOf(run).type].final; }
 function rememberWorld(meta, w) { meta.recent = [{ t: w.type, n: w.name, f: w.fate || null, p: w.people || null }].concat(meta.recent || []).slice(0, RECENT_MAX); }
 
 // ---------- Run ----------
@@ -408,6 +420,8 @@ function newRun(world, setup, meta, rng) {
     title: setup.title && meta.titles[setup.title] ? setup.title : null, hiddenPath: null, milestones: {}, chains: {}, quests: [], wagersWon: 0, freeRerolls: 0, haggle: false,
     entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, earned: [], picks: [], t0: Date.now(),
   };
+  // Its own stream, so pairing never shifts the draft, shops or opponents (a sim's rng keys it by the world)
+  run.pair = genPair(world, setup.seed ? seedRng(setup.seed + ':pair') : rng ? seedRng('pair:' + world.type + ':' + world.name) : undefined);
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // System quests: two visible, every hidden one quietly active
@@ -734,7 +748,7 @@ const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
 function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
-  if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: WORLD_TYPES[run.world.type].final }, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
+  if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: finalId(run), round: ROUNDS }, poolOn(run) ? { pool: true } : {}, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
   const early = run.round <= 3;
   let pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
   // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
@@ -761,7 +775,7 @@ function makeChoices(run, meta, rng) {
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
 function specName(spec) {
   if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
-  if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') return spec.snap.champ;
+  if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant' || (spec.kind === 'final' && spec.snap)) return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
   if (spec.gate) return n + ', Gatekeeper';
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
@@ -780,11 +794,12 @@ function specStyle(spec) {
   if (spec.kind === 'erased') return `Erased. Fell in round ${spec.snap.round} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   if (spec.kind === 'champion') return `Saved ${spec.snap.worldName} as a ${spec.snap.path ? ARCH[spec.snap.path].path : 'champion'}`;
   if (spec.kind === 'entrant') return poolStyle(spec);
+  if (spec.kind === 'final' && spec.snap) return `Finalist for ${spec.snap.worldName || 'another world'}, fighting with ${ENEMIES[spec.id].name}'s power. ${spec.snap.path ? 'Builds as a ' + ARCH[spec.snap.path].path : 'No Path yet'}`;
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
   if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
-  if (spec.kind === 'final') return 'Spares your world';
+  if (spec.kind === 'final') return 'Spares your world. Theirs is not';
   if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
   if (spec.gate) return '3 gold, a stat point, a rune and a rare shop slot';
   if (spec.hard) return '3 gold, a rune and a rare shop slot';
@@ -1188,6 +1203,7 @@ function buildEnemy(run, spec) {
   const gate = spec.gate ? TUNE.gate : 1;
   const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
   if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') { const e = buildSnapEnemy(spec.snap, p, hm, run, spec.kind === 'entrant'); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0; if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp)); return e; }
+  if (spec.kind === 'final' && spec.snap) return buildFinalist(run, spec, p, hm);
   const t = ENEMIES[spec.id];
   const fin = t.tier === 3, mp = p * (fin ? TUNE.finalDmg : 1);
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
@@ -1198,6 +1214,17 @@ function buildEnemy(run, spec) {
     skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
     weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0, burn: run.nextFlags.foeBurn || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
+}
+// A finalist: another player's round-8 build at its own strength, with its world's Final Champion's mechanic on top
+// (the Storm Herald, whose mechanic is its moves, lends an enrage instead) and the final's own effects (bribes, tampering).
+function buildFinalist(run, spec, p, hm) {
+  const t = ENEMIES[spec.id], e = buildSnapEnemy(spec.snap, p, hm, run, true), own = enemyTraits(t, p);
+  Object.assign(e, Object.keys(own).length ? own : { enrage: 0.5, enrageMult: 1.3 }, poolTraits(spec, t, p));
+  e.P = Object.assign({}, e.P); Object.entries(enemyPassives(t.passives, p)).forEach(([q, v]) => e.P[q] = (e.P[q] || 0) + v);
+  e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0;
+  if (run.nextFlags.bribe) e.hp = Math.round(e.hp * 0.8); if (run.finalCut) e.hp = Math.round(e.hp * (1 - run.finalCut));
+  if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp));
+  return e;
 }
 // A spec's traits from the pool, on top of the enemy's own: passives add up; for a trait it already has, the
 // stronger value counts (every how many turns: the more often)
@@ -1262,7 +1289,8 @@ function snapshot(run) {
 // fights), practice runs and the elite bracket never use the pool.
 const POOL_SIZE = 30, POOL_ROUNDS = 7;
 const POOL = { off: false }; // tools/pool-seed.js turns it off to make the reserves
-function poolOn(run) { return !POOL.off && !run.seed && !run.practice && !run.script && !run.elite && run.round >= 1 && run.round <= POOL_ROUNDS; }
+// Rounds 1 to POOL_ROUNDS draw their hard opponent from the pool; the final (round ROUNDS) draws a finalist for the paired world
+function poolOn(run) { return !POOL.off && !run.seed && !run.practice && !run.script && !run.elite && run.round >= 1 && (run.round <= POOL_ROUNDS || run.round === ROUNDS); }
 function poolSlot(rng) { return 1 + Math.floor(rnd(rng) * POOL_SIZE); }
 function poolId(round, slot) { return round + '_' + slot; }
 // What the pool keeps of a build: what it fights with, plus its champion's name, crest and rank letter. No fight
@@ -1297,6 +1325,28 @@ function poolFill(spec, data, me) {
   spec.snap = snap; spec.fileAt = Number(data.at) || 0;
   spec.hearts = Math.max(1, Math.min(POOL_HEARTS, Math.round(Number(data.hearts)) || POOL_HEARTS));
   return true;
+}
+// The final's finalist, from the round's list of filed records: one from a world of the paired type, still standing,
+// never your own. docs: [{ id, data }]. False leaves the paired world's Final Champion in place.
+function finalFill(spec, docs, me, rng) {
+  const ok = (docs || []).filter(d => d && d.data && d.data.snap && d.data.owner && d.data.owner !== me && d.data.hearts > 0 && d.data.snap.worldType === typeOfFinal(spec.id));
+  if (!ok.length) return false;
+  const d = ok[Math.floor(rnd(rng) * ok.length)], slot = Number(String(d.id).split('_')[1]) || 1;
+  const snap = sanitizeSnap(d.data.snap, String(d.data.owner).slice(0, 128));
+  if (!snap || !snap.bar.length) return false;
+  snap.round = spec.round; spec.snap = snap; spec.slot = slot; spec.fileAt = Number(d.data.at) || 0;
+  spec.hearts = Math.max(1, Math.min(POOL_HEARTS, Math.round(Number(d.data.hearts)) || POOL_HEARTS));
+  return true;
+}
+const typeOfFinal = id => Object.keys(WORLD_TYPES).find(k => WORLD_TYPES[k].final === id);
+// The other half of the paired final: what your result does to the paired world and its finalist's record
+function finalResolve(run, spec, won, res, msgs) {
+  const P = pairOf(run), them = spec.snap ? spec.snap.worldName || P.name : P.name, real = spec.snap && !spec.snap.reserve && spec.snap.owner;
+  if (!run.pair) return;
+  if (won) {
+    msgs.push({ t: 'broadcast', text: `[${them} is erased in this tournament. Outcomes vary.]` });
+    if (real) res.poolHit = { owner: spec.snap.owner, champ: spec.snap.champ, round: spec.round, slot: spec.slot, at: spec.fileAt || 0, hearts: spec.hearts == null ? POOL_HEARTS : spec.hearts };
+  } else if (real) res.poolWon = { owner: spec.snap.owner, champ: spec.snap.champ, round: spec.round };
 }
 // Worlds trade fragments. Beat a record and you take a fragment of its world: a lost Heart back (with its World Record
 // entry), or, at full Hearts, one of its pieces. Lose and its world takes a piece of yours (the Hearts you lose anyway).
@@ -1914,7 +1964,7 @@ function resolveFight(run, f, meta, rng) {
   // Titles and world firsts
   if (won) {
     titleFeats('win');
-    if (FINAL_TITLE[spec.id]) worldFirst(run, 'final_' + spec.id, `has defeated ${ENEMIES[spec.id].name} in ${f.turn} turn${f.turn === 1 ? '' : 's'}.`, FINAL_TITLE[spec.id], msgs);
+    if (FINAL_TITLE[spec.id]) worldFirst(run, 'final_' + spec.id, `has defeated ${spec.snap ? spec.snap.champ + ', carrying ' + ENEMIES[spec.id].name + "'s power," : ENEMIES[spec.id].name} in ${f.turn} turn${f.turn === 1 ? '' : 's'}.`, FINAL_TITLE[spec.id], msgs);
   }
   titleFeats('fight');
   questEvent(run, 'fight', { f, won, spec }, msgs);
@@ -1973,6 +2023,7 @@ function resolveFight(run, f, meta, rng) {
     }
   }
   if (spec.kind === 'entrant') poolResolve(run, spec, won, res, msgs, lr);
+  if (spec.kind === 'final') finalResolve(run, spec, won, res, msgs);
   // A pool record's owner hears through poolResolve instead: the build is a copy from one round, not a champion in their Halls
   if (won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.rested = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at, rank: spec.snap.rank || null };
   // A shared champion that beats you earns its owner's champion RP (see champWin)
@@ -2200,7 +2251,7 @@ function rankIntro(run, meta, spec, foeName) {
     if (R) out.push({ t: 'foe', text: `"${meta.archive.beat[spec.id] ? R.grudge : gap < 0 ? R.below : gap > 0 ? R.above : R.level}"` });
     if (spec.id === 'masked') out.push(meta.archive.beat.masked ? { t: 'loss', text: '[The Masked Entrant has copied your record. Including the loss.]' } : { t: 'sys', text: `[Entrant rank: ${me}. Entrant rank: ${me}.]` });
   }
-  if (spec.kind === 'final' && rankIdx(me) >= rankIdx('S') && FINAL_GREET[spec.id]) out.push({ t: 'foe', text: `"${FINAL_GREET[spec.id].replace('{champ}', champ)}"` });
+  if (spec.kind === 'final' && !spec.snap && rankIdx(me) >= rankIdx('S') && FINAL_GREET[spec.id]) out.push({ t: 'foe', text: `"${FINAL_GREET[spec.id].replace('{champ}', champ)}"` });
   if (spec.kind === 'trial') out.unshift({ t: 'class', text: trialLine(spec.to, 0, spec.cond) });
   return out;
 }
@@ -2258,5 +2309,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

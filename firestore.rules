@@ -98,7 +98,7 @@ service cloud.firestore {
           && request.resource.data.rec.ids is list && request.resource.data.rec.ids.size() <= 20));
     }
 
-    // The Entrant pool: 30 filed records for each of rounds 1 to 7, one document per slot (pool/{round}_{slot}), with r its
+    // The Entrant pool: 30 filed records for each of rounds 1 to 7, plus round 8 (finalists for the paired final), one document per slot (pool/{round}_{slot}), with r its
     // round and hearts how many more defeats it survives. Any signed-in player reads a slot, or lists one round (30 at most).
     // A tester files their own build over any slot of a round, with 3 Hearts: replacing a record is the design. Any other
     // tester who beats a record takes exactly one of its Hearts and changes nothing else. At 0 the record is erased.
@@ -106,7 +106,7 @@ service cloud.firestore {
     match /pool/{slot} {
       allow get: if request.auth != null;
       allow list: if request.auth != null && request.query.limit <= 30;
-      allow create, update: if isTester() && slot.matches('[1-7]_([1-9]|[12][0-9]|30)')
+      allow create, update: if isTester() && slot.matches('[1-8]_([1-9]|[12][0-9]|30)')
         && request.resource.data.keys().hasOnly(['snap', 'owner', 'at', 'name', 'hearts', 'r'])
         && request.resource.data.keys().hasAll(['snap', 'owner', 'at', 'hearts', 'r'])
         && request.resource.data.owner == request.auth.uid
