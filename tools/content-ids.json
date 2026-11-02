@@ -493,7 +493,8 @@
   "crisis_sundering_2",
   "crisis_goldenage_1",
   "crisis_goldenage_2",
-  "council_vote"
+  "council_vote",
+  "power_struggle"
  ],
  "chains": [
   "official",
@@ -551,7 +552,8 @@
   "crisis_sundering_2": 3,
   "crisis_goldenage_1": 3,
   "crisis_goldenage_2": 3,
-  "council_vote": 3
+  "council_vote": 3,
+  "power_struggle": 2
  },
  "lore": {
   "drowned": {

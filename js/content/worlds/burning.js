@@ -1,6 +1,8 @@
 // ===== [World Pending Deletion] — content: world pack: Burning Empire =====
 'use strict';
 WORLD_TYPES.burning = { name: 'Burning Empire', flavour: 'An empire that never stopped fighting.', home: 'pyre', guest: 'bastion', gift: 'deserter', final: 'kharros', names: [['Khar', 'Vor', 'Ash', 'Ign', 'Sol', 'Pyr', 'Tar', 'Cind', 'Mag', 'Rax'], ['ros', 'kai', 'heim', 'gard', 'onis', 'ath', 'ium', 'or', 'ax', 'ene']], mids: ['a', 'i', 'en'], champs: ['Varro', 'Kaela', 'Dax', 'Seren', 'Ignis', 'Tor', 'Aurel', 'Cato', 'Drusa', 'Fausta', 'Galen', 'Hadria', 'Junia', 'Lucan', 'Marius', 'Nerva', 'Octa', 'Quint', 'Rufa', 'Severa', 'Tullia', 'Valens', 'Zenon', 'Calla'] };
+// ruler: the old power a clashing People contradicts (PEOPLES[x].clash), and what backing it in the power struggle gives
+WORLD_TYPES.burning.ruler = { name: 'the Imperial Legions', line: 'The legions answer to whoever wears the ash crown.', then: { always: { next: { empower: 1 } } }, say: '[The legions march behind you. You start every fight Empowered.]' };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.burning = {
   roles: ['legionnaire', "smith's apprentice", 'standard-bearer', 'field medic', 'courier'],

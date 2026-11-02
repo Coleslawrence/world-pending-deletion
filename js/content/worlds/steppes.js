@@ -1,6 +1,8 @@
 // ===== [World Pending Deletion] — content: world pack: Thunder Steppes =====
 'use strict';
 WORLD_TYPES.steppes = { name: 'Thunder Steppes', flavour: 'Endless grasslands under a storm that never breaks.', home: 'storm', guest: 'blade', gift: 'lightningrod', final: 'herald', names: [['Bra', 'Kes', 'Vol', 'Rhu', 'Ost', 'Zan', 'Tor', 'Ark', 'Sar', 'Yur'], ['mak', 'ven', 'dra', 'gal', 'ruk', 'esh', 'an', 'ost', 'ir', 'tai']], mids: ['a', 'u', 'ar'], champs: ['Taran', 'Odra', 'Vesna', 'Halvard', 'Iskra', 'Doran', 'Arslan', 'Bogdan', 'Daria', 'Ilya', 'Kasim', 'Milena', 'Nadia', 'Oleg', 'Radka', 'Stanko', 'Temir', 'Ulana', 'Vadim', 'Yara', 'Zarina', 'Boran', 'Kira', 'Mirko'] };
+// ruler: the old power a clashing People contradicts (PEOPLES[x].clash), and what backing it in the power struggle gives
+WORLD_TYPES.steppes.ruler = { name: "the First Rider's line", line: 'One family has ridden at the front since the first storm.', then: { always: { foe: { weaken: 1 } } }, say: "[The First Rider's line rides with you. Every opponent starts Weakened.]" };
 // World Record pool. Pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 LORE.steppes = {
   roles: ['rod-keeper', 'herd rider', 'storm reader', 'tent-weaver', 'clan runner'],
