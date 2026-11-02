@@ -726,3 +726,34 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .dots2 i.a-storm { clip-path: polygon(60% 0, 10% 58%, 45% 58%, 35% 100%, 90% 40%, 55% 40%); }
 .xp-l { font-family: var(--f-m); font-size: 10.5px; color: var(--dim); white-space: nowrap; }
 .ch-sub { flex-wrap: wrap; row-gap: 2px; } .xpw { display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1 0 100%; } .xpw .xp { flex: 0 1 44px; min-width: 16px; }
+/* Event outcome panel (#13): the System's lines and what changed, until Continue */
+.ev-you { margin-bottom: 8px; }
+.ev-out p { margin: 0; } .ev-out p.t-loss { color: var(--bad); } .ev-out p.t-loot, .ev-out p.t-win { color: var(--good); } .ev-out p.t-class, .ev-out p.t-level { color: var(--stun); } .ev-out p.t-favour { color: var(--faith); } .ev-out p.t-skill { color: var(--hex); }
+.ev-ch { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ev-ch span { font-family: var(--f-m); font-size: 12.5px; border: 1px solid; border-radius: 4px; padding: 3px 8px; }
+.ev-ch .good { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, transparent); } .ev-ch .bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 50%, transparent); }
+.ev-res .ev-out { animation: tin .25s ease-out; }
+/* Break and reaction impact (#15) */
+.foe, .me { position: relative; }
+.stamp { position: absolute; left: 50%; top: 42%; z-index: 6; pointer-events: none; font-family: var(--f-d); letter-spacing: .12em; white-space: nowrap; transform: translate(-50%, -50%) rotate(-8deg); animation: stampin .9s ease-out forwards; }
+.stamp.brk { font-size: 34px; color: #ffe39a; border: 3px solid #ffe39a; border-radius: 6px; padding: 2px 14px; background: rgba(40,24,6,.82); box-shadow: 0 0 28px rgba(255,200,90,.55); animation-duration: 1.3s; }
+.stamp.rx { font-size: 20px; color: var(--stun); border: 2px solid var(--stun); border-radius: 5px; padding: 1px 10px; background: rgba(34,28,8,.82); top: 64%; }
+@keyframes stampin { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(1.9); } 14% { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(.94); } 22% { transform: translate(-50%, -50%) rotate(-8deg) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(1); } }
+.brk-bar.shatter { animation: shatter .55s ease-out; }
+@keyframes shatter { 0% { box-shadow: 0 0 0 0 rgba(255,227,154,.9); background: #ffe39a; } 40% { box-shadow: 0 0 14px 4px rgba(255,200,90,.6); transform: scaleY(2.2); } 100% { box-shadow: none; transform: none; } }
+#app.hitstop { filter: brightness(1.35) contrast(1.1); }
+#app.hitstop * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .stamp { animation: none; opacity: 1; } }
+/* Settings (#16) */
+.t-eb { display: flex; align-items: center; justify-content: space-between; gap: 8px; } .t-set { font-size: 18px; flex: none; }
+.setrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.setrow b { font-weight: 500; } .setrow small { display: block; font-size: 12px; color: var(--dim); line-height: 1.3; }
+.seg { display: flex; gap: 4px; } .seg .btn.small { padding-inline: 9px; min-width: 0; }
+@container app (max-width: 359px) { .setrow { grid-template-columns: 1fr; gap: 6px; } }
+/* Reduced motion chosen in Settings: the same as the device setting */
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+:root[data-motion="reduce"] .er.glitch b, :root[data-motion="reduce"] .stamp { animation: none; } :root[data-motion="reduce"] .stamp { opacity: 1; }
+/* Text size: reading text only, so layouts keep fitting */
+:root[data-text="l"] .sh-p, :root[data-text="l"] .sr-desc, :root[data-text="l"] .sr-name, :root[data-text="l"] .sysbox, :root[data-text="l"] .log, :root[data-text="l"] .toast, :root[data-text="l"] .coach p { zoom: 1.12; }
+:root[data-text="xl"] .sh-p, :root[data-text="xl"] .sr-desc, :root[data-text="xl"] .sr-name, :root[data-text="xl"] .sysbox, :root[data-text="xl"] .log, :root[data-text="xl"] .toast, :root[data-text="xl"] .coach p { zoom: 1.25; }
+.seg .btn { font-family: var(--f-b); font-variant-numeric: lining-nums; letter-spacing: 0; }
