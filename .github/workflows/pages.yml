@@ -1,10 +1,13 @@
-# Publishes the game to GitHub Pages on every push to main.
+# Publishes the game to GitHub Pages: the live game from main at the site root, and a dev preview from dev at /dev/.
+# Runs on every push to main or dev, so each always shows its branch's newest commit.
 # One-time setup: Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Pushes to dev need dev allowed to deploy: Settings → Environments → github-pages → Deployment branches and tags → add "dev".
+# The preview opens only for testers marked for previews (docs/FIREBASE.md, "Playtesters"); see js/preview.js.
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +17,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -23,14 +26,29 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Check the engine loads
-        run: node -e "require('./js/core.js')"
+      - name: Check out main (live game)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: live
+      - name: Check out dev (preview)
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          path: dev
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check both engines load
+        run: |
+          node -e "require('./live/js/core.js')"
+          node -e "require('./dev/js/core.js')"
       - uses: actions/configure-pages@v5
       - name: Collect the site files
         run: |
-          mkdir -p _site
-          cp -r index.html manifest.webmanifest sw.js .nojekyll css js icons _site/
+          node dev/tools/site-build.js live _site
+          node dev/tools/site-build.js dev _site/dev --preview live
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
