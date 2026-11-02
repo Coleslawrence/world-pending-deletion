@@ -3,7 +3,7 @@
 // Settings live on this device only (localStorage 'wpd-settings').
 'use strict';
 const SETTINGS_KEY = 'wpd-settings';
-const SETTINGS_DEFAULT = { vol: 2, vib: true, shake: true, motion: 'system', text: 'normal' }; // vol: 0 off, 1 low, 2 medium, 3 high
+const SETTINGS_DEFAULT = { vol: 2, vib: true, shake: true, motion: 'system', text: 'normal', look: 'broadcast' }; // vol: 0 off, 1 low, 2 medium, 3 high
 const VOL_LEVELS = [0, 0.25, 0.55, 1];
 function loadSettings() {
   let s = null; try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { }
@@ -13,11 +13,12 @@ let SET = loadSettings();
 function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(SET)); } catch (e) { } applySettings(); }
 const OS_REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 function reducedMotion() { return SET.motion === 'reduce' || (SET.motion === 'system' && OS_REDUCED); }
-// Settings that change the page itself: reduced motion and text size are attributes on <html> that style.css reads
+// Settings that change the page itself: reduced motion, text size and the look (theme) are attributes on <html> that style.css reads
 function applySettings() {
   const r = document.documentElement;
   if (reducedMotion()) r.setAttribute('data-motion', 'reduce'); else r.removeAttribute('data-motion');
   if (SET.text && SET.text !== 'normal') r.setAttribute('data-text', SET.text); else r.removeAttribute('data-text');
+  if (SET.look === 'classic') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', 'broadcast');
 }
 applySettings();
 

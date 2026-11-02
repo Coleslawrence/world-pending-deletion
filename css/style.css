@@ -862,3 +862,72 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 /* An inserted option (glitched content): still a normal, pickable choice */
 .choice.inserted { border: 1px dashed var(--bad); border-left: 3px solid var(--bad); background: rgba(255,107,98,.06); }
 .choice .ins-tag { display: block; font: 600 11px var(--f-m); color: var(--bad); letter-spacing: .04em; margin-bottom: 2px; text-shadow: -1px 0 rgba(255,46,90,.6), 1px 0 rgba(114,208,255,.6); }
+
+/* ---------- Theme: Broadcast (default look; Settings > Look > Classic turns it off) ----------
+   The tournament as a live feed: black, acid yellow, magenta, hard edges and Anton caps. Only tokens and the
+   shared pieces are restyled here, so every screen and moment picks it up. */
+:root[data-theme="broadcast"] {
+  --bg: #0b0b0d; --bg2: #141416; --panel: #17171a; --panel2: #1f1f23; --line: #2c2c31; --line2: #3a3a40;
+  --text: #f4f4f0; --muted: #b9b9b0; --dim: #8a8a83;
+  --bronze: #e6ff2e; --bronze-d: #3a4206; --sys: #e6ff2e; --sys-d: #2b3006; --gold-hi: #f4ff9a; --ink: #0b0b0d;
+  --f-d: "Anton", "Impact", "Arial Narrow", sans-serif;
+  --r-s: 2px; --r-l: 2px;
+  --shadow: 3px 3px 0 #000; --shadow-m: 3px 3px 0 var(--h-m);
+}
+:root[data-theme="broadcast"] body, :root[data-theme="broadcast"] #app { background: var(--bg); }
+:root[data-theme="broadcast"] .screen { background: radial-gradient(120% 50% at 100% 0, rgba(255,46,154,.16), transparent 60%), var(--bg); }
+@media (min-width: 560px) { :root[data-theme="broadcast"] #app { border-color: var(--line2); } }
+/* Headings and names: condensed caps */
+:root[data-theme="broadcast"] :is(h1, h2, h3, .wname, .fo-name, .nx-name, .sr-name, .me-name, .ch-name, .pk-name, .sc-name, .stab) { text-transform: uppercase; letter-spacing: .01em; }
+:root[data-theme="broadcast"] .title h1, :root[data-theme="broadcast"] .title h1.logo { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--white); text-shadow: 3px 3px 0 var(--h-m); line-height: .9; }
+:root[data-theme="broadcast"] .logo .brk { -webkit-text-fill-color: var(--h-y); color: var(--h-y); text-shadow: 3px 3px 0 var(--h-m); }
+:root[data-theme="broadcast"] .eyebrow, :root[data-theme="broadcast"] .sec-h { color: var(--h-y); }
+/* Panels: hard edges and a black drop shadow */
+:root[data-theme="broadcast"] :is(.opp, .me, .next, .cline, .champ, .t-stats > *, .runcard, .foe, .pick, .scard) { border: 2px solid var(--line2); box-shadow: var(--shadow); }
+:root[data-theme="broadcast"] :is(.pick, .scard).on { border-color: var(--h-y); box-shadow: 3px 3px 0 var(--h-y); background: var(--panel2); }
+:root[data-theme="broadcast"] .opp.hard { border-color: var(--h-m); box-shadow: var(--shadow-m); }
+:root[data-theme="broadcast"] .sysbox { border: 0; border-left: 4px solid var(--h-m); background: var(--h-k); color: var(--h-y); box-shadow: none; }
+:root[data-theme="broadcast"] .sysbox.bad { border-left-color: var(--bad); color: var(--bad); }
+/* Buttons */
+:root[data-theme="broadcast"] .btn { border-width: 2px; }
+:root[data-theme="broadcast"] .btn:hover:not(:disabled) { border-color: var(--h-y); }
+:root[data-theme="broadcast"] .btn.primary { background: var(--h-y); color: var(--h-k); border-color: var(--h-k); box-shadow: var(--shadow-m); font-family: var(--f-d); text-transform: uppercase; letter-spacing: .03em; }
+:root[data-theme="broadcast"] .btn.primary:active:not(:disabled) { translate: 2px 2px; box-shadow: 1px 1px 0 var(--h-m); }
+:root[data-theme="broadcast"] .btn.small.primary { box-shadow: 2px 2px 0 var(--h-m); }
+:root[data-theme="broadcast"] .btn.glow { border-color: var(--h-y); box-shadow: inset 0 0 0 1px var(--h-y); }
+:root[data-theme="broadcast"] .icon-btn.on { color: var(--h-y); border-color: var(--h-y); }
+:root[data-theme="broadcast"] .badge { background: var(--h-m); color: var(--white); }
+/* Counts and accents */
+:root[data-theme="broadcast"] .t-stats b { color: var(--h-y); }
+:root[data-theme="broadcast"] .hcount, :root[data-theme="broadcast"] .hearts .h.on { color: var(--h-m); }
+:root[data-theme="broadcast"] .hearts .h.on { background: var(--h-m); }
+:root[data-theme="broadcast"] .dot.done { background: var(--h-y); border-color: var(--h-y); }
+:root[data-theme="broadcast"] .dot.now { border-color: var(--h-m); background: transparent; box-shadow: 0 0 0 3px rgba(255,46,154,.3); }
+:root[data-theme="broadcast"] .stab.on { border-color: var(--h-y); box-shadow: inset 0 -3px 0 var(--h-y); color: var(--white); }
+/* Sheets: yellow header strip */
+:root[data-theme="broadcast"] .sheet { border: 2px solid var(--h-k); border-bottom: 0; }
+:root[data-theme="broadcast"] .sheet .sh-h { background: var(--h-y); padding-bottom: 10px; }
+:root[data-theme="broadcast"] .sheet .sh-h h3 { color: var(--h-k); font-family: var(--f-d); text-transform: uppercase; }
+:root[data-theme="broadcast"] .sheet .sh-h :is(.icon-btn, .btn) { color: var(--h-k); border-color: var(--h-k); }
+:root[data-theme="broadcast"] .sheet.lose .sh-h { background: var(--h-m); } :root[data-theme="broadcast"] .sheet.lose .sh-h h3 { color: var(--white); }
+:root[data-theme="broadcast"] .sh-b h4 { color: var(--h-y); font-family: var(--f-d); text-transform: uppercase; letter-spacing: .02em; }
+:root[data-theme="broadcast"] .choice { border-width: 2px; border-left-width: 4px; }
+:root[data-theme="broadcast"] .choice:hover:not(:disabled) { border-color: var(--h-y); border-left-color: var(--sc, var(--h-y)); }
+/* Fight: always on air */
+:root[data-theme="broadcast"] .screen.fight .foe { background: linear-gradient(135deg, var(--h-m) 0 62%, var(--h-y) 62% 100%); border-color: var(--h-k); box-shadow: 4px 4px 0 var(--h-k); color: var(--h-k); }
+:root[data-theme="broadcast"] .screen.fight .fo-name { color: var(--white); text-shadow: 2px 2px 0 var(--h-k); }
+:root[data-theme="broadcast"] .screen.fight .fo-hp { color: var(--white); font-weight: 700; text-shadow: 1px 1px 0 var(--h-k); }
+:root[data-theme="broadcast"] .screen.fight .foe .chip { background: var(--h-k); color: var(--h-y); border-color: var(--h-k); }
+:root[data-theme="broadcast"] .screen.fight :is(.foe-bar, .foe .brk-bar) { background: rgba(11,11,13,.55); }
+:root[data-theme="broadcast"] .screen.fight .intent { background: var(--h-k); border: 2px solid var(--h-y); color: var(--h-y); box-shadow: none; }
+:root[data-theme="broadcast"] .screen.fight .intent :is(.in-t, .in-v) { font-family: var(--f-d); text-transform: uppercase; letter-spacing: .02em; color: var(--h-y); font-weight: 400; }
+:root[data-theme="broadcast"] .screen.fight .intent .in-l { color: var(--h-m); }
+:root[data-theme="broadcast"] .screen.fight .intent.k-big { border-color: var(--h-m); box-shadow: 3px 3px 0 var(--h-m); }
+:root[data-theme="broadcast"] .screen.fight .foe .crest { border-color: var(--h-k); color: var(--h-k); background: var(--h-y); }
+:root[data-theme="broadcast"] .sk { border-width: 1px 1px 1px 4px; background: var(--bg2); }
+:root[data-theme="broadcast"] .sk:hover:not(:disabled) { background: var(--panel2); }
+:root[data-theme="broadcast"] .sk .sk-name { font-family: var(--f-d); font-weight: 400; line-height: 1.05; text-transform: uppercase; letter-spacing: .02em; }
+:root[data-theme="broadcast"] .log { background: none; }
+:root[data-theme="broadcast"] .log p.t-sys { color: var(--h-y); }
+:root[data-theme="broadcast"] div.bar { border-radius: 0; }
+:root[data-theme="broadcast"] .toast { border-radius: 0; border-width: 0 0 0 4px; background: var(--h-k); box-shadow: var(--shadow); }

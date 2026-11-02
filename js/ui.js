@@ -1230,6 +1230,7 @@ function settingsSheet() {
   const row = (name, hint, ctl) => `<div class="setrow"><div><b>${name}</b>${hint ? `<small>${hint}</small>` : ''}</div>${ctl}</div>`;
   const speed = `<div class="seg" role="group">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : 'ghost'}" data-act="speed" data-v="${v}" aria-pressed="${ui.speed === v}">${v}×</button>`).join('')}</div>`;
   const body = `<p class="sh-p sysl">[Preferences are noted. On this device only.]</p>`
+    + row('Look', 'Broadcast is the new look; Classic is the old bronze one.', seg('look', [['broadcast', 'Broadcast'], ['classic', 'Classic']]))
     + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
     + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
     + row('Fight speed', 'How fast turns play out.', speed)
