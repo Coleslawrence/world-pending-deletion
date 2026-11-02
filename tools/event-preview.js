@@ -37,6 +37,7 @@ function serve() {
 function stage([key, step]) {
   clearToasts(); ui.sheet = null; run.pending = []; ui.screen = 'shop'; meta.statLines = true; run.gold = Math.max(run.gold, 30);
   run.chains = run.chains || {}; run.chains.poisoner = run.chains.poisoner && typeof run.chains.poisoner === 'object' ? run.chains.poisoner : { step: 'found', who: 'lyss', due: 1 };
+  if (key === 'power_struggle') { run.world.type = 'iron'; run.world.people = 'council'; } // it only comes to a clashing world
   if (step > 0) { Object.keys(run.stats).forEach(k => run.stats[k] = Math.max(run.stats[k], 12)); Object.keys(GODS).forEach(g => run.favour[g] = 8); }
   pushEvent(run, key); if (step > 0) run.luck = { [key]: true };
   render();

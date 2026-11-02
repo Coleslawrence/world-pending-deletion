@@ -442,7 +442,10 @@ function newRun(world, setup, meta, rng) {
     if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
   }
   run.draft = rollDraft(run, stream(run, 'draft', rng));
+  // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
+  run.chosenNow = true;
   Object.keys(GODS).forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
+  delete run.chosenNow;
   run.hp = maxHp(run);
   return run;
 }
@@ -827,6 +830,8 @@ function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; 
 const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
 const WAGERS = {};
 WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
+// The Silence (lore audit, 2 Nov): no Favour and no wagers in a Silence world until its Fate is lifted
+function silent(run) { return !!run && !run.practice && !run.chosenNow && run.world.fate === 'silence' && (run.fateTrack || 0) < FATE_TRACK.max; }
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
   const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
@@ -837,6 +842,8 @@ function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); re
 function addFavour(run, god, n, meta, msgs, rng) {
   if (n < 0) { const b = run.favour[god] || 0; run.favour[god] = Math.max(0, b + n); if (b > run.favour[god]) msgs && msgs.push({ t: 'loss', text: `[${GODS[god].name} is displeased. Favour −${b - run.favour[god]}.]` }); return; }
   if (customOf(run, 'temple')) { n++; customPaid(run, msgs); } // Temple State: omens, every Favour gain +1
+  // The Silence: the gods don't answer in this world until its Fate is lifted. Favour earned meanwhile is held, not lost
+  if (silent(run)) { run.heldFavour = run.heldFavour || {}; run.heldFavour[god] = (run.heldFavour[god] || 0) + n; msgs && msgs.push({ t: 'sys', text: `[${run.world.name} is silent. ${GODS[god].name} did not hear. Favour held: +${n}.]` }); return; }
   run.favour[god] = (run.favour[god] || 0) + n;
   msgs && msgs.push({ t: 'favour', text: `[${GODS[god].name} is pleased. Favour +${n}.]` });
   if (run.favour[god] >= 4 && !(run.gifted[god] >= 1)) {
@@ -858,7 +865,11 @@ const DISTRICTS = {
 };
 // People customs: each People changes one thing about the between-round loop (PEOPLES[x].custom in layers.js says what).
 // The first time a custom pays out, the champion earns the People's epithet ("Maren the Devout"), kept for the run.
-const customOf = (run, k) => !!run && !run.practice && run.world.people === k;
+const customOf = (run, k) => !!run && !run.practice && run.world.people === k && !run.customOff;
+// A power struggle (clashing People and world type): the People backed (customUp, their custom pays more) or the old ruler
+// (customOff, the custom is suspended and the ruler's bonus applies instead). events/peoples.js power_struggle
+function clashOf(run) { const P = PEOPLES[run.world.people], R = WORLD_TYPES[run.world.type].ruler; return P && P.clash && P.clash.includes(run.world.type) && R ? { P, R } : null; }
+function clashDue(run) { return run.round === 1 && !run.practice && !run.elite && clashOf(run) && EVENTS.power_struggle && !(run.seen || []).includes('power_struggle') ? 'power_struggle' : null; }
 function customPaid(run, msgs) {
   if (run.epithet || run.practice) return; const P = PEOPLES[run.world.people]; if (!P || !P.epithets) return;
   run.epithet = P.epithets[0]; const c = `${run.name} ${run.epithet} of ${run.world.name}`; if (c.length <= 60) run.champ = c; // the champion's name carries it, in the Halls and filed records too
@@ -1034,6 +1045,11 @@ function moveFate(run, v, msgs) {
   const F = FATES[run.world.fate]; if (!F) return;
   const was = run.fateTrack || 0; run.fateTrack = Math.max(FATE_TRACK.min, Math.min(FATE_TRACK.max, was + v));
   if (run.fateTrack !== was && msgs) msgs.push({ t: run.fateTrack > was ? 'loot' : 'loss', text: `[${run.world.name}: ${F.name} ${run.fateTrack > was ? 'eases' : 'worsens'}. Fate: ${fateState(run)}.]` });
+  // The Silence lifted: the gods answer, and the Favour held for them arrives at once
+  if (run.world.fate === 'silence' && was < FATE_TRACK.max && run.fateTrack >= FATE_TRACK.max && run.heldFavour) {
+    const H = run.heldFavour; run.heldFavour = null; msgs && msgs.push({ t: 'favour', text: '[The gods answer. Held Favour delivered.]' });
+    Object.keys(H).forEach(g => GODS[g] && H[g] > 0 && addFavour(run, g, H[g], META, msgs));
+  }
 }
 function fateState(run) { const t = run.fateTrack || 0; return t >= FATE_TRACK.max ? 'Lifted' : t <= FATE_TRACK.min ? 'Sealed' : t > 0 ? 'Easing' : t < 0 ? 'Worsening' : 'Holding'; }
 // How the Fate ended: 'lifted', 'sealed' or null, and the Fate's closing line for it (FATES[x].ends), if it has one
@@ -1058,7 +1074,7 @@ function closeFate(run, msgs, spared) {
 // People visits: a People's own event (PEOPLES[x].visit = { at: round, event }) comes to everyone that round, like a crisis
 function visitDue(run) {
   const V = PEOPLES[run.world.people] && PEOPLES[run.world.people].visit;
-  if (!V || run.round !== V.at || run.practice || run.elite) return null;
+  if (!V || run.round !== V.at || run.practice || run.elite || run.customOff) return null;
   return EVENTS[V.event] && !(run.seen || []).includes(V.event) ? V.event : null;
 }
 // Marks that last the run (the outcome always) go on every fight, as next and foe marks do on one
@@ -1141,12 +1157,13 @@ function enterChoose(run, meta, rng, msgs) {
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
-  [crisisDue(run), visitDue(run)].forEach(k => { if (k && !run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
+  [crisisDue(run), visitDue(run), clashDue(run)].forEach(k => { if (k && !run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
   const sm = run.choices.find(c => c.summoned && c.say); if (sm) msgs && msgs.push({ t: 'class', text: sm.say });
   run.wager = makeWager(run, stream(run, 'opps', rng));
+  if (silent(run)) run.wager = null; // drawn anyway, so a Silence world's seeded opponents match everyone else's
   run.stage = 'choose';
 }
 // Each round: choose an opponent, visit a district, shop, fight. The district comes first, so the shop's exit is the fight.
@@ -1977,7 +1994,7 @@ function resolveFight(run, f, meta, rng) {
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
-    if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece('B', { run, msgs, label: 'Royal bounty' }); } }
+    if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
@@ -2015,7 +2032,7 @@ function resolveFight(run, f, meta, rng) {
           run.round++;
           // The Clans: the Blood Tally. Whoever beat you comes back next round in the hard slot, with a bounty on them
           if (customOf(run, 'clans') && ['rival', 'monster', 'erased', 'champion'].includes(spec.kind) && !spec.summoned) {
-            const S = summonSpec(run, { spec: Object.assign({}, spec, { traits: (spec.traits || []).slice(), gate: false }), bounty: { gold: 8, restore: 1 }, say: `[The Blood Tally: ${specName(spec)} owes you a Heart. They are back in your bracket.]` }, lr);
+            const S = summonSpec(run, { spec: Object.assign({}, spec, { traits: (spec.traits || []).slice(), gate: false }), bounty: run.customUp ? { gold: 14, restore: 2 } : { gold: 8, restore: 1 }, say: `[The Blood Tally: ${specName(spec)} owes you a Heart. They are back in your bracket.]` }, lr);
             if (S) { (run.summons = run.summons || []).push({ round: run.round, spec: S }); customPaid(run, msgs); }
           }
         }
@@ -2304,7 +2321,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, champTitle, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

@@ -121,7 +121,7 @@ const PEOPLES = {
       { k: 'custom', tier: 'city', name: 'The Guild Seal', text: 'Nothing is legal without one. Seals are sold separately.' },
       { k: 'person', tier: 'city', name: 'The Guildmaster', text: 'Owns a share of everything, including you.' },
     ] },
-  clans: { name: 'The Clans', line: 'Twelve clans, one old feud, and a council that never ends.',
+  clans: { name: 'The Clans', clash: ['steppes'], line: 'Twelve clans, one old feud, and a council that never ends.',
     custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' },
     roles: ['clan runner', 'feud keeper'], epithets: ['of the Twelve', 'the Feud-Born'],
     entries: [
@@ -137,7 +137,8 @@ const PEOPLES = {
       { k: 'custom', tier: 'city', name: 'Examination Day', text: 'Every adult sits the exams again each year. Failing is public.' },
       { k: 'person', tier: 'city', name: 'The Chief Librarian', text: 'Has read everything. Has opinions about all of it.' },
     ] },
-  council: { name: 'Free Council', line: 'No kings. Every question goes to a vote, eventually.',
+  // clash: world types whose own rulers this People contradicts; such a world opens with a power struggle (events/peoples.js)
+  council: { name: 'Free Council', clash: ['iron', 'burning'], line: 'No kings. Every question goes to a vote, eventually.',
     custom: { name: 'The Long Vote', text: 'In round 2 the Council votes on a Tournament Amendment. You get a vote.' }, visit: { at: 2, event: 'council_vote' },
     roles: ['ward speaker', 'ballot counter'], epithets: ['the Elected', 'the Free'],
     entries: [
@@ -145,7 +146,7 @@ const PEOPLES = {
       { k: 'custom', tier: 'city', name: 'The Long Vote', text: 'The vote on the new town clock has run for nine years.' },
       { k: 'person', tier: 'city', name: 'The Speaker', text: 'Chosen by lot. Still trying to give the job back.' },
     ] },
-  crown: { name: 'The Old Crown', line: 'A dynasty older than the maps, and still in charge.',
+  crown: { name: 'The Old Crown', clash: ['burning', 'iron'], line: 'A dynasty older than the maps, and still in charge.',
     custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' },
     roles: ['palace page', 'royal taster'], epithets: ['the Loyal', 'the Crown-Sworn'],
     entries: [
