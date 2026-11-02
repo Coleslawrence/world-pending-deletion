@@ -627,9 +627,11 @@ function shopItemTile(it, kind, i) {
   const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : '';
   // Copies of pieces you own need no reading: they get a one-tap Buy over the price. Everything else opens its details first.
   const quick = D.owned && canBuy(run, it) ? `<button class="qbuy" data-act="quick-buy" data-k="${kind}" data-i="${i}" aria-label="Buy ${esc(d.name)} for ${price(run, it)} gold">Buy ${price(run, it)}g</button>` : '';
+  // Archetype shapes sit beside the rank, so the tile only needs a footer row for owned pips, a lock or a gear slot
+  const foot = `${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}`;
   return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}" title="${esc(skillTip(pieceDef(baseId(it.id))))}">
-    ${tag}<span class="tl-h">${rk(effRank(it.id, it.mods))}<span class="price">${price(run, it)}g</span></span><span class="tl-n">${esc(d.name)}</span>
-    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span>${pfxLine(it.mods)}<span class="tl-f">${tagDots(it.id)}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}</span></button></div>`;
+    ${tag}<span class="tl-h"><span class="tl-rk">${rk(effRank(it.id, it.mods))}${tagDots(it.id)}</span><span class="price">${price(run, it)}g</span></span><span class="tl-n">${esc(d.name)}</span>
+    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span>${pfxLine(it.mods)}${foot ? `<span class="tl-f">${foot}</span>` : ''}</button></div>`;
 }
 function shortFx(id, mods) {
   if (isGear(id)) return gearText(id, 1);
@@ -1158,19 +1160,19 @@ function resultSheet() {
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
 // Progress to the next level: every 2 points bought is a level
 function lvFill() { return run.level >= 9 ? 100 : (run.bought || 0) % 2 * 50; }
+// A collapsed section of a sheet: the heading is the tap target
+function sec(title, html, open) { return `<details class="ssec"${open ? ' open' : ''}><summary>${title}</summary><div class="ssec-b">${html}</div></details>`; }
 function statsSheet() {
   const s = effStats(run), p = buildPlayer(run), train = ui.screen === 'shop', pr = pointPrice(run);
-  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small><small class="face">${faceTag(k, s[k])}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])} gear)</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
+  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><details class="st-n"><summary>${STAT_INFO[k].name}</summary><small>${STAT_INFO[k].short}</small><small class="face">${faceTag(k, s[k])}</small></details><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
   const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g] || 0} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, (run.favour[g] || 0) / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
   const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : train ? `<p class="sh-p">Train a stat: ${pr} gold a point, you have ${run.gold}. Every 2 points is a level: +4 Max HP and rarer pieces in the shop.</p>` : `<p class="sh-p fine">Train stats with gold in the shop.</p>`}${rows}
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
-    <h4>Stat milestones</h4><ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>
-    <h4>Title</h4>${titleList()}
-    <h4>System quests</h4>${questList()}
-    ${run.hiddenPath ? `<h4>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</h4><p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>` : ''}
-    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
-    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>
-    <h4>Sponsors</h4>${gods}`;
+    ${sec('Stat milestones', `<ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>`)}${sec('Title', titleList())}${sec('System quests', questList(), true)}
+    ${run.hiddenPath ? sec(`Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}`, `<p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>`) : ''}
+    ${sec('Gifts', `<ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>`)}
+    ${sec(`World · ${esc(run.world.name)}`, `<p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>`)}
+    ${sec('Sponsors', gods)}`;
   return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function titleList() {
