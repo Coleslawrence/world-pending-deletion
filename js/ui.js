@@ -81,7 +81,7 @@ const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arca
 function placeToasts() {
   const foe = ui.screen === 'fight' && !ui.sheet && document.getElementById('foe');
   if (foe) { toastsEl.style.top = `${foe.getBoundingClientRect().bottom + 6}px`; toastsEl.style.bottom = ''; toastsEl.classList.remove('low'); return; }
-  const sh = document.querySelector('.sheet'), foot = sh ? sh.querySelector('.sh-f') : document.querySelector('main .foot2, main .foot');
+  const sh = document.querySelector('.sheet'), foot = document.querySelector('.coach.pos-bottom') ? null : sh ? sh.querySelector('.sh-f') : document.querySelector('main .foot2, main .foot');
   const r = foot && foot.getBoundingClientRect();
   if (!r || !r.height) { toastsEl.style.top = ''; toastsEl.style.bottom = ''; toastsEl.classList.remove('low'); return; }
   toastsEl.style.top = 'auto'; toastsEl.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`; toastsEl.classList.add('low');
@@ -171,7 +171,8 @@ function recordSheet() {
 }
 function findSnap(at) { at = String(at); return meta.erased.concat(meta.champions, cloud.shared.map(x => x.snap)).find(s => String(s.at) === at) || (ui.end && ui.end.snap && String(ui.end.snap.at) === at ? ui.end.snap : null); }
 // The deletion moment: one row per erased entry. One tap erases them all, one after another; each glitches, then becomes a bar.
-const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Reduced motion: the phone's setting, or the game's own in Settings (js/sfx.js)
+let REDUCED = reducedMotion();
 function eraseSteps(r) {
   const R = run && run.record; if (!R || !r.erased || !r.erased.length) return [];
   const E = recLore(R, run.world.type).entries;
@@ -463,7 +464,7 @@ function compareSheet() {
 function titleHTML() {
   const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
   return `<main class="screen title ${canResume ? 'resume' : ''}">
-    <div class="t-top"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
+    <div class="t-top"><div class="t-eb"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><button class="icon-btn t-set" data-act="sheet" data-s="settings" aria-label="Settings">⚙</button></div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
     <div class="sysbox"><p>${meta.runs && meta.rank ? esc(rankAddress(meta, meta.champions[0] && meta.champions[0].name, meta.runs)) : '[The Grand Tournament has begun.]'}</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
     <div class="t-stats"><div><b>${meta.wins}</b><span>spared</span></div><div><b>${meta.erased.length}</b><span>erased</span></div><div><b>${meta.echoes}</b><span>Echoes</span></div><button data-act="sheet" data-s="halls"><b>${meta.rank ? meta.rank.letter : 'F'}</b><span>Entrant Rank</span></button></div>
@@ -614,7 +615,7 @@ function shopItemTile(it, kind, i) {
   const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : '';
   // Copies of pieces you own need no reading: they get a one-tap Buy over the price. Everything else opens its details first.
   const quick = D.owned && canBuy(run, it) ? `<button class="qbuy" data-act="quick-buy" data-k="${kind}" data-i="${i}" aria-label="Buy ${esc(d.name)} for ${price(run, it)} gold">Buy ${price(run, it)}g</button>` : '';
-  return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}">
+  return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}" title="${esc(skillTip(pieceDef(baseId(it.id))))}">
     ${tag}<span class="tl-h">${rk(effRank(it.id, it.mods))}<span class="price">${price(run, it)}g</span></span><span class="tl-n">${esc(d.name)}</span>
     <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span>${pfxLine(it.mods)}<span class="tl-f">${tagDots(it.id)}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}</span></button></div>`;
 }
@@ -745,7 +746,7 @@ function updateFight() {
     const btn = (s, i, wide) => {
       const d = s.def, cd = s.cd > 0, prev = previewSkill(f, s);
       const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
-      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
+      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
         <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
         ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}<span class="sk-fx">${esc(prev)}</span>${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
     };
@@ -759,16 +760,32 @@ function floatAt(side, text, cls) {
   const el = document.createElement('span'); el.className = 'fl ' + cls; el.textContent = text;
   el.style.left = (18 + Math.random() * 60) + '%'; host.appendChild(el); setTimeout(() => el.remove(), 1000);
 }
-function shake(side) { const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function shake(side) { if (!SET.shake || REDUCED) return; const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+// Break and reaction impact (#15): a beat of hit-stop, a stamp over the target and the break bar shattering
+function stamp(side, text, cls) {
+  const host = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!host) return;
+  host.querySelectorAll('.stamp.' + cls).forEach(x => x.remove());
+  const el = document.createElement('span'); el.className = 'stamp ' + cls; el.textContent = text; el.setAttribute('aria-hidden', 'true');
+  host.appendChild(el); setTimeout(() => el.remove(), cls === 'brk' ? 1300 : 900);
+}
+function breakFx(side) {
+  const app0 = document.getElementById('app'), bar = document.querySelector('.brk-bar');
+  if (bar) { bar.classList.remove('shatter'); void bar.offsetWidth; bar.classList.add('shatter'); }
+  stamp(side, 'BROKEN', 'brk'); shake(side); sfx('break');
+  if (!REDUCED && app0) { app0.classList.add('hitstop'); setTimeout(() => app0.classList.remove('hitstop'), 160); }
+}
+// Hover details on PC (#17): the full effect text, and the key that uses it in a fight
+function skillTip(d, key) { if (!d) return ''; let t = d.name; try { if (d.fx) t += ': ' + describe(d); else if (d.desc) t += ': ' + d.desc; } catch (e) { } return key ? t + ` [Key ${key}]` : t; }
 function playEvents(f) {
   let d = 0;
   f.events.forEach(e => {
     const at = d;
-    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
+    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
     else if (e.k === 'dot' && e.amt > 0) { setTimeout(() => floatAt(e.side, e.amt, e.kind), at); d += 90; }
-    else if (e.k === 'heal') { setTimeout(() => floatAt(e.side, '+' + e.amt, 'heal'), at); d += 90; }
+    else if (e.k === 'heal') { setTimeout(() => { floatAt(e.side, '+' + e.amt, 'heal'); sfx('heal'); }, at); d += 90; }
     else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
-    else if (e.k === 'reaction') { setTimeout(() => floatAt(e.side, e.name + '!', 'react'), at); d += 160; }
+    else if (e.k === 'reaction') { setTimeout(() => { floatAt(e.side, e.name + '!', 'react'); stamp(e.side, e.name, 'rx'); sfx('react'); }, at); d += 220; }
+    else if (e.k === 'break') { setTimeout(() => breakFx(e.side), at); d += 420; }
     else if (e.k === 'phase') { setTimeout(() => { floatAt(e.side, 'Phase 2', 'react'); shake(e.side); }, at); d += 200; }
   });
   f.events = [];
@@ -835,6 +852,7 @@ function finishFight() {
   // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
   const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
+  sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
   pushMsgs(res.msgs);
   ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
@@ -904,12 +922,34 @@ function statLinesNotice() {
   const p = run.pending[0]; if (meta.statLines || run.practice || !p || p.type !== 'event' || !eventOpts(run, p.key).some(i => EVENTS[p.key].opts[i].check)) return;
   meta.statLines = true; saveMeta(); setTimeout(() => toast('[Attribute dialogue unlocked. Your build has opinions now.]', 'class'), 300);
 }
+// Event outcomes: what changed between before and after a choice, shown in the event until Continue
+function evSnap(run) { return { gold: run.gold, hearts: run.hearts, hp: Math.round(run.hp), max: maxHp(run), notice: run.notice || 0, fav: Object.assign({}, run.favour), ids: allPieces(run).map(x => x.u + ':' + x.id + ':' + (x.star || 1)) }; }
+function evDiff(a, run) {
+  const b = evSnap(run), out = [], sgn = n => (n > 0 ? '+' : '−') + Math.abs(n), add = (text, good) => out.push({ text, good });
+  if (b.gold !== a.gold) add(`${sgn(b.gold - a.gold)} gold`, b.gold > a.gold);
+  if (b.hearts !== a.hearts) add(`${sgn(b.hearts - a.hearts)} Heart${Math.abs(b.hearts - a.hearts) > 1 ? 's' : ''}`, b.hearts > a.hearts);
+  if (b.max !== a.max) add(`Max HP ${sgn(b.max - a.max)}`, b.max > a.max);
+  if (b.hp !== a.hp && b.hp - a.hp !== b.max - a.max) add(`${sgn(b.hp - a.hp)} HP`, b.hp > a.hp);
+  if (b.notice !== a.notice) add(`Noticed ${sgn(b.notice - a.notice)}`, b.notice < a.notice);
+  Object.keys(GODS).forEach(g => { const v = (b.fav[g] || 0) - (a.fav[g] || 0); if (v) add(`${sgn(v)} Favour · ${GODS[g].name}`, v > 0); });
+  const nm = k => { const [, id, st] = k.split(':'), d = pieceDef(id); return d ? d.name + (+st > 1 ? ' ' + '★'.repeat(+st) : '') : id; };
+  b.ids.filter(k => !a.ids.includes(k)).forEach(k => add(`Gained: ${nm(k)}`, true));
+  a.ids.filter(k => !b.ids.includes(k) && !b.ids.some(x => x.split(':')[0] === k.split(':')[0])).forEach(k => add(`Lost: ${nm(k)}`, false));
+  return out;
+}
+function evResultSheet() {
+  const R = ui.sheet;
+  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>`).join('');
+  const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
+  return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
+}
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
     const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
-    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
+    const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
+    return sheetWrap(E.title, `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
@@ -1032,9 +1072,48 @@ function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key =
 function screenLine() { const s = screenInfo(); return `[Display: ${innerWidth}×${s.vh} of ${s.sh} · insets ${Math.round(s.top)}/${Math.round(s.bottom)}${s.standalone ? ' · app' : ''}${document.documentElement.style.getPropertyValue('--app-h') ? ' · stretched' : ''}]`; }
 function menuSheet() {
   const cs = !cloud.on ? (FIREBASE ? '' : 'Progress is saved on this device only.') : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
-  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button><button class="btn" data-act="report">Report a bug or idea</button>
+  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="settings">Settings</button><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button><button class="btn" data-act="report">Report a bug or idea</button>
     ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
+}
+// One-time System hints (#18): the first time a system shows up in a real run, the System explains it once.
+// Never in the practice run (the tutorial covers it there). Seen hints are kept in meta.hints.
+const HINTS = [
+  { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
+  { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into stat points. Every 2 points is a level: more HP and rarer pieces.]' },
+  { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. Damage past Block fills it. Full, they are Broken: a lost turn and 50% more damage.]" },
+  { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
+];
+function hintHTML() {
+  if (!run || run.practice || ui.coach || ui.sheet || (run.pending && run.pending.length && ui.screen !== 'fight')) return '';
+  meta.hints = meta.hints || {};
+  const h = HINTS.find(x => x.scr === ui.screen && !meta.hints[x.k] && x.when());
+  if (!h) return '';
+  ui.hint = h.k;
+  return `<div class="coach hint pos-${ui.screen === 'fight' ? 'mid' : 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[System hint]</span></div><p>${esc(h.text)}</p><div class="co-f"><span></span><button class="btn small primary" data-act="hint-ok">Understood</button></div></div>`;
+}
+// Hints inside events: what a % means, and how a Fate crisis resolves
+function eventHint(E, hasRoll) {
+  if (run.practice) return '';
+  meta.hints = meta.hints || {};
+  if (E.crisis && !meta.hints.crisis) return '<p class="sh-p fine sysl">[Hint: answer the Fate twice and it is lifted. Use it twice and it is sealed.]</p>';
+  if (hasRoll && !meta.hints.roll) return '<p class="sh-p fine sysl">[Hint: a % is your chance of success. Your stats raised it. Failing still does something.]</p>';
+  return '';
+}
+// Settings (#16): kept on this device in js/sfx.js
+function settingsSheet() {
+  const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button class="btn small ${SET[key] === v ? 'primary' : 'ghost'}" data-act="set" data-k="${key}" data-v="${v}" aria-pressed="${SET[key] === v}">${label}</button>`).join('')}</div>`;
+  const row = (name, hint, ctl) => `<div class="setrow"><div><b>${name}</b>${hint ? `<small>${hint}</small>` : ''}</div>${ctl}</div>`;
+  const speed = `<div class="seg" role="group">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : 'ghost'}" data-act="speed" data-v="${v}" aria-pressed="${ui.speed === v}">${v}×</button>`).join('')}</div>`;
+  const body = `<p class="sh-p sysl">[Preferences are noted. On this device only.]</p>`
+    + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
+    + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
+    + row('Fight speed', 'How fast turns play out.', speed)
+    + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
+    + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and effects.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
+    + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
+    + '<p class="sh-p fine">On a keyboard: number keys pick choices and skills, Enter presses the main button, Escape closes, S opens Stats and L the System log.</p>';
+  return sheetWrap('Settings', body, '<button class="btn primary" data-act="close">Done</button>', 'settings');
 }
 const FB_LABEL = { bug: 'Bug', idea: 'Idea', balance: 'Balance', other: 'Other' };
 function reportSheet() {
@@ -1158,14 +1237,15 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
   if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
-  app.innerHTML = h + sh + coachHTML();
+  ui.hint = null;
+  app.innerHTML = h + sh + coachHTML() + hintHTML();
   coachHighlight();
   if (scr === 'fight') updateFight();
   fitNames();
@@ -1223,6 +1303,8 @@ function onAct(el) {
     case 'fb-type': ui.fb.type = d.k; return render();
     case 'fb-send': return sendReport();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
+    case 'hint-ok': if (ui.hint) { meta.hints = meta.hints || {}; meta.hints[ui.hint] = true; saveMeta(); } return render();
+    case 'set': { const k = d.k, v = d.v === 'true' ? true : d.v === 'false' ? false : /^\d+$/.test(d.v) ? +d.v : d.v; SET[k] = v; saveSettings(); REDUCED = reducedMotion(); if (k === 'vol' && v) sfx('tap'); if (k === 'vib' && v) sfx('hit'); return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
     case 'speed-cycle': ui.speed = ui.speed >= 3 ? 1 : ui.speed + 1; lsSet('wpd-speed', ui.speed); return render();
     case 'signin': { const C = window.WPD_CLOUD; if (!C) return; C.signIn(d.k).catch(e => toast(`[Sign-in failed: ${(e && e.message) || 'unknown error'}]`, 'loss')); return; }
@@ -1243,7 +1325,7 @@ function onAct(el) {
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
-    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
+    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
     case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs); saveRun(); } return render();
@@ -1264,7 +1346,18 @@ function onAct(el) {
       if (k === 'enchanter') { ui.enchantMods = rollPrefixes(enchantCount(run), null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
       saveRun(); return render();
     }
-    case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i); if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }
+    case 'event': {
+      const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i), before = evSnap(run), scr0 = ui.screen;
+      if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; }
+      if (!run.practice) { const E = EVENTS[p.key] || {}; meta.hints = meta.hints || {}; if (E.crisis) meta.hints.crisis = true; if (o.roll) meta.hints.roll = true; }
+      run.pending.shift(); saveRun(); saveMeta();
+      const lines = msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }];
+      // The outcome stays in the event until Continue; if the event moved the game on (run over, a new screen), toasts as before
+      if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines); return render(); }
+      lines.forEach(m => logRun(m.text, m.t));
+      ui.sheet = { type: 'evresult', title: (EVENTS[p.key] || {}).title || '[Event]', label: o.label, lines, changes: evDiff(before, run) };
+      return render();
+    }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = +d.i; return render();
@@ -1720,13 +1813,34 @@ function cloudSignInHTML(compact) {
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
-app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
+app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) { if (!['use', 'buy', 'quick-buy'].includes(el.dataset.act)) sfx('tap'); onAct(el); } });
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
 app.addEventListener('input', e => { if (e.target.id === 'fb-text' && ui.fb) ui.fb.text = e.target.value; });
 app.addEventListener('change', e => { if (e.target.id === 'fb-attach' && ui.fb) ui.fb.attach = e.target.checked; if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
+// Keyboard (#17): Escape closes, Enter presses the main button, number keys pick the Nth choice on screen
+// (skills in a fight, as before), S opens Stats and L the System log during a run
+const KEY_PICKS = { choose: '[data-act="pick-opp"]', district: '[data-act="district"]', draft: '[data-act="draft-pick"]', worlds: '[data-act="pick-world"]', shop: '.shopgrid [data-act="shop-item"]' };
+function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true }); el.click(); return true; } return false; }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && ui.sheet && !['result'].includes(ui.sheet.type)) { ui.sheet = null; render(); }
-  if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
+  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
+  if (typing) return;
+  const sheet = app.querySelector('.sheet');
+  if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }
+  if (e.key === 'Enter') {
+    if (tgt && tgt.tagName === 'BUTTON' && app.contains(tgt)) return; // the focused button handles its own Enter
+    const main = sheet ? sheet.querySelector('.sh-f .btn.primary') : app.querySelector('main .foot .btn.primary, main .foot2 .btn.primary');
+    if (keyClick(main)) e.preventDefault(); return;
+  }
+  if (/^[1-9]$/.test(e.key)) {
+    const list = sheet ? sheet.querySelectorAll('.choice, .reply') : KEY_PICKS[ui.screen] ? app.querySelectorAll(KEY_PICKS[ui.screen]) : [];
+    if (keyClick(list[+e.key - 1])) e.preventDefault(); return;
+  }
+  if (!sheet && run && ['choose', 'district', 'shop'].includes(ui.screen)) {
+    if (e.key === 's' || e.key === 'S') { ui.sheet = { type: 'stats' }; render(); }
+    else if (e.key === 'l' || e.key === 'L') { ui.sheet = { type: 'syslog' }; render(); }
+  }
 });
 render();
 maybeShowNews();
