@@ -705,7 +705,8 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 /* fitNames(): long names shrink a step, then wrap to 2 lines instead of being cut */
 .fit2 { white-space: normal !important; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.12; }
 .achip span i { font-style: normal; } .achip .an-s { display: none; letter-spacing: .04em; }
-@container app (max-width: 359px) { .achip .an-l { display: none; } .achip .an-s { display: inline; } }
+@container app (max-width: 479px) { .achip .an-l { display: none; } .achip .an-s { display: inline; } }
+@container app (max-width: 359px) { .achip .dots2 { display: none; } }
 /* Prefixes on their own small line under the piece's name */
 .tl-p { display: block; font-size: 11px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ntc { font: inherit; padding: 0; color: var(--bad); text-decoration: underline dotted; text-underline-offset: 3px; }
