@@ -1498,7 +1498,7 @@ function hit(f, X, Y, raw, o = {}) {
   return rest;
 }
 function checkRevive(f, X) {
-  if (X.hp <= 0 && X.revive) { X.hp = Math.round(X.maxHp * X.revive); X.revive = 0; say(f, `[${X.name} rises again.]`, 'loss'); ev(f, { k: 'revive', side: X.side }); }
+  if (X.hp <= 0 && X.revive) { X.hp = Math.round(X.maxHp * X.revive); X.revive = 0; say(f, `[${X.name} rises again.]`, 'loss'); if (X.id && FOE_LINES[X.id] && FOE_LINES[X.id].rise) say(f, `"${FOE_LINES[X.id].rise}"`, 'foe'); ev(f, { k: 'revive', side: X.side }); }
   if (X.hp <= 0 && X.breath) { X.hp = 1; X.breath = false; f.usedBreath = true; say(f, '[Second Breath! You cling to life with 1 HP.]', 'class'); }
 }
 function heal(f, X, v) {
@@ -1944,10 +1944,12 @@ function resolveFight(run, f, meta, rng) {
   if (f.usedBreath) run.usedBreath = true;
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
-  if (spec.kind === 'rival' && won) meta.archive.beat[spec.id] = true;
+  if ((spec.kind === 'rival' || (spec.kind === 'final' && !spec.snap)) && won) meta.archive.beat[spec.id] = true;
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
   const res = { won, gold: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
+  // What they say at the end (FOE_LINES in enemies.js): beaten when you win, wins when they do. Finalists and snapshots never speak these
+  { const L = !spec.snap && spec.id && FOE_LINES[spec.id], t = L && (won ? L.beaten : L.wins); if (t) res.foeLine = foeLine(t, run); }
   if (!won && !run.elite && hasGift(run, 'rewind') && !run.usedRewind) {
     run.usedRewind = true; run.hp = f.startHp; res.rewind = true;
     msgs.push({ t: 'class', text: '[Return by Death. The world rewinds to the start of the fight.]' });
@@ -2255,6 +2257,8 @@ function rivalReplies(run, f) {
 function rivalReply(run, f, i) { if (!rivalReplies(run, f).includes(i)) return null; f.replied = true; return RIVAL_REPLIES[i].go(f); }
 function rankAddress(meta, champ, n) { const L = RANK_ADDRESS[meta.rank.letter]; return L[(n || 0) % L.length].replace('{champ}', champ || 'Entrant'); }
 // The fight intro, rank against rank. Returns the lines to show after "[X enters the arena.]"; the System's own lines are bracketed.
+// A FOE_LINES line, filled in: a [System line] as it is, anything else in quotes
+function foeLine(t, run) { t = t.replace('{world}', run.world.name).replace('{champ}', run.champ); return /^\[/.test(t) ? t : `"${t}"`; }
 function rankIntro(run, meta, spec, foeName) {
   if (!meta.rank || run.practice) return [];
   const me = meta.rank.letter, champ = run.name, out = [];
@@ -2321,7 +2325,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

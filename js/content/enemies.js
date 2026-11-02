@@ -30,6 +30,29 @@ const ENEMIES = {
 const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute'];
 const RIVALS = ['seraphine', 'grukk', 'lyss', 'masked', 'kaito', 'calder'];
 // below: you're below them; level; above: you outrank them; grudge: you've beaten them before
+// Lines for named opponents (lore audit, 2 Nov; draft lore/drafts/champions-and-rivals-v2.md). All optional:
+//   enter   said when they enter (rivals: only when the rank lines don't speak; Final Champions: not at S-rank, the greeting does)
+//   beaten  what they say when you win; wins: when they beat you (either may be a whole [System line])
+//   rise    after a revive; archive: the Archive line, once you have beaten them
+// Finalists (players' builds carrying a Final Champion's power) never speak these. Rivals' archive lines each lean
+// towards a different answer to the mystery, on purpose (Slaw, 2 Nov).
+const FOE_LINES = {
+  leviathan: { enter: 'Your islands are already half under. I am only finishing the job.', beaten: 'Then hold your breath a little longer, little island.', wins: '[The sea closes over {world}.]', archive: 'The Leviathan Queen\'s own islands sank the day she won. She was not consulted.' },
+  kharros: { enter: 'I have never accepted a surrender. I will not start with yours.', beaten: 'Ash remembers. So will I.', wins: '[Another province for the Ashen Emperor.]', archive: 'Kharros has judged more Burning worlds than anyone. He has spared fewer than any other Final Champion.' },
+  bone_saint: { enter: 'Lie down, child. Everyone lies down eventually.', rise: 'Not yet. They never let me rest either.', beaten: 'Finally. Thank you.', wins: '[The Bone Saint adds {champ} to the congregation.]', archive: 'The Bone Saint has asked to be retired four times. Each request was filed.' },
+  thorn_mother: { enter: 'You walked into my woods. Everyone who walks in stays.', beaten: 'Go, then. The forest grows back. It always does.', wins: '[The Wilds have eaten another traveller.]', archive: 'Lyss of the Thorn claims the Thorn Mother as kin. The Thorn Mother has not commented.' },
+  archmage: { enter: 'You are very small from up here.', beaten: 'Ah. So that is what the ground feels like.', wins: '[The Archmage does not look down.]', archive: 'The Archmage\'s own world was entered again long ago. He did not notice.' },
+  forge_king: { enter: 'The gates stay shut. You will have to break them.', beaten: 'The siege is over, then. Open the gates.', wins: '[The Forge King adds another layer to the wall.]', archive: 'Nobody has checked what is behind the Forge King\'s gates. The Forge King prefers it that way.' },
+  herald: { enter: 'Count the seconds between the flash and me.', beaten: 'The storm breaks. Remember what the sky looked like.', wins: '[The storm over {world} never breaks now.]', archive: 'The Clans say the storm is somebody\'s temper. They do not say whose.' },
+  seraphine: { enter: 'Shield up. Faith up. Let\'s begin.', archive: 'Seraphine\'s world was erased during her semi-final. Its records were marked "consumed". She won the match.' },
+  grukk: { enter: 'Grukk lose a lot. Grukk never stay down.', archive: 'Grukk tried to leave between tournaments once. He says the door was painted on.' },
+  lyss: { enter: 'Don\'t worry. It\'s only a little poison.', archive: 'Lyss tampers with other Entrants\' water as a matter of routine. The System considers this within the rules.' },
+  masked: { enter: '[Entrant name: ███. World: ███. Rank: matched to yours.]', archive: 'Their mask was found empty after the match.' },
+  kaito: { enter: 'You use that skill too much. I\'ve seen it before.', archive: 'Kaito\'s world has been spared three times. Each time, the System entered it again. He says it has started repeating itself.' },
+  calder: { enter: 'Salute. Then we begin. Properly.', archive: 'Ser Calder has filed four formal complaints about other Entrants\' conduct. All four were read aloud to the crowd.' },
+  legend: { enter: '[Retrieving legend from the archive. Varn the Unbowed. Status: unbowed.]', beaten: 'Bowed at last. It was a long wait.' },
+  undefeated: { wins: '[Record unchanged.]' },
+};
 const RIVAL_LINES = {
   grukk: { below: 'Little rank. Grukk go easy. Grukk not know how, but try.', level: 'Same letter as Grukk! Good. Fair fight. Grukk still win.', above: 'Big letter. Grukk lose to big letters lots. Grukk not mind.', grudge: 'You beat Grukk before. Grukk remember. Grukk get up again.' },
   calder: { below: "A lower rank. I'll observe the rules all the same.", level: 'An equal. Salute, and we begin properly.', above: 'Outranked. Then it will be an honour to lose correctly.', grudge: "You beat me last time. I've filed a complaint. Shall we?" },
