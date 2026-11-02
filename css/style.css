@@ -778,3 +778,46 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 #app[data-fx="off"] .erode { display: none; }
 /* Holes stay behind tappable replies: give them a solid base under their tint */
 .log .reply { background: linear-gradient(rgba(114,208,255,.06), rgba(114,208,255,.06)), var(--bg); }
+
+/* ---------- Moments: H Broadcast at full volume (Gatekeeper and Final fights, Fate Crises, end of a world) ---------- */
+:root { --h-y: #e6ff2e; --h-m: #ff2e9a; --h-k: #0b0b0d; --f-h: "Anton", "Impact", "Arial Narrow", sans-serif; }
+/* Fight: the opponent's card goes on air */
+#app[data-moment~="broadcast"] .screen.fight .foe { background: linear-gradient(135deg, var(--h-m) 0 62%, var(--h-y) 62% 100%); border: 2px solid var(--h-k); box-shadow: 4px 4px 0 var(--h-k); color: var(--h-k); }
+#app[data-moment~="broadcast"] .screen.fight .fo-name { font-family: var(--f-h); text-transform: uppercase; font-size: 22px; letter-spacing: .01em; color: #fff; text-shadow: 2px 2px 0 var(--h-k); }
+#app[data-moment~="broadcast"] .screen.fight .fo-hp { color: #fff; font-weight: 700; text-shadow: 1px 1px 0 var(--h-k); }
+#app[data-moment~="broadcast"] .screen.fight .foe .chip { background: var(--h-k); color: var(--h-y); border-color: var(--h-k); }
+#app[data-moment~="broadcast"] .screen.fight .foe-bar, #app[data-moment~="broadcast"] .screen.fight .brk-bar { background: rgba(11,11,13,.55); }
+#app[data-moment~="broadcast"] .screen.fight .intent { background: var(--h-k); border: 2px solid var(--h-y); color: var(--h-y); box-shadow: none; }
+#app[data-moment~="broadcast"] .screen.fight .intent .in-t, #app[data-moment~="broadcast"] .screen.fight .intent .in-v { font-family: var(--f-h); text-transform: uppercase; letter-spacing: .02em; color: var(--h-y); font-weight: 400; }
+#app[data-moment~="broadcast"] .screen.fight .intent .in-l { color: var(--h-m); }
+#app[data-moment~="broadcast"] .screen.fight .log p.t-sys { color: var(--h-y); }
+#app[data-moment~="broadcast"] .screen.fight .crest { border-color: var(--h-k); color: var(--h-k); background: var(--h-y); }
+/* The VS card */
+.bc-splash { position: absolute; inset: 0; z-index: 40; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 16px; overflow: hidden; color: var(--h-k);
+  background: linear-gradient(162deg, var(--h-m) 0 48%, var(--h-y) 48% 100%); animation: bcin .16s steps(2, end), bcout .2s ease-in .9s forwards; cursor: pointer; }
+.bc-splash .bc-tick { font-family: var(--f-m); font-size: 11px; font-weight: 500; letter-spacing: .06em; background: var(--h-k); color: var(--h-y); padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: clip; margin: 0 -16px; }
+.bc-splash .bc-tick.b { color: var(--h-m); align-self: flex-end; margin-top: 8px; }
+.bc-splash .bc-foe, .bc-splash .bc-me { font-family: var(--f-h); text-transform: uppercase; line-height: .92; overflow-wrap: anywhere; }
+.bc-splash .bc-foe { font-size: clamp(40px, 15vw, 76px); color: #fff; text-shadow: 3px 3px 0 var(--h-k); }
+.bc-splash .bc-me { font-size: clamp(30px, 11vw, 56px); text-align: right; }
+.bc-splash .bc-vs { align-self: center; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--h-k); color: var(--h-y); font-family: var(--f-h); font-size: 30px; border: 3px solid var(--h-y); }
+@keyframes bcin { from { opacity: 0; translate: 0 6px; } to { opacity: 1; translate: 0 0; } }
+@keyframes bcout { to { opacity: 0; visibility: hidden; } }
+/* Fate Crisis: the event sheet goes on air */
+#app[data-moment~="broadcast"] .sheet.crisis { border: 2px solid var(--h-y); background: var(--h-k); }
+#app[data-moment~="broadcast"] .sheet.crisis .sh-h { background: var(--h-y); }
+#app[data-moment~="broadcast"] .sheet.crisis .sh-h h3 { font-family: var(--f-h); text-transform: uppercase; font-size: 26px; line-height: 1; letter-spacing: .01em; color: var(--h-k); }
+#app[data-moment~="broadcast"] .sheet.crisis .sh-b > .sh-p.fine:first-child { background: var(--h-m); color: #fff; font-family: var(--f-m); padding: 6px 8px; }
+#app[data-moment~="broadcast"] .sheet.crisis .choice { border: 2px solid var(--h-y); background: #141416; }
+#app[data-moment~="broadcast"] .sheet.crisis .choice .sr-name { font-family: var(--f-h); text-transform: uppercase; letter-spacing: .02em; font-weight: 400; }
+/* End of a world: a ticker, and the verdict at full size */
+.bc-ticker { display: none; }
+#app[data-moment~="broadcast"] .end .bc-ticker { display: flex; overflow: hidden; white-space: nowrap; background: var(--h-k); border-block: 2px solid var(--h-y); flex: none; }
+#app[data-moment~="broadcast"] .end .bc-ticker span { flex: none; padding: 5px 12px; font-family: var(--f-m); font-size: 11px; font-weight: 500; letter-spacing: .06em; color: var(--h-y); animation: tick 9s linear infinite; }
+#app[data-moment~="broadcast"] .end.erased .bc-ticker span { color: var(--h-m); }
+#app[data-fx="off"] .bc-ticker span { animation: none; }
+@keyframes tick { to { translate: -100% 0; } }
+#app[data-moment~="broadcast"] .end h1 { font-family: var(--f-h); font-size: clamp(64px, 24vw, 120px); line-height: .85; letter-spacing: 0; background: none; -webkit-background-clip: border-box; background-clip: border-box; text-shadow: 4px 4px 0 var(--h-k); }
+#app[data-moment~="broadcast"] .end.erased h1 { color: var(--h-m); }
+#app[data-moment~="broadcast"] .end.spared h1 { color: var(--h-y); }
+#app[data-moment~="broadcast"] .end .eyebrow { color: var(--h-y); }

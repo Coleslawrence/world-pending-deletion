@@ -688,12 +688,37 @@ function scoutLine(spec) {
 // J Erosion: low HP tears holes in the fight's middle. Later: H Broadcast, K Gods' chat, I The System is breaking.
 // momentOf() names the active look; render() and updateFight() put it on #app as data-moment, with data-fx="off"
 // when motion is reduced (Settings > Motion), which turns every moment effect off.
+// Several can be on at once (data-moment="broadcast erosion"). Reduced motion keeps the colours and words of a look
+// and drops its movement and damage (holes, splash, scrolling ticker).
 function momentOf() {
-  if (REDUCED) return '';
-  if (ui.screen === 'fight' && ui.fight && erosionLevel(ui.fight) > 0) return 'erosion';
-  return '';
+  const m = [];
+  if (broadcastOn()) m.push('broadcast');
+  if (!REDUCED && ui.screen === 'fight' && ui.fight && erosionLevel(ui.fight) > 0) m.push('erosion');
+  return m.join(' ');
 }
 function applyMoment() { if (!app) return; app.dataset.fx = REDUCED ? 'off' : 'on'; const m = momentOf(); if (m) app.dataset.moment = m; else delete app.dataset.moment; }
+// H Broadcast at full volume: the System puts the run's headline moments on air.
+// Gatekeeper and Final fights, Fate Crisis events, and the end of a world (erased or spared).
+function broadcastFight(spec) { return !!spec && (spec.gate || spec.kind === 'final'); }
+function crisisPending() { const p = run && run.pending && run.pending[0]; return !!(p && p.type === 'event' && EVENTS[p.key] && EVENTS[p.key].crisis); }
+function broadcastOn() {
+  if (ui.screen === 'fight') return !!(ui.fight && broadcastFight(ui.fight.spec));
+  if (ui.screen === 'end') return !!ui.end;
+  if (['choose', 'shop', 'district'].includes(ui.screen) && !ui.sheet) return crisisPending();
+  return false;
+}
+// A one-second VS card as the fight opens; any tap skips it. Not at 2x/3x speed or with reduced motion.
+function broadcastSplash(f) {
+  if (REDUCED || ui.speed > 1 || !broadcastFight(f.spec) || !app) return;
+  const fin = f.spec.kind === 'final';
+  const top = fin ? '++ LIVE +++ [FINAL] +++ ONE WORLD IS SPARED +++' : '++ LIVE +++ [GATEKEEPER ASSIGNED] +++ LIVE ++';
+  const bot = fin ? '[The other is not.]' : '[Passage is a privilege.]';
+  const el = document.createElement('div'); el.className = 'bc-splash'; el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<div class="bc-tick">${esc(top)}</div><div class="bc-foe">${esc(f.B.name)}</div><div class="bc-vs">VS</div><div class="bc-me">${esc(run.name)}</div><div class="bc-tick b">${esc(bot)}</div>`;
+  const done = () => el.remove();
+  el.addEventListener('pointerdown', done); app.appendChild(el); setTimeout(done, 1100);
+}
+function broadcastTicker(text) { return `<div class="bc-ticker" aria-hidden="true"><span>${esc(text)}</span><span>${esc(text)}</span></div>`; }
 // Erosion: no holes at 50% HP or more, then one per 10% lost, up to 5. A telegraphed hit that would tear one outlines it first.
 const EROSION = { start: 0.5, step: 0.1, max: 5, bigHit: 0.2, chunks: 6 };
 function erosionLevel(f, hp) {
@@ -878,7 +903,7 @@ function startFightUI() {
   if (f.spec.gate && !run.gateSeen) { run.gateSeen = true; say2(f, '[Gatekeeper assigned. Passage is a privilege.]', 'sys'); }
   if (f.spec.kind === 'final') say2(f, run.pair ? `[Final. ${run.world.name} against ${f.spec.snap ? f.spec.snap.worldName || pairOf(run).name : pairOf(run).name}. One world is spared. The other is not.]` : `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
-  render(); playEvents(f); updateFight();
+  render(); playEvents(f); updateFight(); broadcastSplash(f);
 }
 const wait = ms => new Promise(r => setTimeout(r, ms / ui.speed));
 async function onUse(i) {
@@ -1008,7 +1033,7 @@ function pendingSheet() {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
     const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}. Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. What you say on air happens to the Hearts you carry.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
-    return sheetWrap(E.title, `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
+    return sheetWrap(E.title, `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
@@ -1270,7 +1295,7 @@ function endHTML() {
   const e = ui.end, s = e.snap;
   const erased = e.kind === 'erased';
   const lines = (e.observed ? [e.observed] : []).concat(erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`].concat(e.filed ? [`[${s.worldName}'s records remain on file.]`] : []).concat(e.opened ? [] : ['[Next world.]']) : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`], e.opened ? [`[Rank Trial unlocked: ${e.opened}-rank. It waits in your next world.]`] : []);
-  return `<main class="screen title end"><div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
+  return `<main class="screen title end ${erased ? 'erased' : 'spared'}">${broadcastTicker(erased ? `++ BREAKING +++ [Entrant eliminated. ${s.worldName} is erased.] +++` : `++ LIVE +++ [${s.worldName} is spared.] +++`)}<div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
     ${runCard(s, { erased, big: true })}</div>
     <div class="t-stats"><div><b>${s.round}</b><span>round</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div><div><b>+${e.rp || 0}</b><span>RP</span></div></div>
