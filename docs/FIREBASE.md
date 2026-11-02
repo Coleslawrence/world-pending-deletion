@@ -40,6 +40,7 @@ and the game files an access request for them.
 - **See requests**: **Firestore Database → Data → `requests`**. Each document's ID is the player's UID; `name` is the name they chose in game.
 - **Approve**: in **Data**, open the `testers` collection (first time: **Start collection**, ID `testers`). **Add document**, paste the UID as the **Document ID**, add any field (for example `note` = who it is, which only you can see), **Save**. Then delete their `requests` document. They are approved the next time they open the game.
 - **Find a UID without a request**: **Authentication → Users**, copy the **User UID** column.
+- **Dev preview access**: the dev copy at `/dev/` only opens for testers whose `testers` document has the field `preview` (type **boolean**) set to `true`. Add it to your own document; add it to a friend's to let them try dev builds too. Remove the field or set it to `false` to take access away.
 - **Revoke**: delete their document in `testers`. Their new posts stop at once; what they already posted stays until you delete it.
 
 ## Playtest stats (the stats dashboard)
