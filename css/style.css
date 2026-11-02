@@ -1,7 +1,7 @@
 /* Layout: a single phone-width column of arena stone and bronze; the System speaks in cool blue monospace. One deliberate dark theme. */
 :root {
   --bg: #120f0d; --bg2: #191512; --panel: #211b17; --panel2: #2b231d; --line: #3b3129; --line2: #54463a;
-  --text: #efe6d8; --muted: #b3a493; --dim: #7a6c5e;
+  --text: #efe6d8; --muted: #b3a493; --dim: #9a8b7a;
   --bronze: #d6a04f; --bronze-d: #4a3519; --sys: #72d0ff; --sys-d: #0f2735;
   --hp: #6cc28a; --foe: #e15b52; --block: #b9c3d6; --burn: #ff8a4c; --poison: #9fd86a; --bleed: #ec5d78; --weaken: #b59dff; --stun: #ffd25a; --good: #8fd39a; --bad: #ff6b62;
   --a-pyre: #ff8a4c; --a-venom: #9fd86a; --a-blade: #ec5d78; --a-bastion: #b9c3d6; --a-arcanist: #8aa5ff; --a-zealot: #e8d48b; --a-reaper: #c27ce6; --a-storm: #ffd25a; --hex: #c27ce6; --faith: #e8d48b;
@@ -308,6 +308,8 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .toast { font-family: var(--f-m); font-size: 13px; color: var(--sys); background: rgba(10,24,34,.96); border: 1px solid var(--sys); border-radius: 4px; padding: 8px 11px; animation: tin .2s ease-out; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
 .toast.t-skill { color: var(--hex); border-color: var(--hex); background: rgba(30,16,36,.96); } .toast.t-level { color: var(--bronze); border-color: var(--bronze); background: rgba(34,24,10,.96); } .toast.t-class { color: var(--stun); border-color: var(--stun); background: rgba(34,28,8,.96); } .toast.t-favour { color: var(--faith); border-color: var(--faith); background: rgba(32,28,14,.96); } .toast.t-loot { color: var(--good); border-color: var(--good); background: rgba(12,30,18,.96); } .toast.t-loss { color: var(--bad); border-color: var(--bad); background: rgba(36,12,10,.96); } .toast.t-win { color: var(--good); border-color: var(--good); background: rgba(12,30,18,.96); font-weight: 500; }
 .toast.out { opacity: 0; transition: opacity .35s; pointer-events: none; }
+#toasts.low { align-content: end; } #toasts.low .toast { animation-name: tinup; }
+@keyframes tinup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .toast { pointer-events: auto; cursor: pointer; }
 .icon-btn.logb { font-family: var(--f-m); font-size: 12px; color: var(--sys); }
 @keyframes tin { from { opacity: 0; transform: translateY(-6px); } }
@@ -426,7 +428,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .sr-next { font-size: 12.5px; color: var(--dim); font-style: italic; }
 .flav { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.35; color: var(--dim); font-style: italic; }
 .archrow { border-left: 3px solid var(--sc); padding: 4px 0 4px 10px; display: grid; gap: 3px; }
-.ar-h { display: flex; gap: 8px; align-items: baseline; } .ar-h b { color: var(--sc); font-family: var(--f-d); font-weight: 400; font-size: 17px; } .ar-n { margin-left: auto; font-family: var(--f-d); font-size: 18px; }
+.ar-h { display: flex; gap: 8px; align-items: baseline; } .ar-h b { color: var(--sc); font-family: var(--f-d); font-weight: 400; font-size: 17px; } .ar-n { margin-left: auto; font-family: var(--f-b); font-variant-numeric: lining-nums; font-weight: 500; font-size: 18px; }
 .ar-b { display: flex; gap: 8px; font-size: 13.5px; color: var(--dim); } .ar-b span { font-family: var(--f-m); width: 14px; flex: none; } .ar-b.on { color: var(--text); } .ar-b.on span { color: var(--sc); }
 .recap { display: grid; gap: 4px; }
 .rc { display: grid; grid-template-columns: 110px 1fr 40px; gap: 8px; align-items: center; font-size: 13px; }
@@ -655,7 +657,7 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .shopctl { flex-wrap: wrap; row-gap: 2px; } .shopctl .fine { flex: 1 1 170px; } .interest { white-space: nowrap; }
 .shoptabs { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } .stab { min-width: 0; flex-wrap: wrap; row-gap: 2px; }
 .sec-h > span:first-child { flex: none; white-space: nowrap; }
-.sec-h .fine { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sec-h .fine { min-width: 0; text-align: right; }
 
 /* Narrow phones: tighter padding and type, and the 5-slot skill bar shares a 4-column grid with the gear */
 @container app (max-width: 400px) {
@@ -699,3 +701,28 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .fld textarea { font: 16px var(--f-b); color: var(--text); background: var(--bg); border: 1px solid var(--line2); border-radius: 5px; padding: 9px 10px; width: 100%; resize: vertical; min-height: 110px; }
 .fb-chk { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0 4px; font-size: 14px; color: var(--text); }
 .fb-chk input { margin-top: 3px; flex: none; }
+
+/* fitNames(): long names shrink a step, then wrap to 2 lines instead of being cut */
+.fit2 { white-space: normal !important; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.12; }
+.achip span i { font-style: normal; } .achip .an-s { display: none; letter-spacing: .04em; }
+@container app (max-width: 479px) { .achip .an-l { display: none; } .achip .an-s { display: inline; } }
+@container app (max-width: 359px) { .achip .dots2 { display: none; } }
+/* Prefixes on their own small line under the piece's name */
+.tl-p { display: block; font-size: 11px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ntc { font: inherit; padding: 0; color: var(--bad); text-decoration: underline dotted; text-underline-offset: 3px; }
+.strow.s4 .st-v small { display: block; white-space: nowrap; line-height: 1.1; }
+/* A soft dark band behind the fight log, so the lines read cleanly over the skyline */
+.log-t { background: radial-gradient(120% 90% at 50% 70%, rgba(18,15,13,.78), rgba(18,15,13,.45) 70%, transparent); border-radius: 8px; }
+.log-t p { text-shadow: 0 0 4px var(--bg), 0 0 1px var(--bg); }
+/* A shape per archetype, so the tags don't rely on colour alone */
+.dots2 i { width: 9px; height: 9px; border-radius: 0; }
+.dots2 i.a-pyre { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.dots2 i.a-venom { clip-path: polygon(50% 0, 82% 45%, 92% 68%, 80% 90%, 50% 100%, 20% 90%, 8% 68%, 18% 45%); }
+.dots2 i.a-blade { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.dots2 i.a-bastion { clip-path: inset(8% round 2px); }
+.dots2 i.a-arcanist { clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.dots2 i.a-zealot { clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%); }
+.dots2 i.a-reaper { clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.dots2 i.a-storm { clip-path: polygon(60% 0, 10% 58%, 45% 58%, 35% 100%, 90% 40%, 55% 40%); }
+.xp-l { font-family: var(--f-m); font-size: 10.5px; color: var(--dim); white-space: nowrap; }
+.ch-sub { flex-wrap: wrap; row-gap: 2px; } .xpw { display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1 0 100%; } .xpw .xp { flex: 0 1 44px; min-width: 16px; }
