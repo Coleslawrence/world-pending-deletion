@@ -912,6 +912,23 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .chips .chip { flex: none; }
 .fo-hp, .me-hp { font-family: var(--f-b); font-size: var(--fs-2); font-weight: 700; font-variant-numeric: lining-nums tabular-nums; }
 
+.tl-rk { display: flex; align-items: center; gap: 5px; min-width: 0; }
+/* Stats sheet: one number per stat; what a stat does opens on tap; long sections fold */
+details.st-n summary { cursor: pointer; list-style: none; min-height: 32px; display: flex; align-items: center; gap: 6px; }
+details.st-n summary::-webkit-details-marker, .ssec summary::-webkit-details-marker { display: none; }
+details.st-n summary::after { content: "?"; display: inline-grid; place-items: center; width: 18px; height: 18px; border: 1px solid var(--line2); border-radius: 50%; font-size: var(--fs-1); color: var(--muted); }
+details.st-n[open] summary::after { content: "−"; }
+details.st-n small { display: block; }
+.strow.s4 .st-v { font-family: var(--f-b); font-weight: 700; font-size: var(--fs-4); font-variant-numeric: lining-nums; }
+.strow.s4 .st-v small { font-size: var(--fs-1); font-weight: 500; color: var(--sys); }
+.strow .btn.add { min-height: 40px; }
+.ssec { border-top: 1px solid var(--line); }
+.ssec summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; min-height: 44px; font-family: var(--f-d); font-size: var(--fs-3); color: var(--bronze); }
+.ssec summary::after { content: "+"; font-family: var(--f-b); font-size: var(--fs-4); color: var(--muted); }
+.ssec[open] summary::after { content: "−"; }
+.ssec-b { display: grid; gap: 9px; padding-bottom: 10px; }
+:root[data-theme="broadcast"] .ssec summary { color: var(--h-y); text-transform: uppercase; letter-spacing: .02em; }
+
 /* ---------- Theme: Broadcast (default look; Settings > Look > Classic turns it off) ----------
    The tournament as a live feed: black, acid yellow, magenta, hard edges and Anton caps. Only tokens and the
    shared pieces are restyled here, so every screen and moment picks it up. */
