@@ -1358,10 +1358,10 @@ function poolResolve(run, spec, won, res, msgs, lr) {
   if (won) {
     if (run.hearts < run.maxHearts && TUNE.poolFragment) {
       const b = run.hearts; run.hearts = Math.min(run.maxHearts, run.hearts + TUNE.poolFragment); restoreRecord(run, run.hearts - b);
-      msgs.push({ t: 'loot', text: s.reserve ? `[You salvaged a fragment of ${world}, erased long ago. ${run.world.name} endures a little longer: +${run.hearts - b} Heart, ${run.hearts} left.]` : `[You took a fragment of ${world}. ${run.world.name} endures a little longer: +${run.hearts - b} Heart, ${run.hearts} left.]` });
+      msgs.push({ t: 'loot', text: s.reserve ? `[Traded for a piece of ${world}, erased long ago. Your record recovers an entry: +${run.hearts - b} Heart, ${run.hearts} left.]` : `[Traded for a piece of ${world}. Your record recovers an entry: +${run.hearts - b} Heart, ${run.hearts} left.]` });
     } else {
       const p = pick(s.bar.concat(s.gear), lr), id = p && baseId(p.id);
-      if (id && pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[You took a fragment of ${world}: ${pieceDef(id).name}.]` }); addPiece(run, id, p.mods || [], msgs); }
+      if (id && pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[You took a piece of ${world}: ${pieceDef(id).name}.]` }); addPiece(run, id, p.mods || [], msgs); }
     }
     if (real) res.poolHit = { owner: s.owner, champ: s.champ, round: spec.round, slot: spec.slot, at: spec.fileAt || 0, hearts: spec.hearts == null ? POOL_HEARTS : spec.hearts };
   } else {
@@ -1984,7 +1984,7 @@ function resolveFight(run, f, meta, rng) {
       const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
       if (noticeOf(run) > was) msgs.push({ t: 'class', text: `[The System takes notice. ${run.notice} straight win${run.notice > 1 ? 's' : ''}: opponents +${noticePct(run)}%.]` });
     }
-    if ((spec.kind === 'erased' || spec.kind === 'entrant') && customOf(run, 'exiles') && !run.elite && run.hearts < run.maxHearts) { msgs.push({ t: 'loot', text: '[Kin of the erased: the Exiles take this one home.]' }); OUTCOME_APPLY.restore(1, { run, msgs }); customPaid(run, msgs); }
+    if ((spec.kind === 'erased' || spec.kind === 'entrant') && customOf(run, 'exiles') && !run.elite && run.hearts < run.maxHearts) { msgs.push({ t: 'loot', text: '[Salvage Rights: the Exiles take a piece of it home.]' }); OUTCOME_APPLY.restore(1, { run, msgs }); customPaid(run, msgs); }
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
       run.eliteWins++;
