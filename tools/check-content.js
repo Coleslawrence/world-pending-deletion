@@ -77,7 +77,7 @@ const SCHEMA = {
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting']],
-  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends']],
+  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy']],
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], []],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],

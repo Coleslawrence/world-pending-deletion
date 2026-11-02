@@ -339,7 +339,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 6 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
 | `ward` | 1 | a ward on your next loss |  | 9 (events) |
-| `mod` | "none" | the world modifier Clear Skies |  | 2 (events) |
+| `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 4 (events) |
 | `fate` | 1 | your world's Fate eased | yes | 56 (events) |
 | `notice` | 1 | the System's notice | yes | 43 (events) |

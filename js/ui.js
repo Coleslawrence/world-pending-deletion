@@ -150,7 +150,7 @@ function redact(text) { return `<span class="redact" role="img" aria-label="eras
 // A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... Guild rates: ... The Long Night: the sun..."
 function layerSentences(w) {
   const F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix], low = t => t.charAt(0).toLowerCase() + t.slice(1);
-  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (P && P.custom ? ` <b>${esc(P.custom.name)}</b>: ${esc(low(P.custom.text))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (F && F.crises ? ' Its crisis comes in rounds 3 and 5.' : '') + (C ? ` The ${esc(C.name)} press in.` : '');
+  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (P && P.custom ? ` <b>${esc(P.custom.name)}</b>: ${esc(low(P.custom.text))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(fateLine(F, w.type)))}` : '') + (F && F.crises ? ' Its crisis comes in rounds 3 and 5.' : '') + (C ? ` The ${esc(C.name)} press in.` : '');
 }
 function bioHTML(rec, type, worldName, champ) { return bioParts(rec, type, worldName, champ).map(p => p.gone ? redact(p.t) : esc(p.t)).join(''); }
 function recLine(e) { return e.line.map(w => w.gone ? redact(w.t) : esc(w.t)).join(' '); }
@@ -485,7 +485,7 @@ function worldsHTML() {
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
       <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
-      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
+      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
       <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
       <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: a paired world's finalist</span></div>
@@ -817,6 +817,7 @@ function startFightUI() {
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
   if (f.spec.kind === 'erased') say2(f, f.spec.snap.rec ? `[The System has returned a champion of an erased world. They remember: "${recFragment(f.spec.snap.rec, f.spec.snap.worldType)}."]` : '[The System has returned a champion of an erased world. They remember you.]', 'loss');
   if (f.spec.kind === 'entrant') say2(f, poolIntro(f.spec), 'sys');
+  if (f.spec.gate && !run.gateSeen) { run.gateSeen = true; say2(f, '[Gatekeeper assigned. Passage is a privilege.]', 'sys'); }
   if (f.spec.kind === 'final') say2(f, run.pair ? `[Final. ${run.world.name} against ${f.spec.snap ? f.spec.snap.worldName || pairOf(run).name : pairOf(run).name}. One world is spared. The other is not.]` : `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
   render(); playEvents(f); updateFight();
@@ -947,7 +948,7 @@ function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
-    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
+    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}. Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. What you say on air happens to the Hearts you carry.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
     return sheetWrap(E.title, `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
   }
@@ -955,7 +956,7 @@ function pendingSheet() {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'perk') {
-    return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
+    return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'rune') return enchantSheet(p.mods, 'rune');
   if (p.type === 'evo') {
@@ -1006,7 +1007,7 @@ function runCard(s, opts) {
 function resultSheet() {
   const r = ui.result, e = ui.end;
   if (r.rewind) return sheetWrap('[Return by Death]', `<p class="sh-p big">${esc(r.enemy)} kills you. Then the world blinks.</p><p class="sh-p">The fight begins again. Nobody else remembers. Your cheat skill is spent.</p>`, `<button class="btn primary" data-act="rewind">Try again</button>`, 'sys', true);
-  if (e && e.kind === 'spared') return sheetWrap(`[${run.world.name} is spared]`, `<p class="sh-p big">You beat the Final Champion. ${esc(run.world.name)} survives the tournament, and ${esc(run.champ)} joins the Hall of Champions.</p>${recapHTML(r)}<p class="sh-p">The System offers the <b>elite bracket</b>: ${!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A') ? '3 more matches, as befits your rank,' : '2 more matches'} against past winners and the Undefeated. Your world is safe either way. Each elite win earns extra Echoes.</p><p class="sh-p fine">+${e.echoes} Echoes earned.</p>`, `<button class="btn ghost" data-act="end-run">End as champion</button><button class="btn primary" data-act="enter-elite">Enter the elite bracket</button>`, 'win', true);
+  if (e && e.kind === 'spared') return sheetWrap(`[${run.world.name} is spared]`, `<p class="sh-p big">You beat the Final Champion. ${esc(run.world.name)} survives the tournament, and ${esc(run.champ)} joins the Hall of Champions.</p>${recapHTML(r)}<p class="sh-p">The System offers the <b>elite bracket</b>: ${!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A') ? '3 more matches, as befits your rank,' : '2 more matches'} against past winners and the Undefeated. Your world is safe either way. Each elite win earns extra Echoes.</p><p class="sh-p">[${esc(run.world.name)} will be entered again, eventually. Exhibition wins delay that.]</p><p class="sh-p fine">+${e.echoes} Echoes earned.</p>`, `<button class="btn ghost" data-act="end-run">End as champion</button><button class="btn primary" data-act="enter-elite">Enter the elite bracket</button>`, 'win', true);
   if (e && (e.kind === 'elite-clear' || e.kind === 'elite-fall')) return sheetWrap(e.kind === 'elite-clear' ? '[The Undefeated has fallen]' : '[Elite bracket over]', `<p class="sh-p big">${e.kind === 'elite-clear' ? 'Impossible. The System will need a new record.' : 'You fall in the elite bracket. Your world remains spared.'}</p><p class="sh-p fine">Elite wins: ${run.eliteWins}. +${8 * run.eliteWins} Echoes.</p>`, `<button class="btn primary" data-act="end-run">Finish</button>`, e.kind === 'elite-clear' ? 'win' : '', true);
   const steps = eraseSteps(r);
   if (e && e.kind === 'erased') return sheetWrap('[Eliminated]', `<p class="sh-p big">${esc(r.enemy)} wins. ${esc(e.snap.worldName)} has no Hearts left.</p>${eraseRows(steps)}${steps.length ? '' : lastTurnsHTML() + recapHTML(r)}<p class="sh-p">${esc(e.snap.worldName)} will be erased, and ${esc(e.snap.champ)} will join the Hall of the Erased. They may return to face you.</p>`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Accept</button>`), 'lose', true);
@@ -1743,7 +1744,7 @@ function poolFile(res) {
 // and its owner is told.
 function poolHit(h, msgs) {
   const left = Math.max(0, h.hearts - 1);
-  msgs.push(left ? { t: 'sys', text: `[${h.champ}'s round ${h.round} record loses a Heart. ${left} left.]` } : { t: 'broadcast', text: `[${h.champ}'s round ${h.round} record has been erased. One fewer world pending.]` });
+  msgs.push(left ? { t: 'sys', text: `[${h.champ}'s round ${h.round} record loses a Heart. ${left} left.]` } : { t: 'broadcast', text: `[${h.champ}'s round ${h.round} record is erased in this tournament. Outcomes vary.]` });
   const ref = cloud.db.doc('pool/' + poolId(h.round, h.slot));
   (async () => {
     const d = await ref.get(), data = d.exists ? d.data() : null;
