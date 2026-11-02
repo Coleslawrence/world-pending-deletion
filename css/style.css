@@ -522,6 +522,11 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .coach.pos-bottom { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
 .coach.pos-top { top: calc(52px + env(safe-area-inset-top, 0px)); }
 .coach.pos-mid { top: 34%; }
+.coach.pos-strip { position: static; transform: none; width: auto; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; box-shadow: none; animation: none; }
+.coach.pos-strip p { font-size: var(--fs-2); line-height: 1.35; }
+.coach.pos-strip .eyebrow { margin-right: 4px; }
+.coach.pos-strip .btn { min-width: 52px; }
+:root[data-theme="broadcast"] .coach { border: 0; border-left: 4px solid var(--h-m); background: var(--h-k); color: var(--text); border-radius: 0; }
 .co-h { display: flex; justify-content: space-between; align-items: center; } .co-h .link { font-size: var(--fs-1); color: var(--muted); text-decoration: none; }
 .coach-pill { position: fixed; z-index: 30; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); font-family: var(--f-m); font-size: var(--fs-1); color: var(--sys); background: rgba(8,22,32,.97); border: 1px solid var(--sys); border-radius: var(--r-l); padding: 6px 10px; cursor: pointer; }
 .co-f { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -862,6 +867,35 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 /* An inserted option (glitched content): still a normal, pickable choice */
 .choice.inserted { border: 1px dashed var(--bad); border-left: 3px solid var(--bad); background: rgba(255,107,98,.06); }
 .choice .ins-tag { display: block; font: 600 11px var(--f-m); color: var(--bad); letter-spacing: .04em; margin-bottom: 2px; text-shadow: -1px 0 rgba(255,46,90,.6), 1px 0 rgba(114,208,255,.6); }
+
+/* ---------- Top strip (board screens): one header instead of a top bar, bracket dots and a champion card ---------- */
+.strip { flex: none; display: grid; gap: 6px; }
+.st-1 { display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 40px; }
+.st-1 .wname { flex: 0 1 auto; min-width: 48px; }
+.st-sp { flex: 1 1 0; }
+.st-1 .hcount { background: none; border: 0; padding: 0 2px; cursor: pointer; }
+.st-1 .gold { padding: 0 2px; }
+.st-1 .icon-btn { width: 40px; height: 40px; }
+.st-2 { position: relative; overflow: hidden; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-l); padding: 6px 10px; min-height: 44px; cursor: pointer; }
+.st-2 .crest { width: 30px; height: 30px; font-size: var(--fs-2); border-width: 1.5px; }
+.st-2 .crest::after { display: none; }
+.st-2 .ch-name { font-family: var(--f-d); font-size: var(--fs-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-lv { display: flex; align-items: center; gap: 5px; font-size: var(--fs-1); color: var(--muted); white-space: nowrap; }
+.st-lv .xp { width: 24px; }
+.st-hp { font-family: var(--f-m); font-size: var(--fs-1); color: var(--muted); white-space: nowrap; }
+.st-2 div.bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; border: 0; border-radius: 0; }
+.st-prog { display: flex; gap: 3px; align-items: center; }
+.st-prog b { font-family: var(--f-m); font-weight: 500; font-size: var(--fs-1); color: var(--muted); margin-right: 4px; white-space: nowrap; }
+.st-prog i { flex: 1; height: 4px; background: var(--line2); }
+.st-prog i.done { background: var(--bronze); } .st-prog i.now { background: var(--sys); box-shadow: 0 0 6px var(--sys); }
+.st-prog i.fin { flex: 1.6; } .st-prog i.elite { background: rgba(255,178,87,.3); } .st-prog i.elite.done { background: var(--elite); }
+/* Taps: small buttons keep their look but get a 44px target */
+.icon-btn, .btn.small, .hcount, .link { position: relative; }
+.icon-btn::after, .btn.small::after, button.hcount::after { content: ""; position: absolute; inset: -4px; }
+:root[data-theme="broadcast"] .st-2 { border: 2px solid var(--line2); box-shadow: var(--shadow); }
+:root[data-theme="broadcast"] .st-2 .ch-name { text-transform: uppercase; letter-spacing: .01em; }
+:root[data-theme="broadcast"] .st-2 .crest { background: var(--h-y); color: var(--h-k); border-color: var(--h-k); }
+:root[data-theme="broadcast"] .st-prog i.done { background: var(--h-y); } :root[data-theme="broadcast"] .st-prog i.now { background: var(--h-m); box-shadow: 0 0 6px var(--h-m); }
 
 /* ---------- Theme: Broadcast (default look; Settings > Look > Classic turns it off) ----------
    The tournament as a live feed: black, acid yellow, magenta, hard edges and Anton caps. Only tokens and the

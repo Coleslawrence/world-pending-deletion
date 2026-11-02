@@ -68,7 +68,7 @@ toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast');
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 // Long world and champion names: drop a size first, then wrap to 2 lines, so nothing is cut at 320 wide
 function fitNames() {
-  app.querySelectorAll('.wname, .cl-l .ch-name, .fo-name, .me-name').forEach(el => {
+  app.querySelectorAll('.bar .wname, .fo-name, .me-name').forEach(el => {
     if (el.scrollWidth <= el.clientWidth + 1) return;
     el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.86).toFixed(1) + 'px';
     if (el.scrollWidth > el.clientWidth + 1) el.classList.add('fit2');
@@ -139,9 +139,19 @@ function archChips(counts, small) {
   return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> <i class="an-l">${ARCH[k].name}</i><i class="an-s" aria-hidden="true">${ARCH_TAG[k] || ARCH[k].name.slice(0, 3).toUpperCase()}</i></span><small>/${next}</small></button>`; }).join('')}</div>`;
 }
 function playerPower(p) { const def = moddedDef(p.id, p.mods); return skillPower(def, effStats(run), p.star) * def.powerMult; }
-function champLine() {
+// One top strip for the board screens (choose, district, shop): world and round, Hearts, gold, Log and menu on the
+// first row; the champion, level and HP on the second (tap it for Stats); bracket progress as a segmented line.
+function stripProg() {
+  let h = '';
+  for (let i = 1; i <= ROUNDS; i++) h += `<i class="${run.elite || i < run.round ? 'done' : i === run.round ? 'now' : ''}${i === ROUNDS ? ' fin' : ''}"></i>`;
+  if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<i class="elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></i>`; });
+  return `<div class="st-prog"><b>${esc(roundLabel())}</b>${h}</div>`;
+}
+function strip() {
   const mh = maxHp(run);
-  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level}<span class="xpw"><span class="xp" aria-hidden="true"><i style="width:${lvFill()}%"></i></span><small class="xp-l">${run.level >= 9 ? 'max' : `${(run.bought || 0) % 2}/2 → Lv ${run.level + 1}`}</small></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}${run.record ? `<button class="ch-hearts" data-act="sheet" data-s="record" aria-label="Open the world record">${hearts(run.hearts, run.maxHearts)}</button>` : `<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div>`}</div></section>`;
+  const hc = run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`;
+  return `<header class="strip"><div class="st-1"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="st-sp"></span>${hc}<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div>
+    <button class="st-2" data-act="sheet" data-s="stats" aria-label="${esc(run.name)}, level ${run.level}, ${n0(run.hp)} of ${mh} HP. Open Stats">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<span class="ch-name">${esc(run.name)}</span><span class="st-lv">Lv ${run.level}<span class="xp" aria-hidden="true"><i style="width:${lvFill()}%"></i></span></span><span class="st-hp">${n0(run.hp)}/${mh} HP</span>${hpBar(run.hp, mh, 'hp')}</button>${stripProg()}</header>`;
 }
 
 // ---------- World Record ----------
@@ -584,7 +594,7 @@ function chooseHTML() {
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
   const fin = run.choices.length === 1;
-  return `<main class="screen choose">${topBar()}<div class="col col-a">${bracketDots()}${champLine()}${questLine()}</div><div class="col col-b">
+  return `<main class="screen choose">${strip()}<div class="col col-a">${questLine()}</div><div class="col col-b">
     <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span> · ` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button> · ` : ''}+${run.lastIncome || 0}g income</span></div>
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
@@ -643,7 +653,7 @@ function shopHTML() {
   // Loot can overfill the bench. It then squeezes into two rows so Fight stays on screen, and Fight waits until it's back to 8.
   const over = benchOver(), cols = over ? Math.ceil(run.bench.length / 2) : 4;
   const rc = rerollCost(run);
-  return `<main class="screen shop">${topBar(roundLabel() + ' · Shop')}
+  return `<main class="screen shop">${strip()}
     <div class="col col-a">${archChips(counts)}
     <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
     <div class="shopgrid">${items}</div>
@@ -671,7 +681,7 @@ function districtDesc(k) {
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage !== 'district';
   const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
-  return `<main class="screen district">${topBar(roundLabel() + ' · District')}<div class="col col-a">${champLine()}
+  return `<main class="screen district">${strip()}<div class="col col-a">
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.gate ? ' · Gatekeeper' : spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     </div><div class="col col-b"><div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
     <section class="inter">${opts}</section>
@@ -1214,6 +1224,8 @@ function hintHTML() {
   const h = HINTS.find(x => x.scr === ui.screen && !meta.hints[x.k] && x.when());
   if (!h) return '';
   ui.hint = h.k;
+  // Board screens show it as a strip under the top strip (moved there by render), so it never covers a choice
+  if (['choose', 'shop', 'district'].includes(ui.screen)) return `<div class="coach hint pos-strip" role="status"><p><span class="eyebrow">[System hint]</span> ${esc(h.text)}</p><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
   return `<div class="coach hint pos-${ui.screen === 'fight' ? 'mid' : 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[System hint]</span></div><p>${esc(h.text)}</p><div class="co-f"><span></span><button class="btn small primary" data-act="hint-ok">Understood</button></div></div>`;
 }
 // Hints inside events: what a % means, and how a Fate crisis resolves
@@ -1373,6 +1385,7 @@ function render() {
   if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
   ui.hint = null;
   app.innerHTML = h + sh + coachHTML() + hintHTML();
+  const hs = app.querySelector('.coach.pos-strip'), stp = app.querySelector('.strip'); if (hs && stp) stp.after(hs);
   applyMoment();
   coachHighlight();
   if (scr === 'fight') updateFight();
