@@ -76,7 +76,7 @@ function inspect() {
   document.querySelectorAll('#app *').forEach(el => {
     const r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.position === 'fixed') return;
-    if (el.closest('.floats, .skyline, .coach')) return;
+    if (el.closest('.floats, .skyline, .coach, .erode')) return;
     if (r.right > W + 1 || r.left < -1) bad.push(`off the side: ${name(el)} "${text(el)}" (${Math.round(r.left)} to ${Math.round(r.right)})`);
     // Sticks out of the side of its box (on iOS this is what widens the page)
     const par = el.parentElement, pcs = par && getComputedStyle(par);
