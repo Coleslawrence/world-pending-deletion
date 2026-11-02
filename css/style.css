@@ -897,6 +897,21 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 :root[data-theme="broadcast"] .st-2 .crest { background: var(--h-y); color: var(--h-k); border-color: var(--h-k); }
 :root[data-theme="broadcast"] .st-prog i.done { background: var(--h-y); } :root[data-theme="broadcast"] .st-prog i.now { background: var(--h-m); box-shadow: 0 0 6px var(--h-m); }
 
+/* Choose: one status row (quest, amendment, Noticed, income) and opponent cards that stay short */
+.status-row { display: flex; align-items: center; gap: 10px; min-height: 32px; font-size: var(--fs-1); color: var(--muted); }
+.sr-q { flex: 1 1 0; min-width: 0; display: flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 0; text-align: left; color: var(--text); font-size: var(--fs-2); cursor: pointer; }
+.sr-q .eyebrow { flex: none; }
+.sr-qt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-q b { flex: none; color: var(--sys); font-weight: 600; }
+.status-row .ntc, .st-inc { white-space: nowrap; flex: none; }
+.opp .nx-traits span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-meta { font-family: var(--f-b); font-size: var(--fs-2); font-weight: 600; }
+/* Fight: status chips on one line that scrolls sideways; HP numbers in the body font, larger */
+.foe .chips, .me .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-height: 22px; }
+.foe .chips::-webkit-scrollbar, .me .chips::-webkit-scrollbar { display: none; }
+.chips .chip { flex: none; }
+.fo-hp, .me-hp { font-family: var(--f-b); font-size: var(--fs-2); font-weight: 700; font-variant-numeric: lining-nums tabular-nums; }
+
 /* ---------- Theme: Broadcast (default look; Settings > Look > Classic turns it off) ----------
    The tournament as a live feed: black, acid yellow, magenta, hard edges and Anton caps. Only tokens and the
    shared pieces are restyled here, so every screen and moment picks it up. */

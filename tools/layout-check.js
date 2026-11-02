@@ -77,7 +77,8 @@ function inspect() {
     const r = el.getBoundingClientRect(); if (!r.width || !r.height) return;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.position === 'fixed') return;
     if (el.closest('.floats, .skyline, .coach, .erode, .bc-splash, .bc-ticker')) return;
-    if (r.right > W + 1 || r.left < -1) bad.push(`off the side: ${name(el)} "${text(el)}" (${Math.round(r.left)} to ${Math.round(r.right)})`);
+    // Fight status chips sit on one line that scrolls sideways, so chips past the edge are reachable
+    if ((r.right > W + 1 || r.left < -1) && !el.closest('.chips')) bad.push(`off the side: ${name(el)} "${text(el)}" (${Math.round(r.left)} to ${Math.round(r.right)})`);
     // Sticks out of the side of its box (on iOS this is what widens the page)
     const par = el.parentElement, pcs = par && getComputedStyle(par);
     if (par && pcs.display !== 'contents' && cs.position !== 'absolute' && !/hidden|clip|auto|scroll/.test(pcs.overflowX)) {

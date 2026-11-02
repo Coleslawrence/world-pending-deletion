@@ -594,8 +594,10 @@ function chooseHTML() {
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
   const fin = run.choices.length === 1;
-  return `<main class="screen choose">${strip()}<div class="col col-a">${questLine()}</div><div class="col col-b">
-    <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span> · ` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button> · ` : ''}+${run.lastIncome || 0}g income</span></div>
+  const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
+  const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
+  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div></div><div class="col col-b">
+   ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
 }
@@ -1180,12 +1182,6 @@ function questList() {
   const qs = run.quests.filter(q => !QUESTS[q.id].hidden || q.done);
   const hidden = run.quests.filter(q => QUESTS[q.id].hidden && !q.done).length;
   return `<ul class="msgs">${qs.map(q => { const Q = QUESTS[q.id]; return `<li class="${q.failed ? 'unk' : q.done ? 't-loot' : ''}"><b>${q.done ? '✓ ' : q.failed ? '✗ ' : ''}${esc(Q.text)}</b> <small>${Q.goal > 1 && !q.done ? `${q.prog}/${Q.goal} · ` : ''}Reward: ${esc(outcomeText(Q.reward))}</small></li>`; }).join('')}${hidden ? `<li class="unk">[${hidden} hidden quest${hidden > 1 ? 's' : ''}: ???]</li>` : ''}</ul>`;
-}
-function questLine() {
-  const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed);
-  if (!q) return '';
-  const Q = QUESTS[q.id];
-  return `<button class="qline" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span>${esc(Q.text)}</span><b>${Q.goal > 1 ? `${q.prog}/${Q.goal}` : ''}</b></button>`;
 }
 function archetypesSheet() {
   const c = runCounts(run);
