@@ -757,3 +757,4 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 :root[data-text="l"] .sh-p, :root[data-text="l"] .sr-desc, :root[data-text="l"] .sr-name, :root[data-text="l"] .sysbox, :root[data-text="l"] .log, :root[data-text="l"] .toast, :root[data-text="l"] .coach p { zoom: 1.12; }
 :root[data-text="xl"] .sh-p, :root[data-text="xl"] .sr-desc, :root[data-text="xl"] .sr-name, :root[data-text="xl"] .sysbox, :root[data-text="xl"] .log, :root[data-text="xl"] .toast, :root[data-text="xl"] .coach p { zoom: 1.25; }
 .seg .btn { font-family: var(--f-b); font-variant-numeric: lining-nums; letter-spacing: 0; }
+.foe-q { font-style: italic; color: var(--muted); }
