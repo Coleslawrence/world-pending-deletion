@@ -6,6 +6,15 @@ import os, re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 read = lambda p: open(os.path.join(ROOT, p), encoding='utf-8').read()
 html = read('index.html')
+# Fonts: inline the Latin files as data URIs (Latin Extended left out to keep the file small)
+import base64
+def font_css():
+    css = read('css/fonts.css')
+    keep = [l for l in css.splitlines() if l.startswith('@font-face') and '-latin.woff2' in l]
+    def uri(m): return "url(data:font/woff2;base64," + base64.b64encode(open(os.path.join(ROOT, 'fonts', m.group(1)), 'rb').read()).decode() + ")"
+    return '\n'.join(re.sub(r"url\(\.\./fonts/([^)]+)\)", uri, l) for l in keep)
+html = re.sub(r'<link rel="preload"[^>]*>\n', '', html)
+html = html.replace('<link rel="stylesheet" href="css/fonts.css">', '<style>\n' + font_css() + '\n</style>')
 html = html.replace('<link rel="stylesheet" href="css/style.css">', '<style>\n' + read('css/style.css') + '</style>')
 # the content files, then the engine
 html = re.sub(r'<script src="(js/content/[^"]+|js/core\.js)"></script>', lambda m: '<script>\n' + read(m.group(1)) + '</script>', html)
