@@ -463,7 +463,7 @@ function compareSheet() {
 // ---------- Title / worlds ----------
 function titleHTML() {
   const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
-  return `<main class="screen title ${canResume ? 'resume' : ''}">
+  return `<main class="screen title ${canResume ? 'resume' : ''}">${titleChunks()}
     <div class="t-top"><div class="t-eb"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><button class="icon-btn t-set" data-act="sheet" data-s="settings" aria-label="Settings">⚙</button></div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
     <div class="sysbox"><p>${meta.runs && meta.rank ? esc(rankAddress(meta, meta.champions[0] && meta.champions[0].name, meta.runs)) : '[The Grand Tournament has begun.]'}</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
@@ -683,6 +683,60 @@ function scoutLine(spec) {
   return `<div class="nx-scout">Skills: ${ENEMIES[spec.id].skills.map(s => esc(s.n)).join(', ')}</div>`;
 }
 
+// ---------- Moments ----------
+// Rule-breaking looks the screen switches into at set moments (Slaw, 2026-11-02: moments now, themes later).
+// J Erosion: low HP tears holes in the fight's middle. Later: H Broadcast, K Gods' chat, I The System is breaking.
+// momentOf() names the active look; render() and updateFight() put it on #app as data-moment, with data-fx="off"
+// when motion is reduced (Settings > Motion), which turns every moment effect off.
+function momentOf() {
+  if (REDUCED) return '';
+  if (ui.screen === 'fight' && ui.fight && erosionLevel(ui.fight) > 0) return 'erosion';
+  return '';
+}
+function applyMoment() { if (!app) return; app.dataset.fx = REDUCED ? 'off' : 'on'; const m = momentOf(); if (m) app.dataset.moment = m; else delete app.dataset.moment; }
+// Erosion: no holes at 50% HP or more, then one per 10% lost, up to 5. A telegraphed hit that would tear one outlines it first.
+const EROSION = { start: 0.5, step: 0.1, max: 5, bigHit: 0.2, chunks: 6 };
+function erosionLevel(f, hp) {
+  const A = f.A; if (!A || !A.maxHp) return 0;
+  const fr = Math.max(0, hp == null ? A.hp : hp) / A.maxHp;
+  return fr >= EROSION.start ? 0 : Math.min(EROSION.max, Math.ceil((EROSION.start - fr) / EROSION.step - 1e-9));
+}
+// Torn polygon for hole i of a seed: same shape and place every redraw
+function holeSpec(seed, i) {
+  const r = seedRng(seed + ':hole:' + i), n = 6 + Math.floor(r() * 3), size = 40 + Math.round(r() * 30);
+  const pts = []; for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2 + r() * 0.5, rad = 0.62 + r() * 0.38; pts.push(`${(50 + Math.cos(a) * rad * 48).toFixed(1)},${(50 + Math.sin(a) * rad * 48).toFixed(1)}`); }
+  // Five lanes across the middle so holes rarely overlap; the skyline's 48px at the top stays clear
+  const lane = [14, 70, 40, 86, 28][i % 5];
+  return { x: lane + (r() - 0.5) * 10, y: 38 + r() * 46, size, rot: Math.round(r() * 360), pts: pts.join(' ') };
+}
+function holeSVG(h, cls) {
+  return `<svg class="hole ${cls}" viewBox="0 0 100 100" style="left:${h.x.toFixed(1)}%;top:${h.y.toFixed(1)}%;--s:${h.size}px;transform:translate(-50%,-50%) rotate(${h.rot}deg)" aria-hidden="true"><polygon points="${h.pts}"/></svg>`;
+}
+function erosionHTML(f) {
+  if (REDUCED || !f || !f.A) return '';
+  if (!f.erSeed) f.erSeed = String(Math.floor(Math.random() * 1e9));
+  const lv = erosionLevel(f), shown = f.erShown || 0;
+  let h = '';
+  for (let i = 0; i < lv; i++) h += holeSVG(holeSpec(f.erSeed, i), i >= shown ? 'new' : '');
+  f.erShown = lv;
+  // A telegraphed hit that would tear a new hole if it lands unblocked: its outline shows where
+  if (!f.over && lv < EROSION.max && f.A.hp > 0) {
+    const it = intentInfo(f), m = (it.kind === 'attack' || it.kind === 'big') && /^(\d+)(?:×(\d+))?/.exec(it.text || '');
+    if (m && erosionLevel(f, f.A.hp - +m[1] * (+m[2] || 1)) > lv) h += holeSVG(holeSpec(f.erSeed, lv), 'due');
+  }
+  return h ? `<div class="erode" aria-hidden="true">${h}</div>` : '';
+}
+// A hit for 20%+ of max HP cracks the middle for a moment
+function tearFx() { if (REDUCED) return; const lg = document.getElementById('log'); if (!lg) return; lg.classList.remove('tear'); void lg.offsetWidth; lg.classList.add('tear'); }
+// Title: one chunk cut from the screen's edges per erased world, up to 6, behind the content
+const CHUNK_AT = [[100, 4, 64], [0, 34, 52], [100, 52, 44], [6, 70, 40], [96, 88, 56], [30, 100, 46]];
+function titleChunks() {
+  const n = Math.min(EROSION.chunks, meta.erased.length); if (REDUCED || !n) return '';
+  let h = '';
+  for (let i = 0; i < n; i++) { const [x, y, size] = CHUNK_AT[i], sp = holeSpec('title', i); h += holeSVG({ x, y, size: size + 24, rot: sp.rot, pts: sp.pts }, ''); }
+  return `<div class="erode chunks" aria-hidden="true">${h}</div>`;
+}
+
 // ---------- Fight ----------
 function fightHTML() {
   const f = ui.fight;
@@ -722,6 +776,7 @@ function chipsHTML(X, f) {
 }
 function updateFight() {
   const f = ui.fight; if (!f) return;
+  applyMoment();
   [['A', f.A], ['B', f.B]].forEach(([k, X]) => {
     const hp = document.getElementById('hp' + k); if (!hp) return;
     hp.textContent = `${n0(X.hp)} / ${X.maxHp}`;
@@ -738,7 +793,7 @@ function updateFight() {
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
-  if (lg) lg.innerHTML = skylineSVG() + '<div class="log-t">' + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('') + '</div>'
+  if (lg) lg.innerHTML = skylineSVG() + erosionHTML(f) + '<div class="log-t">' + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('') + '</div>'
     + (rr.length ? `<div class="replies">${rr.map(i => `<button class="reply" data-act="reply" data-i="${i}"><span class="chk-tag">${esc(checkTag(RIVAL_REPLIES[i].check))}</span> ${esc(RIVAL_REPLIES[i].label)}</button>`).join('')}</div>` : '');
   const sk = document.getElementById('skills');
   if (sk) {
@@ -780,7 +835,7 @@ function playEvents(f) {
   let d = 0;
   f.events.forEach(e => {
     const at = d;
-    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
+    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); if (e.side === 'A' && e.amt >= f.A.maxHp * EROSION.bigHit) tearFx(); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
     else if (e.k === 'dot' && e.amt > 0) { setTimeout(() => floatAt(e.side, e.amt, e.kind), at); d += 90; }
     else if (e.k === 'heal') { setTimeout(() => { floatAt(e.side, '+' + e.amt, 'heal'); sfx('heal'); }, at); d += 90; }
     else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
@@ -1116,7 +1171,7 @@ function settingsSheet() {
     + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
     + row('Fight speed', 'How fast turns play out.', speed)
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
-    + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and effects.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
+    + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
     + '<p class="sh-p fine">On a keyboard: number keys pick choices and skills, Enter presses the main button, Escape closes, S opens Stats and L the System log.</p>';
   return sheetWrap('Settings', body, '<button class="btn primary" data-act="close">Done</button>', 'settings');
@@ -1253,6 +1308,7 @@ function render() {
   if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
   ui.hint = null;
   app.innerHTML = h + sh + coachHTML() + hintHTML();
+  applyMoment();
   coachHighlight();
   if (scr === 'fight') updateFight();
   fitNames();
