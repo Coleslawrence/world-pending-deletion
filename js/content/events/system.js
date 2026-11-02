@@ -47,7 +47,8 @@ EVENTS.rollback = { title: 'Rollback', theme: 'system', can: run => !!(run.lastL
   { label: 'Decline', desc: 'What happened, happened.', go: (run, h) => { run.statPts++; run.lastLoss = null; h.say('[Error retained. Compensation issued: +1 stat point.]', 'level'); } }] };
 
 // Before the final only: the Final Champion is in the next room
-const finalName = run => ENEMIES[WORLD_TYPES[run.world.type].final].name;
+// The paired world's champion (the paired final); runs from before pairing keep their own world's Final Champion
+const finalName = run => run.pair ? `The champion of ${run.pair.name}` : ENEMIES[WORLD_TYPES[run.world.type].final].name;
 EVENTS.seating_error = { title: 'Seating Error', theme: 'system', can: run => run.round < 8, text: run => `[Seating error. Entrant and Final Champion assigned the same room.] ${finalName(run)} is eating dinner, and looks up.`, opts: [
   { label: 'Talk to them', desc: 'Ask how they like to fight.', go: (run, h) => { run.finalTip = true; h.say(`[${finalName(run)} talks. In the final, you'll see their next 2 moves.]`); } },
   { roll: { stat: 'AGI' }, label: 'Tamper with their armour', desc: 'While they are busy with dinner.', then: { notice: 2 }, go: (run, h) => { run.finalCut = 0.1; h.say(`[Tampered. ${finalName(run)} starts the final with 10% less HP.]`); },

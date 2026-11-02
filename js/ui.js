@@ -488,7 +488,7 @@ function worldsHTML() {
       <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
       <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
-      <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: ${esc(ENEMIES[T.final].name)}</span></div>
+      <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: a paired world's finalist</span></div>
     </button>`;
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
@@ -817,7 +817,7 @@ function startFightUI() {
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
   if (f.spec.kind === 'erased') say2(f, f.spec.snap.rec ? `[The System has returned a champion of an erased world. They remember: "${recFragment(f.spec.snap.rec, f.spec.snap.worldType)}."]` : '[The System has returned a champion of an erased world. They remember you.]', 'loss');
   if (f.spec.kind === 'entrant') say2(f, poolIntro(f.spec), 'sys');
-  if (f.spec.kind === 'final') say2(f, `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
+  if (f.spec.kind === 'final') say2(f, run.pair ? `[Final. ${run.world.name} against ${f.spec.snap ? f.spec.snap.worldName || pairOf(run).name : pairOf(run).name}. One world is spared. The other is not.]` : `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
   render(); playEvents(f); updateFight();
 }
@@ -1683,11 +1683,26 @@ const POOL_ECHOES = 2; // Echoes for each time one of your filed records beats a
 function poolLoad() {
   if (!run || !run.choices || !cloud.on || !cloud.db || !cloud.uid || cloud.poolOff) return;
   run.choices.forEach(spec => {
+    if (spec.kind === 'final' && spec.pool && !spec.read) return finalLoad(spec);
     if (spec.kind !== 'entrant' || spec.read) return;
     const key = spec.round + '_' + spec.slot; if (poolBusy[key]) return;
     poolBusy[key] = true;
     poolRead(spec, run).finally(() => { delete poolBusy[key]; });
   });
+}
+// The final's finalist: list the round's filed records once, and take one from a world of the paired type
+function finalLoad(spec) {
+  const key = 'final_' + spec.round; if (poolBusy[key]) return;
+  poolBusy[key] = true; const r = run;
+  (async () => {
+    let docs = [];
+    try { const qs = await cloud.db.collection('pool').query({ where: ['r', '==', spec.round], limit: POOL_SIZE }); docs = qs.docs.map(d => ({ id: d.id, data: d.data() })); }
+    catch (e) { if (e && e.code === 'invalid_argument') cloud.poolOff = true; console.warn('[cloud] list final pool failed:', e && e.code, e); return; }
+    if (run !== r || r.stage !== 'choose' || !r.choices.includes(spec)) return;
+    spec.read = true;
+    docs.forEach(d => { if (d.data && d.data.name && d.data.owner) cloud.names[d.data.owner] = String(d.data.name).slice(0, 24); });
+    if (finalFill(spec, docs, cloud.uid)) { saveRun(); if (ui.screen === 'choose') render(); } else saveRun();
+  })().finally(() => { delete poolBusy[key]; });
 }
 async function poolRead(spec, r, retry) {
   let data = null;
