@@ -68,7 +68,7 @@ toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast');
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 // Long world and champion names: drop a size first, then wrap to 2 lines, so nothing is cut at 320 wide
 function fitNames() {
-  app.querySelectorAll('.bar .wname, .fo-name, .me-name').forEach(el => {
+  app.querySelectorAll('.fo-name, .me-name').forEach(el => {
     if (el.scrollWidth <= el.clientWidth + 1) return;
     el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.86).toFixed(1) + 'px';
     if (el.scrollWidth > el.clientWidth + 1) el.classList.add('fit2');
@@ -125,15 +125,10 @@ function tagDots(id) { return `<span class="dots2">${pieceDef(baseId(id)).tags.m
 function tagNames(id) { return pieceDef(baseId(id)).tags.map(t => `<span class="tagn a-${t}">${ARCH[t].name}</span>`).join(''); }
 function mainTag(id) { const t = pieceDef(baseId(id)).tags; return t.length ? 'a-' + t[0] : ''; }
 function roundLabel() { if (!run) return ''; if (run.elite) return `Elite ${run.eliteIdx + 1} of ${run.eliteBracket.length}`; return run.round >= ROUNDS ? 'Final' : `Round ${run.round} of ${ROUNDS}`; }
-function bracketDots() {
-  let h = '<div class="dots" aria-label="Bracket progress">';
-  for (let i = 1; i <= ROUNDS; i++) { const st = run.elite || i < run.round ? 'done' : i === run.round ? 'now' : ''; h += `<span class="dot ${st} ${i === ROUNDS ? 'fin' : ''}"></span>`; }
-  if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<span class="dot elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></span>`; });
-  return h + '</div>';
-}
-// The fight screen leaves out gold (nothing to spend it on mid-fight) to make room for its speed and ? buttons
-function topBar(title, extra, fight) {
-  return `<header class="bar"><div class="bar-l"><div class="bar-w"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}</div><span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+// The fight's header: the top strip's first row with speed and ? instead of gold and Log (nothing to spend mid-fight)
+function fightBar(extra) {
+  const hc = run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`;
+  return `<header class="strip fstrip"><div class="st-1"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="st-sp"></span>${extra}${hc}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div>${stripProg()}</header>`;
 }
 function archChips(counts, small) {
   return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> <i class="an-l">${ARCH[k].name}</i><i class="an-s" aria-hidden="true">${ARCH_TAG[k] || ARCH[k].name.slice(0, 3).toUpperCase()}</i></span><small>/${next}</small></button>`; }).join('')}</div>`;
@@ -814,7 +809,7 @@ function titleChunks() {
 function fightHTML() {
   const f = ui.fight;
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
-  return `<main class="screen fight">${topBar(roundLabel(), `<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`, true)}
+  return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
