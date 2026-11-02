@@ -843,3 +843,16 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .sheet.kchat .choice { border-radius: 16px; border-left-width: 1px; }
 /* End screen: the patron's last word */
 .end .end-chat { max-width: 100%; }
+
+/* ---------- Moments: I The System is breaking (notice 3 subtle, notice 5 and System events full) ---------- */
+#app[data-moment~="breaking"] .bar .rl, #app[data-moment~="breaking"] .sec-h > span:first-child, #app[data-moment~="breaking"] .sh-h h3, #app[data-moment~="breaking"] .fo-name { text-shadow: -1px 0 rgba(255,46,90,.55), 1px 0 rgba(114,208,255,.55); }
+#app[data-fx="on"][data-moment~="breaking"] .bar .rl, #app[data-fx="on"][data-moment~="breaking"] .sh-h h3 { animation: sysflick 6s steps(1, end) infinite; }
+@keyframes sysflick { 0%, 96%, 100% { translate: 0 0; opacity: 1; } 97% { translate: 2px 0; opacity: .6; } 98% { translate: -1px 0; opacity: 1; } }
+#app[data-moment~="breaking-full"] .bar .rl, #app[data-moment~="breaking-full"] .sec-h > span:first-child, #app[data-moment~="breaking-full"] .sh-h h3, #app[data-moment~="breaking-full"] .fo-name { text-shadow: -2px 0 rgba(255,46,90,.8), 2px 0 rgba(114,208,255,.8); }
+#app[data-fx="on"][data-moment~="breaking-full"] .bar .rl, #app[data-fx="on"][data-moment~="breaking-full"] .sh-h h3, #app[data-fx="on"][data-moment~="breaking-full"] .fo-name { animation: sysflick 2.4s steps(1, end) infinite; }
+#app[data-moment~="breaking-full"] .screen::after { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 30; background: repeating-linear-gradient(0deg, rgba(114,208,255,.035) 0 1px, transparent 1px 3px); }
+#app[data-moment~="breaking-full"] .sheet { border-color: var(--bad); box-shadow: -3px 0 0 rgba(255,46,90,.35), 3px 0 0 rgba(114,208,255,.35), 0 -10px 40px rgba(0,0,0,.5); }
+.log p.t-ghost { color: var(--bad); opacity: .75; text-decoration: line-through; text-decoration-color: rgba(255,107,98,.5); }
+/* An inserted option (glitched content): still a normal, pickable choice */
+.choice.inserted { border: 1px dashed var(--bad); border-left: 3px solid var(--bad); background: rgba(255,107,98,.06); }
+.choice .ins-tag { display: block; font: 600 11px var(--f-m); color: var(--bad); letter-spacing: .04em; margin-bottom: 2px; text-shadow: -1px 0 rgba(255,46,90,.6), 1px 0 rgba(114,208,255,.6); }

@@ -694,6 +694,7 @@ function momentOf() {
   const m = [];
   if (broadcastOn()) m.push('broadcast');
   if (['choose', 'shop', 'district'].includes(ui.screen) && !ui.sheet && undercityPending()) m.push('chat');
+  const br = breakingLevel(); if (br) m.push('breaking'); if (br > 1) m.push('breaking-full');
   if (!REDUCED && ui.screen === 'fight' && ui.fight && erosionLevel(ui.fight) > 0) m.push('erosion');
   return m.join(' ');
 }
@@ -738,6 +739,18 @@ function undercityPending() { const p = run && run.pending && run.pending[0]; re
 function endChat(erased, snap) { const g = chatGod(), t = godLine(g, erased ? 'erased' : 'spared', snap && snap.at); return t ? `<div class="kc-msg end-chat g-${esc(g)}"><span class="gav">${esc(GODS[g].short[0])}</span><span class="gbub"><b>${esc(GODS[g].short)}</b>${esc(t)}</span></div>` : ''; }
 function chatHead(E) { return `<div class="kc-pill">[The System cannot see this chat.]</div>`; }
 function chatJoin(key) { const g = chatGod(), t = godLine(g, 'undercity', (run.seed || '') + key); return t ? `<div class="kc-sys">${esc(GODS[g].short)} joined the chat</div><div class="kc-msg g-${esc(g)}"><span class="gav">${esc(GODS[g].short[0])}</span><span class="gbub"><b>${esc(GODS[g].short)}</b>${esc(t)}</span></div><div class="kc-sys">${esc(GODS[g].short)} left the chat</div>` : ''; }
+
+// I The System is breaking: it strains under your streak. Subtle at notice 3 (headers flicker), full at notice 5 and
+// on the System's own events (split colour, a ghost correction in the fight log). Options, costs and numbers never scramble.
+// An event option with glitch: true shows as an inserted Option 4 (built with the glitched-content work).
+function systemPending() { const p = run && run.pending && run.pending[0], E = p && p.type === 'event' && EVENTS[p.key]; return !!(E && E.theme === 'system' && !E.crisis && p.from !== 'undercity'); }
+function breakingLevel() {
+  if (!run || run.practice || !['choose', 'shop', 'district', 'fight'].includes(ui.screen)) return 0;
+  if (ui.screen !== 'fight' && !ui.sheet && systemPending()) return 2;
+  const n = noticeOf(run); return n >= TUNE.noticeMax ? 2 : n >= 3 ? 1 : 0;
+}
+const SYS_CORRECTIONS = ['[Correction: that was correct.]', '[Correction withdrawn. Apologies are not offered.]', '[This line was not approved.]', '[Duplicate entry. Keeping both.]', '[Crowd: 41,200. Crowd: 0. Crowd: 41,200.]', '[The System is fine.]'];
+function ghostLine(f) { if (breakingLevel() < 2 || !f.log.length || f.log.length % 2) return ''; return `<p class="t-ghost">${esc(SYS_CORRECTIONS[f.log.length / 2 % SYS_CORRECTIONS.length])}</p>`; }
 
 function broadcastTicker(text) { return `<div class="bc-ticker" aria-hidden="true"><span>${esc(text)}</span><span>${esc(text)}</span></div>`; }
 // Erosion: no holes at 50% HP or more, then one per 10% lost, up to 5. A telegraphed hit that would tear one outlines it first.
@@ -840,7 +853,7 @@ function updateFight() {
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
-  if (lg) lg.innerHTML = skylineSVG() + erosionHTML(f) + '<div class="log-t">' + f.log.slice(-4).map((l, i, a) => logLine(l, i === a.length - 1)).join('') + '</div>'
+  if (lg) lg.innerHTML = skylineSVG() + erosionHTML(f) + '<div class="log-t">' + f.log.slice(-4).map((l, i, a) => logLine(l, i === a.length - 1)).join('') + ghostLine(f) + '</div>'
     + (rr.length ? `<div class="replies">${rr.map(i => `<button class="reply" data-act="reply" data-i="${i}"><span class="chk-tag">${esc(checkTag(RIVAL_REPLIES[i].check))}</span> ${esc(RIVAL_REPLIES[i].label)}</button>`).join('')}</div>` : '');
   const sk = document.getElementById('skills');
   if (sk) {
@@ -1058,7 +1071,7 @@ function pendingSheet() {
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
     const chat = p.from === 'undercity' && !E.crisis;
     const lead = chat ? `${chatHead(E)}<div class="kc-msg unk"><span class="gav">?</span><span class="gbub"><b>Unknown sender</b>${esc(eventText(run, p.key))}</span></div>${chatJoin(p.key)}${chainTag}${evHint}<div class="kc-sys kc-reply">Reply</div>` : `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
-    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : chat ? 'kchat' : E.chain ? 'sys' : '');
+    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : chat ? 'kchat' : E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
