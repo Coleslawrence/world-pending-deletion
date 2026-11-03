@@ -504,6 +504,7 @@ function glitchSkill(id, rng) {
 function registerGlitchGear(run) {
   if (!run) return;
   const ids = allPieces(run).map(p => p.id).concat(run.shop ? SHOP_KINDS.flatMap(k => (run.shop[k] || []).filter(Boolean).map(x => x.id)) : [], run.bonusSlot ? [run.bonusSlot.id] : []);
+  if (run.phantom) ids.push(run.phantom.id);
   ids.forEach(id => { if (typeof id === 'string' && id.startsWith('x_')) spliceGear(id); if (typeof id === 'string' && id.startsWith('u_')) unstableSkill(id); });
 }
 // MissingNo.: its passive is another (unglitched) gear piece's, rolled when it arrives and after every fight
@@ -646,7 +647,9 @@ function archCounts(barPieces, gearPieces, gifts) {
   (gifts || []).forEach(g => { if (GIFTS[g] && GIFTS[g].arch && c[GIFTS[g].arch]) c[GIFTS[g].arch]++; });
   return c;
 }
-function runCounts(run) { return archCounts(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts); }
+// The gear that counts: the three slots, plus a Phantom piece (a glitch event's copy that takes no slot)
+function runGear(run) { return GEAR_SLOTS.map(s => run.gear[s]).concat(run.phantom && GEAR[run.phantom.id] ? [run.phantom] : []); }
+function runCounts(run) { return archCounts(run.bar, runGear(run), run.gifts); }
 let META = null;
 function bindMeta(m) { META = m; }
 // Other players' champions (set by the page from the shared store). Each snap carries .owner.
@@ -745,7 +748,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
-function runP(run) { return buildP(run.bar, GEAR_SLOTS.map(s => run.gear[s]), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold }); }
+function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold }); }
 
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
@@ -931,6 +934,22 @@ function eventKit(run, meta, rng, msgs) {
     apply: T => { const ctx = { run, h: kit, msgs }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
     custom: () => customPaid(run, msgs),
     heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
+    // Glitch events (events/glitch.js)
+    phantom: n => { const g = pick(GEAR_SLOTS.map(k => run.gear[k]).filter(Boolean), rng); if (!g) return; run.phantom = { id: g.id, star: g.star, roll: g.roll, left: n }; msgs.push({ t: 'skill', text: `[Phantom ${pieceDef(g.id).name} acquired. It takes no slot. A hotfix is scheduled in ${n} fights.]` }); },
+    anyOption: () => {
+      const outs = []; Object.entries(EVENTS).forEach(([k, E]) => { if (!E.glitch && !E.chain && !E.crisis) E.opts.forEach(o => { if (o.then && !o.roll && !o.pay && !o.payHeart && !o.then.chain && !o.then.summon) outs.push({ title: E.title, then: o.then }); }); });
+      const x = pick(outs, rng); msgs.push({ t: 'sys', text: `[Executing an option from another event: ${x.title}.]` }); kit.apply(x.then);
+    },
+    replay: () => { const ks = (run.seen || []).filter(k => EVENTS[k] && !EVENTS[k].chain && !EVENTS[k].crisis && !EVENTS[k].visit && !EVENTS[k].glitch); const k = pick(ks, rng); if (k) { pushEvent(run, k, rng); msgs.push({ t: 'sys', text: `[Replaying: ${EVENTS[k].title}.]` }); } },
+    patch: () => {
+      const ps = allPieces(run), held = [];
+      ps.forEach(p => { if (pieceDef(p.id).glitch) held.push({ p }); (p.mods || []).forEach(m => { if (PREFIXES[m] && PREFIXES[m].glitch) held.push({ p, m }); }); });
+      if (run.phantom) held.push({ phantom: true });
+      const x = pick(held, rng); if (!x) return;
+      if (x.phantom) { msgs.push({ t: 'loss', text: `[Patched: Phantom ${pieceDef(run.phantom.id).name} removed.]` }); run.phantom = null; }
+      else if (x.m) { x.p.mods = x.p.mods.filter(m => m !== x.m); msgs.push({ t: 'loss', text: `[Patched: ${PREFIXES[x.m].name} removed from ${pieceDef(x.p.id).name}.]` }); }
+      else { removePiece(run, x.p.u); msgs.push({ t: 'loss', text: `[Patched: ${pieceDef(x.p.id).name} removed.]` }); }
+    },
     sellLowest: mult => { const p = run.bench.slice().sort((a, b) => sellValue(a) - sellValue(b))[0]; if (!p) return 0; const v = sellValue(p) * (mult || 1); removePiece(run, p.u); run.gold += v; msgs.push({ t: 'loot', text: `[Sold: ${pieceDef(baseId(p.id)).name}. +${v} gold.]` }); return v; },
   };
   return kit;
@@ -939,7 +958,7 @@ function eventText(run, key) { const t = EVENTS[key].text; return typeof t === '
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
   // Stand-alone events don't repeat in a run until every one has been seen
-  const open = k => !EVENTS[k].chain && !EVENTS[k].crisis && !EVENTS[k].visit && (!EVENTS[k].can || EVENTS[k].can(run));
+  const open = k => !EVENTS[k].chain && !EVENTS[k].crisis && !EVENTS[k].visit && (!EVENTS[k].glitch || glitchesOn(run)) && (!EVENTS[k].can || EVENTS[k].can(run));
   const fresh = Object.keys(EVENTS).filter(k => open(k) && !(run.seen || []).includes(k));
   const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(open)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
   const w = keys.map(k => (EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1) * (worldTagged(run, EVENTS[k]) ? WORLD_LEAN : 1));
@@ -2034,6 +2053,7 @@ function resolveFight(run, f, meta, rng) {
   run.overflow = won && f.overflowOut ? f.overflowOut : 0;
   Object.keys(f.disclosed || {}).forEach(u => { const p = findPiece(run, +u); if (p) p.p.mods = p.p.mods.map(bareMod); });
   allPieces(run).filter(p => GEAR[p.id] && GEAR[p.id].rolling).forEach(p => rollMissing(p, lr));
+  if (run.phantom && !run.practice && --run.phantom.left <= 0) { msgs.push({ t: 'loss', text: `[Hotfix applied: Phantom ${pieceDef(run.phantom.id).name} removed.]` }); run.phantom = null; }
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
   if ((spec.kind === 'rival' || (spec.kind === 'final' && !spec.snap)) && won) meta.archive.beat[spec.id] = true;

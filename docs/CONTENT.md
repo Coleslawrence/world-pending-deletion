@@ -326,13 +326,13 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 28 (quests, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 5 (events) |
+| `gold` | 8 | 8 gold |  | 32 (quests, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
 | `rune` | 1 | a rune |  | 7 (quests, events) |
 | `piece` | "B" | a free B-rank piece |  | 19 (quests, events) |
 | `next` | {"bribe":true} | a mark on your next fight |  | 18 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 10 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 12 (events) |
 | `max_hp` | -0.1 | −10% max HP |  | 6 (events) |
 | `restore` | 1 | 1 Heart restored |  | 8 (events) |
 | `erase` | 1 | 1 Heart erased |  | 5 (events) |
@@ -340,11 +340,11 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `respec` | true | your stat points to place again |  | 1 (events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 6 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
-| `ward` | 1 | a ward on your next loss |  | 9 (events) |
+| `ward` | 1 | a ward on your next loss |  | 10 (events) |
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 4 (events) |
 | `fate` | 1 | your world's Fate eased | yes | 56 (events) |
-| `notice` | 1 | the System's notice | yes | 43 (events) |
+| `notice` | 1 | the System's notice | yes | 54 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
