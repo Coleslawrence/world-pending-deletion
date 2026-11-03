@@ -944,3 +944,7 @@ details.st-n small { display: block; }
 :root[data-theme="broadcast"] .log p.t-sys { color: var(--h-y); }
 :root[data-theme="broadcast"] div.bar { border-radius: 0; }
 :root[data-theme="broadcast"] .toast { border-radius: 0; border-width: 0 0 0 4px; background: var(--h-k); box-shadow: var(--shadow); }
+/* Erosion on Broadcast: black holes vanish on a black screen, so they show as torn-out cuts with a magenta edge */
+:root[data-theme="broadcast"] .erode .hole { filter: drop-shadow(0 0 5px rgba(255,46,154,.75)); }
+:root[data-theme="broadcast"] .erode .hole polygon { fill: #000; stroke: var(--h-m); stroke-width: 2; }
+:root[data-theme="broadcast"] .erode .hole.due polygon { fill: rgba(230,255,46,.08); stroke: var(--h-y); }
