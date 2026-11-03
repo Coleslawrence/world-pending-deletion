@@ -234,6 +234,15 @@ Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
   Object.keys(T.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies`));
   ref(w, T.passives || T.traits, 'needs passives or traits, or it does nothing');
 });
+// Known Issues: each points at real glitched content (or names itself), once each
+const ISSUE_OF = { prefix: G.PREFIXES, gear: C.GEAR, skill: C.SKILLS, event: C.EVENTS, trait: C.TRAIT_POOL, mod: C.MODIFIERS };
+G.KNOWN_ISSUES.forEach((K, i) => {
+  const w = 'known issue ' + (K.id || i), src = ISSUE_OF[K.of];
+  ref(w, K.of === 'other' ? typeof K.name === 'string' : src && src[K.id], K.of === 'other' ? 'an other issue needs a name' : `${K.of} ${K.id} does not exist`);
+  ref(w, K.of === 'other' || !src || !src[K.id] || src[K.id].glitch || src[K.id].corrupt, `${K.of} ${K.id} is not glitched`);
+  ref(w, typeof K.text === 'string' && K.text.length > 0, 'needs text');
+  ref(w, G.KNOWN_ISSUES.filter(x => x.of === K.of && x.id === K.id).length === 1, 'listed twice');
+});
 ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).filter(k => !C.TRAIT_POOL[k].glitch).length), 'one whole number per round, no more than the pool holds');
 Object.entries(C.ENEMIES).forEach(([k, e]) => {
   const w = 'enemies ' + k;

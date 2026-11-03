@@ -144,7 +144,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .nx-style { font-size: var(--fs-2); color: var(--muted); }
 .nx-traits { display: flex; flex-direction: column; gap: 1px; margin-top: 3px; font-size: var(--fs-1); color: var(--text); }
 .nx-traits b { color: var(--elite); font-weight: 600; }
-.nx-traits .glitch b, .chip.trait.glitch, .tag.glitch, .sysl.glitch { color: var(--bad); }
+.nx-traits .glitch b, .chip.trait.glitch, .tag.glitch, .sysl.glitch, .msgs li.glitch b { color: var(--bad); }
 .chip.trait { color: var(--elite); border-style: dashed; }
 .nx-scout { font-size: var(--fs-1); color: var(--sys); font-family: var(--f-m); margin-top: 2px; }
 .crest { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 2px solid var(--line2); background: radial-gradient(circle at 35% 30%, var(--panel2), var(--bg)); font-family: var(--f-d); font-size: var(--fs-4); color: var(--text); position: relative; }
