@@ -114,7 +114,7 @@ function styleOf(spec) {
 }
 // A flavour line (skills, gear, Gifts, Titles): the world's voice under the rules, never instead of them.
 function flavHTML(f) { return f ? `<span class="flav">${esc(f)}</span>` : ''; }
-function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
+function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span${TRAIT_POOL[k].glitch ? ' class="glitch"' : ''}><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · <span class="nw">${r}-rank</span>` : ''; }
 function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
 function rankChip(r) { return `<span class="rank r${r}">${WORLD_RANKS[r]}</span>`; }
@@ -804,7 +804,7 @@ function fightHTML() {
 }
 function chipsHTML(X, f) {
   const c = [];
-  if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait">${esc(TRAIT_POOL[k].name)}</span>`));
+  if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait${TRAIT_POOL[k].glitch ? ' glitch' : ''}">${esc(TRAIT_POOL[k].name)}</span>`));
   if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
   if (X.burn > 0) c.push(`<span class="chip burn">Burn ${n0(X.burn)}</span>`);
   if (X.poison > 0) c.push(`<span class="chip poison">Poison ${n0(X.poison)}</span>`);

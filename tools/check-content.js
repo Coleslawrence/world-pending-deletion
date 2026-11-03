@@ -90,7 +90,7 @@ const SCHEMA = {
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit', 'glitch']],
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
-  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
+  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits', 'glitch']],
 };
 const OPTION = [['label', 'desc'], ['check', 'roll', 'fail', 'pay', 'payHeart', 'can', 'then', 'go', 'reveal', 'glitch']], THEN = Object.keys(C.OUTCOMES);
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
@@ -234,7 +234,7 @@ Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
   Object.keys(T.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies`));
   ref(w, T.passives || T.traits, 'needs passives or traits, or it does nothing');
 });
-ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).length), 'one whole number per round, no more than the pool holds');
+ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).filter(k => !C.TRAIT_POOL[k].glitch).length), 'one whole number per round, no more than the pool holds');
 Object.entries(C.ENEMIES).forEach(([k, e]) => {
   const w = 'enemies ' + k;
   traitCheck(w, Object.fromEntries(MECHANICS.filter(t => e[t] != null).map(t => [t, e[t]])));
