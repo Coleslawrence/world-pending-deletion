@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), enemy move roles (`moves.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
+All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), enemy move roles (`moves.js`), archetypes, skills, rune prefixes (`prefixes.js`), gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers and districts are still in `js/core.js`.
 
 ## Where things go
 
