@@ -465,7 +465,7 @@ const ODDS = [[70, 25, 5, 0, 0], [45, 35, 17, 3, 0], [25, 35, 28, 10, 2], [15, 2
 function oddsFor(run) { const l = run.level + (hasGift(run, 'lucky') ? 1 : 0) + (hasGift(run, 'gacha') ? 1 : 0); return ODDS[l >= 7 ? 3 : l >= 5 ? 2 : l >= 3 ? 1 : 0]; }
 function poolIds(run) {
   const maxed = new Set(allPieces(run).filter(p => p.star >= 3).map(p => baseId(p.id)));
-  const ids = SHOP_SKILLS.concat(Object.keys(GEAR));
+  const ids = SHOP_SKILLS.concat(Object.keys(GEAR).filter(k => !GEAR[k].glitch));
   return ids.filter(id => pieceDef(id).tags.some(t => run.arch.includes(t)) && !maxed.has(id));
 }
 function rollPiece(run, rng, opts = {}) {
@@ -479,10 +479,27 @@ function rollPiece(run, rng, opts = {}) {
   for (let k = 0; k < 5; k++) {
     const want = ranks[clamp(r - k, 0, 4)];
     const c = pool.filter(id => pieceDef(id).rank === want);
-    if (c.length) { const id = wpick(c, c.map(x => isGear(x) ? 0.75 : 1), rng); return { id, mods: !isGear(id) && rnd(rng) < 0.12 ? rollPrefixes(1, rng, id) : [] }; }
+    if (c.length) { const id = wpick(c, c.map(x => isGear(x) ? 0.75 : 1), rng); return { id: isGear(id) && glitchesOn(run) ? glitchGear(id, pool, rng) : id, mods: !isGear(id) && rnd(rng) < 0.12 ? rollPrefixes(1, rng, id) : [] }; }
   }
   return null;
 }
+// Now and then a gear offer comes up glitched (where glitches are on): Spliced with another gear piece from the pool, or
+// MissingNo. GLITCH_GEAR is the chance per gear offer.
+const GLITCH_GEAR = 0.06;
+function glitchGear(id, pool, rng) {
+  if (rnd(rng) >= GLITCH_GEAR) return id;
+  if (rnd(rng) < 0.3) return 'missingno';
+  const other = pick(pool.filter(x => isGear(x) && x !== id && !GEAR[x].glitch), rng);
+  return other && spliceGear(spliceId(id, other)) ? spliceId(id, other) : id;
+}
+// Register the Spliced gear a saved run holds (Spliced pieces are made on demand, so a reload has to make them again)
+function registerGlitchGear(run) {
+  if (!run) return;
+  const ids = allPieces(run).map(p => p.id).concat(run.shop ? SHOP_KINDS.flatMap(k => (run.shop[k] || []).filter(Boolean).map(x => x.id)) : [], run.bonusSlot ? [run.bonusSlot.id] : []);
+  ids.forEach(id => { if (typeof id === 'string' && id.startsWith('x_')) spliceGear(id); });
+}
+// MissingNo.: its passive is another (unglitched) gear piece's, rolled when it arrives and after every fight
+function rollMissing(p, rng) { p.roll = pick(Object.keys(GEAR).filter(k => !GEAR[k].glitch), rng); }
 function price(run, item) {
   let v = PRICE[pieceDef(item.id).rank] + (item.mods ? item.mods.length : 0) + (hasGift(run, 'f_cursed') ? 1 : 0);
   if (hasGift(run, 'affinity') && pieceDef(item.id).tags.includes(run.arch[0])) v = Math.max(1, v - 1);
@@ -529,6 +546,7 @@ function canBuy(run, item) { return item && run.gold >= price(run, item) && (run
 function hasFreeSlot(run, id) { return isGear(id) ? !run.gear[GEAR[id].slot] : run.bar.includes(null); }
 function addPiece(run, id, mods, msgs, star) {
   const p = { u: ++run.uid, id, star: star || 1, mods: (mods || []).slice() };
+  if (GEAR[id] && GEAR[id].rolling) rollMissing(p, stream(run, 'loot'));
   if (isGear(id) && !run.gear[GEAR[id].slot]) run.gear[GEAR[id].slot] = p;
   else if (!isGear(id) && run.bar.includes(null)) run.bar[run.bar.indexOf(null)] = p;
   else run.bench.push(p);
@@ -542,6 +560,7 @@ function buy(run, kind, i, msgs) {
   run.gold -= price(run, item); run.haggle = false;
   if (kind === 'bonus') run.bonusSlot = null; else { run.shop[kind][i] = null; run.locks[kind][i] = false; }
   addPiece(run, item.id, item.mods, msgs);
+  if (pieceDef(item.id).glitch) { msgs && msgs.push({ t: 'skill', text: `[Glitched item acquired: ${pieceDef(item.id).name}. ${pieceDef(item.id).flavour}]` }); OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] }); }
   return true;
 }
 function removePiece(run, u) {
@@ -631,7 +650,7 @@ function sanitizeSnap(x, owner) {
   const str = (v, n) => String(v == null ? '' : v).slice(0, n);
   const num = (v, a, b, d) => { v = Number(v); return Number.isFinite(v) ? clamp(Math.round(v), a, b) : d; };
   const bar = (Array.isArray(x.bar) ? x.bar : []).slice(0, 5).filter(p => p && SKILLS[p.id] && !SKILLS[p.id].basic).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), mods: (Array.isArray(p.mods) ? p.mods : []).filter(m => typeof m === 'string' && PREFIXES[m] && !PREFIXES[m].player).map(bareMod).filter(m => !PREFIXES[m].player).slice(0, MAX_MODS_CORRUPT) }));
-  const gear = (Array.isArray(x.gear) ? x.gear : []).slice(0, 3).filter(p => p && GEAR[p.id]).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1) }));
+  const gear = (Array.isArray(x.gear) ? x.gear : []).slice(0, 3).filter(p => p && typeof p.id === 'string' && (GEAR[p.id] || spliceGear(p.id))).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), roll: p.roll && GEAR[p.roll] && !GEAR[p.roll].glitch ? p.roll : undefined }));
   const stats = {}; STATS.forEach(k => stats[k] = num(x.stats && x.stats[k], 0, 30, 2));
   const gifts = (Array.isArray(x.gifts) ? x.gifts : []).filter(k => GIFTS[k] && GIFTS[k].cat !== 'flaw').slice(0, 10);
   const ms = {}; STATS.forEach(k => { if (x.milestones && x.milestones[k] && stats[k] >= 10) ms[k] = true; });
@@ -704,7 +723,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   const c = archCounts(barPieces, gearPieces, gifts), lm = 1 + 0.08 * ((lvl || 1) - 1);
   // Archetype bonuses, then gear (both grow with level), then everything else. Effects and how they combine: effects.js
   ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach(p => addEffects(P, p, lm)));
-  gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(g.id, g.star), lm));
+  gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll] ? g.roll : g.id, g.star), lm));
   if (P.goldDmg) addEffects(P, { dmgPct: Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10)) }); // per 10 gold held when the fight starts, up to +25%
   const hp = hiddenPathOf(c);
   if (hp) addEffects(P, HIDDEN_PATHS[hp].fx);
@@ -1324,7 +1343,7 @@ function snapshot(run) {
     champ: run.champ, name: run.name, sigil: run.sigil, color: run.color, worldName: run.world.name, worldType: run.world.type, worldFate: run.world.fate || null, worldPeople: run.world.people || null, worldMix: run.world.mix || null, path: run.path,
     stats: s, level: run.level, maxHp: maxHp(run), round: run.round, gifts: run.gifts.filter(k => GIFTS[k].cat !== 'flaw' && k !== 'copycat'), title: run.title, milestones: run.milestones,
     history: (run.history || []).slice(), cause: run.cause || null, hearts: run.hearts, maxHearts: run.maxHearts, wins: run.wins, elite: run.eliteWins || 0, entrant: run.entrant, hiddenPath: run.hiddenPath,
-    bar: run.bar.filter(Boolean).map(p => ({ id: p.id, star: p.star, mods: p.mods.slice() })), gear: GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean).map(p => ({ id: p.id, star: p.star })), at: Date.now() + Math.floor(Math.random() * 1000),
+    bar: run.bar.filter(Boolean).map(p => ({ id: p.id, star: p.star, mods: p.mods.slice() })), gear: GEAR_SLOTS.map(sl => run.gear[sl]).filter(Boolean).map(p => p.roll ? { id: p.id, star: p.star, roll: p.roll } : { id: p.id, star: p.star }), at: Date.now() + Math.floor(Math.random() * 1000),
   };
   if (R) snap.rec = Object.assign({ w: run.world.type, ids: R.ids.slice(), lost: R.lost, partial: R.partial, bio: Object.assign({}, R.bio) }, layersOf(R));
   return snap;
@@ -1468,6 +1487,7 @@ function newFight(run, rng) {
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
+  GEAR_SLOTS.forEach(k => { const g = run.gear[k]; if (g && GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll]) say(f, `[${GEAR[g.id].name} reads as ${GEAR[g.roll].name}: ${gearText(g.roll, g.star)}]`, 'skill'); });
   // Overflow from your last win: the overkill lands before this fight starts (at most a quarter of their HP)
   if (run.overflow > 0 && !run.practice) { const v = Math.min(run.overflow, Math.round(B.maxHp * 0.25)); B.hp -= v; say(f, `[Overflow: ${v} damage carried over from your last fight.]`, 'skill'); }
   planIntent(f, B);
@@ -1989,6 +2009,7 @@ function resolveFight(run, f, meta, rng) {
   // Glitches settled by the fight: Overflow carries into the next one only after a win; [REDACTED] prefixes used are disclosed
   run.overflow = won && f.overflowOut ? f.overflowOut : 0;
   Object.keys(f.disclosed || {}).forEach(u => { const p = findPiece(run, +u); if (p) p.p.mods = p.p.mods.map(bareMod); });
+  allPieces(run).filter(p => GEAR[p.id] && GEAR[p.id].rolling).forEach(p => rollMissing(p, lr));
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
   if ((spec.kind === 'rival' || (spec.kind === 'final' && !spec.snap)) && won) meta.archive.beat[spec.id] = true;
@@ -2367,7 +2388,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,

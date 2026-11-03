@@ -26,5 +26,26 @@ const GEAR = {
   soul_lantern: { name: 'Soul Lantern', slot: 'accessory', tags: ['reaper'], rank: 'B', stats: { STR: 1, LUK: 1 }, pas: { lowLifesteal: 0.25 }, text: v => `Below half HP, heal ${pct(v.lowLifesteal)} of the damage you deal.`, flavour: "The light inside it was someone, once." },
   plague_censer: { name: 'Plague Censer', slot: 'accessory', tags: ['venom', 'pyre'], rank: 'A', stats: { INT: 2 }, pas: { burnPoison: 2 }, text: v => `Whenever you apply Burn, also apply ${v.burnPoison} Poison.`, flavour: "Swung like a temple censer. The smoke is not incense." },
   misers_ring: { name: "Miser's Ring", slot: 'accessory', tags: ['venom', 'blade', 'arcanist'], rank: 'C', stats: { LUK: 1 }, pas: { goldDmg: 0.05 }, text: v => `+${pct(v.goldDmg)} damage for every 10 gold you hold when a fight starts, up to +25%.`, flavour: "Heavy, cold and always asking how much you have." },
+  // Glitched gear (glitch: true): only ever offered as a rare glitch in the gear shop, and buying one raises the System's
+  // notice. rolling: its passive is another gear piece's, re-rolled after every fight (kept on the piece as roll).
+  missingno: { name: 'Missin\u0337gNo.', slot: 'accessory', tags: [], rank: 'B', glitch: true, rolling: true, stats: { LUK: 2 }, pas: {}, text: () => "Works as another gear piece's passive, re-rolled after every fight.", flavour: '[Known issue: item data unreadable. Please do not equip.]' },
 };
 const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
+// Spliced gear: two real pieces stitched into one glitched piece, id 'x_<a>__<b>'. It has both passives, the slot of the
+// first, both pieces' class tags, and a stat line from neither. Made on demand, so saved runs and records register theirs.
+function spliceId(a, b) { return 'x_' + a + '__' + b; }
+function spliceGear(id) {
+  if (GEAR[id]) return GEAR[id];
+  const m = /^x_(\w+?)__(\w+)$/.exec(id || ''), A = m && GEAR[m[1]], B = m && GEAR[m[2]];
+  if (!A || !B || A.glitch || B.glitch || m[1] === m[2]) return null;
+  const words = n => n.replace(/^The /, '').split(' '), a = words(A.name), b = words(B.name);
+  const name = (a[0] !== b[b.length - 1] ? a[0] + ' ' + b[b.length - 1] : A.name) + ' [Spliced]';
+  const used = Object.keys(A.stats).concat(Object.keys(B.stats)), free = STATS.filter(k => !used.includes(k));
+  const total = Math.max(Object.values(A.stats).reduce((x, y) => x + y, 0), Object.values(B.stats).reduce((x, y) => x + y, 0));
+  const stats = {}; for (let i = 0; i < total; i++) { const k = free[i % Math.min(2, free.length)]; stats[k] = (stats[k] || 0) + 1; }
+  const pas = Object.assign({}, A.pas); Object.entries(B.pas || {}).forEach(([k, v]) => pas[k] = (pas[k] || 0) + v);
+  const rank = RANKS[Math.max(RANKS.indexOf(A.rank), RANKS.indexOf(B.rank))];
+  GEAR[id] = { name, slot: A.slot, tags: [...new Set(A.tags.concat(B.tags))], rank, glitch: true, splice: [m[1], m[2]], stats, pas, fix: Object.assign({}, A.fix, B.fix),
+    text: v => A.text(v) + ' ' + B.text(v), flavour: '[Known issue: this item has two owners. Both passives apply.]' };
+  return GEAR[id];
+}
