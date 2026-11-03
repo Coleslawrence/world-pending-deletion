@@ -73,7 +73,7 @@ if (saved) {
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks']],
-  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix']],
+  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice']],
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting', 'ruler']],

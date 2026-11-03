@@ -37,6 +37,7 @@ let meta = migrateMeta(lsGet(META_KEY));
 bindMeta(meta);
 let run = (hot && hot.data && hot.data.run) || lsGet(RUN_KEY);
 if (run && run.v !== VERSION) run = null;
+registerGlitchGear(run); // Spliced gear is made on demand, so a reload makes the run's again
 if (run && run.bought == null) run.bought = Math.max(0, (run.level - 1) * 2);
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
@@ -1390,7 +1391,7 @@ function onAct(el) {
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-row': ui.sheet = { type: 'dailycmp', i: +d.i }; return render();
-    case 'resume': run = lsGet(RUN_KEY); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
+    case 'resume': run = lsGet(RUN_KEY); registerGlitchGear(run); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
     case 'pick-world': ui.world = +d.i; return render();
