@@ -163,7 +163,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `poison` | 22 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
 | `regen` | 3 | Consecrate (4), Hallowed Ground (7), Holy Fire (4) | Heal 4 at the start of your next 3 turns. | yes |
-| `replay` | 1 | Err̷or (1) | (works with other keys on the same skill) | no |
+| `replay` | 1 | Err̷or (1) | (works with other keys on the same skill) | yes |
 | `riposte` | 3 | Riposte (1.5), Perfect Riposte (2.5), Parry Master (1.5) | Until your next turn, damage you block is dealt back ×1.5. | yes |
 | `selfDmg` | 3 | Berserk (3), Err̷or (6), Blood Rage (4) | Costs 3 HP. | no |
 | `siphon` | 3 | Siphon (1), Soul Siphon (1), Hex Siphon (1) | Steal the opponent's Block and remove their Power. | yes |
