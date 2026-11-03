@@ -20,6 +20,7 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | A wager or Trial condition | `WAGER_FEATS` in `js/core.js`: the feats a god will bet on |
 | A new outcome (something given or set as a consequence) | `js/content/outcomes.js` (its words and whether it is announced last), plus the code in `js/core.js` that applies it (`OUTCOME_APPLY`) |
 | A new feat (a measured deed) | `js/content/feats.js`: when it is measured, its words, and how it is checked against the fight tally |
+| Glitched content | Mark it `glitch: true` where it lives: a prefix in `prefixes.js`, gear in `gear.js`, a skill in `skills/glitched.js`, an event in `events/glitch.js`, a trait in `traits.js`, a world modifier in `worlds.js`. Name it with one corrupted letter. Glitches only turn up where `glitchesOn(run)` (never Pending World except on Glitch Day), and each needs a Known Issues entry in `glitches.js` |
 | A new passive effect | `js/content/effects.js` (its phrase, how it combines, whether enemies can carry it), plus the code in `js/core.js` that reads it |
 
 A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`.
