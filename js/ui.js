@@ -659,7 +659,7 @@ function shopHTML() {
     <div class="shopgrid">${items}</div>
     <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}<span class="interest">Interest +${interestOf(run)}g</span></div>
     </div><div class="col col-b"><div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
-    <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
+    <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>${run.phantom ? `<div class="sec-h"><span class="bad">Phantom: ${esc(pieceDef(run.phantom.id).name)}${run.phantom.star > 1 ? ' ' + '★'.repeat(run.phantom.star) : ''}</span><span class="fine">Hotfix in ${run.phantom.left} fight${run.phantom.left > 1 ? 's' : ''}</span></div>` : ''}
     <div class="sec-h"><span${over ? ' class="bad"' : ''}>Bench ${run.bench.length}/8</span><span class="fine">Tap to equip, swap or sell</span></div>
     <div class="bench${over ? ' over' : ''}" style="--bench-cols: ${cols}">${bench}</div></div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button>${over ? `<span class="foot-hint bad">Sell ${over} to continue</span>` : '<button class="btn primary fight" data-act="shop-done">Fight ›</button>'}</footer></main>`;
