@@ -24,40 +24,14 @@ function isGear(id) { return !!GEAR[id]; }
 function pieceDef(id) { return GEAR[id] || SKILLS[id]; }
 function baseId(id) { return (SKILLS[id] && SKILLS[id].base) || id; }
 
-// ---------- Prefixes (skills only) ----------
-const isDmg = d => !!(d.fx.dmg || d.fx.detonate || d.fx.malice || d.fx.blockDmg || d.fx.momentum);
-const PREFIXES = {
-  swift: { name: 'Swift', desc: '1 turn shorter cooldown.', w: 3, ok: d => d.cd >= 2 },
-  heavy: { name: 'Heavy', desc: '+40% power, 1 turn longer cooldown.', w: 3, ok: isDmg },
-  vampiric: { name: 'Vampiric', desc: 'Heal 25% of the damage dealt.', w: 2, ok: isDmg },
-  searing: { name: 'Searing', desc: 'Also apply 3 Burn.', w: 3 },
-  toxic: { name: 'Toxic', desc: 'Also apply 3 Poison.', w: 3 },
-  serrated: { name: 'Serrated', desc: 'Also apply 3 Bleed.', w: 3 },
-  piercing: { name: 'Piercing', desc: 'Ignores Block.', w: 2, ok: d => isDmg(d) && !d.fx.pierce },
-  twin: { name: 'Twin', desc: 'One extra hit.', w: 2, ok: isDmg },
-  echoing: { name: 'Echoing', desc: '30% chance to cast twice.', w: 1, ok: d => !d.quick },
-  quick: { name: 'Quick', desc: "Doesn't end your turn, 2 turns longer cooldown.", w: 1, ok: d => !d.quick && !d.basic },
-};
-const MAX_MODS = 2;
+// ---------- Prefixes (skills only; PREFIXES and MAX_MODS live in js/content/prefixes.js) ----------
 function prefixOk(id, m, mods) { const d = SKILLS[id]; if (!d || d.basic) return false; if ((mods || []).includes(m)) return false; const P = PREFIXES[m]; return !P.ok || P.ok(d); }
 // With run, only prefixes at least one of its skills can take, so every offered rune is pickable
 function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).filter(k => (!forId || prefixOk(forId, k, [])) && (!run || prefixTargets(run, k).length)); if (!keys.length) return []; const out = []; let g = 0; while (out.length < n && g++ < 100) { const k = wpick(keys, keys.map(x => PREFIXES[x].w), rng); if (!out.includes(k)) out.push(k); } return out; }
 function moddedDef(id, mods) {
   const base = SKILLS[id];
   const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: 1 });
-  d.mods.forEach(m => {
-    const fx = d.fx;
-    if (m === 'swift') d.cd = Math.max(1, d.cd - 1);
-    if (m === 'heavy') { d.powerMult *= 1.4; d.cd += 1; }
-    if (m === 'vampiric') fx.lifesteal = (fx.lifesteal || 0) + 0.25;
-    if (m === 'searing') fx.xburn = (fx.xburn || 0) + 3;
-    if (m === 'toxic') fx.xpoison = (fx.xpoison || 0) + 3;
-    if (m === 'serrated') fx.xbleed = (fx.xbleed || 0) + 3;
-    if (m === 'piercing') fx.pierce = 1;
-    if (m === 'twin') { if (fx.dmg) fx.hits = (fx.hits || 1) + 1; else d.powerMult *= 1.3; }
-    if (m === 'echoing') fx.echo = 0.3;
-    if (m === 'quick') { d.quick = true; d.cd += 2; }
-  });
+  d.mods.forEach(m => PREFIXES[m].apply(d));
   return d;
 }
 function effRank(id, mods) { const d = pieceDef(id); return RANKS[Math.min(6, RANKS.indexOf(d.rank) + (mods ? mods.length : 0))]; }
