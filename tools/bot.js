@@ -10,6 +10,7 @@ function choosePlayer(f) {
   ready.forEach(({ s, i }) => {
     const fx = s.def.fx, p = s.power;
     let sc = ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) * 1.6 + (fx.poison || 0) * 2.5 + (fx.bleed || 0) * 1.5 + (fx.detonate ? B.burn * fx.detonate : 0) + (fx.malice ? fx.malice * 2 : 0) + (fx.blockDmg ? A.block * fx.blockDmg : 0) + (fx.brk || 0) * 0.6) * p;
+    if (fx.replay) sc = f.lastPlayerSkill ? 15 * p : 0; // Error: worth a strong skill once there's one to repeat
     // Press a nearly broken guard: a hit that breaks it costs the opponent its turn
     if (B.breakMax && ((fx.dmg || 0) * (fx.hits || 1) + (fx.brk || 0)) * p >= B.breakMax - B.brk) sc += 12;
     if (fx.execute && B.hp / B.maxHp <= fx.execute) sc *= fx.execMult;

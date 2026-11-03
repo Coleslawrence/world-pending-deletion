@@ -72,7 +72,7 @@ if (saved) {
 // ---------- Fields: required ones present, nothing unknown (a typo is an unknown field) ----------
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
-  skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks']],
+  skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice']],
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
@@ -111,7 +111,7 @@ Object.values(C.SKILLS).forEach(s => {
   s.tags.forEach(t => ref(w, isArch(t), `tag ${t} is not an archetype`));
   ref(w, C.RANKS.includes(s.rank), `rank ${s.rank} is not one of ${C.RANKS.join(' ')}`);
   (s.evo || []).forEach(e => ref(w, C.SKILLS[e] && C.SKILLS[e].base === s.id, `evolution ${e} is missing`));
-  if (!s.basic && !s.base) ref(w, (s.evo || []).length === 2, 'needs two ★3 evolutions');
+  if (!s.basic && !s.base && !s.glitch) ref(w, (s.evo || []).length === 2, 'needs two ★3 evolutions'); // glitched skills never evolve
 });
 Object.entries(C.GEAR).forEach(([k, g]) => {
   const w = 'gear ' + k;
