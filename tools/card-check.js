@@ -40,7 +40,7 @@ Object.entries(C.EVENTS).forEach(([k, E]) => own(E.title, 'event ' + k));
 Object.entries(C.CHAINS).forEach(([k, c]) => own(c.name, 'event chain ' + k));
 Object.entries(G.REACTIONS).forEach(([k, r]) => own(r.name, 'reaction ' + k));
 Object.entries(G.MILESTONES).forEach(([k, m]) => own(m.name, 'milestone ' + k));
-Object.entries(G.PREFIXES).forEach(([k, p]) => own(p.name, 'rune ' + k));
+Object.entries(G.PREFIXES).filter(([, p]) => !p.hide).forEach(([k, p]) => own(p.name, 'rune ' + k)); // [REDACTED] stand-ins share its name on purpose
 // The effect menu, read from docs/CONTENT.md (the checker keeps it current), plus what an event option can do as data
 const menuDoc = fs.readFileSync(path.join(ROOT, 'docs/CONTENT.md'), 'utf8');
 const MENU = new Set([...menuDoc.slice(menuDoc.indexOf('<!-- effects:start')).matchAll(/^\| `(\w+)` \|/gm)].map(m => m[1])
