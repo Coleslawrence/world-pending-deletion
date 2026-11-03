@@ -804,28 +804,6 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 #app[data-moment~="broadcast"] .end.spared h1 { color: var(--h-y); }
 #app[data-moment~="broadcast"] .end .eyebrow { color: var(--h-y); }
 
-/* ---------- Moments: K The Gods' group chat (Undercity events, gods at big moments, the end of a world) ---------- */
-:root { --g-war: #e15b52; --g-trick: #b59dff; --g-ruin: #ff8a4c; }
-.gav { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--f-b); color: #120f0d; background: var(--muted); }
-.g-war .gav { background: var(--g-war); } .g-trick .gav { background: var(--g-trick); } .g-ruin .gav { background: var(--g-ruin); }
-.gbub { min-width: 0; background: var(--panel2); border-radius: 4px 14px 14px 14px; padding: 6px 10px; font: 400 13.5px/1.35 var(--f-b); color: var(--text); overflow-wrap: anywhere; }
-.gbub b { display: block; font-size: var(--fs-1); font-weight: 700; margin-bottom: 1px; color: var(--muted); }
-.g-war .gbub b { color: var(--g-war); } .g-trick .gbub b { color: var(--g-trick); } .g-ruin .gbub b { color: var(--g-ruin); }
-/* In a fight: one bubble in the log */
-.log p.t-god { display: flex; gap: 6px; align-items: flex-start; font-family: var(--f-b); }
-.log p.t-god .gbub { font-size: var(--fs-1); padding: 4px 9px; }
-/* Undercity event as a chat */
-.sheet.kchat .sh-b { display: flex; flex-direction: column; gap: 8px; }
-.kc-pill { align-self: center; font: 500 11px var(--f-m); color: var(--bad); background: rgba(255,107,98,.12); border: 1px solid rgba(255,107,98,.35); border-radius: 999px; padding: 3px 10px; }
-.kc-msg { display: flex; gap: 7px; align-items: flex-start; max-width: 92%; }
-.kc-msg.unk .gav { background: var(--line2); color: var(--text); }
-.kc-msg.unk .gbub { font-size: var(--fs-3); }
-.kc-sys { align-self: center; font: 400 11.5px var(--f-b); color: var(--dim); }
-.kc-reply { align-self: flex-start; font: 500 11px var(--f-m); color: var(--muted); margin-top: 2px; }
-.sheet.kchat .choice { border-radius: 16px; border-left-width: 1px; }
-/* End screen: the patron's last word */
-.end .end-chat { max-width: 100%; }
-
 /* ---------- Moments: I The System is breaking (notice 3 subtle, notice 5 and System events full) ---------- */
 #app[data-moment~="breaking"] .st-prog b, #app[data-moment~="breaking"] .sec-h > span:first-child, #app[data-moment~="breaking"] .sh-h h3, #app[data-moment~="breaking"] .fo-name { text-shadow: -1px 0 rgba(255,46,90,.55), 1px 0 rgba(114,208,255,.55); }
 #app[data-fx="on"][data-moment~="breaking"] .sh-h h3 { animation: sysflick 6s steps(1, end) infinite; }
