@@ -177,7 +177,9 @@
   "thunder_wrath",
   "heavens_fury",
   "eye_of_storm",
-  "attack"
+  "attack",
+  "error_skill",
+  "stack_overflow"
  ],
  "gear": [
   "ember_gauntlets",
@@ -973,6 +975,8 @@
   "perHit",
   "pierce",
   "reflect",
-  "selfDmg"
+  "replay",
+  "selfDmg",
+  "stack"
  ]
 }

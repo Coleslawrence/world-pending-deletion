@@ -479,7 +479,7 @@ function rollPiece(run, rng, opts = {}) {
   for (let k = 0; k < 5; k++) {
     const want = ranks[clamp(r - k, 0, 4)];
     const c = pool.filter(id => pieceDef(id).rank === want);
-    if (c.length) { const id = wpick(c, c.map(x => isGear(x) ? 0.75 : 1), rng); return { id: isGear(id) && glitchesOn(run) ? glitchGear(id, pool, rng) : id, mods: !isGear(id) && rnd(rng) < 0.12 ? rollPrefixes(1, rng, id) : [] }; }
+    if (c.length) { const id = wpick(c, c.map(x => isGear(x) ? 0.75 : 1), rng); return { id: !glitchesOn(run) ? id : isGear(id) ? glitchGear(id, pool, rng) : glitchSkill(id, rng), mods: !isGear(id) && rnd(rng) < 0.12 ? rollPrefixes(1, rng, id) : [] }; }
   }
   return null;
 }
@@ -492,11 +492,19 @@ function glitchGear(id, pool, rng) {
   const other = pick(pool.filter(x => isGear(x) && x !== id && !GEAR[x].glitch), rng);
   return other && spliceGear(spliceId(id, other)) ? spliceId(id, other) : id;
 }
-// Register the Spliced gear a saved run holds (Spliced pieces are made on demand, so a reload has to make them again)
+// A skill offer comes up glitched with GLITCH_SKILL chance: an Unstable copy of it when it has two evolutions, else Error
+// or Stack Overflow (js/content/skills/glitched.js)
+const GLITCH_SKILL = 0.04;
+function glitchSkill(id, rng) {
+  if (rnd(rng) >= GLITCH_SKILL) return id;
+  if (SKILLS[id].evo && rnd(rng) < 0.6 && unstableSkill('u_' + id)) return 'u_' + id;
+  return rnd(rng) < 0.5 ? 'error_skill' : 'stack_overflow';
+}
+// Register the Spliced gear and Unstable skills a saved run holds (Spliced pieces are made on demand, so a reload has to make them again)
 function registerGlitchGear(run) {
   if (!run) return;
   const ids = allPieces(run).map(p => p.id).concat(run.shop ? SHOP_KINDS.flatMap(k => (run.shop[k] || []).filter(Boolean).map(x => x.id)) : [], run.bonusSlot ? [run.bonusSlot.id] : []);
-  ids.forEach(id => { if (typeof id === 'string' && id.startsWith('x_')) spliceGear(id); });
+  ids.forEach(id => { if (typeof id === 'string' && id.startsWith('x_')) spliceGear(id); if (typeof id === 'string' && id.startsWith('u_')) unstableSkill(id); });
 }
 // MissingNo.: its passive is another (unglitched) gear piece's, rolled when it arrives and after every fight
 function rollMissing(p, rng) { p.roll = pick(Object.keys(GEAR).filter(k => !GEAR[k].glitch), rng); }
@@ -649,7 +657,7 @@ function sanitizeSnap(x, owner) {
   if (!x || typeof x !== 'object') return null;
   const str = (v, n) => String(v == null ? '' : v).slice(0, n);
   const num = (v, a, b, d) => { v = Number(v); return Number.isFinite(v) ? clamp(Math.round(v), a, b) : d; };
-  const bar = (Array.isArray(x.bar) ? x.bar : []).slice(0, 5).filter(p => p && SKILLS[p.id] && !SKILLS[p.id].basic).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), mods: (Array.isArray(p.mods) ? p.mods : []).filter(m => typeof m === 'string' && PREFIXES[m] && !PREFIXES[m].player).map(bareMod).filter(m => !PREFIXES[m].player).slice(0, MAX_MODS_CORRUPT) }));
+  const bar = (Array.isArray(x.bar) ? x.bar : []).slice(0, 5).filter(p => p && typeof p.id === 'string' && (SKILLS[p.id] || unstableSkill(p.id)) && !SKILLS[p.id].basic).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), mods: (Array.isArray(p.mods) ? p.mods : []).filter(m => typeof m === 'string' && PREFIXES[m] && !PREFIXES[m].player).map(bareMod).filter(m => !PREFIXES[m].player).slice(0, MAX_MODS_CORRUPT) }));
   const gear = (Array.isArray(x.gear) ? x.gear : []).slice(0, 3).filter(p => p && typeof p.id === 'string' && (GEAR[p.id] || spliceGear(p.id))).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), roll: p.roll && GEAR[p.roll] && !GEAR[p.roll].glitch ? p.roll : undefined }));
   const stats = {}; STATS.forEach(k => stats[k] = num(x.stats && x.stats[k], 0, 30, 2));
   const gifts = (Array.isArray(x.gifts) ? x.gifts : []).filter(k => GIFTS[k] && GIFTS[k].cat !== 'flaw').slice(0, 10);
@@ -1242,7 +1250,7 @@ function fighterSkills(barPieces, s, P) {
     if (!def.quick && def.cd >= fin.cdFrom) def.cd = Math.max(fin.cdMin, def.cd - Math.floor((s.INT || 0) / fin.cdEvery));
     if (!def.quick && P.arcCd && def.cd > 1) def.cd = Math.max(1, def.cd - Math.floor(s.INT / P.arcCd)); // Arcanist: INT shortens cooldowns
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
-    out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0 });
+    out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0, unstable: def.unstable ? { name: def.name, cd: def.cd } : null });
   });
   if (P.copycat) out.push({ key: 'copycat', def: { id: 'copycat', name: 'Copycat', tags: [], rank: 'S', cd: 99, fx: { copy: 1 }, cheat: true }, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
   return out;
@@ -1672,7 +1680,20 @@ function useSkill(f, X, s, opt) {
     if (last) { def = Object.assign({}, last.def, { name: 'Copycat: ' + last.def.name }); p = last.power; say(f, `[Copycat! You copy ${last.def.name}.]`, 'class'); }
     else def = { name: 'Copycat', fx: { dmg: 10 }, tags: [] };
   }
+  // Stack Overflow: each cast this fight stronger than the last; the fifth resets the count and Stuns the caster
+  let stackStun = false;
+  if (def.fx.stack && !opt.echo) { s.stackN = (s.stackN || 0) + 1; if (s.stackN >= 5) { s.stackN = 0; stackStun = true; } }
+  if (def.fx.stack && s.stackN > 1) p *= 1 + def.fx.stack * (s.stackN - 1);
+  // Error: replays the last skill you used this fight
+  if (def.fx.replay && !opt.echo) {
+    const last = X.isPlayer && f.lastPlayerSkill;
+    if (last && last !== s) { say(f, `[Error: ${last.def.name} repeated.]`, 'skill'); useSkill(f, X, last, { echo: true }); }
+    else say(f, '[Error: no previous action to repeat.]', 'skill');
+    if (def.fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(def.fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: def.fx.selfDmg, kind: 'self' }); }
+    return;
+  }
   const fx = def.fx;
+  if (stackStun) say(f, `[Stack overflow. ${X.isPlayer ? 'You are' : X.name + ' is'} stunned.]`, 'loss');
   if (!opt.echo) ev(f, { k: 'use', side: X.side, name: def.name });
   if (X.bleed > 0 && !opt.echo) {
     const bm = (Y.P.bleedMult || 1) * (X.marked > 0 ? 2 : 1);
@@ -1751,6 +1772,7 @@ function useSkill(f, X, s, opt) {
     if (P.quickEvade) X.evade = Math.max(X.evade, 1);
     if (P.quickStun && damaging && Y.hp > 0 && rnd(f.rng) < P.quickStun) { say(f, '[Tempest Mage: Stun!]', 'skill'); stunTarget(f, X, Y); }
   }
+  if (stackStun && X.hp > 0) X.stun = Math.max(X.stun, 1);
   if (fx.echo && Y.hp > 0 && rnd(f.rng) < fx.echo) { say(f, `[Echo! ${def.name} casts again.]`, 'skill'); useSkill(f, X, s, { echo: true }); }
   if (def.quick && X.P.quickTwice && Y.hp > 0) useSkill(f, X, s, { echo: true });
 }
@@ -1758,6 +1780,8 @@ function useSkill(f, X, s, opt) {
 function startTurn(f, X, first) {
   // returns false if X can't act (stunned/dead)
   const P = X.P, Y = opp(f, X);
+  // Unstable skills: one evolution on odd turns, the other on even ones (shown on the button before you pick)
+  if (X.isPlayer) X.skills.forEach(s => { if (!s.unstable) return; s.unstableId = s.unstableId || s.def.id; const ids = SKILLS[s.unstableId].unstable, e = ids[(f.turn + 1) % 2]; s.def = Object.assign(moddedDef(e, s.mods), { name: `${s.unstable.name}: ${SKILLS[e].name}`, cd: s.unstable.cd, id: s.unstableId }); });
   if (!first) {
     if (X.forge) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
   }
@@ -1817,7 +1841,7 @@ function playerAct(f, idx) {
   // [REDACTED]: the prefix is disclosed on the skill's first use (the run's piece is updated when the fight is settled)
   if (s.u && (s.mods || []).some(m => PREFIXES[m] && PREFIXES[m].hide) && !(f.disclosed || {})[s.u]) { f.disclosed = Object.assign(f.disclosed || {}, { [s.u]: true }); say(f, `[Disclosure: the [REDACTED] prefix on ${s.def.name} is ${s.mods.filter(m => PREFIXES[m].hide).map(m => PREFIXES[PREFIXES[m].hide].name).join(', ')}.]`, 'skill'); }
   f.useCounts[s.key] = (f.useCounts[s.key] || 0) + 1;
-  if (s.key !== 'attack' && s.key !== 'copycat' && !s.def.quick) f.lastPlayerSkill = s;
+  if (s.key !== 'attack' && s.key !== 'copycat' && !s.def.quick && !s.def.fx.replay) f.lastPlayerSkill = s;
   if (s.def.quick) { f.tally.quickTurn++; f.tally.maxQuick = Math.max(f.tally.maxQuick, f.tally.quickTurn); } else f.tally.quickTurn = 0;
   const mu = Object.entries(f.useCounts).sort((a, b) => b[1] - a[1])[0]; f.tally.mostUsed = mu ? mu[0] : null;
   if (s.def.quick) { checkOver(f); return true; }
@@ -2388,7 +2412,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
