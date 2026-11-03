@@ -1078,8 +1078,21 @@ function pendingSheet() {
 }
 function enchantSheet(mods, from) {
   const sel = ui.enchantSel;
+  // Corrupt: the two rolled results, once a skill is picked (kept on the run, so leaving and coming back can't reroll them)
+  if (from !== 'rune' && run.corrupting) {
+    const c = run.corrupting, f = findPiece(run, c.u);
+    if (f) {
+      const body = `<p class="sh-p">[Corruption in progress: ${esc(SKILLS[f.p.id].name)}. Two outcomes are available. Select one.]</p>` + c.opts.map((o, i) => `<button class="choice glitch ${mainTag(f.p.id)}" data-act="corrupt-do" data-i="${i}">${pieceBody(f.p.id, o.k === 'star' ? Math.min(3, f.p.star + 1) : f.p.star, o.k === 'mod' ? f.p.mods.concat(o.m).slice(-MAX_MODS_CORRUPT) : f.p.mods)}<div class="sr-next">${esc(corruptText(o))}</div></button>`).join('');
+      return sheetWrap('[Corrupt]', body, '', 'sys', true);
+    }
+  }
+  if (sel === 'corrupt') {
+    const list = corruptTargets(run).map(p => { const f = findPiece(run, p.u); return `<button class="choice ${mainTag(p.id)}" data-act="corrupt-pick" data-u="${p.u}">${pieceBody(p.id, p.star, p.mods)}<div class="sr-next">${f.at === 'bench' ? 'On your bench' : 'On your bar'}</div></button>`; }).join('');
+    return sheetWrap('Corrupt which skill?', list, `<button class="btn ghost" data-act="ench-back">Back</button>`, 'sys', true);
+  }
   if (sel == null) {
-    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('');
+    const corruptBtn = from !== 'rune' && corruptTargets(run).length ? `<button class="choice glitch" data-act="ench-mod" data-i="corrupt"><div class="sr-h"><span class="sr-name"><em class="pfx">Corr\u0337upt a skill</em></span></div><div class="sr-desc">Two results are rolled and you keep one: a star, a prefix or a glitch. The skill then takes no more prefixes.</div></button>` : '';
+    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
     return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
   }
   const m = mods[sel];
@@ -1474,14 +1487,16 @@ function onAct(el) {
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
-    case 'ench-mod': ui.enchantSel = +d.i; return render();
+    case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
+    case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
+    case 'corrupt-do': { const c = run.corrupting; if (c && corrupt(run, c.u, c.opts[+d.i], msgs)) pushMsgs(msgs); run.corrupting = null; ui.sheet = null; saveRun(); return render(); }
     case 'ench-back': ui.enchantSel = null; return render();
     case 'ench-skip': { ui.enchantSel = null; if (ui.sheet) ui.sheet = null; else if (run.pending[0] && run.pending[0].type === 'rune') run.pending.shift(); saveRun(); return render(); }
     case 'ench-apply': {
       const fromRune = !ui.sheet && run.pending[0] && run.pending[0].type === 'rune';
       const mods = fromRune ? run.pending[0].mods : ui.enchantMods, m = mods[ui.enchantSel];
       const f = findPiece(run, +d.u);
-      if (f && applyPrefix(run, +d.u, m)) toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill');
+      if (f && applyPrefix(run, +d.u, m, msgs)) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill'); pushMsgs(msgs); }
       ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
     }
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }

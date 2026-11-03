@@ -456,7 +456,7 @@ Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => own(h.name, 'Hidden Path ' + 
 Object.entries(C.TRAIT_POOL).forEach(([k, T]) => own(T.name, 'enemy trait ' + k));
 Object.entries(G.REACTIONS).forEach(([k, r]) => own(r.name, 'reaction ' + k));
 Object.entries(G.MILESTONES).forEach(([k, m]) => own(m.name, 'milestone ' + k));
-Object.entries(G.PREFIXES).forEach(([k, p]) => own(p.name, 'rune ' + k));
+Object.entries(G.PREFIXES).filter(([, p]) => !p.hide).forEach(([k, p]) => own(p.name, 'rune ' + k)); // [REDACTED] stand-ins share its name on purpose
 Object.entries(owners).filter(([, w]) => w.length > 1).forEach(([n, w]) => err(`name "${n}"`, `used by ${w.join(' and ')}. One name, one thing`));
 
 // ---------- The effect lists in docs/CONTENT.md, written from the content itself ----------

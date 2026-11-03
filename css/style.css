@@ -815,6 +815,8 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .log p.t-ghost { color: var(--bad); opacity: .75; text-decoration: line-through; text-decoration-color: rgba(255,107,98,.5); }
 /* An inserted option (glitched content): still a normal, pickable choice */
 .choice.inserted { border: 1px dashed var(--bad); border-left: 3px solid var(--bad); background: rgba(255,107,98,.06); }
+/* Glitched prefixes and Corrupt at the Enchanter: the same look as an inserted option */
+.choice.glitch { border: 1px dashed var(--bad); border-left: 3px solid var(--bad); background: rgba(255,107,98,.06); }
 .choice .ins-tag { display: block; font: 600 11px var(--f-m); color: var(--bad); letter-spacing: .04em; margin-bottom: 2px; text-shadow: -1px 0 rgba(255,46,90,.6), 1px 0 rgba(114,208,255,.6); }
 
 /* ---------- Top strip (board screens): one header instead of a top bar, bracket dots and a champion card ---------- */

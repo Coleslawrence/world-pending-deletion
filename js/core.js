@@ -25,9 +25,20 @@ function pieceDef(id) { return GEAR[id] || SKILLS[id]; }
 function baseId(id) { return (SKILLS[id] && SKILLS[id].base) || id; }
 
 // ---------- Prefixes (skills only; PREFIXES and MAX_MODS live in js/content/prefixes.js) ----------
-function prefixOk(id, m, mods) { const d = SKILLS[id]; if (!d || d.basic) return false; if ((mods || []).includes(m)) return false; const P = PREFIXES[m]; return !P.ok || P.ok(d); }
-// With run, only prefixes at least one of its skills can take, so every offered rune is pickable
-function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).filter(k => (!forId || prefixOk(forId, k, [])) && (!run || prefixTargets(run, k).length)); if (!keys.length) return []; const out = []; let g = 0; while (out.length < n && g++ < 100) { const k = wpick(keys, keys.map(x => PREFIXES[x].w), rng); if (!out.includes(k)) out.push(k); } return out; }
+// A prefix's real key: a [REDACTED] stand-in (r_<glitch>) counts as the glitch it hides
+const bareMod = m => (PREFIXES[m] && PREFIXES[m].hide) || m;
+const GLITCH_PREFIXES = Object.keys(PREFIXES).filter(k => PREFIXES[k].glitch && !PREFIXES[k].hide && k !== 'redacted');
+function prefixOk(id, m, mods) {
+  const d = SKILLS[id]; if (!d || d.basic) return false;
+  const have = (mods || []).map(bareMod);
+  if (m === 'redacted') return GLITCH_PREFIXES.some(k => !have.includes(k) && prefixOk(id, k, mods));
+  if (have.includes(bareMod(m))) return false; const P = PREFIXES[m]; return !P.ok || P.ok(d);
+}
+// Glitches (glitched prefixes, gear and the like) are on everywhere but Pending World
+function glitchesOn(run) { return !!run && !run.daily; }
+// With run, only prefixes at least one of its skills can take, so every offered rune is pickable. Glitched prefixes need
+// a run where glitches are on; [REDACTED] stand-ins and Corrupt results are never offered.
+function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).filter(k => PREFIXES[k].w > 0 && (!PREFIXES[k].glitch || glitchesOn(run)) && (!forId || prefixOk(forId, k, [])) && (!run || prefixTargets(run, k).length)); if (!keys.length) return []; const out = []; let g = 0; while (out.length < n && g++ < 100) { const k = wpick(keys, keys.map(x => PREFIXES[x].w), rng); if (!out.includes(k)) out.push(k); } return out; }
 function moddedDef(id, mods) {
   const base = SKILLS[id];
   const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: 1 });
@@ -549,10 +560,10 @@ function checkMerges(run, msgs) {
     const need = mergeNeed(run, hit[0].id);
     const parts = hit.slice().sort((a, b) => rankLoc(run, a) - rankLoc(run, b)).slice(0, need);
     const keep = parts[0];
-    const mods = [];
-    parts.forEach(p => p.mods.forEach(m => { if (!mods.includes(m) && mods.length < MAX_MODS) mods.push(m); }));
+    const mods = [], corrupt = parts.some(p => p.corrupt), cap = corrupt ? MAX_MODS_CORRUPT : MAX_MODS;
+    parts.forEach(p => p.mods.forEach(m => { if (!mods.some(o => bareMod(o) === bareMod(m)) && mods.length < cap) mods.push(m); }));
     parts.slice(1).forEach(p => removePiece(run, p.u));
-    keep.star++; keep.mods = mods;
+    keep.star++; keep.mods = mods; if (corrupt) keep.corrupt = true;
     if (run.merges > 0) run.merges--;
     msgs && msgs.push({ t: 'merge', text: `[Merge! ${pieceDef(keep.id).name} is now ★${keep.star}.]` });
     questEvent(run, 'merge', {}, msgs);
@@ -597,7 +608,13 @@ function equipBest(run, u) {
 // ---------- Archetype counts, passives ----------
 function archCounts(barPieces, gearPieces, gifts) {
   const seen = new Set(), c = {};
-  barPieces.concat(gearPieces).filter(Boolean).forEach(p => { const b = baseId(p.id); if (seen.has(b)) return; seen.add(b); pieceDef(b).tags.forEach(t => c[t] = (c[t] || 0) + 1); });
+  barPieces.concat(gearPieces).filter(Boolean).forEach(p => {
+    const b = baseId(p.id); if (seen.has(b)) return; seen.add(b);
+    const tags = pieceDef(b).tags.slice();
+    // Misfiled: the skill also counts as its class's two neighbours on the wheel
+    if ((p.mods || []).some(m => bareMod(m) === 'misfiled') && tags.length) themeNear(tags[0]).forEach(t => { if (!tags.includes(t)) tags.push(t); });
+    tags.forEach(t => c[t] = (c[t] || 0) + 1);
+  });
   if (gifts && gifts.includes('monarch')) Object.keys(c).forEach(k => c[k]++);
   (gifts || []).forEach(g => { if (GIFTS[g] && GIFTS[g].arch && c[GIFTS[g].arch]) c[GIFTS[g].arch]++; });
   return c;
@@ -613,7 +630,7 @@ function sanitizeSnap(x, owner) {
   if (!x || typeof x !== 'object') return null;
   const str = (v, n) => String(v == null ? '' : v).slice(0, n);
   const num = (v, a, b, d) => { v = Number(v); return Number.isFinite(v) ? clamp(Math.round(v), a, b) : d; };
-  const bar = (Array.isArray(x.bar) ? x.bar : []).slice(0, 5).filter(p => p && SKILLS[p.id] && !SKILLS[p.id].basic).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), mods: (Array.isArray(p.mods) ? p.mods : []).filter(m => PREFIXES[m]).slice(0, 2) }));
+  const bar = (Array.isArray(x.bar) ? x.bar : []).slice(0, 5).filter(p => p && SKILLS[p.id] && !SKILLS[p.id].basic).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1), mods: (Array.isArray(p.mods) ? p.mods : []).filter(m => typeof m === 'string' && PREFIXES[m] && !PREFIXES[m].player).map(bareMod).filter(m => !PREFIXES[m].player).slice(0, MAX_MODS_CORRUPT) }));
   const gear = (Array.isArray(x.gear) ? x.gear : []).slice(0, 3).filter(p => p && GEAR[p.id]).map(p => ({ id: p.id, star: num(p.star, 1, 3, 1) }));
   const stats = {}; STATS.forEach(k => stats[k] = num(x.stats && x.stats[k], 0, 30, 2));
   const gifts = (Array.isArray(x.gifts) ? x.gifts : []).filter(k => GIFTS[k] && GIFTS[k].cat !== 'flaw').slice(0, 10);
@@ -1060,11 +1077,48 @@ function visitDue(run) {
 function applyAlways(run) { const A = run.always; if (!A) return; const c = { run, msgs: [] }; ['next', 'foe'].forEach(k => A[k] && OUTCOME_APPLY[k](A[k], c)); }
 // Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
 function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
-function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
-function applyPrefix(run, u, m) {
-  const f = findPiece(run, u); if (!f || !prefixOk(f.p.id, m, f.p.mods)) return false;
+// A corrupted skill takes no more prefixes
+function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && !p.corrupt && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
+// Carve prefix m into piece u. [REDACTED] becomes a hidden glitch that fits the skill; a glitch raises the System's notice.
+function applyPrefix(run, u, m, msgs, rng) {
+  const f = findPiece(run, u); if (!f || f.p.corrupt || !prefixOk(f.p.id, m, f.p.mods)) return false;
+  if (m === 'redacted') { const have = f.p.mods.map(bareMod), ks = GLITCH_PREFIXES.filter(k => !have.includes(k) && prefixOk(f.p.id, k, f.p.mods)); m = 'r_' + pick(ks, stream(run, 'loot', rng)); }
   if (f.p.mods.length >= MAX_MODS) f.p.mods.shift();
-  f.p.mods.push(m); return true;
+  f.p.mods.push(m);
+  if (PREFIXES[m].glitch) OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] });
+  return true;
+}
+// ---------- Corrupt (the Enchanter) ----------
+// Gamble one skill: two results are rolled and the player keeps one. Either way the skill is corrupted: it holds one more
+// prefix and can take no more, and the System takes notice.
+function corruptTargets(run) { return allPieces(run).filter(p => SKILLS[p.id] && !SKILLS[p.id].basic && !p.corrupt); }
+function corruptOptions(run, u, rng) {
+  const f = findPiece(run, u); if (!f || f.p.corrupt || !SKILLS[f.p.id] || SKILLS[f.p.id].basic) return null;
+  const p = f.p, r = stream(run, 'loot', rng), have = p.mods.map(bareMod);
+  const fits = ks => ks.filter(k => !have.includes(k) && prefixOk(p.id, k, p.mods));
+  const glitches = glitchesOn(run) ? fits(GLITCH_PREFIXES) : [];
+  const normal = fits(Object.keys(PREFIXES).filter(k => PREFIXES[k].w > 0 && !PREFIXES[k].glitch));
+  const all = [];
+  if (p.star < 3) all.push({ k: 'star' });
+  if (glitches.length) all.push({ k: 'mod', m: pick(glitches, r) });
+  if (normal.length) all.push({ k: 'mod', m: pick(normal, r) });
+  if (!have.includes('overclocked')) all.push({ k: 'mod', m: 'overclocked' });
+  const out = [];
+  while (out.length < 2 && all.length) out.push(all.splice(Math.floor(rnd(r) * all.length), 1)[0]);
+  return { u, opts: out };
+}
+function corruptText(o) { return o.k === 'star' ? 'One star higher' : `Gains ${PREFIXES[o.m].name}: ${PREFIXES[o.m].desc}`; }
+function corrupt(run, u, o, msgs) {
+  const f = findPiece(run, u); if (!f || f.p.corrupt || !o) return false;
+  const p = f.p, name = SKILLS[p.id].name;
+  if (o.k === 'star' && p.star < 3) {
+    p.star++;
+    if (p.star === 3 && SKILLS[p.id].evo) { run.pending.push({ type: 'evo', u: p.u }); msgs && msgs.push({ t: 'skill', text: `[${name} has reached ★3. Evolution available.]` }); }
+  } else if (o.k === 'mod' && PREFIXES[o.m]) { if (p.mods.length >= MAX_MODS_CORRUPT) p.mods.shift(); p.mods.push(o.m); }
+  p.corrupt = true;
+  msgs && msgs.push({ t: 'skill', text: `[Corrupted: ${name}. ${corruptText(o)}. It will take no more prefixes.]` });
+  OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] });
+  return true;
 }
 
 // ---------- Quests ----------
@@ -1414,6 +1468,8 @@ function newFight(run, rng) {
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
+  // Overflow from your last win: the overkill lands before this fight starts (at most a quarter of their HP)
+  if (run.overflow > 0 && !run.practice) { const v = Math.min(run.overflow, Math.round(B.maxHp * 0.25)); B.hp -= v; say(f, `[Overflow: ${v} damage carried over from your last fight.]`, 'skill'); }
   planIntent(f, B);
   startTurn(f, A, true);
   return f;
@@ -1629,6 +1685,7 @@ function useSkill(f, X, s, opt) {
     }
     if (hits >= 2 && X.P.multiWeaken && Y.hp > 0) { Y.weaken = Math.max(Y.weaken, 1); react(f, X, Y); }
   }
+  if (fx.overflow && X.isPlayer && Y.hp < 0) f.overflowOut = Math.max(f.overflowOut || 0, Math.round(-Y.hp)); // Overflow: overkill carries over
   if (fx.brk && Y.hp > 0) addBreak(f, X, Y, fx.brk * p);
   if (!fx.perHit) applyStatus(f, X, Y, fx, p);
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
@@ -1735,6 +1792,10 @@ function playerAct(f, idx) {
   if (s.def.quick) s.cd += 1; // quick skills tick at the end of this same turn
   if (s.def.quick && A.quickFree > 0) { A.quickFree--; s.cd = 1; say(f, `[Hourglass: ${s.def.name} has no cooldown.]`, 'skill'); }
   else if (A.firstFree && !s.def.basic && !s.def.cheat) { A.firstFree = false; s.cd = s.def.quick ? 1 : 0; say(f, `[Archmage: ${s.def.name} has no cooldown.]`, 'skill'); }
+  // Unbound: no cooldown of its own, so another ready skill goes on cooldown instead
+  if (s.def.fx.unbound) { const o = A.skills.filter(x => x !== s && x.key !== 'attack' && !x.def.cheat && x.cd <= 0 && (x.def.cd || 0) > 0); if (o.length) { const t = o[Math.floor(rnd(f.rng) * o.length)]; t.cd = t.def.cd + 1; say(f, `[Unbound: ${t.def.name} is on cooldown instead.]`, 'skill'); } }
+  // [REDACTED]: the prefix is disclosed on the skill's first use (the run's piece is updated when the fight is settled)
+  if (s.u && (s.mods || []).some(m => PREFIXES[m] && PREFIXES[m].hide) && !(f.disclosed || {})[s.u]) { f.disclosed = Object.assign(f.disclosed || {}, { [s.u]: true }); say(f, `[Disclosure: the [REDACTED] prefix on ${s.def.name} is ${s.mods.filter(m => PREFIXES[m].hide).map(m => PREFIXES[PREFIXES[m].hide].name).join(', ')}.]`, 'skill'); }
   f.useCounts[s.key] = (f.useCounts[s.key] || 0) + 1;
   if (s.key !== 'attack' && s.key !== 'copycat' && !s.def.quick) f.lastPlayerSkill = s;
   if (s.def.quick) { f.tally.quickTurn++; f.tally.maxQuick = Math.max(f.tally.maxQuick, f.tally.quickTurn); } else f.tally.quickTurn = 0;
@@ -1856,7 +1917,9 @@ function previewSkill(f, s) {
   if (fx.xburn) parts.push(`+Burn ${Math.round(fx.xburn * p)}`);
   if (fx.xpoison) parts.push(`+Poison ${Math.round(fx.xpoison * p)}`);
   if (fx.xbleed) parts.push(`+Bleed ${Math.round(fx.xbleed * p)}`);
-  if (fx.echo) parts.push('30% echo');
+  if (fx.echo) parts.push(fx.echo >= 1 ? 'Casts twice' : `${Math.round(fx.echo * 100)}% echo`);
+  if (fx.unbound) parts.push('Locks another skill');
+  if (fx.overflow) parts.push('Overflow');
   return parts.join(' · ');
 }
 function describe(def, p = 1) {
@@ -1901,7 +1964,9 @@ function describe(def, p = 1) {
   if (fx.xburn) r.push(`Also apply ${n(fx.xburn)} Burn.`);
   if (fx.xpoison) r.push(`Also apply ${n(fx.xpoison)} Poison.`);
   if (fx.xbleed) r.push(`Also apply ${n(fx.xbleed)} Bleed.`);
-  if (fx.echo) r.push(`${fx.echo * 100}% chance to cast twice.`);
+  if (fx.echo) r.push(fx.echo >= 1 ? 'Always casts twice.' : `${fx.echo * 100}% chance to cast twice.`);
+  if (fx.unbound) r.push('No cooldown; using it puts one of your other skills on cooldown.');
+  if (fx.overflow) r.push('Damage past 0 HP from its killing blow carries into your next fight.');
   if (fx.selfDmg) r.push(`Costs ${fx.selfDmg} HP.`);
   if (def.quick) r.push("Quick: doesn't end your turn.");
   return r.join(' ');
@@ -1921,6 +1986,9 @@ function resolveFight(run, f, meta, rng) {
   bindMeta(meta);
   run.hp = Math.max(0, f.A.hp);
   if (f.usedBreath) run.usedBreath = true;
+  // Glitches settled by the fight: Overflow carries into the next one only after a win; [REDACTED] prefixes used are disclosed
+  run.overflow = won && f.overflowOut ? f.overflowOut : 0;
+  Object.keys(f.disclosed || {}).forEach(u => { const p = findPiece(run, +u); if (p) p.p.mods = p.p.mods.map(bareMod); });
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
   if ((spec.kind === 'rival' || (spec.kind === 'final' && !spec.snap)) && won) meta.archive.beat[spec.id] = true;
@@ -2299,7 +2367,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
