@@ -702,7 +702,6 @@ function scoutLine(spec) {
 function momentOf() {
   const m = [];
   if (broadcastOn()) m.push('broadcast');
-  if (['choose', 'shop', 'district'].includes(ui.screen) && !ui.sheet && undercityPending()) m.push('chat');
   const br = breakingLevel(); if (br) m.push('breaking'); if (br > 1) m.push('breaking-full');
   if (!REDUCED && ui.screen === 'fight' && ui.fight && erosionLevel(ui.fight) > 0) m.push('erosion');
   return m.join(' ');
@@ -729,30 +728,14 @@ function broadcastSplash(f) {
   const done = () => el.remove();
   el.addEventListener('pointerdown', done); app.appendChild(el); setTimeout(done, 1100);
 }
-// K The Gods' group chat: Undercity events arrive as a chat the System cannot see, and the gods speak at big moments.
-// Big moments only (Slaw, 2026-11-02): a Gatekeeper or Final opening, a Break, a big hit, first time near death; at most 2 a fight.
-function chatGod() { return GODS[run && run.patron] ? run.patron : 'trick'; }
-function godLine(g, kind, salt) { const L = GODS[g] && GODS[g].chat && GODS[g].chat[kind]; return L && L.length ? L[Math.abs(hashStr(String(salt) + kind)) % L.length] : null; }
-function godChat(f, kind, sure) {
-  if (!f || f.over || (f.godN || 0) >= 2 || (f.godSaid && f.godSaid[kind])) return;
-  if (!sure && Math.random() < 0.5) return;
-  const g = chatGod(), text = godLine(g, kind, (run.seed || '') + run.round + (f.godN || 0) + f.B.name); if (!text) return;
-  f.godN = (f.godN || 0) + 1; f.godSaid = Object.assign(f.godSaid || {}, { [kind]: 1 });
-  f.log.push({ t: 'god', g, text }); if (f.log.length > 40) f.log.shift();
-}
 function logLine(l, isNew) {
-  if (l.t === 'god' && GODS[l.g]) return `<p class="t-god g-${esc(l.g)} ${isNew ? 'new' : ''}"><span class="gav">${esc(GODS[l.g].short[0])}</span><span class="gbub"><b>${esc(GODS[l.g].short)}</b>${esc(l.text)}</span></p>`;
   return `<p class="t-${l.t} ${isNew ? 'new' : ''}">${esc(l.text)}</p>`;
 }
-function undercityPending() { const p = run && run.pending && run.pending[0]; return !!(p && p.type === 'event' && p.from === 'undercity' && EVENTS[p.key] && !EVENTS[p.key].crisis); }
-function endChat(erased, snap) { const g = chatGod(), t = godLine(g, erased ? 'erased' : 'spared', snap && snap.at); return t ? `<div class="kc-msg end-chat g-${esc(g)}"><span class="gav">${esc(GODS[g].short[0])}</span><span class="gbub"><b>${esc(GODS[g].short)}</b>${esc(t)}</span></div>` : ''; }
-function chatHead(E) { return `<div class="kc-pill">[The System cannot see this chat.]</div>`; }
-function chatJoin(key) { const g = chatGod(), t = godLine(g, 'undercity', (run.seed || '') + key); return t ? `<div class="kc-sys">${esc(GODS[g].short)} joined the chat</div><div class="kc-msg g-${esc(g)}"><span class="gav">${esc(GODS[g].short[0])}</span><span class="gbub"><b>${esc(GODS[g].short)}</b>${esc(t)}</span></div><div class="kc-sys">${esc(GODS[g].short)} left the chat</div>` : ''; }
 
 // I The System is breaking: it strains under your streak. Subtle at notice 3 (headers flicker), full at notice 5 and
 // on the System's own events (split colour, a ghost correction in the fight log). Options, costs and numbers never scramble.
 // An event option with glitch: true shows as an inserted Option 4 (built with the glitched-content work).
-function systemPending() { const p = run && run.pending && run.pending[0], E = p && p.type === 'event' && EVENTS[p.key]; return !!(E && E.theme === 'system' && !E.crisis && p.from !== 'undercity'); }
+function systemPending() { const p = run && run.pending && run.pending[0], E = p && p.type === 'event' && EVENTS[p.key]; return !!(E && E.theme === 'system' && !E.crisis); }
 function breakingLevel() {
   if (!run || run.practice || !['choose', 'shop', 'district', 'fight'].includes(ui.screen)) return 0;
   if (ui.screen !== 'fight' && !ui.sheet && systemPending()) return 2;
@@ -845,7 +828,6 @@ function chipsHTML(X, f) {
 function updateFight() {
   const f = ui.fight; if (!f) return;
   applyMoment();
-  if (f.A && f.A.hp > 0 && f.A.hp < f.A.maxHp * 0.2) godChat(f, 'low', true);
   [['A', f.A], ['B', f.B]].forEach(([k, X]) => {
     const hp = document.getElementById('hp' + k); if (!hp) return;
     hp.textContent = `${n0(X.hp)} / ${X.maxHp}`;
@@ -904,12 +886,12 @@ function playEvents(f) {
   let d = 0;
   f.events.forEach(e => {
     const at = d;
-    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); if (e.side === 'A' && e.amt >= f.A.maxHp * EROSION.bigHit) { tearFx(); godChat(f, 'hurt'); } } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
+    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); if (e.side === 'A' && e.amt >= f.A.maxHp * EROSION.bigHit) tearFx(); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
     else if (e.k === 'dot' && e.amt > 0) { setTimeout(() => floatAt(e.side, e.amt, e.kind), at); d += 90; }
     else if (e.k === 'heal') { setTimeout(() => { floatAt(e.side, '+' + e.amt, 'heal'); sfx('heal'); }, at); d += 90; }
     else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
     else if (e.k === 'reaction') { setTimeout(() => { floatAt(e.side, e.name + '!', 'react'); stamp(e.side, e.name, 'rx'); sfx('react'); }, at); d += 220; }
-    else if (e.k === 'break') { setTimeout(() => { breakFx(e.side); if (e.side === 'B') { godChat(f, 'brk'); updateFight(); } }, at); d += 420; }
+    else if (e.k === 'break') { setTimeout(() => breakFx(e.side), at); d += 420; }
     else if (e.k === 'phase') { setTimeout(() => { floatAt(e.side, 'Phase 2', 'react'); shake(e.side); }, at); d += 200; }
   });
   f.events = [];
@@ -947,7 +929,6 @@ function startFightUI() {
   if (f.spec.gate && !run.gateSeen) { run.gateSeen = true; say2(f, '[Gatekeeper assigned. Passage is a privilege.]', 'sys'); }
   if (f.spec.kind === 'final') say2(f, run.pair ? `[Final. ${run.world.name} against ${f.spec.snap ? f.spec.snap.worldName || pairOf(run).name : pairOf(run).name}. One world is spared. The other is not.]` : `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
-  if (broadcastFight(f.spec)) godChat(f, 'gate', true);
   render(); playEvents(f); updateFight(); broadcastSplash(f);
 }
 const wait = ms => new Promise(r => setTimeout(r, ms / ui.speed));
@@ -1078,9 +1059,8 @@ function pendingSheet() {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
     const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}. Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. What you say on air happens to the Hearts you carry.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
-    const chat = p.from === 'undercity' && !E.crisis;
-    const lead = chat ? `${chatHead(E)}<div class="kc-msg unk"><span class="gav">?</span><span class="gbub"><b>Unknown sender</b>${esc(eventText(run, p.key))}</span></div>${chatJoin(p.key)}${chainTag}${evHint}<div class="kc-sys kc-reply">Reply</div>` : `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
-    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : chat ? 'kchat' : E.chain ? 'sys' : '');
+    const lead = `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
+    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
@@ -1341,7 +1321,6 @@ function endHTML() {
   const lines = (e.observed ? [e.observed] : []).concat(erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`].concat(e.filed ? [`[${s.worldName}'s records remain on file.]`] : []).concat(e.opened ? [] : ['[Next world.]']) : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`], e.opened ? [`[Rank Trial unlocked: ${e.opened}-rank. It waits in your next world.]`] : []);
   return `<main class="screen title end ${erased ? 'erased' : 'spared'}">${broadcastTicker(erased ? `++ BREAKING +++ [Entrant eliminated. ${s.worldName} is erased.] +++` : `++ LIVE +++ [${s.worldName} is spared.] +++`)}<div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
-    ${endChat(erased, s)}
     ${runCard(s, { erased, big: true })}</div>
     <div class="t-stats"><div><b>${s.round}</b><span>round</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div><div><b>+${e.rp || 0}</b><span>RP</span></div></div>
     ${shareBlock(s, erased)}
