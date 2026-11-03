@@ -34,11 +34,18 @@ function prefixOk(id, m, mods) {
   if (m === 'redacted') return GLITCH_PREFIXES.some(k => !have.includes(k) && prefixOk(id, k, mods));
   if (have.includes(bareMod(m))) return false; const P = PREFIXES[m]; return !P.ok || P.ok(d);
 }
-// Glitches (glitched prefixes, gear and the like) are on everywhere but Pending World
-function glitchesOn(run) { return !!run && !run.daily; }
+// Glitches (glitched prefixes, gear and the like) are on everywhere but Pending World, which gets them only on Glitch Day
+function glitchesOn(run) { return !!run && (!run.daily || glitchDay(run.daily)); }
+// Glitch Day: one game day a week (GLITCH_DAY.weekday, 0 = Sunday) Pending World runs on a Corrupted Save, with glitches
+// on. Days before GLITCH_DAY.from never are, so shipping it never changes a day already played.
+// SHIP STEP: set from to the first glitch weekday after the release that ships Glitch Day.
+const GLITCH_DAY = { weekday: 5, from: '2026-11-13' };
+function glitchDay(date) { return !!date && date >= GLITCH_DAY.from && new Date(date + 'T00:00:00Z').getUTCDay() === GLITCH_DAY.weekday; }
+// A Corrupted Save world doubles every glitch chance
+function glitchMul(run) { return run && run.world && run.world.mod === 'corrupted' ? 2 : 1; }
 // With run, only prefixes at least one of its skills can take, so every offered rune is pickable. Glitched prefixes need
 // a run where glitches are on; [REDACTED] stand-ins and Corrupt results are never offered.
-function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).filter(k => PREFIXES[k].w > 0 && (!PREFIXES[k].glitch || glitchesOn(run)) && (!forId || prefixOk(forId, k, [])) && (!run || prefixTargets(run, k).length)); if (!keys.length) return []; const out = []; let g = 0; while (out.length < n && g++ < 100) { const k = wpick(keys, keys.map(x => PREFIXES[x].w), rng); if (!out.includes(k)) out.push(k); } return out; }
+function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).filter(k => PREFIXES[k].w > 0 && (!PREFIXES[k].glitch || glitchesOn(run)) && (!forId || prefixOk(forId, k, [])) && (!run || prefixTargets(run, k).length)); if (!keys.length) return []; const out = [], m = glitchMul(run); let g = 0; while (out.length < n && g++ < 100) { const k = wpick(keys, keys.map(x => PREFIXES[x].w * (PREFIXES[x].glitch ? m : 1)), rng); if (!out.includes(k)) out.push(k); } return out; }
 function moddedDef(id, mods) {
   const base = SKILLS[id];
   const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: 1 });
@@ -273,7 +280,7 @@ function dailySeed(date) { return 'wpd:' + date; }
 // Pending World days before WORLD_GEN.from keep the world the old generator made, so shipping layered worlds never
 // changes a day already under way. SHIP STEP: set from to the game day after the release that ships layered worlds.
 const WORLD_GEN = { from: '2026-11-02' };
-function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'); return date >= WORLD_GEN.from ? genWorld(rng) : genWorldV1(rng); }
+function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'), w = date >= WORLD_GEN.from ? genWorld(rng) : genWorldV1(rng); if (glitchDay(date)) w.mod = 'corrupted'; return w; }
 // w: the day's world (or just its type, for a world without layers)
 function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w); }
 // Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
@@ -296,6 +303,10 @@ function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k
 // ---------- Worlds ----------
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
 const MOD_W = [30, 15, 15, 15, 15];
+// The modifiers in the normal draw (MOD_W is theirs, in order). A glitch modifier (Corrupted Save) comes another way
+const modKeys = () => Object.keys(MODIFIERS).filter(k => !MODIFIERS[k].glitch);
+// A world offer is sometimes a Corrupted Save (never in Pending World, which gets it on Glitch Day)
+const CORRUPT_WORLD = 0.05;
 const worldRank = (rng, cap) => cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
 const pickKey = (o, rng, type) => { const k = Object.keys(o).filter(x => suits(o[x], type)); return k.length ? pick(k, rng) : null; };
 // Syllables join cleanly: two vowels meeting lose the second, and no letter appears three times running
@@ -315,7 +326,7 @@ function genWorld(rng, cap) {
   const mix = CONFLUENCE.chance && rnd(rng) < CONFLUENCE.chance ? pick(types.filter(k => k !== type && settingOf(k) === settingOf(type)), rng) || null : null;
   const name = worldName(T, mix && WORLD_TYPES[mix], rng), rank = worldRank(rng, cap);
   const fate = pickKey(FATES, rng, type), people = pickKey(PEOPLES, rng, type), M = fate && FATES[fate].mods;
-  const mod = M ? wpick(Object.keys(M), Object.values(M), rng) : wpick(Object.keys(MODIFIERS), MOD_W, rng);
+  const mod = M ? wpick(Object.keys(M), Object.values(M), rng) : wpick(modKeys(), MOD_W, rng);
   const w = { v: 2, type, name, rank, mod, champ: pick(T.champs, rng) };
   if (fate) w.fate = fate; if (people) w.people = people; if (mix) w.mix = mix;
   return w;
@@ -324,7 +335,7 @@ function genWorld(rng, cap) {
 function genWorldV1(rng, cap) {
   const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
   const name = pick(T.names[0].slice(0, 6), rng) + pick(T.names[1].slice(0, 6), rng);
-  const rank = worldRank(rng, cap), mod = wpick(Object.keys(MODIFIERS), MOD_W, rng);
+  const rank = worldRank(rng, cap), mod = wpick(modKeys(), MOD_W, rng);
   return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs.slice(0, 6), rng) };
 }
 // A world's class pool: its home, the home's two wheel neighbours and the type's fixed guest. A Confluence world takes
@@ -351,6 +362,7 @@ function offerWorlds(meta, rng) {
   const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0;
   while (out.length < n && guard++ < 80) {
     const w = genWorld(rng, cap), st = staleWorld(meta, w);
+    if (rnd(rng) < CORRUPT_WORLD) w.mod = 'corrupted';
     if ((seen.has(w.type) && guard < 50) || (st === 2 && guard < 70) || (st === 1 && guard < 40)) continue;
     seen.add(w.type); out.push(w);
   }
@@ -479,15 +491,15 @@ function rollPiece(run, rng, opts = {}) {
   for (let k = 0; k < 5; k++) {
     const want = ranks[clamp(r - k, 0, 4)];
     const c = pool.filter(id => pieceDef(id).rank === want);
-    if (c.length) { const id = wpick(c, c.map(x => isGear(x) ? 0.75 : 1), rng); return { id: !glitchesOn(run) ? id : isGear(id) ? glitchGear(id, pool, rng) : glitchSkill(id, rng), mods: !isGear(id) && rnd(rng) < 0.12 ? rollPrefixes(1, rng, id) : [] }; }
+    if (c.length) { const id = wpick(c, c.map(x => isGear(x) ? 0.75 : 1), rng); return { id: !glitchesOn(run) ? id : isGear(id) ? glitchGear(id, pool, rng, glitchMul(run)) : glitchSkill(id, rng, glitchMul(run)), mods: !isGear(id) && rnd(rng) < 0.12 ? rollPrefixes(1, rng, id) : [] }; }
   }
   return null;
 }
 // Now and then a gear offer comes up glitched (where glitches are on): Spliced with another gear piece from the pool, or
 // MissingNo. GLITCH_GEAR is the chance per gear offer.
 const GLITCH_GEAR = 0.06;
-function glitchGear(id, pool, rng) {
-  if (rnd(rng) >= GLITCH_GEAR) return id;
+function glitchGear(id, pool, rng, mul) {
+  if (rnd(rng) >= GLITCH_GEAR * (mul || 1)) return id;
   if (rnd(rng) < 0.3) return 'missingno';
   const other = pick(pool.filter(x => isGear(x) && x !== id && !GEAR[x].glitch), rng);
   return other && spliceGear(spliceId(id, other)) ? spliceId(id, other) : id;
@@ -501,14 +513,14 @@ const GLITCH_TRAIT = 0.15;
 function rollTraits(run, n, rng, have) {
   have = have || [];
   const out = shuffle(Object.keys(TRAIT_POOL).filter(k => !TRAIT_POOL[k].glitch && !have.includes(k)), rng).slice(0, n);
-  if (out.length && glitchesOn(run) && rnd(rng) < GLITCH_TRAIT) {
+  if (out.length && glitchesOn(run) && rnd(rng) < GLITCH_TRAIT * glitchMul(run)) {
     const g = Object.keys(TRAIT_POOL).filter(k => TRAIT_POOL[k].glitch && !have.includes(k));
     if (g.length) out[out.length - 1] = pick(g, rng);
   }
   return out;
 }
-function glitchSkill(id, rng) {
-  if (rnd(rng) >= GLITCH_SKILL) return id;
+function glitchSkill(id, rng, mul) {
+  if (rnd(rng) >= GLITCH_SKILL * (mul || 1)) return id;
   if (SKILLS[id].evo && rnd(rng) < 0.6 && unstableSkill('u_' + id)) return 'u_' + id;
   return rnd(rng) < 0.5 ? 'error_skill' : 'stack_overflow';
 }
@@ -973,7 +985,7 @@ function undercityEvent(run, rng) {
   const open = k => !EVENTS[k].chain && !EVENTS[k].crisis && !EVENTS[k].visit && (!EVENTS[k].glitch || glitchesOn(run)) && (!EVENTS[k].can || EVENTS[k].can(run));
   const fresh = Object.keys(EVENTS).filter(k => open(k) && !(run.seen || []).includes(k));
   const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(open)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
-  const w = keys.map(k => (EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1) * (worldTagged(run, EVENTS[k]) ? WORLD_LEAN : 1));
+  const w = keys.map(k => (EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1) * (worldTagged(run, EVENTS[k]) ? WORLD_LEAN : 1) * (EVENTS[k].glitch ? glitchMul(run) : 1));
   return wpick(keys, w, rng);
 }
 // An event tagged with a Fate or People (fate: id, people: id, or lists of them) turns up WORLD_LEAN times as often in a world that has it
@@ -2444,7 +2456,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,

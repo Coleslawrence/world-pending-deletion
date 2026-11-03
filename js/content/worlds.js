@@ -19,4 +19,6 @@ const MODIFIERS = {
   famine: { name: 'Famine', desc: 'Healing after fights and at the Infirmary is halved.' },
   golden: { name: 'Rich Tithes', desc: '+2 gold every round.' },
   restless: { name: 'Restless Dead', desc: 'Erased champions appear more often.' },
+  // glitch: never in the normal draw. A world offer is sometimes one, and Pending World runs on one each Glitch Day (core.js)
+  corrupted: { name: 'Corrupted Save', desc: 'Glitches turn up twice as often.', glitch: true },
 };
