@@ -1,6 +1,6 @@
 // ===== [World Pending Deletion] — content: enemies =====
 'use strict';
-// theme: the archetype (or two neighbours) an enemy fights like, from the wheel in archetypes.js. The System's own
+// theme: the archetype (or two allies) an enemy fights like, from the grid in archetypes.js. The System's own
 // examiners and legends have none.
 const ENEMIES = {
   goblin: { name: 'Goblin Pit-Fighter', style: 'Fast, dirty fighter', tier: 1, theme: ['blade', 'venom'], rank: 'E', hp: 40, skills: [{ n: 'Shiv', fx: { dmg: 8 } }, { n: 'Dirty Trick', fx: { dmg: 3, weaken: 1 } }], script: [0, 0, 1] },
@@ -8,7 +8,7 @@ const ENEMIES = {
   drake: { name: 'Venom Drake', style: 'Poisons, then waits', tier: 1, theme: 'venom', rank: 'E', hp: 44, skills: [{ n: 'Bite', fx: { dmg: 7 } }, { n: 'Venom Spit', fx: { poison: 4 } }], script: [1, 0, 0] },
   ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, theme: ['venom', 'blade'], rank: 'E', hp: 42, skills: [{ n: 'Claw', fx: { dmg: 4, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 4, lifesteal: 1 } }], script: [0, 0, 1] },
   imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, theme: 'pyre', rank: 'E', hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 5, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
-  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, theme: ['bastion', 'storm'], rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 22 } }, { n: 'Shove', fx: { dmg: 5 } }], script: [2, 0, 1] },
+  brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, theme: ['bastion'], rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 22 } }, { n: 'Shove', fx: { dmg: 5 } }], script: [2, 0, 1] },
   seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, theme: ['zealot', 'bastion'], rank: 'B', rival: true, hp: 80, passives: { regen: 2 }, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 19, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
   grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, theme: 'reaper', rank: 'D', rival: true, hp: 62, enrage: 0.5, enrageMult: 1.5, skills: [{ n: 'Axe Swing', fx: { dmg: 9 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 6, hits: 3 } }], script: [0, 1, 0, 2] },
   lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, theme: 'venom', rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 5, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },

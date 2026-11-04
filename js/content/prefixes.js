@@ -28,7 +28,7 @@ const PREFIXES = {
   // Glitched prefixes
   duplicated: { name: 'Dupl̷icated', desc: 'Always casts twice. Its cooldown is doubled.', w: 0.5, glitch: true, ok: d => !d.quick && d.cd >= 1, apply: d => { d.fx.echo = 1; d.cd *= 2; } },
   unbound: { name: 'Unbo̷und', desc: 'No cooldown. Using it puts one of your other skills on cooldown.', w: 0.5, glitch: true, player: true, ok: d => !d.quick && d.cd >= 2, apply: d => { d.cd = 0; d.fx.unbound = 1; } },
-  misfiled: { name: 'Misf̷iled', desc: 'Also counts as both neighbouring classes on the wheel. 20% less power.', w: 0.5, glitch: true, ok: d => !!(d.tags && d.tags.length), apply: d => { d.powerMult *= 0.8; d.misfiled = true; } },
+  misfiled: { name: 'Misf̷iled', desc: 'Also counts as its class\'s allies. 20% less power.', w: 0.5, glitch: true, ok: d => !!(d.tags && d.tags.length), apply: d => { d.powerMult *= 0.8; d.misfiled = true; } },
   overflow: { name: 'Overf̷low', desc: 'Damage past 0 HP from its killing blow carries into your next fight.', w: 0.5, glitch: true, player: true, ok: isDmg, apply: d => { d.fx.overflow = 1; } },
   null: { name: 'Nu̷ll', desc: 'Deals no damage. All of it goes into the break bar instead.', w: 0.5, glitch: true, player: true, ok: d => !!d.fx.dmg && !d.fx.blockDmg && !d.fx.malice && !d.fx.momentum, apply: d => {
     const fx = d.fx, hits = fx.hits || 1;

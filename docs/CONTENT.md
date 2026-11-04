@@ -8,7 +8,7 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | --- | --- |
 | A skill | `js/content/skills/<archetype>.js`: one `sk()` line with its two ★3 evolutions |
 | Gear | `js/content/gear.js` |
-| An archetype | `js/content/archetypes.js` (the entry, the wheel), its skills file, a colour in `css/style.css`, a Hidden Path for every pair, `STAT_INFO` in `base.js` |
+| An archetype | `js/content/archetypes.js` (the entry and its grid cell), its skills file, a colour in `css/style.css`, a Hidden Path for every pair, `STAT_INFO` in `base.js` |
 | A world type | A new pack in `js/content/worlds/` (the world with its `guest` class and optional `setting`, its World Record pool, its Final Champion's greeting), plus its Final Champion in `enemies.js`, its World Gift in `gifts.js` and its world-first Title in `titles.js` and `FINAL_TITLE` |
 | A Fate or a People (world layers) | `js/content/layers.js`: its name, card line, record entries, roles and promises; a Fate's modifier weights, a People's epithets. Ids sit in their own number range in records, so each list holds at most 99 |
 | A god | `js/content/gods.js` (its archetypes, blessing and rival reply line) and a `chosen_<id>` divine Gift in `gifts.js` |
@@ -56,7 +56,7 @@ This whole process, from an outside source to Draft cards with previews, is call
 - **Effects come from the menu below.** New content that only uses effects already listed is data. A new effect is a mechanic: it needs code in `js/core.js`, a line in the bot's scoring (`tools/bot.js`, `choosePlayer`) and its own pull request.
 - **Passive effects live in `js/content/effects.js`.** Archetype bonuses, gear, Hidden Paths, Gifts, Titles, Rank perks, stat milestones, god blessings and enemy passives all say what they do as `{ key: value }` from it. Each entry has the phrase players read, so a description says what the effect says. Where an effect has a rule players couldn't guess from its number (Thorns double below half HP), its `must` makes the checker fail any description that leaves the rule out.
 - **Feats live in `js/content/feats.js`.** A deed the player can be asked for (win within 6 turns, trigger 2 reactions, defeat a rival without healing) is declared once as a feat, and wagers, Rank Trial conditions, Titles and quests all ask for it by key, so it is measured the same way everywhere. A feat that an archetype's kit can't meet says so (`unfairFor`), and one that needs a tool says which (`needs`). The checker makes a Title's or quest's words say what counts (`must`).
-- **Content sits on the wheel.** Every skill, piece of gear, enemy, world, god and event chain is tagged with one archetype or two neighbours, and uses what they own (see Archetypes and the wheel).
+- **Content sits on the grid.** Every skill, piece of gear, enemy, world, god and event chain is tagged with one archetype or two allies, and uses what they own (see Archetypes and the grid).
 - **Every choice can be picked.** An event always keeps one option with no condition and no cost. Options the player can't take are left out, never shown greyed out.
 - **Choices are actions.** A cost is shown only when paying is the action itself ("Pay 6 gold"). Every other consequence is revealed after the pick, as a System line in [brackets].
 - **Every skill, piece of gear, Gift and Title has a flavour line** (`flavour`; skills and their evolutions get theirs from the `flav({ ... })` block at the end of their archetype's file). It is the world's voice under the rules, or one whole System line in [brackets]: up to 16 words, no numbers, its own line (no two alike). The game shows it in italics under the description.
@@ -77,11 +77,11 @@ After merging content into dev or main, run `node tools/content-index.js --out <
 
 After adding content, run `node tools/check-content.js --write`. It records the new ids in `tools/content-ids.json` and rewrites the effect lists below. Commit both.
 
-## Archetypes and the wheel
+## Archetypes and the grid
 
-The eight archetypes are the game's themes, laid out on a wheel like a colour pie. `WHEEL` in `archetypes.js` sets the order: an archetype's allies are its two neighbours, everything further round is its enemy, and a run is dealt its home archetype's allies first. A new archetype goes into the wheel between the two it borrows from, and the wheel grows with it.
+The archetypes are the game's themes, placed on a fixed grid like a colour pie: every archetype is one stat (`stat`) and one Discipline (`disc`, from `DISCIPLINES` in `archetypes.js`: Ward, Mend, Bane, Sway, Might). Archetypes sharing a stat or a Discipline are allies (`themeAllies`), and a run is dealt its home archetype's allies first. The grid is 5 by 5 and never grows: a new archetype takes a free cell (the checker refuses two in one cell), and no existing archetype changes. A world type whose home has only one ally names a `guest2` to fill its class pool.
 
-Each archetype carries its `line` (its philosophy in one sentence; everything made for it fits the line), `owns` (the skill effects it owns) and `words` (imagery for names and lore). The wheel table in the menu below is written from them.
+Each archetype carries its `line` (its philosophy in one sentence; everything made for it fits the line), `owns` (the skill effects it owns) and `words` (imagery for names and lore). The grid table in the menu below is written from them.
 
 **Tags.** A piece of content carries one archetype, or two neighbours (a pair, like a Bastion and Stormcaller boss that blocks and stuns): skills and gear in `tags`, worlds in `home`, gods in `arch`, enemies and event chains in `theme`. Finals carry their world's home. The System's own fighters (the Proctor, legends, the Undefeated) and events about the tournament itself carry none.
 
@@ -89,7 +89,7 @@ Each archetype carries its `line` (its philosophy in one sentence; everything ma
 
 ## Enemy traits, passives and phases
 
-An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as player skills), the order it uses them (`script`, looping), and any of these. Every move plays a role the checker reads from its effects: a **strike**, a **big hit** (the one to Block or Stun; it shows as a big move), a **guard**, a **setup** (its theme's status, with little damage) or **sustain**. `moves.js` holds each tier's numbers for those roles and what a tier needs (a Final Champion has a big hit or sustain). Numbers outside the tier warn, as the power budget, and the balance gate (the sims) decides in the end. A new enemy is a theme from the wheel plus roles: a Stormcaller boss is a strike, a guard, a big hit and a Stun setup. A new boss mixes them; a trait that doesn't exist yet is a mechanic and gets its own pull request first.
+An enemy is its moves (`skills`, each a name `n` and the same `fx` keys as player skills), the order it uses them (`script`, looping), and any of these. Every move plays a role the checker reads from its effects: a **strike**, a **big hit** (the one to Block or Stun; it shows as a big move), a **guard**, a **setup** (its theme's status, with little damage) or **sustain**. `moves.js` holds each tier's numbers for those roles and what a tier needs (a Final Champion has a big hit or sustain). Numbers outside the tier warn, as the power budget, and the balance gate (the sims) decides in the end. A new enemy is a theme from the grid plus roles: a Stormcaller boss is a strike, a guard, a big hit and a Stun setup. A new boss mixes them; a trait that doesn't exist yet is a mechanic and gets its own pull request first.
 
 | Trait | Value | What it does |
 | --- | --- | --- |
@@ -287,20 +287,20 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `revive` | 2 | The Bone Saint (0.3), trait Repl̷icated (0.3) |
 | `twincast` | 2 | The Archmage Who Fell Upward (3), trait Desy̷nced (3) |
 
-### The wheel, from `js/content/archetypes.js`
+### The grid, from `js/content/archetypes.js`
 
-Each archetype is a theme. Its neighbours on the wheel are its allies; a piece of content carries one archetype, or two neighbours. Owns: the skill effects it owns, which it and its neighbours may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.
+Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (Ward: Stops the hit and gives it back. Mend: Outlasts: heals, drains, recovers. Bane: Hurts over time and weakens. Sway: Controls the turn: first, twice, or not at all. Might: Hits hardest and finishes it.). Archetypes sharing a stat or a Discipline are allies; a piece of content carries one archetype, or two allies. Owns: the skill effects it owns, which it and its allies may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.
 
-| Archetype | Stat | Line | Owns | Allies | Words |
-| --- | --- | --- | --- | --- | --- |
-| Zealot | VIT | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` | Bladedancer, Bastion | light, prayer, vow, saint, tide, undying |
-| Bastion | VIT | Takes the hit, then gives it back. | `thorns` `blockDmg` `riposte` `keep` `reflect` | Zealot, Stormcaller | wall, iron, shield, anvil, stand, weight |
-| Stormcaller | STR | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` | Bastion, Arcanist | thunder, lightning, crack, break, sky, gale |
-| Arcanist | INT | Does more in a turn than anyone should. | `focus` `pierce` `siphon` `haste` `evade` `interrupt` `hits` `mirror` | Stormcaller, Pyre | glyph, mind, spell, time, trick, sky |
-| Pyre | INT | Sets a fire and lets it finish the work. | `burn` `detonate` | Arcanist, Reaper | ember, ash, flame, cinder, blaze, smoke |
-| Reaper | STR | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` | Pyre, Venom | scythe, grave, harvest, end, hollow, bone |
-| Venom | AGI | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` | Reaper, Bladedancer | fang, rot, drip, plague, patience, thorn |
-| Bladedancer | AGI | Never stops moving: a hundred cuts beat one. | `bleed` `hits` `perHit` `mark` `critBonus` `cruel` `riposte` `evade` `alwaysCrit` `nextCrit` | Venom, Zealot | edge, dance, cut, flurry, quick, step |
+| Archetype | Stat | Discipline | Line | Owns | Allies | Words |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pyre | INT | Bane | Sets a fire and lets it finish the work. | `burn` `detonate` | Venom, Arcanist | ember, ash, flame, cinder, blaze, smoke |
+| Venom | AGI | Bane | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` | Pyre, Bladedancer | fang, rot, drip, plague, patience, thorn |
+| Bladedancer | AGI | Might | Never stops moving: a hundred cuts beat one. | `bleed` `hits` `perHit` `mark` `critBonus` `cruel` `riposte` `evade` `alwaysCrit` `nextCrit` | Reaper, Venom | edge, dance, cut, flurry, quick, step |
+| Bastion | VIT | Ward | Takes the hit, then gives it back. | `thorns` `blockDmg` `riposte` `keep` `reflect` | Zealot | wall, iron, shield, anvil, stand, weight |
+| Arcanist | INT | Sway | Does more in a turn than anyone should. | `focus` `pierce` `siphon` `haste` `evade` `interrupt` `hits` `mirror` | Stormcaller, Pyre | glyph, mind, spell, time, trick, sky |
+| Zealot | VIT | Mend | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` | Bastion | light, prayer, vow, saint, tide, undying |
+| Reaper | STR | Might | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` | Bladedancer, Stormcaller | scythe, grave, harvest, end, hollow, bone |
+| Stormcaller | STR | Sway | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` | Arcanist, Reaper | thunder, lightning, crack, break, sky, gale |
 
 ### Enemy move roles and tier numbers, from `js/content/moves.js`
 

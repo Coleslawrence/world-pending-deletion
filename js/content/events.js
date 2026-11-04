@@ -29,7 +29,7 @@
 'use strict';
 const EVENTS = {};
 // CHAINS.id = { name, start, theme? }: name is shown on later steps ("[Event chain: The Official]"), start is the first event,
-// theme the archetype (or two neighbours) the chain belongs to on the wheel, when it belongs to one
+// theme the archetype (or two allies) the chain belongs to on the grid, when it belongs to one
 const CHAINS = {};
 // Tournament Amendments: rules an event can change for the rest of the run (the outcome amend), outside the Elite bracket.
 // foeHp / foeDmg multiply every opponent's HP and damage; winGold is paid on each win
