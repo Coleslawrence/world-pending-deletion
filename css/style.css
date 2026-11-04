@@ -304,7 +304,14 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .toast.out { opacity: 0; transition: opacity .35s; pointer-events: none; }
 #toasts.low { align-content: end; } #toasts.low .toast { animation-name: tinup; }
 @keyframes tinup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.toast { pointer-events: auto; cursor: pointer; }
+.toast { pointer-events: auto; cursor: pointer; position: relative; }
+.toast .cause { display: block; font-size: var(--fs-1); opacity: .75; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+.toast.stay { padding-right: 28px; } #toasts.under .toast.stay { display: none; }
+.toast .tx { position: absolute; top: 6px; right: 9px; opacity: .7; }
+/* A number that just changed pulses, so you see what a result touched */
+@keyframes pulse { 0%, 100% { transform: none; } 30% { transform: scale(1.25); } }
+.pulse { display: inline-block; animation: pulse .6s ease-out 2; }
+.pulse.up { color: var(--good) !important; } .pulse.down { color: var(--bad) !important; }
 .icon-btn.logb { font-family: var(--f-m); font-size: var(--fs-1); color: var(--sys); }
 @keyframes tin { from { opacity: 0; transform: translateY(-6px); } }
 
@@ -721,7 +728,8 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .ev-item > summary small { color: var(--muted); font-weight: 400; margin-left: auto; }
 .ev-item[open] > summary small { display: none; }
 .ev-item .srow { margin: 0 6px 6px; }
-.got-h { margin: 10px 0 4px; } .msgs.got li { color: var(--muted); }
+.got-h { margin: 10px 0 4px; } .msgs.marks li { margin-bottom: 6px; } .msgs.marks small { color: var(--muted); }
+.mk { display: block; color: var(--stun); font-family: var(--f-m); font-size: var(--fs-1); margin: 6px 0 0; min-height: 32px; text-align: left; } .msgs.got li { color: var(--muted); }
 /* Break and reaction impact (#15) */
 .foe, .me { position: relative; }
 .stamp { position: absolute; left: 50%; top: 42%; z-index: 6; pointer-events: none; font-family: var(--f-d); letter-spacing: .12em; white-space: nowrap; transform: translate(-50%, -50%) rotate(-8deg); animation: stampin .9s ease-out forwards; }

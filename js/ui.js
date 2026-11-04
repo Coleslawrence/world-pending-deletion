@@ -52,15 +52,21 @@ function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'd
 // ---------- Toasts ----------
 // Notices wait their turn instead of pushing each other off screen: a few show at once, each stays long enough to
 // read (longer lines stay longer), and a tap clears one early so the next comes in. Missed ones are in the System log.
+// Each can name its cause (what you did that made it happen) above the line. Big ones (Hearts, levels, quests, Notice,
+// broadcasts) stay until tapped, outside fights, so nothing that matters goes by unread.
 const toastQ = [];
 const toastMs = (text, t) => Math.min(9000, 2400 + text.length * 45) + (t === 'broadcast' ? 1200 : 0);
-function toast(text, t = 'sys', onTap) { toastQ.push({ text, t, onTap }); pumpToasts(); }
+const bigToast = (text, t) => ['level', 'class', 'broadcast', 'merge'].includes(t) || /Heart/.test(text);
+function toast(text, t = 'sys', onTap, cause) { toastQ.push({ text, t, onTap, cause }); pumpToasts(); }
 function pumpToasts() {
-  if (!toastQ.length || pumpToasts.gap || toastsEl.querySelectorAll('.toast:not(.out)').length >= (ui.screen === 'fight' ? 2 : 3)) return;
-  const { text, t, onTap } = toastQ.shift();
-  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text; el.onTap = onTap;
+  if (!toastQ.length || pumpToasts.gap || toastsEl.querySelectorAll(toastsEl.classList.contains('under') ? '.toast:not(.out):not(.stay)' : '.toast:not(.out)').length >= (ui.screen === 'fight' ? 2 : 3)) return;
+  const { text, t, onTap, cause } = toastQ.shift(), stay = ui.screen !== 'fight' && bigToast(text, t);
+  const el = document.createElement('div'); el.className = 'toast t-' + t + (stay ? ' stay' : ''); el.onTap = onTap;
+  if (cause) { const c = document.createElement('small'); c.className = 'cause'; c.textContent = cause; el.appendChild(c); }
+  el.appendChild(document.createTextNode(text));
+  if (stay) { const x = document.createElement('span'); x.className = 'tx'; x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; el.appendChild(x); }
   placeToasts(); toastsEl.appendChild(el);
-  el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
+  if (!stay) el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
   pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280);
 }
 function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => el.remove(), 350); pumpToasts(); }
@@ -90,15 +96,25 @@ function placeToasts() {
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 const TOAST_MAX = 5;
-function pushMsgs(msgs, logged) {
+// cause: what the player did, shown above each notice ("Bought Iron Fang", "Infirmary")
+function pushMsgs(msgs, logged, cause) {
   if (!logged) msgs.forEach(m => logRun(m.text, m.t));
   const show = msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9));
-  show.slice(0, TOAST_MAX).forEach(m => toast(m.text, m.t));
+  show.slice(0, TOAST_MAX).forEach(m => toast(m.text, m.t, null, cause));
   const more = show.length - TOAST_MAX;
   if (more > 0 && run) toast(`[${more} more in the System log. Tap to read.]`, 'sys', openLog);
 }
-function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ui.sheet.type === 'result')) return; ui.sheet = { type: 'syslog' }; render(); }
+function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ['result', 'note'].includes(ui.sheet.type))) return; ui.sheet = { type: 'syslog' }; render(); }
 
+// A number in the top strip that changed since the last screen pulses (green up, red down), so you see what a result
+// touched. Held while a result sheet covers the strip, so the pulse plays when you can see it.
+function pulseChanged() {
+  if (!run || !document.querySelector('.strip') || (ui.sheet && ['evresult', 'result', 'note'].includes(ui.sheet.type))) return;
+  const now = { run, gold: run.gold, hearts: run.hearts, hp: Math.round(run.hp), notice: noticeOf(run) }, was = ui.pv; ui.pv = now;
+  if (!was || was.run !== run) return;
+  const sel = { gold: '.strip .gold', hearts: '.strip .hcount', hp: '.strip .st-hp', notice: '.ntc' };
+  Object.keys(sel).forEach(k => { if (now[k] === was[k]) return; const el = document.querySelector(sel[k]); if (el) el.classList.add('pulse', (k === 'notice' ? now[k] < was[k] : now[k] > was[k]) ? 'up' : 'down'); });
+}
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial', entrant: 'Filed record' };
 function initials(name) { const w = name.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(x => x && !['the', 'of'].includes(x.toLowerCase())); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
@@ -592,7 +608,7 @@ function chooseHTML() {
   const fin = run.choices.length === 1;
   const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
   const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
-  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div></div><div class="col col-b">
+  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
    ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
@@ -957,17 +973,20 @@ async function onUse(i) {
   if (f.over) { await wait(700); finishFight(); }
 }
 function finishFight() {
-  const f = ui.fight;
+  const f = ui.fight, before = evSnap(run);
   const res = resolveFight(run, f, run.practice ? META : meta);
   poolFile(res);
-  // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
-  const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  // Every fight that the run goes on from ends on a summary, then each notification it raised as its own card, tapped
+  // away one at a time (ui.notes). Settings > Fast wins sends ordinary wins straight on with notices instead.
+  // Run endings (erased, spared, elite, rewind, practice) keep their own sheets and notices.
+  const goesOn = !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  const plain = res.won && goesOn && SET.fastWins;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
   sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
-  pushMsgs(res.msgs);
-  ui.result = res; ui.erDone = 0; ui.erBusy = false;
+  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); recordRest(res.rested); }
+  if (goesOn && !plain) { res.msgs.forEach(m => logRun(m.text, m.t)); ui.notes = noteList(res.msgs); ui.noteN = ui.notes.length; } else { ui.notes = null; pushMsgs(res.msgs); }
+  ui.result = res; ui.erDone = 0; ui.erBusy = false; res.changes = evDiff(before, run);
   if (res.practiceDone) { ui.practiceAfter = true; }
-  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.fell) recordWin(res.fell);
   if (res.death) { const out = endRun(run, meta, 'erased'); recordRunStats('erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false), filed: !!run.poolFiled }; lsDel(RUN_KEY); }
   else if (res.spared) { const out = endRun(run, meta, 'spared'); recordRunStats('spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
@@ -1035,6 +1054,14 @@ function gotHTML(p) {
   Object.entries(p.mgot || {}).forEach(([m, t]) => { if (mods.includes(bareMod(m)) && PREFIXES[bareMod(m)]) rows.push(`<li><b>${esc(PREFIXES[bareMod(m)].name)}</b>: ${esc(t)}</li>`); });
   return rows.length ? `<h4 class="got-h">How you got it</h4><ul class="msgs got">${rows.join('')}</ul>` : '';
 }
+// What your choices have set up for later fights (run.marks, from core.js addMark), and which choice set each
+function liveMarks() { return (run.marks || []).filter(m => m.kind !== 'ward' || run.ward > 0); }
+function marksBtn() { const n = liveMarks().length; return n ? `<button class="link mk" data-act="sheet" data-s="marks">[${n} pending effect${n > 1 ? 's' : ''} from your choices] ›</button>` : ''; }
+function marksSheet() {
+  const L = { next: 'Next fight', foe: 'Next fight', stakes: 'Next fight', ward: `Next ${run.ward > 1 ? run.ward + ' losses' : 'loss'}`, always: 'Every fight' };
+  const rows = liveMarks().map(m => `<li><b>${L[m.kind]}</b>: ${esc(m.text.charAt(0).toUpperCase() + m.text.slice(1))}.<br><small>From: ${esc(m.from)}</small></li>`).join('');
+  return sheetWrap('[Pending effects]', `<p class="sh-p">[Effects of your choices, waiting for the arena.]</p><ul class="msgs marks">${rows}</ul>`, '<button class="btn primary" data-act="close">Done</button>');
+}
 // The first time a stat line is offered, the System says so once
 function statLinesNotice() {
   const p = run.pending[0]; if (meta.statLines || run.practice || !p || p.type !== 'event' || !eventOpts(run, p.key).some(i => EVENTS[p.key].opts[i].check)) return;
@@ -1055,11 +1082,19 @@ function evDiff(a, run) {
   a.ids.filter(k => !b.ids.includes(k) && !b.ids.some(x => x.split(':')[0] === k.split(':')[0])).forEach(k => add(`Lost: ${nm(k)}`, false));
   return out;
 }
+// The messages a fight result shows: erase lines become rows and the defeat lines repeat the summary
+function noteList(msgs) { return msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text)); }
+// One notification after a fight, tapped away before the next
+function noteSheet() {
+  const m = ui.notes[0], i = ui.noteN - ui.notes.length + 1, r = ui.result;
+  return sheetWrap(`[Notification ${i} of ${ui.noteN}]`, `${r ? `<p class="sh-p fine ev-you">After: ${r.won ? 'victory over' : 'defeat by'} ${esc(r.enemy)}</p>` : ''}<div class="sysbox ev-out"><p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}</div>`,
+    `<button class="btn primary" data-act="note-ok">${ui.notes.length > 1 ? 'Next' : 'Continue'}</button>`, 'ev-res note', true);
+}
+// An item reward: its card folded under its line, so you can see what you got without leaving
+function itemCard(m) { if (!m.item || !pieceDef(m.item)) return ''; const f = m.u != null && findPiece(run, m.u), q = f ? f.p : { star: 1, mods: [] }; return `<details class="ev-item"><summary>${esc(pieceDef(m.item).name)} <small>tap to view</small></summary>${pieceBody(m.item, q.star, q.mods)}</details>`; }
 function evResultSheet() {
   const R = ui.sheet;
-  // An item reward: its line, then its card folded underneath, so you can see what you got without leaving
-  const card = m => { if (!m.item || !pieceDef(m.item)) return ''; const f = m.u != null && findPiece(run, m.u), q = f ? f.p : { star: 1, mods: [] }; return `<details class="ev-item"><summary>${esc(pieceDef(m.item).name)} <small>tap to view</small></summary>${pieceBody(m.item, q.star, q.mods)}</details>`; };
-  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${card(m)}`).join('');
+  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}`).join('');
   const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
   return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
 }
@@ -1150,10 +1185,11 @@ function resultSheet() {
   const lines = [];
   if (r.won) lines.push(`+${r.gold} gold · healed 30%`);
   if (!r.won && !run.elite) lines.push(`A piece of ${esc(run.world.name)} is erased: −${r.heartsLost} Heart${r.heartsLost > 1 ? 's' : ''}. ${run.hearts} left. ${ui.fight && ui.fight.spec.kind === 'final' ? 'You must face the Final Champion again.' : 'The tournament moves on.'}`);
-  // erase lines become rows, and the defeat lines repeat the summary above
-  const shown = r.msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text));
-  const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
-  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
+  // erase lines become rows, and the defeat lines repeat the summary above. With notification cards to follow, the
+  // summary says how many instead of listing them
+  const shown = noteList(r.msgs), chips = r.changes && r.changes.length ? `<div class="ev-ch">${r.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
+  const msgs = ui.notes ? (ui.noteN ? `<p class="sh-p fine">[${ui.noteN} notification${ui.noteN > 1 ? 's' : ''} to review.]</p>` : '') : shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${chips ? `<p class="sh-p fine">Altogether this fight:</p>${chips}` : ''}${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
@@ -1243,6 +1279,7 @@ function settingsSheet() {
     + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
     + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
     + row('Fight speed', 'How fast turns play out.', speed)
+    + row('Fast wins', 'Off: every fight ends on a summary, then each notification to tap through. On: ordinary wins go straight on, with notices.', seg('fastWins', [[false, 'Off'], [true, 'On']]))
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
@@ -1374,7 +1411,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1388,6 +1425,8 @@ function render() {
   coachHighlight();
   if (scr === 'fight') updateFight();
   fitNames();
+  pulseChanged();
+  toastsEl.classList.toggle('under', !!app.querySelector('.sheet')); // notices that wait for a tap step aside while a sheet is open
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
   if (fbFocus) { const el = document.getElementById('fb-text'); if (el) { el.focus(); el.setSelectionRange(fbFocus[0], fbFocus[1]); } }
@@ -1464,23 +1503,23 @@ function onAct(el) {
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
-    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
+    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs, false, `Bought ${pieceDef(it.id).name}`); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
-    case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs); saveRun(); } return render();
+    case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs, false, `Trained ${d.k}`); saveRun(); } return render();
     case 'sell': { const p = findPiece(run, +d.u); const v = sell(run, +d.u); if (v) toast(`[Sold ${pieceDef(p.p.id).name} for ${v}g]`, 'loot'); ui.sheet = null; saveRun(); return render(); }
     case 'move': {
       const u = +d.u, to = d.to;
       const ok = to === 'bench' ? movePiece(run, u, 'bench', msgs) : to === 'gear' ? movePiece(run, u, { gear: GEAR[findPiece(run, u).p.id].slot }, msgs) : movePiece(run, u, { bar: +d.i }, msgs);
       if (!ok) toast('[Not possible: your bench may be full.]', 'loss');
-      ui.sheet = null; pushMsgs(msgs); saveRun(); saveMeta(); return render();
+      ui.sheet = null; pushMsgs(msgs, false, 'Moved a piece'); saveRun(); saveMeta(); return render();
     }
-    case 'shop-done': { if (benchOver()) return render(); if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
+    case 'shop-done': { if (benchOver()) return render(); if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs, false, 'Left the shop'); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'undercity') { const p = run.pending[run.pending.length - 1]; if (p && p.type === 'event') p.from = 'undercity'; }
-      if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
-      if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
+      if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot', null, 'Infirmary');
+      if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot', null, 'Sanctum'); pushMsgs(msgs, false, 'Sanctum'); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
       if (k === 'enchanter') { ui.enchantMods = rollPrefixes(enchantCount(run), null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
@@ -1493,35 +1532,38 @@ function onAct(el) {
       run.pending.shift(); saveRun(); saveMeta();
       const lines = msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }];
       // The outcome stays in the event until Continue; if the event moved the game on (run over, a new screen), toasts as before
-      if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines); return render(); }
+      if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines, false, `${(EVENTS[p.key] || {}).title || 'Event'}: ${o.label}`); return render(); }
       lines.forEach(m => logRun(m.text, m.t));
       ui.sheet = { type: 'evresult', title: (EVENTS[p.key] || {}).title || '[Event]', label: o.label, lines, changes: evDiff(before, run) };
       return render();
     }
-    case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs); saveRun(); return render(); }
-    case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
+    case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
+    case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
     case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
-    case 'corrupt-do': { const c = run.corrupting; if (c && corrupt(run, c.u, c.opts[+d.i], msgs)) pushMsgs(msgs); run.corrupting = null; ui.sheet = null; saveRun(); return render(); }
+    case 'corrupt-do': { const c = run.corrupting; if (c && corrupt(run, c.u, c.opts[+d.i], msgs)) pushMsgs(msgs, false, 'Corrupted a skill'); run.corrupting = null; ui.sheet = null; saveRun(); return render(); }
     case 'ench-back': ui.enchantSel = null; return render();
     case 'ench-skip': { ui.enchantSel = null; if (ui.sheet) ui.sheet = null; else if (run.pending[0] && run.pending[0].type === 'rune') run.pending.shift(); saveRun(); return render(); }
     case 'ench-apply': {
       const fromRune = !ui.sheet && run.pending[0] && run.pending[0].type === 'rune';
       const mods = fromRune ? run.pending[0].mods : ui.enchantMods, m = mods[ui.enchantSel];
       const f = findPiece(run, +d.u);
-      if (f && applyPrefix(run, +d.u, m, msgs, null, fromRune ? run.pending[0].got : '[Carved by the Enchanter, for a price.]')) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill'); pushMsgs(msgs); }
+      if (f && applyPrefix(run, +d.u, m, msgs, null, fromRune ? run.pending[0].got : '[Carved by the Enchanter, for a price.]')) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill', null, fromRune ? 'Rune' : 'Enchanter'); pushMsgs(msgs, false, `Carved ${PREFIXES[m].name}`); }
       ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
     }
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
-    case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs); saveRun(); } return render();
+    case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs, false, `+1 ${d.k}`); saveRun(); } return render();
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
     case 'use': return onUse(+d.i);
     case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
+    case 'note-ok': if (ui.notes) ui.notes.shift(); // falls through: the next card, or on with the run
     case 'result-ok': {
+      if (ui.notes && ui.notes.length) { ui.sheet = { type: 'note' }; return render(); }
       if (ui.practiceAfter) { ui.practiceAfter = false; ui.result = null; ui.sheet = { type: 'practicedone' }; return render(); }
-      ui.sheet = null; ui.fight = null; ui.result = null;
+      if (ui.result && ui.result.won) while (coachStep() && coachStep().scr === 'fight') coachAdvance(); // tutorial steps that wait on the fight screen are over once it closes
+      ui.notes = null; ui.sheet = null; ui.fight = null; ui.result = null;
       if (ui.end && ui.end.kind === 'erased') return go('end');
       saveRun(); return go(stageScreen());
     }
@@ -1981,7 +2023,7 @@ function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
-  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
+  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
   if (typing) return;
   const sheet = app.querySelector('.sheet');
   if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }

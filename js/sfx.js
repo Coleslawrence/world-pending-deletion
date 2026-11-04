@@ -3,7 +3,7 @@
 // Settings live on this device only (localStorage 'wpd-settings').
 'use strict';
 const SETTINGS_KEY = 'wpd-settings';
-const SETTINGS_DEFAULT = { vol: 2, vib: true, shake: true, motion: 'system', text: 'normal', look: 'broadcast' }; // vol: 0 off, 1 low, 2 medium, 3 high
+const SETTINGS_DEFAULT = { vol: 2, vib: true, shake: true, motion: 'system', text: 'normal', look: 'broadcast', fastWins: false }; // vol: 0 off, 1 low, 2 medium, 3 high
 const VOL_LEVELS = [0, 0.25, 0.55, 1];
 function loadSettings() {
   let s = null; try { s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch (e) { }

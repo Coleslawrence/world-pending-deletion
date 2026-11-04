@@ -964,7 +964,7 @@ function eventKit(run, meta, rng, msgs) {
     meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
     lose: (f, text) => lose(run, f, msgs, text), piece: (tries, got) => merchantPiece(run, rng, msgs, tries, got), eraseRecord: n => eraseRecord(run, n, msgs),
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
-    apply: T => { const ctx = { run, h: kit, msgs }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
+    apply: T => { const ctx = { run, h: kit, msgs, from: kit.from }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
     custom: () => customPaid(run, msgs),
     heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
     // Glitch events (events/glitch.js)
@@ -1045,7 +1045,7 @@ function eventOpt(run, key, idx) { return eventOpts(run, key).includes(idx) ? EV
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
-  msgs = msgs || []; const r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
+  msgs = msgs || []; const r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs); h.from = EVENTS[key].title;
   if (o.pay) run.gold -= o.pay;
   if (o.payHeart) { run.hearts -= o.payHeart; msgs.push({ t: 'loss', text: `[Paid: ${o.payHeart} Heart${o.payHeart > 1 ? 's' : ''}, ${run.hearts} left.]` }); eraseRecord(run, o.payHeart, msgs); }
   // A chance option: the roll made when the event appeared decides which branch happens
@@ -1057,7 +1057,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
     if (run.rolls) delete run.rolls[key];
   }
   const before = msgs.length, T = B.then || {};
-  const ctx = { run, h, msgs, chain: EVENTS[key].chain };
+  const ctx = { run, h, msgs, chain: EVENTS[key].chain, from: EVENTS[key].title };
   applyOutcomes(T, ctx, false);
   if (B.go) B.go(run, h);
   notePick(run, 'e:' + key + '.' + idx);
@@ -1074,7 +1074,7 @@ const OUTCOME_APPLY = {
   heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
   rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run), got: c.gotRune || (c.label ? `[${c.label}: a rune.]` : null) }); },
   piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || `[${c.label || 'Reward'}: {item}]`); },
-  next: (v, c) => { Object.assign(c.run.nextFlags, v); },
+  next: (v, c) => { Object.assign(c.run.nextFlags, v); addMark(c, 'next', markNext(v)); },
   foe: (v, c) => {
     const F = c.run.nextFlags;
     if (v.weaken) F.foeWeaken = (F.foeWeaken || 0) + v.weaken;
@@ -1082,10 +1082,11 @@ const OUTCOME_APPLY = {
     if (v.burn) F.foeBurn = (F.foeBurn || 0) + v.burn;
     if (v.hp) F.foeHp = (F.foeHp || 1) * (1 + v.hp);
     if (v.trait) { const have = F.foeTraits || [], add = rollTraits(c.run, v.trait, stream(c.run, 'opps'), have); F.foeTraits = have.concat(add); }
+    addMark(c, 'foe', markFoe(v));
   },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
-  stakes: (v, c) => { const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
+  stakes: (v, c) => { addMark(c, 'stakes', ['win', 'lose'].filter(w => v[w]).map(w => `${w === 'win' ? 'Win' : 'Lose'}: ${outcomeText(v[w])}`));  const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
   respec: (v, c) => { const pts = STATS.reduce((n, k) => n + Math.max(0, c.run.stats[k] - 1), 0); STATS.forEach(k => c.run.stats[k] = Math.min(c.run.stats[k], 1)); c.run.statPts += pts; c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: 'level', text: `[Stats reset. ${pts} stat points to place again.]` }); },
   summon: (v, c) => { const s = summonSpec(c.run, v, stream(c.run, 'opps')); if (!s) return; (c.run.summons = c.run.summons || []).push({ round: c.run.round + 1, spec: s }); },
   amend: (v, c) => { c.run.amend = v; c.msgs.push({ t: 'class', text: `[Amendment passed: ${AMENDMENTS[v].name}. ${AMENDMENTS[v].say}]` }); },
@@ -1096,12 +1097,24 @@ const OUTCOME_APPLY = {
     else if (now < was) c.msgs.push({ t: 'sys', text: now ? `[The System looks elsewhere. Opponents +${noticePct(c.run)}%.]` : '[The System looks elsewhere. Notice cleared.]' });
   },
   fate: (v, c) => moveFate(c.run, v, c.msgs),
-  ward: (v, c) => { c.run.ward = (c.run.ward || 0) + v; c.msgs.push({ t: 'loot', text: `[Warded: your next ${c.run.ward === 1 ? 'loss costs' : c.run.ward + ' losses cost'} no Heart.]` }); },
+  ward: (v, c) => { addMark(c, 'ward', ['A lost fight costs no Heart']);  c.run.ward = (c.run.ward || 0) + v; c.msgs.push({ t: 'loot', text: `[Warded: your next ${c.run.ward === 1 ? 'loss costs' : c.run.ward + ' losses cost'} no Heart.]` }); },
   mod: (v, c) => { if (!MODIFIERS[v] || c.run.world.mod === v) return; c.run.world.mod = v; c.msgs.push({ t: 'class', text: `[World modifier changed: ${MODIFIERS[v].name}. ${MODIFIERS[v].desc}]` }); },
-  always: (v, c) => { const A = c.run.always = c.run.always || {}; ['next', 'foe'].forEach(k => { if (!v[k]) return; A[k] = Object.assign({}, A[k]); Object.entries(v[k]).forEach(([f, n]) => A[k][f] = typeof n === 'number' && typeof A[k][f] === 'number' ? A[k][f] + n : n); OUTCOME_APPLY[k](v[k], c); }); },
+  always: (v, c) => { addMark(c, 'always', [].concat(v.next ? markNext(v.next) : [], v.foe ? markFoe(v.foe) : [])); c = Object.assign({}, c, { from: null }); const A = c.run.always = c.run.always || {}; ['next', 'foe'].forEach(k => { if (!v[k]) return; A[k] = Object.assign({}, A[k]); Object.entries(v[k]).forEach(([f, n]) => A[k][f] = typeof n === 'number' && typeof A[k][f] === 'number' ? A[k][f] + n : n); OUTCOME_APPLY[k](v[k], c); }); },
   chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
   favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
 };
+// Marks: what an event set up for later fights, in words, with the event that set it (c.from), so the run can show them
+// until they happen (run.marks; next, foe and stakes go after the next fight, ward when used up, always never)
+function addMark(c, kind, lines) { if (!c.from || !lines.length) return; (c.run.marks = c.run.marks || []).push({ kind, from: c.from, text: lines.join(', ') }); }
+function markNext(v) {
+  const w = { weaken: n => `you start Weakened ${n} turns`, empower: n => `you start Empowered ${n} turns`, poison: n => `you start with ${n} Poison`, burn: n => `you start with ${n} Burn`, bleed: n => `you start with ${n} Bleed`,
+    bribe: () => 'your opponent starts with less HP', heartCut: n => `a loss costs ${n} more Heart${n > 1 ? 's' : ''}`, noWinGold: () => 'a win pays no gold', foePoison: n => `your opponent starts with ${n} Poison` };
+  return Object.entries(v).filter(([k]) => w[k]).map(([k, n]) => w[k](n));
+}
+function markFoe(v) {
+  const w = { weaken: n => `opponent starts Weakened ${n} turns`, poison: n => `opponent starts with ${n} Poison`, burn: n => `opponent starts with ${n} Burn`, hp: n => `opponent ${n > 0 ? '+' : '−'}${Math.round(Math.abs(n) * 100)}% HP`, trait: n => `opponent +${n} trait${n > 1 ? 's' : ''}` };
+  return Object.entries(v).filter(([k]) => w[k]).map(([k, n]) => w[k](n));
+}
 // A summoned opponent: { who: 'copy' | 'erased' | a rival id, bounty?: outcomes for beating them, traits?: n }. An Erased champion
 // when there is none to send falls back to an unmet rival; summoned rivals are Veterans
 function summonSpec(run, v, rng) {
@@ -2142,7 +2155,7 @@ function resolveFight(run, f, meta, rng) {
   const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'], heartCut = run.nextFlags.heartCut || 0, noWinGold = !!run.nextFlags.noWinGold;
   if (stakes) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Stakes' }; applyOutcomes(stakes, ctx, false); applyOutcomes(stakes, ctx, true); }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
-  run.nextFlags = {}; applyAlways(run);
+  run.nextFlags = {}; run.marks = (run.marks || []).filter(m => m.kind === 'always' || (m.kind === 'ward' && run.ward > 0)); applyAlways(run);
   const c = featCtx(run, f, won, spec);
   // Titles are earned for feats (titles.js); world firsts for a Final Champion come between the won-fight ones and the any-fight ones
   const titleFeats = at => Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === at && featOk(t.feat, c, t.n)) earnTitle(run, k, msgs); });
