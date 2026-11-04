@@ -19,6 +19,7 @@ function choosePlayer(f) {
     if (fx.heal) sc += low ? fx.heal * p * 1.5 : 0;
     if (fx.healMissing) sc += low ? (A.maxHp - A.hp) * fx.healMissing * 1.2 : 0;
     if ((fx.stun || fx.interrupt || (fx.stunIfWeak && B.weaken)) && intent.kind === 'big') sc += 25;
+    if (fx.augury) sc += 4; if (fx.portent) sc += 4;
     if (fx.empower) sc += 8; if (fx.evade && intent.kind === 'big') sc += 15;
     if (fx.weaken && (intent.kind === 'attack' || intent.kind === 'big')) sc += 6;
     if (fx.cleanse) sc += (A.poison + A.burn) * 1.5;

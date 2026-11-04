@@ -1144,7 +1144,7 @@ const OUTCOME_APPLY = {
 function addMark(c, kind, lines) { if (!c.from || !lines.length) return; (c.run.marks = c.run.marks || []).push({ kind, from: c.from, text: lines.join(', ') }); }
 function markNext(v) {
   const w = { weaken: n => `you start Weakened ${n} turns`, empower: n => `you start Empowered ${n} turns`, poison: n => `you start with ${n} Poison`, burn: n => `you start with ${n} Burn`, bleed: n => `you start with ${n} Bleed`,
-    bribe: () => 'your opponent starts with less HP', heartCut: n => `a loss costs ${n} more Heart${n > 1 ? 's' : ''}`, noWinGold: () => 'a win pays no gold', foePoison: n => `your opponent starts with ${n} Poison` };
+    bribe: () => 'your opponent starts with less HP', jinxFirst: () => "your opponent's first move goes wrong", heartCut: n => `a loss costs ${n} more Heart${n > 1 ? 's' : ''}`, noWinGold: () => 'a win pays no gold', foePoison: n => `your opponent starts with ${n} Poison` };
   return Object.entries(v).filter(([k]) => w[k]).map(([k, n]) => w[k](n));
 }
 function markFoe(v) {
@@ -1458,7 +1458,7 @@ function gatePhase(t) { return { at: 0.5, say: `[${t.name} will not let you pass
 function enemyMove(x, i, power) { return { key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power, cd: 0 }; }
 // The trait library: fields on an enemy (or in its phase's set) that give it a signature. What each does is in
 // docs/CONTENT.md, "Enemy traits". Amounts that deal or block damage scale with the enemy's power, like its moves.
-const ENEMY_TRAITS = ['enrage', 'enrageMult', 'dodge', 'adapt', 'flood', 'aura', 'revive', 'briar', 'twincast', 'forge'];
+const ENEMY_TRAITS = ['enrage', 'enrageMult', 'dodge', 'adapt', 'flood', 'aura', 'revive', 'briar', 'twincast', 'forge', 'jinxTax', 'showNext', 'hexer'];
 function enemyTraits(t, p) {
   const o = {};
   ENEMY_TRAITS.forEach(k => { if (t[k] != null) o[k] = t[k]; });
@@ -1639,6 +1639,7 @@ function newFight(run, rng) {
   // Overflow from your last win: the overkill lands before this fight starts (at most a quarter of their HP)
   if (run.overflow > 0 && !run.practice) { const v = Math.min(run.overflow, Math.round(B.maxHp * 0.25)); B.hp -= v; say(f, `[Overflow: ${v} damage carried over from your last fight.]`, 'skill'); }
   if (A.P.startMisf) B.misfortune += A.P.startMisf; // Black Cat Collar
+  if (A.P.firstJinx || run.nextFlags.jinxFirst) B.jinxed = true; // The Crow; feeding the cat
   A.isJinx = A.skills.some(s => s.def.tags && s.def.tags.includes('jinx')) || !!A.P.jinxCheap; // the Jinx button needs a Jinx skill
   planIntent(f, B);
   startTurn(f, A, true);
@@ -1676,8 +1677,8 @@ function dmgMult(f, X, Y) {
 }
 function hit(f, X, Y, raw, o = {}) {
   if (Y.hp <= 0) return 0;
-  if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); return 0; }
-  if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); return 0; }
+  if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; return 0; }
+  if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; return 0; }
   let d = raw, crit = false;
   if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0))) { crit = true; d *= X.critMult; X.critNext = false; X.lastCrit = true; }
   if (o.resist) d *= o.resist;
@@ -1893,7 +1894,7 @@ function jinxCost(f) {
 function canJinx(f) {
   const A = f.A, B = f.B;
   if (f.phase !== 'player' || f.over || !B.intent || B.jinxed || B.stun > 0 || B.unjinxable || A.jinxTurn === f.turn) return false;
-  if (!A.isJinx) return false;
+  if (!A.isJinx || B.noJinxT === f.turn) return false; // Augury: its next move can't be jinxed
   return (B.misfortune || 0) >= jinxCost(f);
 }
 function addCurse(f, X, n) {
@@ -2048,6 +2049,8 @@ function useSkill(f, X, s, opt) {
   if (fx.misfT) { Y.misfT = 3; Y.misfTv = fx.misfT; } // Bad Penny
   if (fx.omenAtk || fx.omenGuard) { Y.omens = (Y.omens || []).slice(-(OMEN_MAX - (fx.omenGuard && fx.omenAtk ? 2 : 1))); if (fx.omenAtk) Y.omens.push({ on: 'attack', dmg: Math.round(fx.omenAtk * p), misf: 3 }); if (fx.omenGuard) Y.omens.push({ on: 'guard', misf: 3 }); }
   if (fx.jinxDisc) X.jinxDisc = fx.jinxDisc;
+  if (fx.augury) X.noJinxT = f.turn + 1; // the Hanged Augur: its next move can't be jinxed
+  if (fx.portent && Y.isPlayer) { const k = f.tally.mostUsed; if (k && k !== 'attack') { Y.hexKey = k; Y.hexT = f.turn + 1; const s2 = Y.skills.find(o => o.key === k); say(f, `[Portent: ${s2 ? s2.def.name : 'your skill'} is hexed next turn.]`, 'loss'); } }
   if (fx.uncurse) X.curse = Math.max(0, (X.curse || 0) - fx.uncurse);
   if (fx.coinStun) X.coinStun = true;
   if (fx.passCurse) { const n = Math.max(0, (X.curse || 0) - (fx.curseKeep || 0)); if (n) { addMisfortune(f, Y, n * fx.passCurse); X.curse -= n; say(f, `[${n} Curse passed on: +${n * fx.passCurse} Misfortune.]`, 'class'); if (fx.curseDmg) dealt += hit(f, X, Y, fx.curseDmg * n * p, { src: def.name }); } }
@@ -2150,6 +2153,7 @@ function playerAct(f, idx) {
   if (f.phase !== 'player' || f.over) return false;
   const A = f.A, s = A.skills[idx]; if (!s || !canUse(s)) return false;
   f.events = [];
+  if (A.hexKey === s.key && A.hexT === f.turn) { ev(f, { k: 'use', side: 'A', name: s.def.name }); say(f, `[Hexed. ${s.def.name} goes wrong. +2 Curse.]`, 'loss'); addCurse(f, A, 2); A.hexKey = null; } else
   useSkill(f, A, s);
   checkPhase(f, f.B, true);
   s.cd = s.def.fx.killReset && f.B.hp <= 0 ? 0 : s.def.cd || 0; // Last Hour
@@ -2173,7 +2177,8 @@ function playerAct(f, idx) {
 function skipPlayer(f) { f.events = []; endTurn(f, f.A, null); if (!checkOver(f)) f.phase = 'enemy'; }
 function scoreSkill(s, low) { const fx = s.def.fx; return ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) + (fx.poison || 0) * 1.5 + (fx.bleed || 0) + (fx.detonate ? 10 : 0) + (fx.doom ? fx.doom * 0.5 : 0) + (fx.blockDmg ? 6 : 0)) * s.power + (low ? ((fx.heal || 0) + (fx.healMissing ? 25 : 0) + (fx.block || 0) * 0.8) * s.power * 2 : (fx.block || 0) * 0.5 * s.power) + (fx.stun ? 8 : 0) + (fx.interrupt ? 6 : 0); }
 function planIntent(f, B) {
-  rollDice(f, B); // an opponent with dice (Delphine Coyle, a Gambler Entrant) rolls as it plans, so you see the roll
+  rollDice(f, B);
+  if (B.hexer) { const A = f.A, can = A.skills.filter(s => s.key !== 'attack' && !s.def.cheat); const s = can.length ? can[Math.floor(rnd(f.rng) * can.length)] : null; A.hexKey = s ? s.key : null; A.hexT = f.turn + 1; } // Mott: one of your skills, shown // an opponent with dice (Delphine Coyle, a Gambler Entrant) rolls as it plans, so you see the roll
   if (B.smart) {
     const ready = B.skills.filter(s => s.cd <= 0);
     let best = ready[0];
@@ -2246,7 +2251,7 @@ function intentInfo(f) {
   const r = intentText(f, s, B);
   if (B.twincast && (B.turns + 1) % B.twincast === 0) r.text += ' · twice';
   if (B.flood && (B.turns + 1) % B.flood === 0) r.text += ' · flood';
-  if (f.foresight) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; }
+  if (f.foresight || B.showNext) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; } // the Hanged Augur shows two moves
   return r;
 }
 function previewSkill(f, s) {
@@ -2450,6 +2455,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
     if (runP(run).goldPerWin) { run.gold += runP(run).goldPerWin; msgs.push({ t: 'loot', text: `[The House pays out: +${runP(run).goldPerWin} gold.]` }); }
+    if (META && !META.unlocks.arch_jinx && !run.practice && (spec.id === 'mott' || (f.tally.missed || 0) >= 3)) { META.unlocks.arch_jinx = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Jinx. Please stand well back.]' }); } // beat Mott, or win a fight where 3 attacks missed you
     if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
     if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }

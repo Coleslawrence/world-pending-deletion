@@ -280,7 +280,8 @@
   "war",
   "trick",
   "ruin",
-  "house"
+  "house",
+  "crow"
  ],
  "worlds": [
   "drowned",
@@ -290,7 +291,8 @@
   "sky",
   "iron",
   "steppes",
-  "marches"
+  "marches",
+  "fens"
  ],
  "modifiers": [
   "none",
@@ -333,6 +335,7 @@
   "masked",
   "kaito",
   "delphine",
+  "mott",
   "calder",
   "leviathan",
   "kharros",
@@ -341,6 +344,7 @@
   "archmage",
   "forge_king",
   "dealer",
+  "augur",
   "herald",
   "proctor",
   "legend",
@@ -353,6 +357,7 @@
   "hedgewitch",
   "prodigy",
   "runesmith",
+  "nearmiss",
   "loadeddice",
   "lightningrod",
   "appraisal",
@@ -385,12 +390,14 @@
   "chosen_war",
   "chosen_trick",
   "chosen_house",
+  "chosen_crow",
   "chosen_ruin",
   "ironwill",
   "dragon",
   "elf",
   "demon",
   "lastwords",
+  "illstarred",
   "f_glass",
   "f_marked",
   "f_cursed",
@@ -417,6 +424,7 @@
   "bloodthirsty",
   "spellweaver",
   "luckyseven",
+  "blackcat",
   "high_roller",
   "underdog",
   "rank_is_just_a_letter",
@@ -431,6 +439,7 @@
   "skyfall",
   "forgebreaker",
   "housebreaker",
+  "omenbreaker",
   "stormbreaker",
   "ascendant",
   "pathfinder",
@@ -473,6 +482,7 @@
   "path",
   "bankrupt",
   "chances",
+  "jinxes",
   "wagers"
  ],
  "outcomes": [
@@ -551,6 +561,7 @@
   "crowd",
   "large_chest",
   "house_game",
+  "black_cat",
   "field_test",
   "official_1",
   "official_bribed",
@@ -620,6 +631,7 @@
   "crowd": 6,
   "large_chest": 6,
   "house_game": 4,
+  "black_cat": 4,
   "field_test": 5,
   "official_1": 5,
   "official_bribed": 4,
@@ -902,6 +914,36 @@
     "The corner card table",
     "Your father Belmar",
     "Your rival Pen"
+   ]
+  },
+  "fens": {
+   "roles": [
+    "reed cutter",
+    "omen reader",
+    "causeway keeper",
+    "eel trapper",
+    "lantern boy"
+   ],
+   "promises": [
+    "find the road that goes straight home",
+    "lift the family curse",
+    "outlive the omen"
+   ],
+   "entries": [
+    "The Drowned Steeple",
+    "The Crooked Road",
+    "The Gallows Oak",
+    "The Long Curse",
+    "The Causeway Market",
+    "The Hall of Omens",
+    "Salt Night",
+    "Old Mother Gloam",
+    "Thirteen Steps",
+    "The Lantern Path",
+    "The house on stilts",
+    "The horseshoe door",
+    "Your aunt Hester",
+    "Your rival Fitch"
    ]
   },
   "fate longnight": {

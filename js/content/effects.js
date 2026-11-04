@@ -129,6 +129,7 @@ const EFFECTS = {
   startMisf: { say: v => `Opponents start each fight with ${v} Misfortune.`, theme: 'jinx' },
   curseBlock: { say: v => `Each Curse you take gives you ${v} Block.`, theme: 'jinx' },
   omenWeaken: { how: 'set', say: v => `Omens also Weaken their target for ${v} turns when they fire.`, theme: 'jinx' },
+  firstJinx: { how: 'set', say: () => "The opponent's first move each fight goes wrong for them, as if jinxed." },
   startCurse: { say: v => `Start each fight with ${v} Curse.` },
   jinxReroll: { how: 'set', say: () => 'When you jinx a move, reroll all your dice.', theme: ['jinx', 'dicer'] },
   jinxHeal: { say: v => `Jinxing a move heals you ${pct(v)} of your max HP.`, theme: ['jinx', 'zealot'] },

@@ -35,6 +35,12 @@ EVENTS.house_game = { title: 'The House Game', theme: ['dicer'], text: 'A table 
   { roll: { stat: 'LUK', hard: true }, label: 'Stake a Heart', desc: 'Big table, big stakes.', then: { piece: 'B', got: '[The table pays out in kind: {item}.]' },
     fail: { then: { erase: 1 }, go: (run, h) => h.say('[The House collects. A page of your world is gone.]') } },
   { label: 'Ask who runs the table', desc: 'Nobody answers. Something listens.', then: { favour: { house: 1 } }, reveal: '[A voice from the empty seat: "Everyone runs it. Nobody owns it. Come back when you are winning."]' }] };
+EVENTS.black_cat = { title: 'Cat in the Road', theme: ['jinx'], text: 'A black cat sits in the middle of the road and watches you decide.', opts: [
+  { label: 'Step around it', desc: 'Take the long way.', then: { gold: 2 }, reveal: '[You take the long way and find 2 gold in the ditch. The cat follows you anyway.]' },
+  { roll: { stat: 'LUK' }, label: 'Cross its path', desc: "It's only a cat.", then: { piece: 'C', got: '[Nothing bad happens. Something good does: {item}.]' },
+    fail: { then: { next: { weaken: 2 } }, go: (run, h) => h.say('[It was not only a cat. You start your next fight Weakened.]') } },
+  { pay: 2, label: 'Feed it', desc: 'You have scraps. Pay 2 gold.', then: { next: { jinxFirst: 1 } }, reveal: "[The cat eats, and wanders off toward your next opponent. Their first move will go wrong.]" },
+  { check: { stat: 'LUK' }, label: 'Read the omen', desc: "It's looking at something behind you.", then: { favour: { crow: 1 } }, go: run => { run.scouted = true; }, reveal: "[You see your next opponent's moves before they make them.]" }] };
 EVENTS.field_test = { fate: 'plague', people: 'archive', title: 'Field Test', theme: ['arcanist', 'pyre'], text: 'A clerk in a scorched coat holds out a gauntlet with too many dials. "Experimental. Mandatory. Mostly."', opts: [
   { label: 'Field-test it', desc: 'It has a lot of dials.', then: { experimental: 1, notice: 1, got: '[Field test assigned. Experimental equipment issued: {item}. Please report all malfunctions.]' } },
   { check: { stat: 'INT' }, label: 'Rewire it for your class', desc: 'Make it yours. Ignore the ticking.', then: { piece: 'B', next: { burn: 4 }, got: '[Rewired for your class. Output reclassified: {item}.]' }, go: (run, h) => h.say('[It is still ticking. You start your next fight with 4 Burn.]', 'loss') },

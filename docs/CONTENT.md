@@ -127,8 +127,9 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | Key | Used | Examples (value) | Shown to players as | Bot scores it |
 | --- | --- | --- | --- | --- |
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
+| `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bleed` | 12 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 48 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 50 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 7 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 4 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
@@ -148,7 +149,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `detonate` | 3 | Ignite (2), Combust (3), Wildfire (2) | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
 | `die` | 15 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 1 | Two-Headed Coin (4) | (works with other keys on the same skill) | yes |
-| `dmg` | 167 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 172 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 3 | Jackpot (3), Progressive Jackpot (3), Cash Out (3) | Deal 3 per pip across all your shown dice. | yes |
 | `dmgPip` | 9 | Coin Toss (2), Double Down (6), Double or Nothing (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 3 | Doom (26), Swift Doom (22), Inevitable Doom (40) | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
@@ -187,6 +188,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perMisf` | 3 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3) | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
 | `pierce` | 7 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
 | `poison` | 22 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
 | `regen` | 3 | Consecrate (4), Hallowed Ground (7), Holy Fire (4) | Heal 4 at the start of your next 3 turns. | yes |
@@ -203,7 +205,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `stunIfWeak` | 4 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 7 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
-| `weaken` | 29 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 30 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -251,9 +253,10 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `execPip` | 1 | Dead Man's Hand (0.02) | Execute thresholds rise by 2% for each pip on your highest die. | add |  |  | Gambler, Reaper |
 | `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
 | `firstCrit` | 1 | duelist_rapier (1) | Your first hit each fight is critical. | set |  |  |  |
-| `firstEvade` | 2 | shadow_leathers (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
+| `firstEvade` | 3 | shadow_leathers (1), Near Miss (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
 | `firstFree` | 1 | Arcanist 4 (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
 | `firstHit` | 3 | First Strike (1), First Blood (0.5), Arcane Mind (0.3) | Your first damaging skill each fight deals double. | add |  |  |  |
+| `firstJinx` | 1 | The Crow (1) | The opponent's first move each fight goes wrong for them, as if jinxed. | set |  |  |  |
 | `firstSix` | 2 | weighted_dice (1), Lucky Seven (1) | Your first die each fight rolls 6. | set |  |  | Gambler |
 | `firstStun` | 1 | thunder_maul (1) | Your first damaging skill each fight Stuns. | set |  |  | Stormcaller |
 | `flareFull` | 1 | Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
@@ -319,8 +322,8 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `sluggish` | 1 | Sluggish (1) | Start every fight Weakened. | set |  |  |  |
 | `startBlock` | 6 | chain_mail (8), Legion Deserter (15), Untouched (8), … | Start each fight with 8 Block. | add | yes | flat, scales with power | Bastion |
 | `startBlockPct` | 2 | Iron Body (0.1), trait Braced (0.15) | Start each fight with Block equal to 10% of your max HP. | add |  | rate | Bastion |
-| `startCurse` | 0 |  | Start each fight with 1 Curse. | add |  |  |  |
-| `startMisf` | 1 | black_cat_collar (3) | Opponents start each fight with 3 Misfortune. | add |  |  | Jinx |
+| `startCurse` | 1 | Ill-Starred (3) | Start each fight with 3 Curse. | add |  |  |  |
+| `startMisf` | 3 | black_cat_collar (3), Black Cat (2), Omenbreaker (3) | Opponents start each fight with 3 Misfortune. | add |  |  | Jinx |
 | `startPoison` | 1 | blight_kris (3) | Your opponent starts each fight with 3 Poison. | add |  |  | Venom |
 | `stormBreak` | 1 | Stormcaller 2 (1) | Your Stuns and Interrupts add your STR to their damage and shatter Block. Stopping a big attack Empowers you for 2 turns. | set |  |  | Stormcaller |
 | `stunBurn` | 1 | Wildstorm (5) | Your Stuns and Interrupts also apply 5 Burn. | add |  |  | Stormcaller, Pyre |
@@ -355,7 +358,10 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `enrageMult` | 3 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4) |
 | `flood` | 1 | The Leviathan Queen (3) |
 | `forge` | 1 | The Forge King (3) |
+| `hexer` | 1 | Mott the Unlucky (1) |
+| `jinxTax` | 1 | The Hanged Augur (2) |
 | `revive` | 2 | The Bone Saint (0.3), trait Repl̷icated (0.3) |
+| `showNext` | 1 | The Hanged Augur (1) |
 | `twincast` | 2 | The Archmage Who Fell Upward (3), trait Desy̷nced (3) |
 
 ### The grid, from `js/content/archetypes.js`
@@ -373,7 +379,7 @@ Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (
 | Reaper | STR | Might | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` | Bladedancer, Stormcaller | scythe, grave, harvest, end, hollow, bone |
 | Stormcaller | STR | Sway | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` | Arcanist, Gambler, Reaper | thunder, lightning, crack, break, sky, gale |
 | Gambler | LUK | Sway | Makes its own luck, then bets all of it. | `die` `dmgPip` `blockPip` `healPip` `dieMin` `dbl` `snake` `boxcars` `bust` `bustAt` `dmgAll` `cashOut` `progressive` `reroll` `setSix` `rollTwice` `mark` | Arcanist, Stormcaller, Jinx | dice, coin, card, odds, stake, jackpot |
-| Jinx | LUK | Bane | Everything goes wrong, for them. The rest it carries. | `misf` `misfT` `omenAtk` `omenGuard` `jinxDisc` `uncurse` `passCurse` `curseDmg` `curseKeep` `perMisf` `perCurse` `killReset` `coinStun` `calamity` `keepHalf` | Pyre, Venom, Gambler | crow, omen, mirror, curse, ladder, thirteen |
+| Jinx | LUK | Bane | Everything goes wrong, for them. The rest it carries. | `misf` `misfT` `omenAtk` `omenGuard` `jinxDisc` `uncurse` `passCurse` `curseDmg` `curseKeep` `perMisf` `perCurse` `killReset` `coinStun` `calamity` `keepHalf` `augury` `portent` | Pyre, Venom, Gambler | crow, omen, mirror, curse, ladder, thirteen |
 
 ### Enemy move roles and tier numbers, from `js/content/moves.js`
 
@@ -388,10 +394,10 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 25 moves |
-| big | a big hit, the one to Block or Stun | 12 moves |
-| guard | Block and nothing else | 16 moves |
-| setup | a status, buff or trick with little damage | 18 moves |
+| strike | a plain hit | 28 moves |
+| big | a big hit, the one to Block or Stun | 13 moves |
+| guard | Block and nothing else | 18 moves |
+| setup | a status, buff or trick with little damage | 19 moves |
 | sustain | healing or draining | 5 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
@@ -400,13 +406,13 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 34 (quests, events) |
+| `gold` | 8 | 8 gold |  | 35 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
 | `rune` | 1 | a rune |  | 6 (quests, events) |
-| `piece` | "B" | a free B-rank piece |  | 20 (quests, events) |
+| `piece` | "B" | a free B-rank piece |  | 21 (quests, events) |
 | `experimental` | 1 | an Experimental item |  | 1 (events) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 18 (events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 20 (events) |
 | `foe` | {"weaken":2} | a mark on your next opponent |  | 12 (events) |
 | `max_hp` | -0.1 | −10% max HP |  | 6 (events) |
 | `restore` | 1 | 1 Heart restored |  | 8 (events) |
@@ -421,7 +427,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `fate` | 1 | your world's Fate eased | yes | 56 (events) |
 | `notice` | 1 | the System's notice | yes | 55 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
-| `favour` | {"war":2} | 2 Favour with the God of War | yes | 9 (quests, events) |
+| `favour` | {"war":2} | 2 Favour with the God of War | yes | 10 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`
 
@@ -440,6 +446,7 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2 |
 | `healed` | fight | Heal 60 HP in a single fight | 60 |  |  | Title Bloodthirsty |
 | `healthy` | win | Win with more than half your HP |  |  |  | wager |
+| `jinxes` | fight | Jinx 3 moves in a single fight | 3 |  |  | Title Black Cat |
 | `masked` | win | Defeat the Masked Entrant |  |  |  | Title Mirror Breaker |
 | `merge` | merge | Merge pieces |  |  |  | quest merge4 |
 | `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal |
