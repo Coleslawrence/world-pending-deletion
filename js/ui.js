@@ -1040,6 +1040,7 @@ function pieceSheet() {
   const f = findPiece(run, S.u); if (!f) { ui.sheet = null; return ''; }
   const p = f.p, g = isGear(p.id);
   const acts = [];
+  if (g && GEAR[p.id].consumable) return sheetWrap('On your bench', pieceBody(p.id, p.star, p.mods) + gotHTML(p), `<button class="btn ghost" data-act="close">Not yet</button><button class="btn primary" data-act="patch-open" data-u="${p.u}">Use</button>`);
   if (f.at === 'bench') {
     if (g) { const cur = run.gear[GEAR[p.id].slot]; acts.push(`<button class="btn" data-act="move" data-u="${p.u}" data-to="gear">${cur ? 'Swap with ' + esc(GEAR[cur.id].name) : 'Equip'}</button>`); }
     else {
@@ -1068,6 +1069,12 @@ function marksSheet() {
   const L = { next: 'Next fight', foe: 'Next fight', stakes: 'Next fight', ward: `Next ${run.ward > 1 ? run.ward + ' losses' : 'loss'}`, always: 'Every fight' };
   const rows = liveMarks().map(m => `<li><b>${L[m.kind]}</b>: ${esc(m.text.charAt(0).toUpperCase() + m.text.slice(1))}.<br><small>From: ${esc(m.from)}</small></li>`).join('');
   return sheetWrap('[Pending effects]', `<p class="sh-p">[Effects of your choices, waiting for the arena.]</p><ul class="msgs marks">${rows}</ul>`, '<button class="btn primary" data-act="close">Done</button>');
+}
+// Unsigned Patch (experimental, gear.js): three rules offered, one removed for the rest of the run
+function patchSheet() {
+  const S = ui.sheet, offer = patchOffer(run);
+  const opts = offer.map(k => `<button class="choice glitch" data-act="patch-pick" data-k="${k}"><div class="sr-h"><span class="sr-name">Remove: ${esc(PATCH_RULES[k].name)}</span></div><div class="sr-desc">${esc(PATCH_RULES[k].text)}</div></button>`).join('');
+  return sheetWrap('[Unsigned Patch]', `<p class="sh-p">[Publisher: unknown. This patch removes one rule for the rest of the run. Select the rule.]</p>${opts}`, '<button class="btn ghost" data-act="close">Not yet</button>', 'sys', true);
 }
 // The first time a stat line is offered, the System says so once
 function statLinesNotice() {
@@ -1418,7 +1425,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1566,6 +1573,8 @@ function onAct(el) {
     case 'info': ui.info = !ui.info; return render();
     case 'reroll-mode': ui.reroll = !ui.reroll; return updateFight();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
+    case 'patch-open': ui.sheet = { type: 'patch', u: +d.u }; saveRun(); return render();
+    case 'patch-pick': { const S = ui.sheet; if (S && usePatch(run, S.u, d.k, meta, msgs)) { sfx('buy'); ui.sheet = null; pushMsgs(msgs, false, 'Unsigned Patch'); saveRun(); saveMeta(); } return render(); }
     case 'note-ok': if (ui.notes) ui.notes.shift(); // falls through: the next card, or on with the run
     case 'result-ok': {
       if (ui.notes && ui.notes.length) { ui.sheet = { type: 'note' }; return render(); }

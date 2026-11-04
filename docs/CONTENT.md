@@ -214,6 +214,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `burnPlus` | 4 | Pyre 4 (4), ember_gauntlets (2), Emberfall (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 1 | plague_censer (2) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
+| `countdown` | 1 | countdown_collar (12) | You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted. | set |  |  |  |
 | `critBonus` | 5 | duelist_rapier (0.1), Lucky Star (0.1), Mirror Breaker (0.08), … | +10% critical chance. | add |  |  |  |
 | `critMult` | 1 | Executioner (1.75) | Critical hits deal ×1.75 instead of ×1.5. | set |  |  |  |
 | `dieMin` | 1 | Gambler 2 (2) | Your dice never roll below 2. | set |  |  | Gambler |
@@ -222,6 +223,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
 | `dotPlus` | 1 | The Trickster (2) | Burn, Poison and Bleed you apply +2. | add |  | flat, scales with power |  |
+| `echoNext` | 1 | echo_chamber (0.5) | Every skill plays again next turn at 50% power. | set |  |  |  |
 | `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
 | `execBonus` | 1 | executioner_axe (0.4) | +40% damage to opponents below 30% HP. | add |  |  | Reaper |
 | `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
@@ -251,6 +253,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `mighty` | 1 | Mighty Frame (0.1) | Reaper and Stormcaller skills deal 10% more. | set |  |  |  |
 | `multiWeaken` | 1 | Lightning Blade (1) | Multi-hit skills Weaken the opponent for 1 turn. | add |  |  | Bladedancer, Stormcaller |
 | `overhealBlock` | 1 | Zealot 6 (1) | Overhealing becomes Block. | set |  |  | Zealot |
+| `painLink` | 1 | pain_link (0.5) | Every hit is split evenly between both fighters. | set |  |  |  |
 | `poisonHeal` | 3 | grave_shroud (0.2), Plague Doctor (0.25), Grave Warden (0.3) | Heal 20% of Poison damage dealt (max 30% from all sources). | add |  |  | Venom |
 | `poisonMult` | 1 | Venom 6 (1.5) | Poison deals 50% more damage. | mul |  | rate | Venom |
 | `poisonOnHit` | 1 | serpent_dagger (1) | Each skill that hits also applies 1 Poison. | add |  |  | Venom |
@@ -283,6 +286,8 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `stunEmpower` | 2 | conductive_mail (1), Stormbreaker (1) | Whenever you Stun or Interrupt, you are Empowered for 1 turn. | add |  |  | Stormcaller |
 | `stunHeal` | 1 | Inquisitor (8) | Your Stuns and Interrupts heal you 8. | add |  |  | Stormcaller, Zealot |
 | `stunWeaken` | 1 | Stormcaller 4 (3) | Your Stuns also Weaken for 3 turns. | set |  |  | Stormcaller |
+| `suspend` | 1 | delay_engine (3) | Your hits are stored and all strike at once every 3rd turn, +50%. | set |  |  |  |
+| `swapHp` | 1 | mirror_cuirass (0.3) | Once per fight below 30% HP, your HP and your opponent's trade places. | set |  |  |  |
 | `swordSaint` | 1 | Sword Saint (1) | Your basic Attack becomes S-rank: far stronger, and it ignores Block. | set |  |  |  |
 | `thornBurn` | 1 | Ember Wall (2) | Thorns also apply 2 Burn. | add |  | flat, scales with power | Bastion, Pyre |
 | `thornMult` | 1 | Duelist (1.5) | Thorns and Riposte deal 50% more. | add |  | rate | Bastion, Bladedancer |
@@ -354,8 +359,9 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `gold` | 8 | 8 gold |  | 32 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
-| `rune` | 1 | a rune |  | 7 (quests, events) |
+| `rune` | 1 | a rune |  | 6 (quests, events) |
 | `piece` | "B" | a free B-rank piece |  | 19 (quests, events) |
+| `experimental` | 1 | an Experimental item |  | 1 (events) |
 | `next` | {"bribe":true} | a mark on your next fight |  | 18 (events) |
 | `foe` | {"weaken":2} | a mark on your next opponent |  | 12 (events) |
 | `max_hp` | -0.1 | −10% max HP |  | 6 (events) |

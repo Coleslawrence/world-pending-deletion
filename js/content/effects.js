@@ -12,6 +12,12 @@
 'use strict';
 const EFFECTS = {
   // Damage
+  // Experimental (Field Test prototypes in gear.js): mechanics nothing else has yet
+  suspend: { how: 'set', say: v => `Your hits are stored and all strike at once every ${v}rd turn, +50%.` },
+  swapHp: { how: 'set', say: v => `Once per fight below ${pct(v)} HP, your HP and your opponent's trade places.` },
+  echoNext: { how: 'set', say: v => `Every skill plays again next turn at ${pct(v)} power.` },
+  countdown: { how: 'set', say: v => `You deal 20% less damage. If a fight reaches turn ${v}, your opponent is deleted.` },
+  painLink: { how: 'set', say: () => 'Every hit is split evenly between both fighters.' },
   dmgPct: { say: v => `All your damage +${pct(v)}.`, enemy: 'rate' },
   firstHit: { say: v => v >= 1 ? 'Your first damaging skill each fight deals double.' : `Your first damaging skill each fight deals ${pct(v)} more.` },
   lowHpDmg: { say: v => `Below half HP, deal ${pct(v)} more damage.`, enemy: 'rate' },
