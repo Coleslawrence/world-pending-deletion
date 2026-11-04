@@ -322,8 +322,9 @@ function worldName(T, C, rng) {
 }
 // A world (v 2): type, name, rank, its layers, the modifier its Fate brings, and a champion name for the Awakening.
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
-function genWorld(rng, cap) {
-  const types = Object.keys(WORLD_TYPES), type = pick(types, rng), T = WORLD_TYPES[type];
+// types: the world types it may pick from (default: all)
+function genWorld(rng, cap, only) {
+  const types = Object.keys(WORLD_TYPES), type = pick(only || types, rng), T = WORLD_TYPES[type];
   const mix = CONFLUENCE.chance && rnd(rng) < CONFLUENCE.chance ? pick(types.filter(k => k !== type && settingOf(k) === settingOf(type)), rng) || null : null;
   const name = worldName(T, mix && WORLD_TYPES[mix], rng), rank = worldRank(rng, cap);
   const fate = pickKey(FATES, rng, type), people = pickKey(PEOPLES, rng, type), M = fate && FATES[fate].mods;
@@ -362,8 +363,9 @@ function staleWorld(meta, w) {
 }
 function offerWorlds(meta, rng) {
   const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0;
+  const open = unlockedArch(meta), types = Object.keys(WORLD_TYPES).filter(k => open.includes(WORLD_TYPES[k].home)); // a world whose home class is still locked isn't offered
   while (out.length < n && guard++ < 80) {
-    const w = genWorld(rng, cap), st = staleWorld(meta, w);
+    const w = genWorld(rng, cap, types), st = staleWorld(meta, w);
     if (rnd(rng) < CORRUPT_WORLD) w.mod = 'corrupted';
     if ((seen.has(w.type) && guard < 50) || (st === 2 && guard < 70) || (st === 1 && guard < 40)) continue;
     seen.add(w.type); out.push(w);
@@ -1041,8 +1043,9 @@ function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour 
 const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, ROLL_MAX = 95;
 function rollChance(run, r) {
   const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
-  const floor = runP(run).chanceFloor; // Born Lucky: the first chance option each round
-  return floor && run.chanceFloorAt !== run.round ? Math.max(ch, floor) : ch;
+  const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
+  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0)); // The House, Loaded Dice
+  return floor && run.chanceFloorAt !== run.round ? Math.max(c2, floor) : c2;
 }
 // A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
 const CHANCE_UNLOCK = 3;
@@ -2074,8 +2077,8 @@ function playerAct(f, idx) {
 function skipPlayer(f) { f.events = []; endTurn(f, f.A, null); if (!checkOver(f)) f.phase = 'enemy'; }
 function scoreSkill(s, low) { const fx = s.def.fx; return ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) + (fx.poison || 0) * 1.5 + (fx.bleed || 0) + (fx.detonate ? 10 : 0) + (fx.doom ? fx.doom * 0.5 : 0) + (fx.blockDmg ? 6 : 0)) * s.power + (low ? ((fx.heal || 0) + (fx.healMissing ? 25 : 0) + (fx.block || 0) * 0.8) * s.power * 2 : (fx.block || 0) * 0.5 * s.power) + (fx.stun ? 8 : 0) + (fx.interrupt ? 6 : 0); }
 function planIntent(f, B) {
+  rollDice(f, B); // an opponent with dice (Delphine Coyle, a Gambler Entrant) rolls as it plans, so you see the roll
   if (B.smart) {
-    rollDice(f, B);
     const ready = B.skills.filter(s => s.cd <= 0);
     let best = ready[0];
     const lowHp = B.hp / B.maxHp < 0.35;
@@ -2330,6 +2333,8 @@ function resolveFight(run, f, meta, rng) {
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
+    if (runP(run).goldPerWin) { run.gold += runP(run).goldPerWin; msgs.push({ t: 'loot', text: `[The House pays out: +${runP(run).goldPerWin} gold.]` }); }
+    if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
     if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }

@@ -13,10 +13,11 @@
 const MOVE_ROLES = { strike: 'a plain hit', big: 'a big hit, the one to Block or Stun', guard: 'Block and nothing else', setup: 'a status, buff or trick with little damage', sustain: 'healing or draining' };
 const BIG_HIT = { 1: 18, 2: 16, 3: 14, 4: 20 };
 const SETUP_FX = ['burn', 'poison', 'bleed', 'weaken', 'empower', 'evade', 'mirror', 'cleanse', 'stun', 'doublePoison', 'blockDmg'];
-function moveDmg(fx) { return (fx.dmg || 0) * (fx.hits || 1); }
+// A die move (fx.die) is counted at its average roll, 3.5
+function moveDmg(fx) { return ((fx.dmg || 0) + (fx.dmgPip || 0) * 3.5) * (fx.hits || 1); }
 function moveRole(fx, tier) {
   if (fx.heal || fx.lifesteal || fx.regen) return 'sustain';
-  if (fx.block && !fx.dmg) return 'guard';
+  if ((fx.block || fx.blockPip) && !moveDmg(fx)) return 'guard';
   const d = moveDmg(fx);
   if (d >= (BIG_HIT[tier] || BIG_HIT[4])) return 'big';
   if (d <= 8 && SETUP_FX.some(k => fx[k])) return 'setup';

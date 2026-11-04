@@ -34,7 +34,7 @@ EVENTS.house_game = { title: 'The House Game', theme: ['dicer'], text: 'A table 
   { check: { stat: 'LUK' }, label: 'Count the cards', desc: 'You see the pattern.', then: { gold: 6, notice: 1 }, reveal: '[Counting is not cheating. It is noticed.]' },
   { roll: { stat: 'LUK', hard: true }, label: 'Stake a Heart', desc: 'Big table, big stakes.', then: { piece: 'B', got: '[The table pays out in kind: {item}.]' },
     fail: { then: { erase: 1 }, go: (run, h) => h.say('[The House collects. A page of your world is gone.]') } },
-  { label: 'Ask who runs the table', desc: 'Nobody answers. Something listens.', then: { gold: 2 }, reveal: '[A voice from the empty seat: "Everyone runs it. Nobody owns it. Two gold for asking. Come back when you are winning."]' }] };
+  { label: 'Ask who runs the table', desc: 'Nobody answers. Something listens.', then: { favour: { house: 1 } }, reveal: '[A voice from the empty seat: "Everyone runs it. Nobody owns it. Come back when you are winning."]' }] };
 EVENTS.field_test = { fate: 'plague', people: 'archive', title: 'Field Test', theme: ['arcanist', 'pyre'], text: 'A clerk in a scorched coat holds out a gauntlet with too many dials. "Experimental. Mandatory. Mostly."', opts: [
   { label: 'Field-test it', desc: 'It has a lot of dials.', then: { experimental: 1, notice: 1, got: '[Field test assigned. Experimental equipment issued: {item}. Please report all malfunctions.]' } },
   { check: { stat: 'INT' }, label: 'Rewire it for your class', desc: 'Make it yours. Ignore the ticking.', then: { piece: 'B', next: { burn: 4 }, got: '[Rewired for your class. Output reclassified: {item}.]' }, go: (run, h) => h.say('[It is still ticking. You start your next fight with 4 Burn.]', 'loss') },

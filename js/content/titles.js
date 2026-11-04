@@ -23,9 +23,10 @@ const TITLES = {
   thornbane: { name: 'Thornbane', cond: 'World first: defeat the Thorn Mother.', desc: 'Bleed you apply +1.', first: true, p: { bleedPlus: 1 }, flavour: "The Thorn Mother withered. The forest let you leave." },
   skyfall: { name: 'Skyfall', cond: 'World first: defeat the Archmage Who Fell Upward.', desc: '+5% critical chance and +5% dodge.', first: true, p: { critBonus: 0.05, dodge: 0.05 }, flavour: "You brought the Archmage down. Gravity sent its thanks." },
   forgebreaker: { name: 'Forgebreaker', cond: 'World first: defeat the Forge King.', desc: 'Always have 2 Thorns, doubled below half HP.', first: true, p: { thornsAlways: 2 }, flavour: "The Forge King's anvil is cold. You did that." },
+  housebreaker: { name: 'Housebreaker', cond: 'World first: defeat the Dealer.', desc: 'Start each fight with 1 reroll.', first: true, p: { rerolls: 1 }, flavour: "The Dealer folded. The House sent a polite note." },
   stormbreaker: { name: 'Stormbreaker', cond: 'World first: defeat the Storm Herald.', desc: 'Whenever you Stun or Interrupt, you are Empowered for 1 turn.', first: true, p: { stunEmpower: 1 }, flavour: "The Storm Herald fell. The thunder paused, just once." },
   ascendant: { name: 'Ascendant', cond: 'World first: merge a piece to ★3.', desc: '+5% damage.', first: true, p: { dmgPct: 0.05 }, flavour: "[Evolution recorded. The System had not expected it so soon.]" },
   pathfinder: { name: 'Pathfinder', cond: 'World first: unlock a Hidden Path.', desc: 'Start each fight with 5 Block and heal 1 each turn.', first: true, p: { startBlock: 5, regen: 1 }, flavour: "[Hidden Path found. The System is redrawing its maps.]" },
   unbeaten: { name: 'Unbeaten', cond: 'World first: defeat the Undefeated.', desc: '+10% damage.', first: true, p: { dmgPct: 0.1 }, flavour: "[Record for the Undefeated: amended. Please stand by.]" },
 };
-const FINAL_TITLE = { leviathan: 'tidebreaker', kharros: 'emberfall', bone_saint: 'bonebreaker', thorn_mother: 'thornbane', archmage: 'skyfall', forge_king: 'forgebreaker', herald: 'stormbreaker', undefeated: 'unbeaten' };
+const FINAL_TITLE = { leviathan: 'tidebreaker', kharros: 'emberfall', bone_saint: 'bonebreaker', thorn_mother: 'thornbane', archmage: 'skyfall', forge_king: 'forgebreaker', herald: 'stormbreaker', dealer: 'housebreaker', undefeated: 'unbeaten' };

@@ -128,13 +128,13 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | --- | --- | --- | --- | --- |
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `bleed` | 12 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 44 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 45 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 7 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
-| `blockPip` | 3 | Hedge Your Bet (3), Insurance (3), Side Bet (2) | (works with other keys on the same skill) | yes |
+| `blockPip` | 4 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
 | `brk` | 18 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
 | `burn` | 25 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
-| `bust` | 2 | Double Down (6), All In (8) | (works with other keys on the same skill) | yes |
+| `bust` | 3 | Double Down (6), All In (8), Delphine Coyle: Double or Nothing (5) | (works with other keys on the same skill) | yes |
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
 | `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
 | `cleanse` | 14 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
@@ -142,16 +142,16 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `cruel` | 3 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5) | ×2 damage if the opponent has 2 or more effects. | yes |
 | `dbl` | 1 | Double or Nothing (4) | (works with other keys on the same skill) | yes |
 | `detonate` | 3 | Ignite (2), Combust (3), Wildfire (2) | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `die` | 12 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
+| `die` | 15 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 1 | Two-Headed Coin (4) | (works with other keys on the same skill) | yes |
-| `dmg` | 157 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 161 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 3 | Jackpot (3), Progressive Jackpot (3), Cash Out (3) | Deal 3 per pip across all your shown dice. | yes |
-| `dmgPip` | 7 | Coin Toss (2), Double Down (6), Double or Nothing (2), … | (works with other keys on the same skill) | yes |
+| `dmgPip` | 9 | Coin Toss (2), Double Down (6), Double or Nothing (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 3 | Doom (26), Swift Doom (22), Inevitable Doom (40) | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
 | `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
 | `drainPoison` | 1 | Wither (1) | Heal equal to the opponent's Poison. | no |
-| `empower` | 8 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
+| `empower` | 9 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
 | `evade` | 6 | Smoke Bomb (1), Vanish (2), Caltrops (1), … | Evade the next attack. | yes |
 | `execMult` | 6 | Execute (2.5), Soul Harvest (2), Decapitate (3), … | (works with other keys on the same skill) | yes |
 | `execute` | 6 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
@@ -160,7 +160,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `heal` | 16 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 6 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 1 | Insurance (1) | (works with other keys on the same skill) | yes |
-| `hits` | 36 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
+| `hits` | 37 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
 | `interrupt` | 3 | Counterspell (1), Nullify (1), Spell Theft (1) | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
 | `leech` | 3 | Leech (3), Blood Leech (6), Parasite (3) | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
@@ -214,6 +214,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `burnLowDie` | 1 | Wildfire Bet (1) | Burn you apply is raised by your lowest die. | set |  |  | Gambler, Pyre |
 | `burnPlus` | 4 | Pyre 4 (4), ember_gauntlets (2), Emberfall (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 1 | plague_censer (2) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
+| `chanceBonus` | 2 | Loaded Dice (15), The House (10) | Chance options in events +15%. | add |  |  |  |
 | `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `countdown` | 1 | countdown_collar (12) | You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted. | set |  |  |  |
@@ -239,6 +240,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `flareFull` | 1 | Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
 | `flatDR` | 3 | Thick Skin (2), Ser Calder (2), trait Armoured (2) | Every hit you take deals 2 less damage. | add |  | flat, scales with power |  |
 | `goldDmg` | 1 | misers_ring (0.05) | +5% damage for every 10 gold you hold when a fight starts, up to +25%. | add |  |  |  |
+| `goldPerWin` | 1 | The House (1) | +1 gold after each win. | add |  |  |  |
 | `healBlock` | 2 | templar_plate (0.3), Paladin (0.5) | Healing also gives Block equal to 30% of it. | add |  |  | Zealot, Bastion |
 | `healDmg` | 1 | Last Rites (0.3) | Your healing also deals 30% of it as damage to the opponent. | add |  |  | Reaper, Zealot |
 | `healOnBleed` | 3 | bloodstone_amulet (3), Blood Saint (3), Hedge Witch (1) | Heal 3 whenever you apply Bleed. | add |  |  | Bladedancer, Zealot |
@@ -280,7 +282,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `reapBlood` | 1 | Reaper 2 (0.15) | The first time you hit an opponent below half HP, heal 15% of your max HP. | set |  |  | Reaper |
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
 | `regen` | 6 | Zealot 4 (2), prayer_beads (3), Tidecaller (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
-| `rerolls` | 1 | Gambler 4 (2) | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
+| `rerolls` | 2 | Gambler 4 (2), Housebreaker (1) | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
 | `savingGrace` | 1 | Saving Grace (1) | Healing from a die skill showing 6 is doubled. | set |  |  | Gambler, Zealot |
 | `sixGold` | 1 | gilded_coin (1) | +1 gold after each win where you rolled a 6. | add |  |  | Gambler |
 | `sixStun` | 1 | Thunder Roll (1) | A die skill showing 6 also Stuns. | set |  |  | Gambler, Stormcaller |
@@ -353,9 +355,9 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 23 moves |
-| big | a big hit, the one to Block or Stun | 9 moves |
-| guard | Block and nothing else | 14 moves |
+| strike | a plain hit | 25 moves |
+| big | a big hit, the one to Block or Stun | 12 moves |
+| guard | Block and nothing else | 16 moves |
 | setup | a status, buff or trick with little damage | 18 moves |
 | sustain | healing or draining | 5 moves |
 
@@ -365,7 +367,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 35 (quests, events) |
+| `gold` | 8 | 8 gold |  | 34 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
 | `rune` | 1 | a rune |  | 6 (quests, events) |
@@ -386,7 +388,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `fate` | 1 | your world's Fate eased | yes | 56 (events) |
 | `notice` | 1 | the System's notice | yes | 55 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
-| `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
+| `favour` | {"war":2} | 2 Favour with the God of War | yes | 9 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`
 
