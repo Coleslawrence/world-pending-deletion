@@ -28,5 +28,13 @@ const HIDDEN_PATHS = {
   'arcanist+zealot': { name: 'Chronomancer', desc: 'Quick skills heal you 4.', fx: { quickHeal: 4 } },
   'arcanist+reaper': { name: 'Soul Weaver', desc: 'Doom and Leech you apply are 40% stronger.', fx: { doomLeech: 0.4 } },
   'bastion+reaper': { name: 'Juggernaut', desc: 'Deal 1% more damage for every 2 Block you have (up to 40%).', fx: { blockDmgPct: 1 } },
+  'arcanist+dicer': { name: 'Card Trick', desc: 'Quick skills reroll your lowest die.', fx: { quickReroll: 1 } },
+  'dicer+storm': { name: 'Thunder Roll', desc: 'A die skill showing 6 also Stuns.', fx: { sixStun: 1 } },
+  'dicer+pyre': { name: 'Wildfire Bet', desc: 'Burn you apply is raised by your lowest die.', fx: { burnLowDie: 1 } },
+  'dicer+reaper': { name: "Dead Man's Hand", desc: 'Execute thresholds rise by 2% for each pip on your highest die.', fx: { execPip: 0.02 } },
+  'dicer+venom': { name: 'Poisoned Chalice', desc: 'Jackpots also apply 4 Poison.', fx: { jackpotPoison: 4 } },
+  'blade+dicer': { name: 'Lucky Cut', desc: 'A critical hit from a die skill showing 6 hits once more.', fx: { luckyCut: 1 } },
+  'bastion+dicer': { name: 'Iron Odds', desc: 'Block from a die skill showing 5 or 6 is doubled.', fx: { ironOdds: 1 } },
+  'dicer+zealot': { name: 'Saving Grace', desc: 'Healing from a die skill showing 6 is doubled.', fx: { savingGrace: 1 } },
   'storm+zealot': { name: 'Inquisitor', desc: 'Your Stuns and Interrupts heal you 8.', fx: { stunHeal: 8 } },
 };

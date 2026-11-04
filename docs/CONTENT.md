@@ -211,8 +211,10 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `burnExec` | 1 | Funeral Pyre (0.25) | +25% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
 | `burnFade` | 2 | Pyre 2 (0.15), Pyre 6 (0) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
 | `burnHeal` | 2 | cinder_robe (0.3), Sunpriest (0.3) | Heal 30% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
+| `burnLowDie` | 1 | Wildfire Bet (1) | Burn you apply is raised by your lowest die. | set |  |  | Gambler, Pyre |
 | `burnPlus` | 4 | Pyre 4 (4), ember_gauntlets (2), Emberfall (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 1 | plague_censer (2) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
+| `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `countdown` | 1 | countdown_collar (12) | You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted. | set |  |  |  |
 | `critBonus` | 5 | duelist_rapier (0.1), Lucky Star (0.1), Mirror Breaker (0.08), … | +10% critical chance. | add |  |  |  |
@@ -226,12 +228,13 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `echoNext` | 1 | echo_chamber (0.5) | Every skill plays again next turn at 50% power. | set |  |  |  |
 | `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
 | `execBonus` | 1 | executioner_axe (0.4) | +40% damage to opponents below 30% HP. | add |  |  | Reaper |
+| `execPip` | 1 | Dead Man's Hand (0.02) | Execute thresholds rise by 2% for each pip on your highest die. | add |  |  | Gambler, Reaper |
 | `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
 | `firstCrit` | 1 | duelist_rapier (1) | Your first hit each fight is critical. | set |  |  |  |
 | `firstEvade` | 2 | shadow_leathers (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
 | `firstFree` | 1 | Arcanist 4 (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
 | `firstHit` | 3 | First Strike (1), First Blood (0.5), Arcane Mind (0.3) | Your first damaging skill each fight deals double. | add |  |  |  |
-| `firstSix` | 1 | weighted_dice (1) | Your first die each fight rolls 6. | set |  |  | Gambler |
+| `firstSix` | 2 | weighted_dice (1), Lucky Seven (1) | Your first die each fight rolls 6. | set |  |  | Gambler |
 | `firstStun` | 1 | thunder_maul (1) | Your first damaging skill each fight Stuns. | set |  |  | Stormcaller |
 | `flareFull` | 1 | Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
 | `flatDR` | 3 | Thick Skin (2), Ser Calder (2), trait Armoured (2) | Every hit you take deals 2 less damage. | add |  | flat, scales with power |  |
@@ -244,12 +247,15 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `heartOnWin` | 1 | Reaper 6 (1) | Each win restores 1 Heart. | set |  |  | Reaper |
 | `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
 | `hitHeal` | 1 | pilgrim_mace (2) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
+| `ironOdds` | 1 | Iron Odds (1) | Block from a die skill showing 5 or 6 is doubled. | set |  |  | Gambler, Bastion |
 | `jackpot` | 1 | Gambler 6 (0.5) | Jackpot: when two of your dice show the same number, both skills are 50% stronger. | set |  |  | Gambler |
+| `jackpotPoison` | 1 | Poisoned Chalice (4) | Jackpots also apply 4 Poison. | add |  |  | Gambler, Venom |
 | `lastWords` | 1 | Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP. | set |  |  |  |
 | `lifesteal` | 5 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDR` | 1 | Comeback Kid (0.2) | Below 25% HP, take 20% less damage. | set |  | rate |  |
 | `lowHpDmg` | 2 | Berserker's Blood (0.3), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
 | `lowLifesteal` | 1 | soul_lantern (0.25) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
+| `luckyCut` | 1 | Lucky Cut (1) | A critical hit from a die skill showing 6 hits once more. | set |  |  | Gambler, Bladedancer |
 | `mighty` | 1 | Mighty Frame (0.1) | Reaper and Stormcaller skills deal 10% more. | set |  |  |  |
 | `multiWeaken` | 1 | Lightning Blade (1) | Multi-hit skills Weaken the opponent for 1 turn. | add |  |  | Bladedancer, Stormcaller |
 | `overhealBlock` | 1 | Zealot 6 (1) | Overhealing becomes Block. | set |  |  | Zealot |
@@ -265,6 +271,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `quickFree` | 1 | hourglass (1) | Your first Quick skill each fight has no cooldown. | add |  |  | Arcanist |
 | `quickHeal` | 1 | Chronomancer (4) | Quick skills heal you 4. | add |  |  | Arcanist, Zealot |
 | `quickPoison` | 1 | Apothecary (2) | Quick skills apply 2 Poison. | add |  |  | Arcanist, Venom |
+| `quickReroll` | 1 | Card Trick (1) | Quick skills reroll your lowest die. | set |  |  | Gambler, Arcanist |
 | `quickStun` | 1 | Tempest Mage (0.25) | Damaging Quick skills have a 25% chance to Stun. | add |  |  | Arcanist, Stormcaller |
 | `quickTwice` | 1 | Arcanist 6 (1) | Quick skills cast twice. | set |  |  | Arcanist |
 | `rakeReroll` | 1 | croupiers_rake (1) | After a Jackpot, gain 1 reroll. | add |  |  | Gambler |
@@ -274,7 +281,9 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
 | `regen` | 6 | Zealot 4 (2), prayer_beads (3), Tidecaller (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
 | `rerolls` | 1 | Gambler 4 (2) | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
+| `savingGrace` | 1 | Saving Grace (1) | Healing from a die skill showing 6 is doubled. | set |  |  | Gambler, Zealot |
 | `sixGold` | 1 | gilded_coin (1) | +1 gold after each win where you rolled a 6. | add |  |  | Gambler |
+| `sixStun` | 1 | Thunder Roll (1) | A die skill showing 6 also Stuns. | set |  |  | Gambler, Stormcaller |
 | `sleeveFix` | 1 | sharps_sleeve (1) | Once per fight, a die that rolls 1 becomes a 6. | set |  |  | Gambler |
 | `sluggish` | 1 | Sluggish (1) | Start every fight Weakened. | set |  |  |  |
 | `startBlock` | 6 | chain_mail (8), Legion Deserter (15), Untouched (8), … | Start each fight with 8 Block. | add | yes | flat, scales with power | Bastion |
@@ -356,17 +365,17 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 32 (quests, events) |
+| `gold` | 8 | 8 gold |  | 35 (quests, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
 | `rune` | 1 | a rune |  | 6 (quests, events) |
-| `piece` | "B" | a free B-rank piece |  | 19 (quests, events) |
+| `piece` | "B" | a free B-rank piece |  | 20 (quests, events) |
 | `experimental` | 1 | an Experimental item |  | 1 (events) |
 | `next` | {"bribe":true} | a mark on your next fight |  | 18 (events) |
 | `foe` | {"weaken":2} | a mark on your next opponent |  | 12 (events) |
 | `max_hp` | -0.1 | −10% max HP |  | 6 (events) |
 | `restore` | 1 | 1 Heart restored |  | 8 (events) |
-| `erase` | 1 | 1 Heart erased |  | 5 (events) |
+| `erase` | 1 | 1 Heart erased |  | 6 (events) |
 | `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 6 (events) |
 | `respec` | true | your stat points to place again |  | 1 (events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 6 (events) |
@@ -375,7 +384,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 4 (events) |
 | `fate` | 1 | your world's Fate eased | yes | 56 (events) |
-| `notice` | 1 | the System's notice | yes | 54 (events) |
+| `notice` | 1 | the System's notice | yes | 55 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
@@ -387,6 +396,7 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | --- | --- | --- | --- | --- | --- | --- |
 | `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt |
 | `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner |
+| `chances` | chance | Win 3 chance rolls in one run | 3 |  |  | Title Lucky Seven |
 | `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
 | `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector |
 | `fast` | win | Win within 6 turns | 6 |  |  | wager, Title First Blood, quest fast3 |

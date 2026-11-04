@@ -422,6 +422,7 @@ function newRun(world, setup, meta, rng) {
   // Its own stream, so pairing never shifts the draft, shops or opponents (a sim's rng keys it by the world)
   run.pair = genPair(world, setup.seed ? seedRng(setup.seed + ':pair') : rng ? seedRng('pair:' + world.type + ':' + world.name) : undefined);
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
+  if (G.includes('bornlucky')) run.stats.LUK += 2;
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // System quests: two visible, every hidden one quietly active
   const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
@@ -1038,7 +1039,18 @@ function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour 
 // point of the stat + ROLL_LUK per point of LUK, kept between ROLL_MIN and ROLL_MAX. The roll is made when the event appears and kept
 // with the run, so reloading never changes it; a failed roll takes the option's fail branch, which always does something.
 const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, ROLL_MAX = 95;
-function rollChance(run, r) { const s = effStats(run); return Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0)))); }
+function rollChance(run, r) {
+  const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
+  const floor = runP(run).chanceFloor; // Born Lucky: the first chance option each round
+  return floor && run.chanceFloorAt !== run.round ? Math.max(ch, floor) : ch;
+}
+// A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
+const CHANCE_UNLOCK = 3;
+function chanceWon(run, msgs) {
+  run.chanceWins = (run.chanceWins || 0) + 1;
+  Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === 'chance' && featOk(t.feat, { run }, t.n)) earnTitle(run, k, msgs); });
+  if (run.chanceWins >= CHANCE_UNLOCK && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); }
+}
 function rollTag(run, r) { return `[${r.stat} ${rollChance(run, r)}%]`; }
 function pushEvent(run, key, rng) {
   run.pending.push({ type: 'event', key });
@@ -1069,6 +1081,8 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
   if (o.roll) {
     const ch = rollChance(run, o.roll), got = run.rolls && run.rolls[key] != null ? run.rolls[key] : rnd(r) * 100, won = got < ch;
     msgs.push({ t: won ? 'class' : 'loss', text: `[${o.roll.stat} check: ${ch}%. ${won ? 'Success' : 'Failed'}.]` });
+    run.chanceFloorAt = run.round;
+    if (won) chanceWon(run, msgs);
     if (!won) B = o.fail;
     if (run.rolls) delete run.rolls[key];
   }
@@ -1657,7 +1671,7 @@ function hit(f, X, Y, raw, o = {}) {
   if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); return 0; }
   if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); return 0; }
   let d = raw, crit = false;
-  if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0))) { crit = true; d *= X.critMult; X.critNext = false; }
+  if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0))) { crit = true; d *= X.critMult; X.critNext = false; X.lastCrit = true; }
   if (o.resist) d *= o.resist;
   if (Y.P.lowDR && Y.hp < Y.maxHp * 0.25) d *= 1 - Y.P.lowDR;
   if (Y.P.flatDR && !o.isThorns) d -= Y.P.flatDR;
@@ -1712,7 +1726,7 @@ function gainBlock(f, X, v) {
 function addStatus(f, X, Y, kind, v) {
   if (v <= 0 || Y.hp <= 0) return;
   const P = X.P;
-  if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
+  if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0) + (P.burnLowDie ? lowDie(X) : 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
   if (kind === 'poison') { v += (P.poisonPlus || 0) + (P.dotPlus || 0); Y.poison += v; }
   if (kind === 'bleed') { v += (P.bleedPlus || 0) + (P.dotPlus || 0); Y.bleed += v; if (P.healOnBleed) heal(f, X, P.healOnBleed); if (P.bleedPoison) Y.poison += P.bleedPoison; }
   if (X.isPlayer) f.tally.maxPoison = Math.max(f.tally.maxPoison, Y.poison);
@@ -1800,6 +1814,8 @@ function effectCount(Y) { return (Y.burn > 0) + (Y.poison > 0) + (Y.bleed > 0) +
 // plain numbers, so the button, the bot and the fight all read ordinary effects. Smart opponents roll when they plan.
 const DIE_FACES = ['\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
 function hasDice(X) { return X.skills.some(s => { const fx = (s.baseDef || s.def).fx; return fx.die || fx.dmgAll || fx.reroll || fx.setSix; }); }
+function lowDie(X) { const p = X.skills.filter(s => s.pip).map(s => s.pip); return p.length ? Math.min(...p) : 0; }
+function highDie(X) { const p = X.skills.filter(s => s.pip).map(s => s.pip); return p.length ? Math.max(...p) : 0; }
 function rollPip(f, X, s) {
   const min = Math.min(6, Math.max(1, X.P.dieMin || 0, s.baseDef.fx.dieMin || 0)), r = () => min + Math.floor(rnd(f.rng) * (7 - min));
   let v = r(); if (X.rollTwiceT > 0) v = Math.max(v, r());
@@ -1826,6 +1842,9 @@ function resolveDice(X) {
       if (fx.dbl) fx.dmg *= v >= fx.dbl ? 2 : 0.5;
       if (fx.snake && (v === 1 || (fx.boxcars && v === 6))) { fx.dmg = fx.snake; fx.stun = 1; }
       if (fx.bust && v <= (fx.bustAt || 1)) fx.selfDmg = fx.bust;
+      if (X.P.ironOdds && fx.block && v >= 5) fx.block *= 2; // Iron Odds
+      if (X.P.savingGrace && fx.heal && v === 6) fx.heal *= 2; // Saving Grace
+      if (X.P.sixStun && v === 6) fx.stun = 1; // Thunder Roll
     }
     if (fx.dmgAll) fx.dmg = (fx.dmg || 0) + (fx.dmgAll + (fx.progressive ? X.jackpots || 0 : 0)) * sum;
     if (fx.cashOut) fx.lifesteal = fx.cashOut;
@@ -1877,6 +1896,7 @@ function useSkill(f, X, s, opt) {
     X.jackpots = (X.jackpots || 0) + 1; if (X.isPlayer) f.tally.jackpots = (f.tally.jackpots || 0) + 1;
     if (X.P.jackpot) p *= 1 + X.P.jackpot;
     if (X.P.rakeReroll) X.rerolls = (X.rerolls || 0) + X.P.rakeReroll;
+    if (X.P.jackpotPoison) addStatus(f, X, Y, 'poison', X.P.jackpotPoison); // Poisoned Chalice
     say(f, X.isPlayer ? '[Jackpot. The House notes it.]' : `[Jackpot for ${X.name}.]`, X.isPlayer ? 'class' : 'loss');
   }
   if (stackStun) say(f, `[Stack overflow. ${X.isPlayer ? 'You are' : X.name + ' is'} stunned.]`, 'loss');
@@ -1903,10 +1923,12 @@ function useSkill(f, X, s, opt) {
     if (fx.malice) base += fx.malice * p * effectCount(Y);
     if (fx.momentum) base += fx.momentum * p * (X.streak || 0);
     if (fx.cruel && effectCount(Y) >= 2) base *= fx.cruel;
-    if (fx.execute && Y.hp / Y.maxHp <= fx.execute) base *= fx.execMult;
+    if (fx.execute && Y.hp / Y.maxHp <= fx.execute + (X.P.execPip || 0) * highDie(X)) base *= fx.execMult; // Dead Man's Hand raises the line
     const hits = fx.hits || 1, heavy = base * m * hits >= Y.maxHp * BREAK.big;
     for (let i = 0; i < hits && Y.hp > 0; i++) {
+      X.lastCrit = false;
       dealt += hit(f, X, Y, base * m, { heavy, pierce: fx.pierce || (X.P.reapPierce && half(Y)), critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
+      if (X.lastCrit && X.P.luckyCut && def.pip === 6 && !s.luckyCut && Y.hp > 0) { s.luckyCut = true; say(f, '[Lucky Cut: a six and a critical. Once more.]', 'skill'); dealt += hit(f, X, Y, base * m, { pierce: fx.pierce, resist, src }); } // Lucky Cut
       if (fx.perHit) applyStatus(f, X, Y, fx, p);
       if (hits >= 2 && X.P.hitBurn) addStatus(f, X, Y, 'burn', X.P.hitBurn);
     }
@@ -1962,6 +1984,7 @@ function useSkill(f, X, s, opt) {
     if (P.quickPoison) addStatus(f, X, Y, 'poison', P.quickPoison);
     if (P.quickBlock) X.block += P.quickBlock;
     if (P.quickHeal) heal(f, X, P.quickHeal);
+    if (P.quickReroll) { const lo = X.skills.filter(o => o.pip).sort((a, b) => a.pip - b.pip)[0]; if (lo) { const was = lo.pip; rollDice(f, X, [lo]); if (X.isPlayer) say(f, `[Card Trick: ${lo.def.name} ${was} \u2192 ${lo.pip}.]`, 'skill'); } }
     if (P.quickEvade) X.evade = Math.max(X.evade, 1);
     if (P.quickStun && damaging && Y.hp > 0 && rnd(f.rng) < P.quickStun) { say(f, '[Tempest Mage: Stun!]', 'skill'); stunTarget(f, X, Y); }
   }
@@ -2641,5 +2664,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, DIE_FACES, dmgMult, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
