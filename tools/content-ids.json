@@ -198,6 +198,27 @@
   "jackpot",
   "progressive",
   "cash_out",
+  "evil_eye",
+  "stare_down",
+  "glare",
+  "ill_omen",
+  "dire_omen",
+  "twin_omens",
+  "knock_wood",
+  "touch_wood",
+  "ward_off",
+  "pass_curse",
+  "crossed_path",
+  "keep_little",
+  "thirteenth",
+  "witching_hour",
+  "last_hour",
+  "cursed_coin",
+  "bad_penny",
+  "heads_win",
+  "calamity",
+  "catastrophe",
+  "aftermath",
   "attack",
   "error_skill",
   "stack_overflow"
@@ -231,6 +252,10 @@
   "weighted_dice",
   "gilded_coin",
   "sharps_sleeve",
+  "bent_horseshoe",
+  "black_cat_collar",
+  "mirror_shard_mail",
+  "crow_feather",
   "delay_engine",
   "mirror_cuirass",
   "echo_chamber",
@@ -248,7 +273,8 @@
   "zealot",
   "reaper",
   "storm",
-  "dicer"
+  "dicer",
+  "jinx"
  ],
  "gods": [
   "war",
@@ -380,7 +406,8 @@
   "aff_zealot",
   "aff_reaper",
   "aff_storm",
-  "aff_dicer"
+  "aff_dicer",
+  "aff_jinx"
  ],
  "titles": [
   "first_blood",
@@ -508,6 +535,15 @@
   "blade+dicer",
   "bastion+dicer",
   "dicer+zealot",
+  "dicer+jinx",
+  "jinx+storm",
+  "arcanist+jinx",
+  "bastion+jinx",
+  "jinx+zealot",
+  "jinx+pyre",
+  "jinx+reaper",
+  "jinx+venom",
+  "blade+jinx",
   "storm+zealot"
  ],
  "events": [
@@ -1064,17 +1100,21 @@
  "botIgnores": [
   "alwaysCrit",
   "critBonus",
+  "curseKeep",
   "die",
   "doomT",
   "doublePoison",
   "drainPoison",
   "keep",
+  "keepHalf",
+  "killReset",
   "lifesteal",
   "mirror",
   "nextCrit",
   "perHit",
   "pierce",
   "reflect",
-  "stack"
+  "stack",
+  "uncurse"
  ]
 }

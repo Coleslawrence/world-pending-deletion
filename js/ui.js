@@ -113,7 +113,7 @@ function fitNames() {
   });
 }
 // Short archetype tags for the shop chips on narrow phones
-const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM', dicer: 'GMB' };
+const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM', dicer: 'GMB', jinx: 'JNX' };
 // Fights: under the opponent's panel. Elsewhere: just above the bottom buttons (or an open sheet's), clear of the
 // header and the screen's instructions
 function placeToasts() {
@@ -870,6 +870,9 @@ function chipsHTML(X, f) {
   if (X.stun > 0) c.push(`<span class="chip stun">Stunned</span>`);
   if (X.enrage && X.hp / X.maxHp <= X.enrage) c.push(`<span class="chip burn">Enraged</span>`);
   if (X.revive) c.push(`<span class="chip evade">Will rise</span>`);
+  if (X.misfortune > 0) c.push(`<span class="chip misf">Misfortune ${X.misfortune}</span>`);
+  (X.omens || []).forEach(o => c.push(`<span class="chip misf" title="Omen: fires if they ${o.on === 'attack' ? 'attack' : 'guard'} next">Omen: ${o.on === 'attack' ? 'attacks' : 'guards'}</span>`));
+  if (X.curse > 0) c.push(`<span class="chip curse" title="+${Math.round(CURSE_DMG * 100 * X.curse)}% skill damage, +${Math.round(CURSE_TAKEN * 100 * X.curse)}% damage taken">Curse ${X.curse}</span>`);
   if (X.isPlayer && run.wagerOn && run.wager) c.push(`<span class="chip wagerc">Wager: ${esc(WAGERS[run.wager.key].text)}</span>`);
   return c.join('');
 }
@@ -888,7 +891,7 @@ function updateFight() {
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
-    else { const i = intentInfo(f); it.className = 'intent k-' + i.kind; it.innerHTML = `<span class="in-l">Next</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>`; }
+    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
@@ -1602,6 +1605,7 @@ function onAct(el) {
     case 'use': return onUse(+d.i);
     case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
+    case 'jinx': if (ui.fight && !ui.busy && jinxMove(ui.fight)) { playEvents(ui.fight); updateFight(); } return;
     case 'reroll-mode': ui.reroll = !ui.reroll; return updateFight();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
     case 'patch-open': ui.sheet = { type: 'patch', u: +d.u }; saveRun(); return render();

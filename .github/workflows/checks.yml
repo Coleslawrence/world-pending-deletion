@@ -35,6 +35,8 @@ jobs:
         run: node tools/record.js
       - name: Dice checks (Gambler)
         run: node tools/dice-test.js
+      - name: Jinx checks
+        run: node tools/jinx-test.js
 
   balance:
     name: Balance gate

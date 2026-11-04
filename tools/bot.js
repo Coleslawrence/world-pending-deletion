@@ -33,11 +33,25 @@ function choosePlayer(f) {
     // selfDmg; s.def.pip is the roll), so the lines above already score them. See resolveDice in core.js.
     if (s.def.pip && fx.selfDmg) sc -= fx.selfDmg;
     if (fx.reroll || fx.setSix) sc += 8 + (fx.setSix ? 6 : 0);
+    // Jinx: Misfortune builds toward jinxing big hits; Curse is passed on at 6 or more
+    if (fx.perMisf) sc += (fx.perMisf * (B.misfortune || 0) + (fx.perCurse || 0) * (A.curse || 0)) * p;
+    if (fx.calamity) sc += fx.calamity * (B.misfortune || 0) * p + (intent.kind === 'big' ? 20 : 0);
+    if (fx.misf) sc += fx.misf * 2 + (fx.misfT || 0) * 3;
+    if (fx.omenAtk) sc += B.omens && B.omens.length >= 3 ? 0 : fx.omenAtk * p * 0.7 + (fx.omenGuard ? 4 : 0);
+    if (fx.passCurse) sc = (A.curse || 0) >= 6 ? 40 + (fx.curseDmg || 0) * A.curse * p : 0;
+    if (fx.coinStun) sc += 4;
+    if (fx.jinxDisc && !G.canJinx(f)) sc -= 6;
     if (fx.rollTwice) sc += 10;
     if (s.def.quick) sc += 1000;
     if (sc > bs) { bs = sc; best = { s, i }; }
   });
   return best.i;
+}
+// The Jinx: jinx a big hit whenever it can, anything else once Misfortune is plentiful
+function jinxIfWise(f) {
+  if (!G.canJinx(f)) return;
+  const role = G.jinxRole(f, f.B.intent), cost = G.jinxCost(f);
+  if (role === 'big' || (f.B.misfortune || 0) >= cost + 6) G.jinxMove(f);
 }
 // The Gambler's rerolls: spend them on a die showing 1 or 2
 function rerollLow(f) {
@@ -48,7 +62,7 @@ function fight(run) {
   const rr = G.rivalReplies(run, f); if (rr.length) G.rivalReply(run, f, rr[0]); // a rival reply when one is shown
   let guard = 0;
   while (!f.over && guard++ < 300) {
-    if (f.phase === 'player') { rerollLow(f); G.playerAct(f, choosePlayer(f)); }
+    if (f.phase === 'player') { rerollLow(f); jinxIfWise(f); G.playerAct(f, choosePlayer(f)); }
     else if (f.phase === 'stunned') G.skipPlayer(f);
     if (!f.over && f.phase === 'enemy') G.enemyTurn(f);
   }
@@ -173,7 +187,7 @@ function playRun(meta, verbose, opts = {}) {
   }
   return { result: 'stuck', w, run };
 }
-module.exports = { playRun, choosePlayer, rerollLow };
+module.exports = { playRun, choosePlayer, rerollLow, jinxIfWise };
 if (require.main === module) {
   if (process.argv[2] === 'v') { const meta = G.newMeta(); for (let i = 0; i < (+process.argv[3] || 1); i++) console.log(playRun(meta, true).result); }
   else {
