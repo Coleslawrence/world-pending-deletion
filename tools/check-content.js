@@ -237,7 +237,7 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => e.script.forEach(i => ref('enemies
 // Traits: the numbers make sense; phases point at real moves; passives are ones that work on enemies; the trait pool too
 const share = v => typeof v === 'number' && v > 0 && v < 1, every = v => Number.isInteger(v) && v >= 2;
 const TRAIT_OK = { enrage: [share, 'a share of max HP between 0 and 1'], enrageMult: [v => v > 1, 'a damage multiplier above 1'], dodge: [share, 'a chance between 0 and 1'], adapt: [share, 'the share of damage taken from your most used skill, between 0 and 1'],
-  flood: [every, 'every how many turns, 2 or more'], twincast: [every, 'every how many turns, 2 or more'], revive: [share, 'the share of max HP it rises with, between 0 and 1'], aura: [v => v > 0, 'Burn per turn'], briar: [v => v > 0, 'Bleed per turn'], forge: [v => v > 0, 'Block gained per turn'] };
+  flood: [every, 'every how many turns, 2 or more'], twincast: [every, 'every how many turns, 2 or more'], revive: [share, 'the share of max HP it rises with, between 0 and 1'], aura: [v => v > 0, 'Burn per turn'], briar: [v => v > 0, 'Bleed per turn'], forge: [v => v > 0, 'Block gained per turn'], jinxTax: [v => v > 0, 'extra Misfortune its moves cost to jinx'], showNext: [v => v === 1, '1: it shows its next two moves'], hexer: [v => v === 1, '1: it hexes one of your skills each turn'] };
 const traitCheck = (w, o) => Object.entries(o).forEach(([t, v]) => { if (!TRAIT_OK[t]) err(w, `${t} is not a trait (${MECHANICS.join(', ')})`); else if (!TRAIT_OK[t][0](v)) err(w, `${t} is ${JSON.stringify(v)}; it should be ${TRAIT_OK[t][1]}`); });
 Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
   const w = 'trait pool ' + k;
