@@ -104,12 +104,12 @@ function pushMsgs(msgs, logged, cause) {
   const more = show.length - TOAST_MAX;
   if (more > 0 && run) toast(`[${more} more in the System log. Tap to read.]`, 'sys', openLog);
 }
-function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ui.sheet.type === 'result')) return; ui.sheet = { type: 'syslog' }; render(); }
+function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ['result', 'note'].includes(ui.sheet.type))) return; ui.sheet = { type: 'syslog' }; render(); }
 
 // A number in the top strip that changed since the last screen pulses (green up, red down), so you see what a result
 // touched. Held while a result sheet covers the strip, so the pulse plays when you can see it.
 function pulseChanged() {
-  if (!run || !document.querySelector('.strip') || (ui.sheet && ['evresult', 'result'].includes(ui.sheet.type))) return;
+  if (!run || !document.querySelector('.strip') || (ui.sheet && ['evresult', 'result', 'note'].includes(ui.sheet.type))) return;
   const now = { run, gold: run.gold, hearts: run.hearts, hp: Math.round(run.hp), notice: noticeOf(run) }, was = ui.pv; ui.pv = now;
   if (!was || was.run !== run) return;
   const sel = { gold: '.strip .gold', hearts: '.strip .hcount', hp: '.strip .st-hp', notice: '.ntc' };
@@ -608,7 +608,7 @@ function chooseHTML() {
   const fin = run.choices.length === 1;
   const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
   const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
-  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}${marksBtn()}<span class="st-inc">+${run.lastIncome || 0}g</span></div></div><div class="col col-b">
+  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
    ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
@@ -973,17 +973,20 @@ async function onUse(i) {
   if (f.over) { await wait(700); finishFight(); }
 }
 function finishFight() {
-  const f = ui.fight;
+  const f = ui.fight, before = evSnap(run);
   const res = resolveFight(run, f, run.practice ? META : meta);
   poolFile(res);
-  // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
-  const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  // Every fight that the run goes on from ends on a summary, then each notification it raised as its own card, tapped
+  // away one at a time (ui.notes). Settings > Fast wins sends ordinary wins straight on with notices instead.
+  // Run endings (erased, spared, elite, rewind, practice) keep their own sheets and notices.
+  const goesOn = !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  const plain = res.won && goesOn && SET.fastWins;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
   sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
-  pushMsgs(res.msgs);
-  ui.result = res; ui.erDone = 0; ui.erBusy = false;
+  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); recordRest(res.rested); }
+  if (goesOn && !plain) { res.msgs.forEach(m => logRun(m.text, m.t)); ui.notes = noteList(res.msgs); ui.noteN = ui.notes.length; } else { ui.notes = null; pushMsgs(res.msgs); }
+  ui.result = res; ui.erDone = 0; ui.erBusy = false; res.changes = evDiff(before, run);
   if (res.practiceDone) { ui.practiceAfter = true; }
-  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.fell) recordWin(res.fell);
   if (res.death) { const out = endRun(run, meta, 'erased'); recordRunStats('erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false), filed: !!run.poolFiled }; lsDel(RUN_KEY); }
   else if (res.spared) { const out = endRun(run, meta, 'spared'); recordRunStats('spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
@@ -1053,7 +1056,7 @@ function gotHTML(p) {
 }
 // What your choices have set up for later fights (run.marks, from core.js addMark), and which choice set each
 function liveMarks() { return (run.marks || []).filter(m => m.kind !== 'ward' || run.ward > 0); }
-function marksBtn() { const n = liveMarks().length; return n ? `<button class="link mk" data-act="sheet" data-s="marks" aria-label="${n} effect${n > 1 ? 's' : ''} waiting for your fights. Tap for details">Pending ×${n}</button>` : ''; }
+function marksBtn() { const n = liveMarks().length; return n ? `<button class="link mk" data-act="sheet" data-s="marks">[${n} pending effect${n > 1 ? 's' : ''} from your choices] ›</button>` : ''; }
 function marksSheet() {
   const L = { next: 'Next fight', foe: 'Next fight', stakes: 'Next fight', ward: `Next ${run.ward > 1 ? run.ward + ' losses' : 'loss'}`, always: 'Every fight' };
   const rows = liveMarks().map(m => `<li><b>${L[m.kind]}</b>: ${esc(m.text.charAt(0).toUpperCase() + m.text.slice(1))}.<br><small>From: ${esc(m.from)}</small></li>`).join('');
@@ -1079,11 +1082,19 @@ function evDiff(a, run) {
   a.ids.filter(k => !b.ids.includes(k) && !b.ids.some(x => x.split(':')[0] === k.split(':')[0])).forEach(k => add(`Lost: ${nm(k)}`, false));
   return out;
 }
+// The messages a fight result shows: erase lines become rows and the defeat lines repeat the summary
+function noteList(msgs) { return msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text)); }
+// One notification after a fight, tapped away before the next
+function noteSheet() {
+  const m = ui.notes[0], i = ui.noteN - ui.notes.length + 1, r = ui.result;
+  return sheetWrap(`[Notification ${i} of ${ui.noteN}]`, `${r ? `<p class="sh-p fine ev-you">After: ${r.won ? 'victory over' : 'defeat by'} ${esc(r.enemy)}</p>` : ''}<div class="sysbox ev-out"><p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}</div>`,
+    `<button class="btn primary" data-act="note-ok">${ui.notes.length > 1 ? 'Next' : 'Continue'}</button>`, 'ev-res note', true);
+}
+// An item reward: its card folded under its line, so you can see what you got without leaving
+function itemCard(m) { if (!m.item || !pieceDef(m.item)) return ''; const f = m.u != null && findPiece(run, m.u), q = f ? f.p : { star: 1, mods: [] }; return `<details class="ev-item"><summary>${esc(pieceDef(m.item).name)} <small>tap to view</small></summary>${pieceBody(m.item, q.star, q.mods)}</details>`; }
 function evResultSheet() {
   const R = ui.sheet;
-  // An item reward: its line, then its card folded underneath, so you can see what you got without leaving
-  const card = m => { if (!m.item || !pieceDef(m.item)) return ''; const f = m.u != null && findPiece(run, m.u), q = f ? f.p : { star: 1, mods: [] }; return `<details class="ev-item"><summary>${esc(pieceDef(m.item).name)} <small>tap to view</small></summary>${pieceBody(m.item, q.star, q.mods)}</details>`; };
-  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${card(m)}`).join('');
+  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}`).join('');
   const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
   return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
 }
@@ -1174,10 +1185,11 @@ function resultSheet() {
   const lines = [];
   if (r.won) lines.push(`+${r.gold} gold · healed 30%`);
   if (!r.won && !run.elite) lines.push(`A piece of ${esc(run.world.name)} is erased: −${r.heartsLost} Heart${r.heartsLost > 1 ? 's' : ''}. ${run.hearts} left. ${ui.fight && ui.fight.spec.kind === 'final' ? 'You must face the Final Champion again.' : 'The tournament moves on.'}`);
-  // erase lines become rows, and the defeat lines repeat the summary above
-  const shown = r.msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text));
-  const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
-  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
+  // erase lines become rows, and the defeat lines repeat the summary above. With notification cards to follow, the
+  // summary says how many instead of listing them
+  const shown = noteList(r.msgs), chips = r.changes && r.changes.length ? `<div class="ev-ch">${r.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
+  const msgs = ui.notes ? (ui.noteN ? `<p class="sh-p fine">[${ui.noteN} notification${ui.noteN > 1 ? 's' : ''} to review.]</p>` : '') : shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${chips ? `<p class="sh-p fine">Altogether this fight:</p>${chips}` : ''}${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
@@ -1267,6 +1279,7 @@ function settingsSheet() {
     + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
     + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
     + row('Fight speed', 'How fast turns play out.', speed)
+    + row('Fast wins', 'Off: every fight ends on a summary, then each notification to tap through. On: ordinary wins go straight on, with notices.', seg('fastWins', [[false, 'Off'], [true, 'On']]))
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
@@ -1398,7 +1411,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1545,9 +1558,12 @@ function onAct(el) {
     case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
+    case 'note-ok': if (ui.notes) ui.notes.shift(); // falls through: the next card, or on with the run
     case 'result-ok': {
+      if (ui.notes && ui.notes.length) { ui.sheet = { type: 'note' }; return render(); }
       if (ui.practiceAfter) { ui.practiceAfter = false; ui.result = null; ui.sheet = { type: 'practicedone' }; return render(); }
-      ui.sheet = null; ui.fight = null; ui.result = null;
+      if (ui.result && ui.result.won) while (coachStep() && coachStep().scr === 'fight') coachAdvance(); // tutorial steps that wait on the fight screen are over once it closes
+      ui.notes = null; ui.sheet = null; ui.fight = null; ui.result = null;
       if (ui.end && ui.end.kind === 'erased') return go('end');
       saveRun(); return go(stageScreen());
     }
@@ -2007,7 +2023,7 @@ function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
-  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
+  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
   if (typing) return;
   const sheet = app.querySelector('.sheet');
   if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }
