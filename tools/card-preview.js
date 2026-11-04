@@ -81,7 +81,7 @@ function serve() {
 // ---------- In the page: add the card as content and open its screens ----------
 // Each step returns a caption; the tool screenshots after it. Runs in the browser, where content names are globals.
 function stage([C, step]) {
-  clearToasts(); ui.sheet = null; run.pending = []; ui.screen = 'shop'; meta.statLines = true;
+  clearToasts(); ui.sheet = null; run.pending = []; ui.screen = 'shop'; meta.statLines = true; meta.hints = Object.fromEntries(HINTS.map(h => [h.k, true]).concat([['crisis', true], ['roll', true]]));
   if (C.data) (0, eval)(C.data); // the card's draft data, in the global scope like a content file
   Object.keys(run.stats).forEach(k => run.stats[k] = Math.max(run.stats[k], 12)); run.gold = Math.max(run.gold, 30);
   if (C.kind === 'event') {
