@@ -53,5 +53,13 @@ for (let k = 0; k < 300; k++) {
   let low = 7; for (let k = 0; k < 200; k++) { const f = fightWith(['two_headed']); low = Math.min(low, f.A.skills.find(x => x.pip).pip); }
   ok(low === 4, 'Two-Headed Coin never rolls below 4');
 }
+// Hidden Paths read the dice: Iron Odds, Saving Grace, Thunder Roll
+for (let k = 0; k < 100; k++) {
+  const f = fightWith(['hedge', 'insurance', 'coin_toss']), A = f.A; Object.assign(A.P, { ironOdds: 1, savingGrace: 1, sixStun: 1 }); G.resolveDice(A);
+  const h = A.skills.find(x => x.baseDef && x.baseDef.id === 'hedge'), ins = A.skills.find(x => x.baseDef && x.baseDef.id === 'insurance'), c = A.skills.find(x => x.baseDef && x.baseDef.id === 'coin_toss');
+  ok(h.def.fx.block === 3 * h.pip * (h.pip >= 5 ? 2 : 1), 'Iron Odds doubles Block on a 5 or 6');
+  ok(ins.def.fx.heal === ins.pip * (ins.pip === 6 ? 2 : 1), 'Saving Grace doubles healing on a 6');
+  ok(!!c.def.fx.stun === (c.pip === 6), 'Thunder Roll Stuns on a 6 only');
+}
 console.log(fails ? `dice: ${fails} failures` : 'dice: all checks passed');
 process.exit(fails ? 1 : 0);

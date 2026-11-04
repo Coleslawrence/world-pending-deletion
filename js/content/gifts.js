@@ -32,6 +32,7 @@ const GIFTS = {
   thickskin: { name: 'Thick Skin', cat: 'combat', cost: 2, desc: 'Every hit you take deals 2 less damage.', lock: 'untouched', p: { flatDR: 2 }, flavour: "Years of knocks have left you hard to dent." },
   vampire: { name: 'Vampirism', cat: 'combat', cost: 3, desc: 'Heal 8% of all damage you deal.', lock: 'bloodthirsty', p: { lifesteal: 0.08 }, flavour: "You are always a little thirsty in a fight." },
   manaaffinity: { name: 'Mana Affinity', cat: 'combat', cost: 2, desc: 'Quick skills have a 1 turn shorter cooldown.', lock: 'spellweaver', p: { quickCd: 1 }, flavour: "Quick spells come back to your hands like trained birds." },
+  bornlucky: { name: 'Born Lucky', cat: 'fortune', cost: 2, desc: "+2 LUK. Your first chance option each round can't be under 50%.", p: { chanceFloor: 50 }, flavour: "The midwife lost a bet on you. She never stopped telling people." },
   lucky: { name: 'Lucky Star', cat: 'fortune', cost: 2, desc: '+10% critical chance and better shop odds.', p: { critBonus: 0.1 }, flavour: "Born under a good star. The star is still watching." },
   golden: { name: 'Golden Touch', cat: 'fortune', cost: 3, desc: 'Interest cap rises from 5 to 8.', flavour: "Coin sticks to you. Nobody can say why." },
   breath: { name: 'Second Breath', cat: 'fortune', cost: 3, desc: 'Once per run, survive a killing blow with 1 HP.', flavour: "Once, you should have died. You did not." },
