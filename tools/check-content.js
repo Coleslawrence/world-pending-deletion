@@ -9,8 +9,8 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
-// Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+// Content names are globals under Node (core.js loads js/content/ into the global scope).
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -74,9 +74,9 @@ const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice']],
-  archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
+  archetypes: [C.ARCH, ['name', 'stat', 'disc', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
-  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting', 'ruler']],
+  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'guest2', 'mids', 'setting', 'ruler']],
   fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy']],
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit', 'clash']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], ['glitch']],
@@ -120,8 +120,8 @@ Object.entries(C.GEAR).forEach(([k, g]) => {
   ref(w, C.RANKS.includes(g.rank), `rank ${g.rank} is unknown`);
   Object.keys(g.stats).forEach(s => ref(w, C.STATS.includes(s), `stat ${s} is unknown`));
 });
-Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
-ref('archetypes WHEEL', C.WHEEL.length === archs.length && archs.every(a => C.WHEEL.includes(a)), 'the wheel must hold every archetype exactly once');
+Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, !!C.DISCIPLINES[a.disc], `Discipline ${a.disc} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
+archs.forEach((a, i) => archs.slice(0, i).forEach(b => ref('archetypes ' + a, C.ARCH[a].stat !== C.ARCH[b].stat || C.ARCH[a].disc !== C.ARCH[b].disc, `shares its grid cell (${C.ARCH[a].stat} ${C.ARCH[a].disc}) with ${b}; every archetype needs a cell of its own`)));
 C.START_ARCH.forEach(a => ref('archetypes START_ARCH', isArch(a), `${a} is not an archetype`));
 Object.entries(C.GODS).forEach(([k, g]) => {
   g.arch.forEach(a => ref('gods ' + k, isArch(a), `${a} is not an archetype`));
@@ -203,7 +203,9 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   ref(w, C.LORE[k] && C.LORE[k].entries.length >= 14, 'needs a World Record pool of at least 14 entries in LORE');
   ref(w, t.names.length === 2 && t.names.every(a => a.length >= 4), 'names needs two lists of syllables');
   ref(w, t.champs.length >= 4, 'needs at least 4 champion names');
-  ref(w, t.guest == null || (isArch(t.guest) && t.guest !== t.home && !C.themeNear(t.home).includes(t.guest)), `guest ${t.guest} must be an archetype other than the home class and its two wheel neighbours`);
+  ref(w, t.guest == null || (isArch(t.guest) && t.guest !== t.home && !C.themeNear(t.home).includes(t.guest)), `guest ${t.guest} must be an archetype other than the home class and its allies`);
+  ref(w, t.guest2 == null || (isArch(t.guest2) && t.guest2 !== t.home && t.guest2 !== t.guest && !C.themeNear(t.home).includes(t.guest2)), `guest2 ${t.guest2} must be an archetype other than the home class, its allies and the guest`);
+  ref(w, t.guest2 != null || C.themeAllies(t.home).length >= 2, `home ${t.home} has fewer than two allies on the grid, so the type needs a guest2`);
   ref(w, !t.mids || t.mids.every(m => typeof m === 'string' && m.length <= 3), 'mids are short middle syllables');
 });
 // Fate Crises: each is a crisis event (crisis: true) for one stage round; ends are the closing lines for a lifted or sealed Fate
@@ -352,10 +354,10 @@ described.forEach(([w, text, p]) => Object.entries(p || {}).forEach(([k, v]) => 
 }));
 Object.keys(uses.enemy).forEach(k => { if (!new RegExp('\\.' + k + '\\b').test(core)) err('enemy mechanic ' + k, 'core.js never reads it'); });
 
-// ---------- Themes: the wheel is a colour pie; content carries one archetype or two neighbours, and uses what they own ----------
-const themeOk = (where, t) => { const ts = [].concat(t); ts.forEach(a => ref(where, isArch(a), `theme ${a} is not an archetype`)); if (ts.every(isArch)) ref(where, C.themePairOk(ts), `themes ${ts.join(' + ')} are not neighbours on the wheel (a pair has to be)`); };
+// ---------- Themes: the grid is a colour pie; content carries one archetype or two allies, and uses what they own ----------
+const themeOk = (where, t) => { const ts = [].concat(t); ts.forEach(a => ref(where, isArch(a), `theme ${a} is not an archetype`)); if (ts.every(isArch)) ref(where, C.themePairOk(ts), `themes ${ts.join(' + ')} are not allies on the grid (a pair has to be)`); };
 // breaks: effects a skill or enemy borrows on purpose, so the warning is silenced once Slaw has said yes
-const pieBreak = (where, themes, fx, breaks) => { if ((breaks || []).includes(fx)) return; if (!C.themeFits(themes, fx)) warn(where, `uses ${fx}, which ${C.PIE[fx].map(a => C.ARCH[a].name).join(' and ')} own${C.PIE[fx].length === 1 ? 's' : ''}, off its part of the wheel (a pie break: fine if meant, or retag it)`); };
+const pieBreak = (where, themes, fx, breaks) => { if ((breaks || []).includes(fx)) return; if (!C.themeFits(themes, fx)) warn(where, `uses ${fx}, which ${C.PIE[fx].map(a => C.ARCH[a].name).join(' and ')} own${C.PIE[fx].length === 1 ? 's' : ''}, outside its allies on the grid (a pie break: fine if meant, or retag it)`); };
 Object.entries(C.ARCH).forEach(([k, a]) => {
   const w = 'archetypes ' + k;
   ref(w, typeof a.line === 'string' && /\.$/.test(a.line), 'line is one sentence, its philosophy, ending with a full stop');
@@ -365,12 +367,12 @@ Object.entries(C.ARCH).forEach(([k, a]) => {
 // A ★3 evolution may borrow from anywhere: that is where the game blends on purpose
 Object.values(C.SKILLS).filter(s => !s.base).forEach(s => Object.keys(s.fx).forEach(fx => pieBreak('skills ' + s.id, s.tags, fx, s.breaks)));
 Object.entries(C.ENEMIES).forEach(([k, e]) => { if (e.theme == null) return; themeOk('enemies ' + k, e.theme); e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.keys(m.fx || {}).forEach(fx => pieBreak(`enemies ${k} move ${m.n}`, e.theme, fx, e.breaks))); });
-// Events and chains may also belong to the System itself (theme: 'system'), outside the wheel
+// Events and chains may also belong to the System itself (theme: 'system'), outside the grid
 Object.entries(C.CHAINS).forEach(([k, c]) => { if (c.theme != null && c.theme !== 'system') themeOk('chains ' + k, c.theme); });
 Object.entries(C.EVENTS).forEach(([k, E]) => { if (E.theme != null) { if (E.theme !== 'system') themeOk('event ' + k, E.theme); if (E.chain) warn('event ' + k, "has its own theme as well as its chain's; the chain's is the one that counts"); } });
 ['GIFTS', 'TITLES', 'QUESTS'].forEach(L => Object.entries(C[L]).forEach(([k, d]) => { if (d.theme != null) themeOk(`${L.toLowerCase()} ${k}`, d.theme); }));
 const effectThemes = p => Object.keys(p || {}).flatMap(k => [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []));
-const themedFits = (where, themes, p) => Object.keys(p || {}).forEach(k => { const th = [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []); if (th.length && !th.some(o => [].concat(themes).some(t => C.themeNear(t).includes(o)))) warn(where, `uses ${k}, a ${th.map(a => C.ARCH[a].name).join('/')} effect, off its part of the wheel (a pie break: fine if meant, or retag it)`); });
+const themedFits = (where, themes, p) => Object.keys(p || {}).forEach(k => { const th = [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []); if (th.length && !th.some(o => [].concat(themes).some(t => C.themeNear(t).includes(o)))) warn(where, `uses ${k}, a ${th.map(a => C.ARCH[a].name).join('/')} effect, outside its allies on the grid (a pie break: fine if meant, or retag it)`); });
 Object.entries(C.GEAR).forEach(([k, g]) => themedFits('gear ' + k, g.tags, Object.assign({}, g.pas, g.fix)));
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => themedFits('paths ' + k, k.split('+'), h.fx));
 Object.entries(C.GIFTS).forEach(([k, g]) => { if (g.theme != null) themedFits('gifts ' + k, g.theme, g.p); });
@@ -380,7 +382,7 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   if (gift) themedFits(w + ' World Gift ' + t.gift, gift.theme != null ? gift.theme : t.home, gift.p);
 });
 Object.keys(C.PIE).forEach(fx => { if (!fxRead.has(fx)) err('archetypes PIE', `${fx} is owned but core.js never reads fx.${fx}`); });
-Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block', 'brk'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the wheel, so any archetype may use it`));
+Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block', 'brk'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the grid, so any archetype may use it`));
 
 // ---------- Moves and the power budget: every enemy move plays a role, and its numbers sit in its tier (warn only) ----------
 const inRange = (v, [a, b]) => v >= a && v <= b;
@@ -492,10 +494,10 @@ function effectDoc() {
     ...sorted(C.EFFECTS).map(([k, E]) => { const who = passiveUses(k); let t = ''; try { t = E.say(who.length && typeof who[0][1] === 'number' ? who[0][1] : 1); } catch (e) { /* reported above */ } return row(k, who, ` ${t.replace(/\|/g, '\\|')} | ${E.how || 'add'} | ${E.lvl ? 'yes' : ''} | ${E.enemy ? E.enemy + (E.enemy === 'flat' ? ', scales with power' : '') : ''} | ${[].concat(E.theme || []).map(a => C.ARCH[a] ? C.ARCH[a].name : a).join(', ')} |`); }),
     '', '### Enemy traits (fields on the enemy, or in its phase\'s set)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
-    '', '### The wheel, from `js/content/archetypes.js`',
-    '', 'Each archetype is a theme. Its neighbours on the wheel are its allies; a piece of content carries one archetype, or two neighbours. Owns: the skill effects it owns, which it and its neighbours may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.',
-    '', '| Archetype | Stat | Line | Owns | Allies | Words |', '| --- | --- | --- | --- | --- | --- |',
-    ...C.WHEEL.map(k => { const a = C.ARCH[k], near = C.themeNear(k).slice(1); return `| ${a.name} | ${a.stat} | ${a.line} | ${(a.owns || []).map(x => '`' + x + '`').join(' ')} | ${near.map(n => C.ARCH[n].name).join(', ')} | ${(a.words || []).join(', ')} |`; }),
+    '', '### The grid, from `js/content/archetypes.js`',
+    '', 'Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (' + Object.values(C.DISCIPLINES).map(d => `${d.name}: ${d.line}`).join(' ') + '). Archetypes sharing a stat or a Discipline are allies; a piece of content carries one archetype, or two allies. Owns: the skill effects it owns, which it and its allies may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.',
+    '', '| Archetype | Stat | Discipline | Line | Owns | Allies | Words |', '| --- | --- | --- | --- | --- | --- | --- |',
+    ...archs.map(k => { const a = C.ARCH[k], near = C.themeNear(k).slice(1); return `| ${a.name} | ${a.stat} | ${C.DISCIPLINES[a.disc].name} | ${a.line} | ${(a.owns || []).map(x => '`' + x + '`').join(' ')} | ${near.map(n => C.ARCH[n].name).join(', ')} | ${(a.words || []).join(', ')} |`; }),
     '', '### Enemy move roles and tier numbers, from `js/content/moves.js`',
     '', 'A move\'s role is read from its effects (`moveRole`). A big hit is one of at least the tier\'s BIG_HIT damage before the round\'s scaling. Numbers are ranges the checker warns outside of; the balance gate has the last word.',
     '', '| Tier | Who | HP | Strike | Big hit (from) | Guard Block | Damage per turn | Needs |', '| --- | --- | --- | --- | --- | --- | --- | --- |',

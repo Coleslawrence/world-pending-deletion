@@ -2,7 +2,8 @@
 'use strict';
 // Each world type is a pack in worlds/: its entry here, its World Record pool and its Final Champion's greeting.
 // setting: optional, 'fantasy' unless it says otherwise; layers and their entries only come to worlds whose setting they suit.
-// guest: the class that joins the home class and its two wheel neighbours in this world's class pool.
+// guest: the class that joins the home class and its first two allies on the grid in this world's class pool; never the home or an ally.
+// guest2: only when the home class has a single ally: the class that takes the missing ally's place (also never the home or an ally).
 // names: syllable starts and ends (the first 6 of each are the original lists, kept for old Pending World days); mids: optional middles.
 // champs: champion names offered at the Awakening (the first 6 are the originals).
 // Its Final Champion fights in enemies.js, its World Gift is in gifts.js and its world-first Title in titles.js.

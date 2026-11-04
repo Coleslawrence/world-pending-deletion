@@ -11,7 +11,7 @@ const VERSION = 5;
 const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 
 // ---------- Archetypes ----------
-function alliesOf(k) { const i = WHEEL.indexOf(k), n = WHEEL.length; return [WHEEL[(i + n - 1) % n], WHEEL[(i + 1) % n]]; }
+function alliesOf(k) { return themeAllies(k); }
 function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 
 // ---------- Gear: stats + one passive, no active skill ----------
@@ -338,15 +338,16 @@ function genWorldV1(rng, cap) {
   const rank = worldRank(rng, cap), mod = wpick(modKeys(), MOD_W, rng);
   return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs.slice(0, 6), rng) };
 }
-// A world's class pool: its home, the home's two wheel neighbours and the type's fixed guest. A Confluence world takes
-// both homes and both guests instead. The home always comes; any other class not unlocked yet (or already in) gives way
-// to its nearest free unlocked class on the wheel. Worlds from before v 2 kept a random fourth class (newRun).
+// A world's class pool: its home, the home's first two allies on the grid (with the type's guest2 standing in when the
+// home has only one) and the type's fixed guest. A Confluence world takes both homes and both guests instead. The home
+// always comes; any other class not unlocked yet (or already in) gives way to its nearest free unlocked class: one of
+// its allies first, then any. Worlds from before v 2 kept a random fourth class (newRun).
 function worldArch(world, U) {
-  const T = WORLD_TYPES[world.type], C = world.mix && WORLD_TYPES[world.mix], n = WHEEL.length;
-  const want = C ? [C.home, T.guest, C.guest] : alliesOf(T.home).concat(T.guest), open = unlockedArch({ unlocks: U }), out = [T.home];
+  const T = WORLD_TYPES[world.type], C = world.mix && WORLD_TYPES[world.mix];
+  const near = alliesOf(T.home).slice(0, 2), want = C ? [C.home, T.guest, C.guest] : near.concat(near.length < 2 && T.guest2 ? [T.guest2] : [], T.guest);
+  const open = unlockedArch({ unlocks: U }), out = [T.home];
   want.forEach(k => {
-    const i = WHEEL.indexOf(k);
-    for (let d = 0; d < n; d++) { const c = [WHEEL[(i + d) % n], WHEEL[(i + n - d) % n]].find(x => open.includes(x) && !out.includes(x)); if (c) { out.push(c); break; } }
+    const c = [k].concat(alliesOf(k), ARCH_KEYS).find(x => open.includes(x) && !out.includes(x)); if (c) out.push(c);
   });
   return out;
 }
@@ -663,7 +664,7 @@ function archCounts(barPieces, gearPieces, gifts) {
   barPieces.concat(gearPieces).filter(Boolean).forEach(p => {
     const b = baseId(p.id); if (seen.has(b)) return; seen.add(b);
     const tags = pieceDef(b).tags.slice();
-    // Misfiled: the skill also counts as its class's two neighbours on the wheel
+    // Misfiled: the skill also counts as its class's allies on the grid
     if ((p.mods || []).some(m => bareMod(m) === 'misfiled') && tags.length) themeNear(tags[0]).forEach(t => { if (!tags.includes(t)) tags.push(t); });
     tags.forEach(t => c[t] = (c[t] || 0) + 1);
   });
