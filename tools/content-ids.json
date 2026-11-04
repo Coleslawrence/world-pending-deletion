@@ -177,6 +177,27 @@
   "thunder_wrath",
   "heavens_fury",
   "eye_of_storm",
+  "coin_toss",
+  "double_nothing",
+  "two_headed",
+  "hedge",
+  "insurance",
+  "side_bet",
+  "loaded_die",
+  "sleight_hand",
+  "weighted_die",
+  "double_down",
+  "all_in",
+  "safe_bet",
+  "snake_eyes",
+  "boxcars",
+  "long_odds",
+  "house_edge",
+  "stacked_deck",
+  "marked_cards",
+  "jackpot",
+  "progressive",
+  "cash_out",
   "attack",
   "error_skill",
   "stack_overflow"
@@ -206,6 +227,10 @@
   "soul_lantern",
   "plague_censer",
   "misers_ring",
+  "croupiers_rake",
+  "weighted_dice",
+  "gilded_coin",
+  "sharps_sleeve",
   "missingno"
  ],
  "archetypes": [
@@ -216,7 +241,8 @@
   "arcanist",
   "zealot",
   "reaper",
-  "storm"
+  "storm",
+  "dicer"
  ],
  "gods": [
   "war",
@@ -340,7 +366,8 @@
   "aff_arcanist",
   "aff_zealot",
   "aff_reaper",
-  "aff_storm"
+  "aff_storm",
+  "aff_dicer"
  ],
  "titles": [
   "first_blood",
@@ -980,6 +1007,7 @@
  "botIgnores": [
   "alwaysCrit",
   "critBonus",
+  "die",
   "doomT",
   "doublePoison",
   "drainPoison",
@@ -990,7 +1018,6 @@
   "perHit",
   "pierce",
   "reflect",
-  "selfDmg",
   "stack"
  ]
 }

@@ -243,6 +243,7 @@ const ROUNDS = 8;
 const UNLOCKS = {
   arch_arcanist: { name: 'Archetype: Arcanist', desc: 'Quick skills and cooldown tricks join the pool.', cost: 20 },
   arch_storm: { name: 'Archetype: Stormcaller', desc: 'Stuns and Interrupts join the pool.', cost: 20 },
+  arch_dicer: { name: 'Archetype: Gambler', desc: 'Dice, rerolls and Jackpots join the pool.', cost: 20 },
   reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 15 },
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 25 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 15 },
@@ -1570,6 +1571,7 @@ function newFight(run, rng) {
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
+    X.rerolls = P.rerolls || 0; X.firstSix = !!P.firstSix; X.sleeve = !!P.sleeveFix; X.jackpots = 0;
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
   GEAR_SLOTS.forEach(k => { const g = run.gear[k]; if (g && GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll]) say(f, `[${GEAR[g.id].name} reads as ${GEAR[g.roll].name}: ${gearText(g.roll, g.star)}]`, 'skill'); });
@@ -1743,6 +1745,56 @@ function interrupt(f, X, Y, stunned) {
 }
 function effectCount(Y) { return (Y.burn > 0) + (Y.poison > 0) + (Y.bleed > 0) + (Y.weaken > 0) + (Y.stun > 0) + (Y.marked > 0); }
 
+// ---------- Dice (Gambler) ----------
+// A die skill (fx.die) rolls 1 to 6 at the start of its owner's turn, and the roll is shown on the skill before the pick,
+// so a roll is never a hidden cost. s.baseDef keeps the skill as written; s.def is that skill with the roll worked into
+// plain numbers, so the button, the bot and the fight all read ordinary effects. Smart opponents roll when they plan.
+const DIE_FACES = ['\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
+function hasDice(X) { return X.skills.some(s => { const fx = (s.baseDef || s.def).fx; return fx.die || fx.dmgAll || fx.reroll || fx.setSix; }); }
+function rollPip(f, X, s) {
+  const min = Math.min(6, Math.max(1, X.P.dieMin || 0, s.baseDef.fx.dieMin || 0)), r = () => min + Math.floor(rnd(f.rng) * (7 - min));
+  let v = r(); if (X.rollTwiceT > 0) v = Math.max(v, r());
+  if (X.firstSix) { X.firstSix = false; v = 6; }
+  if (v === 1 && X.sleeve) { X.sleeve = false; v = 6; if (X.isPlayer) say(f, "[Cardsharp's Sleeve: a 1 becomes a 6.]", 'skill'); }
+  if (v === 6) X.rolledSix = true;
+  return v;
+}
+function rollDice(f, X, only) {
+  if (!hasDice(X)) return;
+  X.skills.forEach(s => { if (s.unstable || !s.baseDef) s.baseDef = s.def; if (s.baseDef.fx.die && (!only || only.includes(s))) s.pip = rollPip(f, X, s); });
+  if (!only && X.rollTwiceT > 0) X.rollTwiceT--;
+  resolveDice(X);
+}
+function resolveDice(X) {
+  const pips = X.skills.filter(s => s.baseDef && s.baseDef.fx.die).map(s => s.pip), sum = pips.reduce((a, b) => a + b, 0);
+  X.skills.forEach(s => {
+    const b = s.baseDef; if (!b || !(b.fx.die || b.fx.dmgAll)) return;
+    const fx = Object.assign({}, b.fx), v = s.pip || 0;
+    if (fx.die) {
+      if (fx.dmgPip) fx.dmg = (fx.dmg || 0) + fx.dmgPip * v;
+      if (fx.blockPip) fx.block = (fx.block || 0) + fx.blockPip * v;
+      if (fx.healPip) fx.heal = (fx.heal || 0) + fx.healPip * v;
+      if (fx.dbl) fx.dmg *= v >= fx.dbl ? 2 : 0.5;
+      if (fx.snake && (v === 1 || (fx.boxcars && v === 6))) { fx.dmg = fx.snake; fx.stun = 1; }
+      if (fx.bust && v <= (fx.bustAt || 1)) fx.selfDmg = fx.bust;
+    }
+    if (fx.dmgAll) fx.dmg = (fx.dmg || 0) + (fx.dmgAll + (fx.progressive ? X.jackpots || 0 : 0)) * sum;
+    if (fx.cashOut) fx.lifesteal = fx.cashOut;
+    const die = !!fx.die;
+    ['die', 'dmgPip', 'blockPip', 'healPip', 'dieMin', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
+    s.jackpot = die && pips.filter(x => x === v).length >= 2;
+    s.def = Object.assign({}, b, { fx, pip: die ? v : null, jackpot: s.jackpot });
+  });
+}
+// Spend a reroll on one of your dice (the Gambler's tier 2). Returns false when there is nothing to reroll.
+function rerollDie(f, idx) {
+  const A = f.A, s = A.skills[idx];
+  if (f.phase !== 'player' || f.over || !(A.rerolls > 0) || !s || !s.baseDef || !s.baseDef.fx.die) return false;
+  A.rerolls--; const was = s.pip;
+  rollDice(f, A, [s]);
+  say(f, `[Reroll: ${s.def.name} ${was} \u2192 ${s.pip}.]`, 'skill');
+  return true;
+}
 function useSkill(f, X, s, opt) {
   opt = opt || {};
   const Y = opp(f, X);
@@ -1770,6 +1822,13 @@ function useSkill(f, X, s, opt) {
     return;
   }
   const fx = def.fx;
+  // Jackpot: this skill's die matches another shown die
+  if (def.jackpot && !opt.echo) {
+    X.jackpots = (X.jackpots || 0) + 1; if (X.isPlayer) f.tally.jackpots = (f.tally.jackpots || 0) + 1;
+    if (X.P.jackpot) p *= 1 + X.P.jackpot;
+    if (X.P.rakeReroll) X.rerolls = (X.rerolls || 0) + X.P.rakeReroll;
+    say(f, X.isPlayer ? '[Jackpot. The House notes it.]' : `[Jackpot for ${X.name}.]`, X.isPlayer ? 'class' : 'loss');
+  }
   if (stackStun) say(f, `[Stack overflow. ${X.isPlayer ? 'You are' : X.name + ' is'} stunned.]`, 'loss');
   if (!opt.echo) ev(f, { k: 'use', side: X.side, name: def.name });
   if (X.bleed > 0 && !opt.echo) {
@@ -1826,6 +1885,13 @@ function useSkill(f, X, s, opt) {
   if (fx.xbleed) addStatus(f, X, Y, 'bleed', Math.round(fx.xbleed * p));
   if (fx.mark) { Y.marked = Math.max(Y.marked || 0, fx.mark); react(f, X, Y); }
   if (fx.focus) X.focus = fx.focus;
+  if (fx.rollTwice) X.rollTwiceT = fx.rollTwice;
+  if (fx.reroll || fx.setSix) {
+    const dice = X.skills.filter(o => o !== s && o.baseDef && o.baseDef.fx.die);
+    if (fx.reroll) rollDice(f, X, dice);
+    if (fx.setSix && dice.length) { const lo = dice.reduce((a, o) => o.pip < a.pip ? o : a); lo.pip = 6; resolveDice(X); }
+    if (dice.length && X.isPlayer) say(f, `[${def.name}: ${dice.map(o => o.pip).join(', ')}.]`, 'skill');
+  }
   if (fx.haste) X.skills.forEach(o => { if (o !== s) o.cd = Math.max(0, o.cd - fx.haste); });
   if (fx.interrupt) interrupt(f, X, Y, false);
   if (fx.stunIfWeak && Y.weaken > 0 && Y.hp > 0) stunTarget(f, X, Y);
@@ -1859,6 +1925,7 @@ function startTurn(f, X, first) {
   const P = X.P, Y = opp(f, X);
   // Unstable skills: one evolution on odd turns, the other on even ones (shown on the button before you pick)
   if (X.isPlayer) X.skills.forEach(s => { if (!s.unstable) return; s.unstableId = s.unstableId || s.def.id; const ids = SKILLS[s.unstableId].unstable, e = ids[(f.turn + 1) % 2]; s.def = Object.assign(moddedDef(e, s.mods), { name: `${s.unstable.name}: ${SKILLS[e].name}`, cd: s.unstable.cd, id: s.unstableId }); });
+  if (X.isPlayer) rollDice(f, X);
   if (!first) {
     if (X.forge) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
   }
@@ -1931,6 +1998,7 @@ function skipPlayer(f) { f.events = []; endTurn(f, f.A, null); if (!checkOver(f)
 function scoreSkill(s, low) { const fx = s.def.fx; return ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) + (fx.poison || 0) * 1.5 + (fx.bleed || 0) + (fx.detonate ? 10 : 0) + (fx.doom ? fx.doom * 0.5 : 0) + (fx.blockDmg ? 6 : 0)) * s.power + (low ? ((fx.heal || 0) + (fx.healMissing ? 25 : 0) + (fx.block || 0) * 0.8) * s.power * 2 : (fx.block || 0) * 0.5 * s.power) + (fx.stun ? 8 : 0) + (fx.interrupt ? 6 : 0); }
 function planIntent(f, B) {
   if (B.smart) {
+    rollDice(f, B);
     const ready = B.skills.filter(s => s.cd <= 0);
     let best = ready[0];
     const lowHp = B.hp / B.maxHp < 0.35;
@@ -2089,6 +2157,22 @@ function describe(def, p = 1) {
   if (fx.unbound) r.push('No cooldown; using it puts one of your other skills on cooldown.');
   if (fx.overflow) r.push('Damage past 0 HP from its killing blow carries into your next fight.');
   if (fx.selfDmg) r.push(`Costs ${fx.selfDmg} HP.`);
+  if (fx.die) {
+    const base = fx.dmg && (fx.dmgPip || fx.snake) ? n(fx.dmg) : 0;
+    if (fx.snake) r.splice(0, r.length, `On a 1${fx.boxcars ? ' or a 6' : ''}: deal ${n(fx.snake)} and Stun. Otherwise deal ${base}.`);
+    else if (fx.dmgPip) { if (fx.dmg) r.shift(); r.unshift(`Deal ${base ? base + ' + ' : ''}${n(fx.dmgPip)} per pip.`); }
+    if (fx.blockPip) r.push(`Block ${n(fx.blockPip)} per pip.`);
+    if (fx.healPip) r.push(`Heal ${n(fx.healPip)} per pip.`);
+    if (fx.dbl) r.push(`On ${fx.dbl}+ deal double, otherwise half.`);
+    if (fx.dieMin) r.push(`This die never rolls below ${fx.dieMin}.`);
+    if (fx.bust) r.push(`On a ${fx.bustAt ? '1 or 2' : '1'}, you take ${fx.bust}.`);
+    r.unshift('Rolls a die each turn, shown before you pick.');
+  }
+  if (fx.dmgAll) r.unshift(`Deal ${n(fx.dmgAll)} per pip across all your shown dice${fx.progressive ? ', +1 per pip for each Jackpot this fight' : ''}.`);
+  if (fx.cashOut) r.push(`Heal ${fx.cashOut * 100}% of the damage dealt.`);
+  if (fx.rollTwice) r.push(`For ${fx.rollTwice} turns, your dice roll twice and keep the higher.`);
+  if (fx.reroll) r.push('Reroll your other dice.');
+  if (fx.setSix) r.push('Set your lowest die to 6.');
   if (def.quick) r.push("Quick: doesn't end your turn.");
   return r.join(' ');
 }
@@ -2168,6 +2252,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run) });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
+    if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
@@ -2501,5 +2586,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, DIE_FACES, dmgMult, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
