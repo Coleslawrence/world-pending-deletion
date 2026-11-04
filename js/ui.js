@@ -37,6 +37,7 @@ let meta = migrateMeta(lsGet(META_KEY));
 bindMeta(meta);
 let run = (hot && hot.data && hot.data.run) || lsGet(RUN_KEY);
 if (run && run.v !== VERSION) run = null;
+registerGlitchGear(run); // Spliced gear is made on demand, so a reload makes the run's again
 if (run && run.bought == null) run.bought = Math.max(0, (run.level - 1) * 2);
 if (run && Array.isArray(run.shop)) { run.shop = null; run.locks = null; refreshShop(run); }
 if (run && !run.quests) Object.assign(run, { quests: [], chains: {}, milestones: {}, title: null, hiddenPath: null, wagersWon: 0, freeRerolls: 0, haggle: false, entrant: 100 + (meta.runs || 0), extraGiven: run.round >= 5, earned: [] });
@@ -66,7 +67,26 @@ function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(
 function clearToasts() { toastQ.length = 0; toastsEl.querySelectorAll('.toast').forEach(el => clearTimeout(el.timer)); toastsEl.replaceChildren(); }
 toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast'); if (!el) return; dropToast(el); if (el.onTap) el.onTap(); });
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
-function placeToasts() { const foe = ui.screen === 'fight' && document.getElementById('foe'); toastsEl.style.top = foe ? `${foe.getBoundingClientRect().bottom + 6}px` : ''; }
+// Long world and champion names: drop a size first, then wrap to 2 lines, so nothing is cut at 320 wide
+function fitNames() {
+  app.querySelectorAll('.fo-name, .me-name').forEach(el => {
+    if (el.scrollWidth <= el.clientWidth + 1) return;
+    el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.86).toFixed(1) + 'px';
+    if (el.scrollWidth > el.clientWidth + 1) el.classList.add('fit2');
+  });
+}
+// Short archetype tags for the shop chips on narrow phones
+const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM' };
+// Fights: under the opponent's panel. Elsewhere: just above the bottom buttons (or an open sheet's), clear of the
+// header and the screen's instructions
+function placeToasts() {
+  const foe = ui.screen === 'fight' && !ui.sheet && document.getElementById('foe');
+  if (foe) { toastsEl.style.top = `${foe.getBoundingClientRect().bottom + 6}px`; toastsEl.style.bottom = ''; toastsEl.classList.remove('low'); return; }
+  const sh = document.querySelector('.sheet'), foot = document.querySelector('.coach.pos-bottom') ? null : sh ? sh.querySelector('.sh-f') : document.querySelector('main .foot2, main .foot');
+  const r = foot && foot.getBoundingClientRect();
+  if (!r || !r.height) { toastsEl.style.top = ''; toastsEl.style.bottom = ''; toastsEl.classList.remove('low'); return; }
+  toastsEl.style.top = 'auto'; toastsEl.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`; toastsEl.classList.add('low');
+}
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 const TOAST_MAX = 5;
@@ -94,7 +114,7 @@ function styleOf(spec) {
 }
 // A flavour line (skills, gear, Gifts, Titles): the world's voice under the rules, never instead of them.
 function flavHTML(f) { return f ? `<span class="flav">${esc(f)}</span>` : ''; }
-function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
+function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span${TRAIT_POOL[k].glitch ? ' class="glitch"' : ''}><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · <span class="nw">${r}-rank</span>` : ''; }
 function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
 function rankChip(r) { return `<span class="rank r${r}">${WORLD_RANKS[r]}</span>`; }
@@ -106,23 +126,28 @@ function tagDots(id) { return `<span class="dots2">${pieceDef(baseId(id)).tags.m
 function tagNames(id) { return pieceDef(baseId(id)).tags.map(t => `<span class="tagn a-${t}">${ARCH[t].name}</span>`).join(''); }
 function mainTag(id) { const t = pieceDef(baseId(id)).tags; return t.length ? 'a-' + t[0] : ''; }
 function roundLabel() { if (!run) return ''; if (run.elite) return `Elite ${run.eliteIdx + 1} of ${run.eliteBracket.length}`; return run.round >= ROUNDS ? 'Final' : `Round ${run.round} of ${ROUNDS}`; }
-function bracketDots() {
-  let h = '<div class="dots" aria-label="Bracket progress">';
-  for (let i = 1; i <= ROUNDS; i++) { const st = run.elite || i < run.round ? 'done' : i === run.round ? 'now' : ''; h += `<span class="dot ${st} ${i === ROUNDS ? 'fin' : ''}"></span>`; }
-  if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<span class="dot elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></span>`; });
-  return h + '</div>';
-}
-// The fight screen leaves out gold (nothing to spend it on mid-fight) to make room for its speed and ? buttons
-function topBar(title, extra, fight) {
-  return `<header class="bar"><div class="bar-l"><div class="bar-w"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}</div><span class="rl">${esc(title || roundLabel())}</span></div><div class="bar-r">${extra || ''}${run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`}${fight ? '' : `<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button>`}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div></header>`;
+// The fight's header: the top strip's first row with speed and ? instead of gold and Log (nothing to spend mid-fight)
+function fightBar(extra) {
+  const hc = run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`;
+  return `<header class="strip fstrip"><div class="st-1"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="st-sp"></span>${extra}${hc}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div>${stripProg()}</header>`;
 }
 function archChips(counts, small) {
-  return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span>${ARCH[k].name}</span><small>/${next}</small></button>`; }).join('')}</div>`;
+  return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> <i class="an-l">${ARCH[k].name}</i><i class="an-s" aria-hidden="true">${ARCH_TAG[k] || ARCH[k].name.slice(0, 3).toUpperCase()}</i></span><small>/${next}</small></button>`; }).join('')}</div>`;
 }
 function playerPower(p) { const def = moddedDef(p.id, p.mods); return skillPower(def, effStats(run), p.star) * def.powerMult; }
-function champLine() {
+// One top strip for the board screens (choose, district, shop): world and round, Hearts, gold, Log and menu on the
+// first row; the champion, level and HP on the second (tap it for Stats); bracket progress as a segmented line.
+function stripProg() {
+  let h = '';
+  for (let i = 1; i <= ROUNDS; i++) h += `<i class="${run.elite || i < run.round ? 'done' : i === run.round ? 'now' : ''}${i === ROUNDS ? ' fin' : ''}"></i>`;
+  if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<i class="elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></i>`; });
+  return `<div class="st-prog"><b>${esc(roundLabel())}</b>${h}</div>`;
+}
+function strip() {
   const mh = maxHp(run);
-  return `<section class="cline"><div class="cl-l">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<div><div class="ch-name">${esc(run.name)}</div><div class="ch-sub">${run.path ? esc(ARCH[run.path].path) + ' · ' : ''}Lv ${run.level} <span class="xp"><i style="width:${lvFill()}%"></i></span></div></div></div><div class="cl-r"><div class="ch-hp">${n0(run.hp)} / ${mh} HP</div>${hpBar(run.hp, mh, 'hp')}${run.record ? `<button class="ch-hearts" data-act="sheet" data-s="record" aria-label="Open the world record">${hearts(run.hearts, run.maxHearts)}</button>` : `<div class="ch-hearts">${hearts(run.hearts, run.maxHearts)}</div>`}</div></section>`;
+  const hc = run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`;
+  return `<header class="strip"><div class="st-1"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="st-sp"></span>${hc}<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div>
+    <button class="st-2" data-act="sheet" data-s="stats" aria-label="${esc(run.name)}, level ${run.level}, ${n0(run.hp)} of ${mh} HP. Open Stats">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<span class="ch-name">${esc(run.name)}</span><span class="st-lv">Lv ${run.level}<span class="xp" aria-hidden="true"><i style="width:${lvFill()}%"></i></span></span><span class="st-hp">${n0(run.hp)}/${mh} HP</span>${hpBar(run.hp, mh, 'hp')}</button>${stripProg()}</header>`;
 }
 
 // ---------- World Record ----------
@@ -131,7 +156,7 @@ function redact(text) { return `<span class="redact" role="img" aria-label="eras
 // A world's layers as sentences for the world sheet: " A Merchant League: the guilds own... Guild rates: ... The Long Night: the sun..."
 function layerSentences(w) {
   const F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix], low = t => t.charAt(0).toLowerCase() + t.slice(1);
-  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (P && P.custom ? ` <b>${esc(P.custom.name)}</b>: ${esc(low(P.custom.text))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(F.line))}` : '') + (F && F.crises ? ' Its crisis comes in rounds 3 and 5.' : '') + (C ? ` The ${esc(C.name)} press in.` : '');
+  return (P ? ` ${esc(P.name)}: ${esc(low(P.line))}` : '') + (P && P.custom ? ` <b>${esc(P.custom.name)}</b>: ${esc(low(P.custom.text))}` : '') + (F ? ` ${esc(F.name)}: ${esc(low(fateLine(F, w.type)))}` : '') + (F && F.crises ? ' Its crisis comes in rounds 3 and 5.' : '') + (C ? ` The ${esc(C.name)} press in.` : '');
 }
 function bioHTML(rec, type, worldName, champ) { return bioParts(rec, type, worldName, champ).map(p => p.gone ? redact(p.t) : esc(p.t)).join(''); }
 function recLine(e) { return e.line.map(w => w.gone ? redact(w.t) : esc(w.t)).join(' '); }
@@ -152,7 +177,8 @@ function recordSheet() {
 }
 function findSnap(at) { at = String(at); return meta.erased.concat(meta.champions, cloud.shared.map(x => x.snap)).find(s => String(s.at) === at) || (ui.end && ui.end.snap && String(ui.end.snap.at) === at ? ui.end.snap : null); }
 // The deletion moment: one row per erased entry. One tap erases them all, one after another; each glitches, then becomes a bar.
-const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Reduced motion: the phone's setting, or the game's own in Settings (js/sfx.js)
+let REDUCED = reducedMotion();
 function eraseSteps(r) {
   const R = run && run.record; if (!R || !r.erased || !r.erased.length) return [];
   const E = recLore(R, run.world.type).entries;
@@ -302,7 +328,7 @@ function sendReport() {
   const F = ui.fb; if (!F) return;
   if (!F.text.trim()) { toast('[The System cannot read an empty report. Type something.]', 'loss'); return; }
   const s = screenInfo(), build = (typeof PATCH_NOTES !== 'undefined' && PATCH_NOTES.length ? PATCH_NOTES[0].id : '?') + '/s' + VERSION;
-  const d = feedbackDoc(F.type, F.text, { build, screen: F.from, w: innerWidth, h: s.vh, app: s.standalone, ua: navigator.userAgent }, F.attach && run && !run.practice ? run : null);
+  const d = feedbackDoc(F.type, F.text, { build, screen: F.from, w: innerWidth, h: s.vh, app: s.standalone, ua: screenLine() + ' ' + navigator.userAgent }, F.attach && run && !run.practice ? run : null);
   const q = lsGet(FBQ_KEY) || []; q.push(d); lsSet(FBQ_KEY, q.slice(-10));
   ui.fb = null; ui.sheet = null; render();
   toast(cloud.on ? '[Report filed. The System reads every one. Eventually.]' : '[Report filed. It sends once you sign in.]', 'sys');
@@ -369,7 +395,7 @@ function dailySheet() {
     note = FIREBASE ? 'Sign in to post your score.' : 'Scores stay on this device.';
   }
   if (!r) note = 'Your ranked attempt is still in progress.';
-  const body = `<p class="sh-p sysl">[${esc(w.name)}, rank ${WORLD_RANKS[w.rank]}. Next world in ${untilTomorrow()}.]</p>
+  const body = `<p class="sh-p sysl">[${esc(w.name)}, rank ${WORLD_RANKS[w.rank]}. Next world in ${untilTomorrow()}.]</p>${glitchDay(date) ? `<p class="sh-p sysl glitch">[Glitch Day. Today's world loaded from a Corrupted Save. Glitches are on.]</p>` : ''}
     <div class="board"><div class="brow head"><span class="br-n">#</span><span></span><span class="br-name">Entrant</span><span class="br-r">Reached</span><span class="br-h" aria-label="Hearts">♥</span><span class="br-k">Kept</span></div>${rows}</div>
     ${note ? `<p class="sh-p fine">${note}</p>` : ''}${!cloud.on && FIREBASE ? cloudSignInHTML(true) : ''}
     ${cloud.on && B && B.rows && B.rows.some(x => x.rec) ? '<p class="sh-p fine">Tap a row to compare records.</p>' : ''}`;
@@ -443,8 +469,8 @@ function compareSheet() {
 // ---------- Title / worlds ----------
 function titleHTML() {
   const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
-  return `<main class="screen title ${canResume ? 'resume' : ''}">
-    <div class="t-top"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
+  return `<main class="screen title ${canResume ? 'resume' : ''}">${titleChunks()}
+    <div class="t-top"><div class="t-eb"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><button class="icon-btn t-set" data-act="sheet" data-s="settings" aria-label="Settings">⚙</button></div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
     <div class="sysbox"><p>${meta.runs && meta.rank ? esc(rankAddress(meta, meta.champions[0] && meta.champions[0].name, meta.runs)) : '[The Grand Tournament has begun.]'}</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
     <div class="t-stats"><div><b>${meta.wins}</b><span>spared</span></div><div><b>${meta.erased.length}</b><span>erased</span></div><div><b>${meta.echoes}</b><span>Echoes</span></div><button data-act="sheet" data-s="halls"><b>${meta.rank ? meta.rank.letter : 'F'}</b><span>Entrant Rank</span></button></div>
@@ -455,7 +481,7 @@ function titleHTML() {
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
       <div class="row3"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button><button class="btn ghost small" data-act="report">Report</button></div>
-      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · cloud save on · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
+      ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · ${window.WPD_PREVIEW ? 'dev preview, not saved to cloud' : 'cloud save on'} · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
     </div></main>`;
 }
 function worldsHTML() {
@@ -465,10 +491,10 @@ function worldsHTML() {
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
       <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
-      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(F.line) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
+      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
-      <div class="pk-row"><span class="tag">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
-      <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: ${esc(ENEMIES[T.final].name)}</span></div>
+      <div class="pk-row"><span class="tag${M.glitch ? ' glitch' : ''}">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
+      <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: a paired world's finalist</span></div>
     </button>`;
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
@@ -564,8 +590,10 @@ function chooseHTML() {
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
   const fin = run.choices.length === 1;
-  return `<main class="screen choose">${topBar()}<div class="col col-a">${bracketDots()}${champLine()}${questLine()}</div><div class="col col-b">
-    <div class="sec-h"><span>${fin ? '[The Final Champion awaits]' : '[Choose your opponent]'}</span><span class="fine">${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span> · ` : ''}${noticeOf(run) ? `<span class="bad" title="Each straight win makes opponents stronger. Losing a Heart resets it.">Noticed +${Math.round(TUNE.notice * noticeOf(run) * 100)}%</span> · ` : ''}+${run.lastIncome || 0}g income</span></div>
+  const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
+  const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
+  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div></div><div class="col col-b">
+   ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
 }
@@ -576,10 +604,10 @@ function pieceTile(p, act, extra, inShop) {
   const d = pieceDef(p.id), g = isGear(p.id);
   const marker = inShop && inShop.has(p.id) && p.star < 3 ? '<span class="inshop" title="A copy is in the shop">in shop</span>' : '';
   return `<button class="tile ${mainTag(p.id)} ${g ? 'gear' : ''} ${extra || ''} ${marker ? 'hasdup' : ''}" data-act="${act}" data-u="${p.u}">
-    <span class="tl-h">${rk(effRank(p.id, p.mods))}${stars(p.star)}</span><span class="tl-n">${esc(d.name)}</span><span class="tl-f">${tagDots(p.id)}${pfxLine(p.mods)}</span>${marker}</button>`;
+    <span class="tl-h">${rk(effRank(p.id, p.mods))}${stars(p.star)}</span><span class="tl-n">${esc(d.name)}</span>${pfxLine(p.mods)}<span class="tl-f">${tagDots(p.id)}</span>${marker}</button>`;
 }
 // Prefixes on a tile: one small line that gives way before the skill's name does
-function pfxLine(mods) { return mods && mods.length ? `<em class="pfx tl-p">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em>` : '';
+function pfxLine(mods) { return mods && mods.length ? `<em class="pfx tl-p" title="${esc(mods.map(m => PREFIXES[m].name).join(' '))}">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em>` : '';
 }
 // How a shop item relates to what you own: copies at ★1, a ★2 already owned, and whether buying merges
 function dupInfo(id) {
@@ -595,9 +623,11 @@ function shopItemTile(it, kind, i) {
   const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : '';
   // Copies of pieces you own need no reading: they get a one-tap Buy over the price. Everything else opens its details first.
   const quick = D.owned && canBuy(run, it) ? `<button class="qbuy" data-act="quick-buy" data-k="${kind}" data-i="${i}" aria-label="Buy ${esc(d.name)} for ${price(run, it)} gold">Buy ${price(run, it)}g</button>` : '';
-  return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}">
-    ${tag}<span class="tl-h">${rk(effRank(it.id, it.mods))}<span class="price">${price(run, it)}g</span></span><span class="tl-n">${esc(d.name)}</span>
-    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span><span class="tl-f">${tagDots(it.id)}${pfxLine(it.mods)}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}</span></button></div>`;
+  // Archetype shapes sit beside the rank, so the tile only needs a footer row for owned pips, a lock or a gear slot
+  const foot = `${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}`;
+  return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}" title="${esc(skillTip(pieceDef(baseId(it.id))))}">
+    ${tag}<span class="tl-h"><span class="tl-rk">${rk(effRank(it.id, it.mods))}${tagDots(it.id)}</span><span class="price">${price(run, it)}g</span></span><span class="tl-n">${esc(d.name)}</span>
+    <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span>${pfxLine(it.mods)}${foot ? `<span class="tl-f">${foot}</span>` : ''}</button></div>`;
 }
 function shortFx(id, mods) {
   if (isGear(id)) return gearText(id, 1);
@@ -623,13 +653,13 @@ function shopHTML() {
   // Loot can overfill the bench. It then squeezes into two rows so Fight stays on screen, and Fight waits until it's back to 8.
   const over = benchOver(), cols = over ? Math.ceil(run.bench.length / 2) : 4;
   const rc = rerollCost(run);
-  return `<main class="screen shop">${topBar(roundLabel() + ' · Shop')}
+  return `<main class="screen shop">${strip()}
     <div class="col col-a">${archChips(counts)}
     <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
     <div class="shopgrid">${items}</div>
     <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}<span class="interest">Interest +${interestOf(run)}g</span></div>
     </div><div class="col col-b"><div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
-    <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>
+    <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>${run.phantom ? `<div class="sec-h"><span class="bad">Phantom: ${esc(pieceDef(run.phantom.id).name)}${run.phantom.star > 1 ? ' ' + '★'.repeat(run.phantom.star) : ''}</span><span class="fine">Hotfix in ${run.phantom.left} fight${run.phantom.left > 1 ? 's' : ''}</span></div>` : ''}
     <div class="sec-h"><span${over ? ' class="bad"' : ''}>Bench ${run.bench.length}/8</span><span class="fine">Tap to equip, swap or sell</span></div>
     <div class="bench${over ? ' over' : ''}" style="--bench-cols: ${cols}">${bench}</div></div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button>${over ? `<span class="foot-hint bad">Sell ${over} to continue</span>` : '<button class="btn primary fight" data-act="shop-done">Fight ›</button>'}</footer></main>`;
@@ -651,7 +681,7 @@ function districtDesc(k) {
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage !== 'district';
   const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
-  return `<main class="screen district">${topBar(roundLabel() + ' · District')}<div class="col col-a">${champLine()}
+  return `<main class="screen district">${strip()}<div class="col col-a">
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.gate ? ' · Gatekeeper' : spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     </div><div class="col col-b"><div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
     <section class="inter">${opts}</section>
@@ -663,11 +693,107 @@ function scoutLine(spec) {
   return `<div class="nx-scout">Skills: ${ENEMIES[spec.id].skills.map(s => esc(s.n)).join(', ')}</div>`;
 }
 
+// ---------- Moments ----------
+// Rule-breaking looks the screen switches into at set moments (Slaw, 2026-11-02: moments now, themes later).
+// J Erosion: low HP tears holes in the fight's middle. Later: H Broadcast, K Gods' chat, I The System is breaking.
+// momentOf() names the active look; render() and updateFight() put it on #app as data-moment, with data-fx="off"
+// when motion is reduced (Settings > Motion), which turns every moment effect off.
+// Several can be on at once (data-moment="broadcast erosion"). Reduced motion keeps the colours and words of a look
+// and drops its movement and damage (holes, splash, scrolling ticker).
+function momentOf() {
+  const m = [];
+  if (broadcastOn()) m.push('broadcast');
+  const br = breakingLevel(); if (br) m.push('breaking'); if (br > 1) m.push('breaking-full');
+  if (!REDUCED && ui.screen === 'fight' && ui.fight && erosionLevel(ui.fight) > 0) m.push('erosion');
+  return m.join(' ');
+}
+function applyMoment() { if (!app) return; app.dataset.fx = REDUCED ? 'off' : 'on'; const m = momentOf(); if (m) app.dataset.moment = m; else delete app.dataset.moment; }
+// H Broadcast at full volume: the System puts the run's headline moments on air.
+// Gatekeeper and Final fights, Fate Crisis events, and the end of a world (erased or spared).
+function broadcastFight(spec) { return !!spec && (spec.gate || spec.kind === 'final'); }
+function crisisPending() { const p = run && run.pending && run.pending[0]; return !!(p && p.type === 'event' && EVENTS[p.key] && EVENTS[p.key].crisis); }
+function broadcastOn() {
+  if (ui.screen === 'fight') return !!(ui.fight && broadcastFight(ui.fight.spec));
+  if (ui.screen === 'end') return !!ui.end;
+  if (['choose', 'shop', 'district'].includes(ui.screen) && !ui.sheet) return crisisPending();
+  return false;
+}
+// A one-second VS card as the fight opens; any tap skips it. Not at 2x/3x speed or with reduced motion.
+function broadcastSplash(f) {
+  if (REDUCED || ui.speed > 1 || !broadcastFight(f.spec) || !app) return;
+  const fin = f.spec.kind === 'final';
+  const top = fin ? '++ LIVE +++ [FINAL] +++ ONE WORLD IS SPARED +++' : '++ LIVE +++ [GATEKEEPER ASSIGNED] +++ LIVE ++';
+  const bot = fin ? '[The other is not.]' : '[Passage is a privilege.]';
+  const el = document.createElement('div'); el.className = 'bc-splash'; el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<div class="bc-tick">${esc(top)}</div><div class="bc-foe">${esc(f.B.name)}</div><div class="bc-vs">VS</div><div class="bc-me">${esc(run.name)}</div><div class="bc-tick b">${esc(bot)}</div>`;
+  const done = () => el.remove();
+  el.addEventListener('pointerdown', done); app.appendChild(el); setTimeout(done, 1100);
+}
+function logLine(l, isNew) {
+  return `<p class="t-${l.t} ${isNew ? 'new' : ''}">${esc(l.text)}</p>`;
+}
+
+// I The System is breaking: it strains under your streak. Subtle at notice 3 (headers flicker), full at notice 5 and
+// on the System's own events (split colour, a ghost correction in the fight log). Options, costs and numbers never scramble.
+// An event option with glitch: true shows as an inserted Option 4 (built with the glitched-content work).
+function systemPending() { const p = run && run.pending && run.pending[0], E = p && p.type === 'event' && EVENTS[p.key]; return !!(E && E.theme === 'system' && !E.crisis); }
+function breakingLevel() {
+  if (!run || run.practice || !['choose', 'shop', 'district', 'fight'].includes(ui.screen)) return 0;
+  if (ui.screen !== 'fight' && !ui.sheet && systemPending()) return 2;
+  const n = noticeOf(run); return n >= TUNE.noticeMax ? 2 : n >= 3 ? 1 : 0;
+}
+const SYS_CORRECTIONS = ['[Correction: that was correct.]', '[Correction withdrawn. Apologies are not offered.]', '[This line was not approved.]', '[Duplicate entry. Keeping both.]', '[Crowd: 41,200. Crowd: 0. Crowd: 41,200.]', '[The System is fine.]'];
+function ghostLine(f) { if (breakingLevel() < 2 || !f.log.length || f.log.length % 2) return ''; return `<p class="t-ghost">${esc(SYS_CORRECTIONS[f.log.length / 2 % SYS_CORRECTIONS.length])}</p>`; }
+
+function broadcastTicker(text) { return `<div class="bc-ticker" aria-hidden="true"><span>${esc(text)}</span><span>${esc(text)}</span></div>`; }
+// Erosion: no holes at 50% HP or more, then one per 10% lost, up to 5. A telegraphed hit that would tear one outlines it first.
+const EROSION = { start: 0.5, step: 0.1, max: 5, bigHit: 0.2, chunks: 6 };
+function erosionLevel(f, hp) {
+  const A = f.A; if (!A || !A.maxHp) return 0;
+  const fr = Math.max(0, hp == null ? A.hp : hp) / A.maxHp;
+  return fr >= EROSION.start ? 0 : Math.min(EROSION.max, Math.ceil((EROSION.start - fr) / EROSION.step - 1e-9));
+}
+// Torn polygon for hole i of a seed: same shape and place every redraw
+function holeSpec(seed, i) {
+  const r = seedRng(seed + ':hole:' + i), n = 6 + Math.floor(r() * 3), size = 40 + Math.round(r() * 30);
+  const pts = []; for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2 + r() * 0.5, rad = 0.62 + r() * 0.38; pts.push(`${(50 + Math.cos(a) * rad * 48).toFixed(1)},${(50 + Math.sin(a) * rad * 48).toFixed(1)}`); }
+  // Five lanes across the middle so holes rarely overlap; the skyline's 48px at the top stays clear
+  const lane = [14, 70, 40, 86, 28][i % 5];
+  return { x: lane + (r() - 0.5) * 10, y: 38 + r() * 46, size, rot: Math.round(r() * 360), pts: pts.join(' ') };
+}
+function holeSVG(h, cls) {
+  return `<svg class="hole ${cls}" viewBox="0 0 100 100" style="left:${h.x.toFixed(1)}%;top:${h.y.toFixed(1)}%;--s:${h.size}px;transform:translate(-50%,-50%) rotate(${h.rot}deg)" aria-hidden="true"><polygon points="${h.pts}"/></svg>`;
+}
+function erosionHTML(f) {
+  if (REDUCED || !f || !f.A) return '';
+  if (!f.erSeed) f.erSeed = String(Math.floor(Math.random() * 1e9));
+  const lv = erosionLevel(f), shown = f.erShown || 0;
+  let h = '';
+  for (let i = 0; i < lv; i++) h += holeSVG(holeSpec(f.erSeed, i), i >= shown ? 'new' : '');
+  f.erShown = lv;
+  // A telegraphed hit that would tear a new hole if it lands unblocked: its outline shows where
+  if (!f.over && lv < EROSION.max && f.A.hp > 0) {
+    const it = intentInfo(f), m = (it.kind === 'attack' || it.kind === 'big') && /^(\d+)(?:×(\d+))?/.exec(it.text || '');
+    if (m && erosionLevel(f, f.A.hp - +m[1] * (+m[2] || 1)) > lv) h += holeSVG(holeSpec(f.erSeed, lv), 'due');
+  }
+  return h ? `<div class="erode" aria-hidden="true">${h}</div>` : '';
+}
+// A hit for 20%+ of max HP cracks the middle for a moment
+function tearFx() { if (REDUCED) return; const lg = document.getElementById('log'); if (!lg) return; lg.classList.remove('tear'); void lg.offsetWidth; lg.classList.add('tear'); }
+// Title: one chunk cut from the screen's edges per erased world, up to 6, behind the content
+const CHUNK_AT = [[100, 4, 64], [0, 34, 52], [100, 52, 44], [6, 70, 40], [96, 88, 56], [30, 100, 46]];
+function titleChunks() {
+  const n = Math.min(EROSION.chunks, meta.erased.length); if (REDUCED || !n) return '';
+  let h = '';
+  for (let i = 0; i < n; i++) { const [x, y, size] = CHUNK_AT[i], sp = holeSpec('title', i); h += holeSVG({ x, y, size: size + 24, rot: sp.rot, pts: sp.pts }, ''); }
+  return `<div class="erode chunks" aria-hidden="true">${h}</div>`;
+}
+
 // ---------- Fight ----------
 function fightHTML() {
   const f = ui.fight;
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
-  return `<main class="screen fight">${topBar(roundLabel(), `<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`, true)}
+  return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
@@ -678,7 +804,7 @@ function fightHTML() {
 }
 function chipsHTML(X, f) {
   const c = [];
-  if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait">${esc(TRAIT_POOL[k].name)}</span>`));
+  if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait${TRAIT_POOL[k].glitch ? ' glitch' : ''}">${esc(TRAIT_POOL[k].name)}</span>`));
   if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
   if (X.burn > 0) c.push(`<span class="chip burn">Burn ${n0(X.burn)}</span>`);
   if (X.poison > 0) c.push(`<span class="chip poison">Poison ${n0(X.poison)}</span>`);
@@ -702,6 +828,7 @@ function chipsHTML(X, f) {
 }
 function updateFight() {
   const f = ui.fight; if (!f) return;
+  applyMoment();
   [['A', f.A], ['B', f.B]].forEach(([k, X]) => {
     const hp = document.getElementById('hp' + k); if (!hp) return;
     hp.textContent = `${n0(X.hp)} / ${X.maxHp}`;
@@ -718,7 +845,7 @@ function updateFight() {
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
-  if (lg) lg.innerHTML = skylineSVG() + '<div class="log-t">' + f.log.slice(-4).map((l, i, a) => `<p class="t-${l.t} ${i === a.length - 1 ? 'new' : ''}">${esc(l.text)}</p>`).join('') + '</div>'
+  if (lg) lg.innerHTML = skylineSVG() + erosionHTML(f) + '<div class="log-t">' + f.log.slice(-4).map((l, i, a) => logLine(l, i === a.length - 1)).join('') + ghostLine(f) + '</div>'
     + (rr.length ? `<div class="replies">${rr.map(i => `<button class="reply" data-act="reply" data-i="${i}"><span class="chk-tag">${esc(checkTag(RIVAL_REPLIES[i].check))}</span> ${esc(RIVAL_REPLIES[i].label)}</button>`).join('')}</div>` : '');
   const sk = document.getElementById('skills');
   if (sk) {
@@ -726,7 +853,7 @@ function updateFight() {
     const btn = (s, i, wide) => {
       const d = s.def, cd = s.cd > 0, prev = previewSkill(f, s);
       const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
-      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
+      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
         <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
         ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}<span class="sk-fx">${esc(prev)}</span>${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
     };
@@ -740,16 +867,32 @@ function floatAt(side, text, cls) {
   const el = document.createElement('span'); el.className = 'fl ' + cls; el.textContent = text;
   el.style.left = (18 + Math.random() * 60) + '%'; host.appendChild(el); setTimeout(() => el.remove(), 1000);
 }
-function shake(side) { const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function shake(side) { if (!SET.shake || REDUCED) return; const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+// Break and reaction impact (#15): a beat of hit-stop, a stamp over the target and the break bar shattering
+function stamp(side, text, cls) {
+  const host = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!host) return;
+  host.querySelectorAll('.stamp.' + cls).forEach(x => x.remove());
+  const el = document.createElement('span'); el.className = 'stamp ' + cls; el.textContent = text; el.setAttribute('aria-hidden', 'true');
+  host.appendChild(el); setTimeout(() => el.remove(), cls === 'brk' ? 1300 : 900);
+}
+function breakFx(side) {
+  const app0 = document.getElementById('app'), bar = document.querySelector('.brk-bar');
+  if (bar) { bar.classList.remove('shatter'); void bar.offsetWidth; bar.classList.add('shatter'); }
+  stamp(side, 'BROKEN', 'brk'); shake(side); sfx('break');
+  if (!REDUCED && app0) { app0.classList.add('hitstop'); setTimeout(() => app0.classList.remove('hitstop'), 160); }
+}
+// Hover details on PC (#17): the full effect text, and the key that uses it in a fight
+function skillTip(d, key) { if (!d) return ''; let t = d.name; try { if (d.fx) t += ': ' + describe(d); else if (d.desc) t += ': ' + d.desc; } catch (e) { } return key ? t + ` [Key ${key}]` : t; }
 function playEvents(f) {
   let d = 0;
   f.events.forEach(e => {
     const at = d;
-    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
+    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); if (e.side === 'A' && e.amt >= f.A.maxHp * EROSION.bigHit) tearFx(); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
     else if (e.k === 'dot' && e.amt > 0) { setTimeout(() => floatAt(e.side, e.amt, e.kind), at); d += 90; }
-    else if (e.k === 'heal') { setTimeout(() => floatAt(e.side, '+' + e.amt, 'heal'), at); d += 90; }
+    else if (e.k === 'heal') { setTimeout(() => { floatAt(e.side, '+' + e.amt, 'heal'); sfx('heal'); }, at); d += 90; }
     else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
-    else if (e.k === 'reaction') { setTimeout(() => floatAt(e.side, e.name + '!', 'react'), at); d += 160; }
+    else if (e.k === 'reaction') { setTimeout(() => { floatAt(e.side, e.name + '!', 'react'); stamp(e.side, e.name, 'rx'); sfx('react'); }, at); d += 220; }
+    else if (e.k === 'break') { setTimeout(() => breakFx(e.side), at); d += 420; }
     else if (e.k === 'phase') { setTimeout(() => { floatAt(e.side, 'Phase 2', 'react'); shake(e.side); }, at); d += 200; }
   });
   f.events = [];
@@ -781,9 +924,13 @@ function startFightUI() {
   if (!run.elite && run.round === 1) say2(f, '[Tutorial] [Please attempt not to die during the tutorial. It is embarrassing for everyone.]', 'sys');
   if (f.spec.kind === 'erased') say2(f, f.spec.snap.rec ? `[The System has returned a champion of an erased world. They remember: "${recFragment(f.spec.snap.rec, f.spec.snap.worldType)}."]` : '[The System has returned a champion of an erased world. They remember you.]', 'loss');
   if (f.spec.kind === 'entrant') say2(f, poolIntro(f.spec), 'sys');
-  if (f.spec.kind === 'final') say2(f, `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
+  // Named opponents' entrance lines (FOE_LINES): rivals only when their rank lines are silent, Final Champions unless greeting at S-rank
+  { const L = !f.spec.snap && f.spec.id && FOE_LINES[f.spec.id]; if (L && L.enter && !intro.some(l => l.t === 'foe')) say2(f, foeLine(L.enter, run), /^\[/.test(L.enter) ? 'sys' : 'foe'); }
+  if (f.spec.kind === 'champion') say2(f, `[${f.spec.snap.champ} saved their world once. They are here to keep it saved.]`, 'sys');
+  if (f.spec.gate && !run.gateSeen) { run.gateSeen = true; say2(f, '[Gatekeeper assigned. Passage is a privilege.]', 'sys'); }
+  if (f.spec.kind === 'final') say2(f, run.pair ? `[Final. ${run.world.name} against ${f.spec.snap ? f.spec.snap.worldName || pairOf(run).name : pairOf(run).name}. One world is spared. The other is not.]` : `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
-  render(); playEvents(f); updateFight();
+  render(); playEvents(f); updateFight(); broadcastSplash(f);
 }
 const wait = ms => new Promise(r => setTimeout(r, ms / ui.speed));
 async function onUse(i) {
@@ -816,6 +963,7 @@ function finishFight() {
   // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
   const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
+  sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
   pushMsgs(res.msgs);
   ui.result = res; ui.erDone = 0; ui.erBusy = false;
   if (res.practiceDone) { ui.practiceAfter = true; }
@@ -885,18 +1033,41 @@ function statLinesNotice() {
   const p = run.pending[0]; if (meta.statLines || run.practice || !p || p.type !== 'event' || !eventOpts(run, p.key).some(i => EVENTS[p.key].opts[i].check)) return;
   meta.statLines = true; saveMeta(); setTimeout(() => toast('[Attribute dialogue unlocked. Your build has opinions now.]', 'class'), 300);
 }
+// Event outcomes: what changed between before and after a choice, shown in the event until Continue
+function evSnap(run) { return { gold: run.gold, hearts: run.hearts, hp: Math.round(run.hp), max: maxHp(run), notice: run.notice || 0, fav: Object.assign({}, run.favour), ids: allPieces(run).map(x => x.u + ':' + x.id + ':' + (x.star || 1)) }; }
+function evDiff(a, run) {
+  const b = evSnap(run), out = [], sgn = n => (n > 0 ? '+' : '−') + Math.abs(n), add = (text, good) => out.push({ text, good });
+  if (b.gold !== a.gold) add(`${sgn(b.gold - a.gold)} gold`, b.gold > a.gold);
+  if (b.hearts !== a.hearts) add(`${sgn(b.hearts - a.hearts)} Heart${Math.abs(b.hearts - a.hearts) > 1 ? 's' : ''}`, b.hearts > a.hearts);
+  if (b.max !== a.max) add(`Max HP ${sgn(b.max - a.max)}`, b.max > a.max);
+  if (b.hp !== a.hp && b.hp - a.hp !== b.max - a.max) add(`${sgn(b.hp - a.hp)} HP`, b.hp > a.hp);
+  if (b.notice !== a.notice) add(`Noticed ${sgn(b.notice - a.notice)}`, b.notice < a.notice);
+  Object.keys(GODS).forEach(g => { const v = (b.fav[g] || 0) - (a.fav[g] || 0); if (v) add(`${sgn(v)} Favour · ${GODS[g].name}`, v > 0); });
+  const nm = k => { const [, id, st] = k.split(':'), d = pieceDef(id); return d ? d.name + (+st > 1 ? ' ' + '★'.repeat(+st) : '') : id; };
+  b.ids.filter(k => !a.ids.includes(k)).forEach(k => add(`Gained: ${nm(k)}`, true));
+  a.ids.filter(k => !b.ids.includes(k) && !b.ids.some(x => x.split(':')[0] === k.split(':')[0])).forEach(k => add(`Lost: ${nm(k)}`, false));
+  return out;
+}
+function evResultSheet() {
+  const R = ui.sheet;
+  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>`).join('');
+  const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
+  return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
+}
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
-    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
-    return sheetWrap(E.title, `${chainTag}<p class="sh-p big">${esc(eventText(run, p.key))}</p>` + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''}" data-act="event" data-i="${i}"><div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.chain ? 'sys' : '');
+    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}. Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. What you say on air happens to the Hearts you carry.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
+    const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
+    const lead = `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
+    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'perk') {
-    return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
+    return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'rune') return enchantSheet(p.mods, 'rune');
   if (p.type === 'evo') {
@@ -908,8 +1079,21 @@ function pendingSheet() {
 }
 function enchantSheet(mods, from) {
   const sel = ui.enchantSel;
+  // Corrupt: the two rolled results, once a skill is picked (kept on the run, so leaving and coming back can't reroll them)
+  if (from !== 'rune' && run.corrupting) {
+    const c = run.corrupting, f = findPiece(run, c.u);
+    if (f) {
+      const body = `<p class="sh-p">[Corruption in progress: ${esc(SKILLS[f.p.id].name)}. Two outcomes are available. Select one.]</p>` + c.opts.map((o, i) => `<button class="choice glitch ${mainTag(f.p.id)}" data-act="corrupt-do" data-i="${i}">${pieceBody(f.p.id, o.k === 'star' ? Math.min(3, f.p.star + 1) : f.p.star, o.k === 'mod' ? f.p.mods.concat(o.m).slice(-MAX_MODS_CORRUPT) : f.p.mods)}<div class="sr-next">${esc(corruptText(o))}</div></button>`).join('');
+      return sheetWrap('[Corrupt]', body, '', 'sys', true);
+    }
+  }
+  if (sel === 'corrupt') {
+    const list = corruptTargets(run).map(p => { const f = findPiece(run, p.u); return `<button class="choice ${mainTag(p.id)}" data-act="corrupt-pick" data-u="${p.u}">${pieceBody(p.id, p.star, p.mods)}<div class="sr-next">${f.at === 'bench' ? 'On your bench' : 'On your bar'}</div></button>`; }).join('');
+    return sheetWrap('Corrupt which skill?', list, `<button class="btn ghost" data-act="ench-back">Back</button>`, 'sys', true);
+  }
   if (sel == null) {
-    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('');
+    const corruptBtn = from !== 'rune' && corruptTargets(run).length ? `<button class="choice glitch" data-act="ench-mod" data-i="corrupt"><div class="sr-h"><span class="sr-name"><em class="pfx">Corr\u0337upt a skill</em></span></div><div class="sr-desc">Two results are rolled and you keep one: a star, a prefix or a glitch. The skill then takes no more prefixes.</div></button>` : '';
+    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
     return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
   }
   const m = mods[sel];
@@ -944,38 +1128,40 @@ function runCard(s, opts) {
     ${best ? `<div class="rc-l"><span>Best fight</span>${esc(best.name)} in ${best.turns} turn${best.turns === 1 ? '' : 's'}</div>` : ''}
     <div class="rc-l"><span>${opts.erased ? 'Erased by' : 'Hearts'}</span>${opts.erased ? esc(s.cause || 'the System') : `${s.hearts != null ? s.hearts : '?'} of ${s.maxHearts || 10} left`}${lost ? ` · ${lost} lost` : ''}</div></div>`;
 }
+// The opponent's last word on the result sheet (res.foeLine, from FOE_LINES)
+function foeHTML(r) { return r && r.foeLine ? `<p class="sh-p ${/^\[/.test(r.foeLine) ? 'sysl' : 'foe-q'}">${esc(r.foeLine)}</p>` : ''; }
 function resultSheet() {
   const r = ui.result, e = ui.end;
   if (r.rewind) return sheetWrap('[Return by Death]', `<p class="sh-p big">${esc(r.enemy)} kills you. Then the world blinks.</p><p class="sh-p">The fight begins again. Nobody else remembers. Your cheat skill is spent.</p>`, `<button class="btn primary" data-act="rewind">Try again</button>`, 'sys', true);
-  if (e && e.kind === 'spared') return sheetWrap(`[${run.world.name} is spared]`, `<p class="sh-p big">You beat the Final Champion. ${esc(run.world.name)} survives the tournament, and ${esc(run.champ)} joins the Hall of Champions.</p>${recapHTML(r)}<p class="sh-p">The System offers the <b>elite bracket</b>: ${!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A') ? '3 more matches, as befits your rank,' : '2 more matches'} against past winners and the Undefeated. Your world is safe either way. Each elite win earns extra Echoes.</p><p class="sh-p fine">+${e.echoes} Echoes earned.</p>`, `<button class="btn ghost" data-act="end-run">End as champion</button><button class="btn primary" data-act="enter-elite">Enter the elite bracket</button>`, 'win', true);
-  if (e && (e.kind === 'elite-clear' || e.kind === 'elite-fall')) return sheetWrap(e.kind === 'elite-clear' ? '[The Undefeated has fallen]' : '[Elite bracket over]', `<p class="sh-p big">${e.kind === 'elite-clear' ? 'Impossible. The System will need a new record.' : 'You fall in the elite bracket. Your world remains spared.'}</p><p class="sh-p fine">Elite wins: ${run.eliteWins}. +${8 * run.eliteWins} Echoes.</p>`, `<button class="btn primary" data-act="end-run">Finish</button>`, e.kind === 'elite-clear' ? 'win' : '', true);
+  if (e && e.kind === 'spared') return sheetWrap(`[${run.world.name} is spared]`, `<p class="sh-p big">You beat the Final Champion. ${esc(run.world.name)} survives the tournament, and ${esc(run.champ)} joins the Hall of Champions.</p>${foeHTML(r)}${recapHTML(r)}<p class="sh-p">The System offers the <b>elite bracket</b>: ${!run.seed && meta.rank && rankIdx(meta.rank.letter) >= rankIdx('A') ? '3 more matches, as befits your rank,' : '2 more matches'} against past winners and the Undefeated. Your world is safe either way. Each elite win earns extra Echoes.</p><p class="sh-p">[${esc(run.world.name)} will be entered again, eventually. Exhibition wins delay that.]</p><p class="sh-p fine">+${e.echoes} Echoes earned.</p>`, `<button class="btn ghost" data-act="end-run">End as champion</button><button class="btn primary" data-act="enter-elite">Enter the elite bracket</button>`, 'win', true);
+  if (e && (e.kind === 'elite-clear' || e.kind === 'elite-fall')) return sheetWrap(e.kind === 'elite-clear' ? '[The Undefeated has fallen]' : '[Elite bracket over]', `<p class="sh-p big">${e.kind === 'elite-clear' ? 'Impossible. The System will need a new record.' : 'You fall in the elite bracket. Your world remains spared.'}</p>${foeHTML(r)}<p class="sh-p fine">Elite wins: ${run.eliteWins}. +${8 * run.eliteWins} Echoes.</p>`, `<button class="btn primary" data-act="end-run">Finish</button>`, e.kind === 'elite-clear' ? 'win' : '', true);
   const steps = eraseSteps(r);
-  if (e && e.kind === 'erased') return sheetWrap('[Eliminated]', `<p class="sh-p big">${esc(r.enemy)} wins. ${esc(e.snap.worldName)} has no Hearts left.</p>${eraseRows(steps)}${steps.length ? '' : lastTurnsHTML() + recapHTML(r)}<p class="sh-p">${esc(e.snap.worldName)} will be erased, and ${esc(e.snap.champ)} will join the Hall of the Erased. They may return to face you.</p>`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Accept</button>`), 'lose', true);
+  if (e && e.kind === 'erased') return sheetWrap('[Eliminated]', `<p class="sh-p big">${esc(r.enemy)} wins. ${esc(e.snap.worldName)} has no Hearts left.</p>${foeHTML(r)}${eraseRows(steps)}${steps.length ? '' : lastTurnsHTML() + recapHTML(r)}<p class="sh-p">${esc(e.snap.worldName)} will be erased, and ${esc(e.snap.champ)} will join the Hall of the Erased. They may return to face you.</p>`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Accept</button>`), 'lose', true);
   const lines = [];
   if (r.won) lines.push(`+${r.gold} gold · healed 30%`);
   if (!r.won && !run.elite) lines.push(`A piece of ${esc(run.world.name)} is erased: −${r.heartsLost} Heart${r.heartsLost > 1 ? 's' : ''}. ${run.hearts} left. ${ui.fight && ui.fight.spec.kind === 'final' ? 'You must face the Final Champion again.' : 'The tournament moves on.'}`);
   // erase lines become rows, and the defeat lines repeat the summary above
   const shown = r.msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text));
   const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
-  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p><p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
 // Progress to the next level: every 2 points bought is a level
 function lvFill() { return run.level >= 9 ? 100 : (run.bought || 0) % 2 * 50; }
+// A collapsed section of a sheet: the heading is the tap target
+function sec(title, html, open) { return `<details class="ssec"${open ? ' open' : ''}><summary>${title}</summary><div class="ssec-b">${html}</div></details>`; }
 function statsSheet() {
   const s = effStats(run), p = buildPlayer(run), train = ui.screen === 'shop', pr = pointPrice(run);
-  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small><small class="face">${faceTag(k, s[k])}</small></span><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small> (${run.stats[k]})</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
+  const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><details class="st-n"><summary>${STAT_INFO[k].name}</summary><small>${STAT_INFO[k].short}</small><small class="face">${faceTag(k, s[k])}</small></details><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
   const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g] || 0} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, (run.favour[g] || 0) / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
   const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : train ? `<p class="sh-p">Train a stat: ${pr} gold a point, you have ${run.gold}. Every 2 points is a level: +4 Max HP and rarer pieces in the shop.</p>` : `<p class="sh-p fine">Train stats with gold in the shop.</p>`}${rows}
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
-    <h4>Stat milestones</h4><ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>
-    <h4>Title</h4>${titleList()}
-    <h4>System quests</h4>${questList()}
-    ${run.hiddenPath ? `<h4>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</h4><p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>` : ''}
-    <h4>Gifts</h4><ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>
-    <h4>World · ${esc(run.world.name)}</h4><p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>
-    <h4>Sponsors</h4>${gods}`;
+    ${sec('Stat milestones', `<ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>`)}${sec('Title', titleList())}${sec('System quests', questList(), true)}
+    ${run.hiddenPath ? sec(`Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}`, `<p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>`) : ''}
+    ${sec('Gifts', `<ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>`)}
+    ${sec(`World · ${esc(run.world.name)}`, `<p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>`)}
+    ${sec('Sponsors', gods)}`;
   return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function titleList() {
@@ -988,15 +1174,9 @@ function questList() {
   const hidden = run.quests.filter(q => QUESTS[q.id].hidden && !q.done).length;
   return `<ul class="msgs">${qs.map(q => { const Q = QUESTS[q.id]; return `<li class="${q.failed ? 'unk' : q.done ? 't-loot' : ''}"><b>${q.done ? '✓ ' : q.failed ? '✗ ' : ''}${esc(Q.text)}</b> <small>${Q.goal > 1 && !q.done ? `${q.prog}/${Q.goal} · ` : ''}Reward: ${esc(outcomeText(Q.reward))}</small></li>`; }).join('')}${hidden ? `<li class="unk">[${hidden} hidden quest${hidden > 1 ? 's' : ''}: ???]</li>` : ''}</ul>`;
 }
-function questLine() {
-  const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed);
-  if (!q) return '';
-  const Q = QUESTS[q.id];
-  return `<button class="qline" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span>${esc(Q.text)}</span><b>${Q.goal > 1 ? `${q.prog}/${Q.goal}` : ''}</b></button>`;
-}
 function archetypesSheet() {
   const c = runCounts(run);
-  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b>${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${esc(b)}</div>`).join('')}</div>`; }).join('');
+  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> ${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${esc(b)}</div>`).join('')}</div>`; }).join('');
   const hp = run.hiddenPath ? `<div class="archrow hidden"><div class="ar-h"><b>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</b></div><div class="ar-b on">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</div></div>` : '<p class="sh-p fine">Reach 4 pieces in two archetypes at once to unlock a Hidden Path.</p>';
   return sheetWrap('Archetypes this run', `<p class="sh-p fine">Equipped pieces (skill bar and gear) count. Each different piece counts once; pieces with two tags count for both. At 4, the System names your path.</p>${body}${hp}<h4>Reactions</h4><ul class="msgs">${Object.values(REACTIONS).map(R => `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>`).join('')}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
@@ -1013,9 +1193,51 @@ function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key =
 function screenLine() { const s = screenInfo(); return `[Display: ${innerWidth}×${s.vh} of ${s.sh} · insets ${Math.round(s.top)}/${Math.round(s.bottom)}${s.standalone ? ' · app' : ''}${document.documentElement.style.getPropertyValue('--app-h') ? ' · stretched' : ''}]`; }
 function menuSheet() {
   const cs = !cloud.on ? (FIREBASE ? '' : 'Progress is saved on this device only.') : cloud.syncOff ? 'Signed in, but your access level cannot save to the account. Progress stays on this device.' : 'Progress syncs to your account across devices.';
-  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}<br><span class="scr-info">${screenLine()}</span></p><div class="stack"><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button><button class="btn" data-act="report">Report a bug or idea</button>
+  return sheetWrap('Menu', `${cloudSignInHTML(false)}<p class="sh-p fine">${cs}${cloud.on && cloud.shared.length ? ` ${cloud.shared.length} shared champion${cloud.shared.length > 1 ? 's' : ''} from other entrants.` : ''}</p><div class="stack"><button class="btn" data-act="sheet" data-s="settings">Settings</button><button class="btn" data-act="sheet" data-s="howto">How to play</button>${run ? '<button class="btn" data-act="sheet" data-s="archetypes">Archetypes and reactions</button><button class="btn" data-act="sheet" data-s="syslog">System log</button>' : ''}<button class="btn" data-act="sheet" data-s="archive">Archive</button><button class="btn" data-act="sheet" data-s="halls">Halls</button><button class="btn" data-act="report">Report a bug or idea</button>
     ${ui.screen === 'fight' ? `<div class="speed" role="group" aria-label="Animation speed">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : ''}" data-act="speed" data-v="${v}">${v}×</button>`).join('')}</div>` : ''}
     ${run ? (ui.confirmAbandon ? `<button class="btn danger" data-act="abandon-yes">Confirm: erase ${esc(run.world.name)}</button>` : `<button class="btn ghost danger-t" data-act="abandon">Abandon run</button>`) : ''}</div>`, false);
+}
+// One-time System hints (#18): the first time a system shows up in a real run, the System explains it once.
+// Never in the practice run (the tutorial covers it there). Seen hints are kept in meta.hints.
+const HINTS = [
+  { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
+  { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into stat points. Every 2 points is a level: more HP and rarer pieces.]' },
+  { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. Damage past Block fills it. Full, they are Broken: a lost turn and 50% more damage.]" },
+  { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
+];
+function hintHTML() {
+  if (!run || run.practice || ui.coach || ui.sheet || (run.pending && run.pending.length && ui.screen !== 'fight')) return '';
+  meta.hints = meta.hints || {};
+  const h = HINTS.find(x => x.scr === ui.screen && !meta.hints[x.k] && x.when());
+  if (!h) return '';
+  ui.hint = h.k;
+  // Board screens show it as a strip under the top strip (moved there by render), so it never covers a choice
+  if (['choose', 'shop', 'district'].includes(ui.screen)) return `<div class="coach hint pos-strip" role="status"><p><span class="eyebrow">[System hint]</span> ${esc(h.text)}</p><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
+  return `<div class="coach hint pos-${ui.screen === 'fight' ? 'mid' : 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[System hint]</span></div><p>${esc(h.text)}</p><div class="co-f"><span></span><button class="btn small primary" data-act="hint-ok">Understood</button></div></div>`;
+}
+// Hints inside events: what a % means, and how a Fate crisis resolves
+function eventHint(E, hasRoll) {
+  if (run.practice) return '';
+  meta.hints = meta.hints || {};
+  if (E.crisis && !meta.hints.crisis) return '<p class="sh-p fine sysl">[Hint: answer the Fate twice and it is lifted. Use it twice and it is sealed.]</p>';
+  if (hasRoll && !meta.hints.roll) return '<p class="sh-p fine sysl">[Hint: a % is your chance of success. Your stats raised it. Failing still does something.]</p>';
+  return '';
+}
+// Settings (#16): kept on this device in js/sfx.js
+function settingsSheet() {
+  const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button class="btn small ${SET[key] === v ? 'primary' : 'ghost'}" data-act="set" data-k="${key}" data-v="${v}" aria-pressed="${SET[key] === v}">${label}</button>`).join('')}</div>`;
+  const row = (name, hint, ctl) => `<div class="setrow"><div><b>${name}</b>${hint ? `<small>${hint}</small>` : ''}</div>${ctl}</div>`;
+  const speed = `<div class="seg" role="group">${[1, 2, 3].map(v => `<button class="btn small ${ui.speed === v ? 'primary' : 'ghost'}" data-act="speed" data-v="${v}" aria-pressed="${ui.speed === v}">${v}×</button>`).join('')}</div>`;
+  const body = `<p class="sh-p sysl">[Preferences are noted. On this device only.]</p>`
+    + row('Look', 'Broadcast is the new look; Classic is the old bronze one.', seg('look', [['broadcast', 'Broadcast'], ['classic', 'Classic']]))
+    + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
+    + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
+    + row('Fight speed', 'How fast turns play out.', speed)
+    + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
+    + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
+    + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
+    + '<p class="sh-p fine">On a keyboard: number keys pick choices and skills, Enter presses the main button, Escape closes, S opens Stats and L the System log.</p>';
+  return sheetWrap('Settings', body, '<button class="btn primary" data-act="close">Done</button>', 'settings');
 }
 const FB_LABEL = { bug: 'Bug', idea: 'Idea', balance: 'Balance', other: 'Other' };
 function reportSheet() {
@@ -1074,12 +1296,15 @@ function archiveSheet() {
   const hidden = Object.entries(HIDDEN_PATHS).filter(([k]) => A.hidden && A.hidden[k]).map(([k, H]) => `<li><b>${esc(H.name)}</b> (${k.split('+').map(x => ARCH[x].name).join(' + ')}): ${esc(H.desc)}</li>`).join('');
   const nh = Object.keys(HIDDEN_PATHS).length, fh = Object.keys(A.hidden || {}).length;
   const quests = Object.entries(QUESTS).filter(([k, Q]) => Q.hidden).map(([k, Q]) => A.quests && A.quests[k] ? `<li><b>${esc(Q.text)}</b></li>` : '<li class="unk">Hidden quest: ???</li>').join('');
-  const rivals = RIVALS.map(k => A.rivals[k] ? `<li><b>${esc(ENEMIES[k].name)}</b>: ${esc(ENEMIES[k].style)}. Skills: ${ENEMIES[k].skills.map(s => esc(s.n)).join(', ')}.</li>` : `<li class="unk">Unknown rival</li>`).join('');
-  const finals = Object.keys(ENEMIES).filter(k => ENEMIES[k].final).map(k => A.finals[k] ? `<li><b>${esc(ENEMIES[k].name)}</b>: ${esc(ENEMIES[k].style)}.</li>` : `<li class="unk">Unknown Final Champion</li>`).join('');
+  const arch = k => A.beat[k] && FOE_LINES[k] && FOE_LINES[k].archive ? `<br><small>${esc(FOE_LINES[k].archive)}</small>` : '';
+  const rivals = RIVALS.map(k => A.rivals[k] ? `<li><b>${esc(ENEMIES[k].name)}</b>: ${esc(ENEMIES[k].style)}. Skills: ${ENEMIES[k].skills.map(s => esc(s.n)).join(', ')}.${arch(k)}</li>` : `<li class="unk">Unknown rival</li>`).join('');
+  const finals = Object.keys(ENEMIES).filter(k => ENEMIES[k].final).map(k => A.finals[k] ? `<li><b>${esc(ENEMIES[k].name)}</b>: ${esc(ENEMIES[k].style)}.${arch(k)}</li>` : `<li class="unk">Unknown Final Champion</li>`).join('');
   const rx = Object.entries(REACTIONS).map(([k, R]) => A.reactions[k] ? `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>` : `<li class="unk">Undiscovered reaction</li>`).join('');
   const paths = ARCH_KEYS.map(k => A.paths[k] ? `<li><b>${ARCH[k].path}</b> (${ARCH[k].name})</li>` : '').join('');
   const evos = Object.keys(A.evos).map(k => { const [a, b] = k.split('>'); return SKILLS[a] && SKILLS[b] ? `<li>${esc(SKILLS[a].name)} → <b>${esc(SKILLS[b].name)}</b></li>` : ''; }).join('');
-  return sheetWrap('Tournament Archive', `<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
+  const iss = A.issues || {}, ni = KNOWN_ISSUES.filter(K => iss[issueKey(K)]).length;
+  const issues = KNOWN_ISSUES.map(K => iss[issueKey(K)] ? `<li class="glitch"><b>${esc(issueName(K))}</b>: [${esc(K.text)}]</li>` : '<li class="unk">[Issue not yet reproduced.]</li>').join('');
+  return sheetWrap('Tournament Archive', `<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul><h4>Known Issues · ${ni} of ${KNOWN_ISSUES.length}</h4><ul class="msgs">${issues}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Entrant Rank in the Halls: grade, RP to the next trial, perks and one line per promotion
 function rankHTML() {
@@ -1110,7 +1335,7 @@ function endHTML() {
   const e = ui.end, s = e.snap;
   const erased = e.kind === 'erased';
   const lines = (e.observed ? [e.observed] : []).concat(erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`].concat(e.filed ? [`[${s.worldName}'s records remain on file.]`] : []).concat(e.opened ? [] : ['[Next world.]']) : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`], e.opened ? [`[Rank Trial unlocked: ${e.opened}-rank. It waits in your next world.]`] : []);
-  return `<main class="screen title end"><div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
+  return `<main class="screen title end ${erased ? 'erased' : 'spared'}">${broadcastTicker(erased ? `++ BREAKING +++ [Entrant eliminated. ${s.worldName} is erased.] +++` : `++ LIVE +++ [${s.worldName} is spared.] +++`)}<div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
     ${runCard(s, { erased, big: true })}</div>
     <div class="t-stats"><div><b>${s.round}</b><span>round</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div><div><b>+${e.rp || 0}</b><span>RP</span></div></div>
@@ -1139,15 +1364,20 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
   if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
-  app.innerHTML = h + sh + coachHTML();
+  if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
+  ui.hint = null;
+  app.innerHTML = h + sh + coachHTML() + hintHTML();
+  const hs = app.querySelector('.coach.pos-strip'), stp = app.querySelector('.strip'); if (hs && stp) stp.after(hs);
+  applyMoment();
   coachHighlight();
   if (scr === 'fight') updateFight();
+  fitNames();
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
   if (fbFocus) { const el = document.getElementById('fb-text'); if (el) { el.focus(); el.setSelectionRange(fbFocus[0], fbFocus[1]); } }
@@ -1163,7 +1393,7 @@ function onAct(el) {
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-row': ui.sheet = { type: 'dailycmp', i: +d.i }; return render();
-    case 'resume': run = lsGet(RUN_KEY); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
+    case 'resume': run = lsGet(RUN_KEY); registerGlitchGear(run); ensureRecord(run); ui.pick = null; ui.wagerOn = false; return go(stageScreen());
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
     case 'pick-world': ui.world = +d.i; return render();
@@ -1202,6 +1432,8 @@ function onAct(el) {
     case 'fb-type': ui.fb.type = d.k; return render();
     case 'fb-send': return sendReport();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
+    case 'hint-ok': if (ui.hint) { meta.hints = meta.hints || {}; meta.hints[ui.hint] = true; saveMeta(); } return render();
+    case 'set': { const k = d.k, v = d.v === 'true' ? true : d.v === 'false' ? false : /^\d+$/.test(d.v) ? +d.v : d.v; SET[k] = v; saveSettings(); REDUCED = reducedMotion(); if (k === 'vol' && v) sfx('tap'); if (k === 'vib' && v) sfx('hit'); return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
     case 'speed-cycle': ui.speed = ui.speed >= 3 ? 1 : ui.speed + 1; lsSet('wpd-speed', ui.speed); return render();
     case 'signin': { const C = window.WPD_CLOUD; if (!C) return; C.signIn(d.k).catch(e => toast(`[Sign-in failed: ${(e && e.message) || 'unknown error'}]`, 'loss')); return; }
@@ -1222,7 +1454,7 @@ function onAct(el) {
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
-    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
+    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
     case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs); saveRun(); } return render();
@@ -1236,6 +1468,7 @@ function onAct(el) {
     case 'shop-done': { if (benchOver()) return render(); if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
+      if (k === 'undercity') { const p = run.pending[run.pending.length - 1]; if (p && p.type === 'event') p.from = 'undercity'; }
       if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
       if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
@@ -1243,17 +1476,30 @@ function onAct(el) {
       if (k === 'enchanter') { ui.enchantMods = rollPrefixes(enchantCount(run), null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
       saveRun(); return render();
     }
-    case 'event': { const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i); if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; } run.pending.shift(); pushMsgs(msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }]); saveRun(); saveMeta(); return render(); }
+    case 'event': {
+      const p = run.pending[0]; if (!p || p.type !== 'event') return; const o = eventOpt(run, p.key, +d.i), before = evSnap(run), scr0 = ui.screen;
+      if (!resolveEvent(run, p.key, +d.i, meta, null, msgs)) { toast('[Not possible.]', 'loss'); return; }
+      if (!run.practice) { const E = EVENTS[p.key] || {}; meta.hints = meta.hints || {}; if (E.crisis) meta.hints.crisis = true; if (o.roll) meta.hints.roll = true; }
+      run.pending.shift(); saveRun(); saveMeta();
+      const lines = msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }];
+      // The outcome stays in the event until Continue; if the event moved the game on (run over, a new screen), toasts as before
+      if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines); return render(); }
+      lines.forEach(m => logRun(m.text, m.t));
+      ui.sheet = { type: 'evresult', title: (EVENTS[p.key] || {}).title || '[Event]', label: o.label, lines, changes: evDiff(before, run) };
+      return render();
+    }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
-    case 'ench-mod': ui.enchantSel = +d.i; return render();
+    case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
+    case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
+    case 'corrupt-do': { const c = run.corrupting; if (c && corrupt(run, c.u, c.opts[+d.i], msgs)) pushMsgs(msgs); run.corrupting = null; ui.sheet = null; saveRun(); return render(); }
     case 'ench-back': ui.enchantSel = null; return render();
     case 'ench-skip': { ui.enchantSel = null; if (ui.sheet) ui.sheet = null; else if (run.pending[0] && run.pending[0].type === 'rune') run.pending.shift(); saveRun(); return render(); }
     case 'ench-apply': {
       const fromRune = !ui.sheet && run.pending[0] && run.pending[0].type === 'rune';
       const mods = fromRune ? run.pending[0].mods : ui.enchantMods, m = mods[ui.enchantSel];
       const f = findPiece(run, +d.u);
-      if (f && applyPrefix(run, +d.u, m)) toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill');
+      if (f && applyPrefix(run, +d.u, m, msgs)) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill'); pushMsgs(msgs); }
       ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
     }
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
@@ -1366,6 +1612,11 @@ function practiceDoneSheet() {
   return sheetWrap('[Practice complete]', `<p class="sh-p big">That is the loop: choose an opponent, shop, visit a district, fight.</p>
     <ul class="msgs plain"><li>A real tournament has 8 rounds and a Final Champion for each world.</li><li>You'll also meet Titles, System quests, Hidden Paths, event chains and the Additional Gift after round 4.</li><li>Lose all your Hearts and your world is erased; its champion will come back to face you.</li></ul>
     <p class="sh-p fine">${meta.tutorialDone ? 'You can replay the practice run from the title screen.' : '+5 Echoes for finishing.'}</p>`, `<button class="btn ghost" data-act="practice-end">Title screen</button><button class="btn primary" data-act="practice-tournament">Enter the tournament</button>`, 'win', true);
+}
+// "Noticed": what the System's attention does, in its own voice
+function noticeSheet() {
+  const step = Math.round(TUNE.notice * 100), max = Math.round(TUNE.notice * TUNE.noticeMax * 100);
+  return sheetWrap('[You have been Noticed]', `<div class="sysbox"><p>[Straight wins attract attention. Each one makes your opponents hit ${step}% harder, up to ${max}%.]</p><p>[Currently: +${noticePct(run)}%.]</p><p>[Lose a Heart and the System loses interest. This is not a suggestion.]</p></div>`, '<button class="btn primary" data-act="close">Understood</button>');
 }
 function firstTimeSheet() {
   return sheetWrap('[New entrant detected]', `<p class="sh-p big">First time in the tournament?</p><p class="sh-p">The practice run teaches the basics in 3 short rounds with the System guiding you. It takes about 5 minutes and you can skip it at any point.</p>`, `<button class="btn ghost" data-act="skip-practice">Skip, enter the tournament</button><button class="btn primary" data-act="practice">Practice run</button>`, 'sys');
@@ -1564,11 +1815,26 @@ const POOL_ECHOES = 2; // Echoes for each time one of your filed records beats a
 function poolLoad() {
   if (!run || !run.choices || !cloud.on || !cloud.db || !cloud.uid || cloud.poolOff) return;
   run.choices.forEach(spec => {
+    if (spec.kind === 'final' && spec.pool && !spec.read) return finalLoad(spec);
     if (spec.kind !== 'entrant' || spec.read) return;
     const key = spec.round + '_' + spec.slot; if (poolBusy[key]) return;
     poolBusy[key] = true;
     poolRead(spec, run).finally(() => { delete poolBusy[key]; });
   });
+}
+// The final's finalist: list the round's filed records once, and take one from a world of the paired type
+function finalLoad(spec) {
+  const key = 'final_' + spec.round; if (poolBusy[key]) return;
+  poolBusy[key] = true; const r = run;
+  (async () => {
+    let docs = [];
+    try { const qs = await cloud.db.collection('pool').query({ where: ['r', '==', spec.round], limit: POOL_SIZE }); docs = qs.docs.map(d => ({ id: d.id, data: d.data() })); }
+    catch (e) { if (e && e.code === 'invalid_argument') cloud.poolOff = true; console.warn('[cloud] list final pool failed:', e && e.code, e); return; }
+    if (run !== r || r.stage !== 'choose' || !r.choices.includes(spec)) return;
+    spec.read = true;
+    docs.forEach(d => { if (d.data && d.data.name && d.data.owner) cloud.names[d.data.owner] = String(d.data.name).slice(0, 24); });
+    if (finalFill(spec, docs, cloud.uid)) { saveRun(); if (ui.screen === 'choose') render(); } else saveRun();
+  })().finally(() => { delete poolBusy[key]; });
 }
 async function poolRead(spec, r, retry) {
   let data = null;
@@ -1609,7 +1875,7 @@ function poolFile(res) {
 // and its owner is told.
 function poolHit(h, msgs) {
   const left = Math.max(0, h.hearts - 1);
-  msgs.push(left ? { t: 'sys', text: `[${h.champ}'s round ${h.round} record loses a Heart. ${left} left.]` } : { t: 'broadcast', text: `[${h.champ}'s round ${h.round} record has been erased. One fewer world pending.]` });
+  msgs.push(left ? { t: 'sys', text: `[${h.champ}'s round ${h.round} record loses a Heart. ${left} left.]` } : { t: 'broadcast', text: `[${h.champ}'s round ${h.round} record is erased in this tournament. Outcomes vary.]` });
   const ref = cloud.db.doc('pool/' + poolId(h.round, h.slot));
   (async () => {
     const d = await ref.get(), data = d.exists ? d.data() : null;
@@ -1694,13 +1960,34 @@ function cloudSignInHTML(compact) {
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
-app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) onAct(el); });
+app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) { if (!['use', 'buy', 'quick-buy'].includes(el.dataset.act)) sfx('tap'); onAct(el); } });
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
 app.addEventListener('input', e => { if (e.target.id === 'fb-text' && ui.fb) ui.fb.text = e.target.value; });
 app.addEventListener('change', e => { if (e.target.id === 'fb-attach' && ui.fb) ui.fb.attach = e.target.checked; if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
+// Keyboard (#17): Escape closes, Enter presses the main button, number keys pick the Nth choice on screen
+// (skills in a fight, as before), S opens Stats and L the System log during a run
+const KEY_PICKS = { choose: '[data-act="pick-opp"]', district: '[data-act="district"]', draft: '[data-act="draft-pick"]', worlds: '[data-act="pick-world"]', shop: '.shopgrid [data-act="shop-item"]' };
+function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true }); el.click(); return true; } return false; }
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && ui.sheet && !['result'].includes(ui.sheet.type)) { ui.sheet = null; render(); }
-  if (ui.screen === 'fight' && !ui.sheet && /^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
+  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
+  if (typing) return;
+  const sheet = app.querySelector('.sheet');
+  if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }
+  if (e.key === 'Enter') {
+    if (tgt && tgt.tagName === 'BUTTON' && app.contains(tgt)) return; // the focused button handles its own Enter
+    const main = sheet ? sheet.querySelector('.sh-f .btn.primary') : app.querySelector('main .foot .btn.primary, main .foot2 .btn.primary');
+    if (keyClick(main)) e.preventDefault(); return;
+  }
+  if (/^[1-9]$/.test(e.key)) {
+    const list = sheet ? sheet.querySelectorAll('.choice, .reply') : KEY_PICKS[ui.screen] ? app.querySelectorAll(KEY_PICKS[ui.screen]) : [];
+    if (keyClick(list[+e.key - 1])) e.preventDefault(); return;
+  }
+  if (!sheet && run && ['choose', 'district', 'shop'].includes(ui.screen)) {
+    if (e.key === 's' || e.key === 'S') { ui.sheet = { type: 'stats' }; render(); }
+    else if (e.key === 'l' || e.key === 'L') { ui.sheet = { type: 'syslog' }; render(); }
+  }
 });
 render();
 maybeShowNews();

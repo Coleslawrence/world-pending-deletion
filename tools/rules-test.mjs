@@ -151,7 +151,8 @@ await check('signed out listing is refused', assertFails(getDocs(query(collectio
 await check('a non-tester cannot file', assertFails(setDoc(poolRef(erin, '3_18'), filed('erin'))));
 await check('filing under someone else is refused', assertFails(setDoc(poolRef(bob, '3_18'), filed('alice'))));
 await check('slot 31 is refused', assertFails(setDoc(poolRef(alice, '3_31'), filed('alice'))));
-await check('round 8 is refused', assertFails(setDoc(poolRef(alice, '8_1'), filed('alice', { r: 8 }))));
+await check('round 8 (finalists) is fine', assertSucceeds(setDoc(poolRef(alice, '8_1'), filed('alice', { r: 8, snap: Object.assign({}, poolBuild, { round: 8 }) }))));
+await check('round 9 is refused', assertFails(setDoc(poolRef(alice, '9_1'), filed('alice', { r: 9, snap: Object.assign({}, poolBuild, { round: 9 }) }))));
 await check('slot 30 is fine', assertSucceeds(setDoc(poolRef(alice, '3_30'), filed('alice'))));
 await check('a build from another round is refused', assertFails(setDoc(poolRef(alice, '4_1'), filed('alice', { r: 4 }))));
 await check('a round field that does not match the slot is refused', assertFails(setDoc(poolRef(alice, '3_1'), filed('alice', { r: 4 }))));

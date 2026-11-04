@@ -12,6 +12,8 @@
     id: path.split('/').pop(), path,
     get: async () => { try { const s = await api.getDoc(api.doc(api.fs, path)); return { id: s.id, exists: s.exists(), data: () => s.data() }; } catch (e) { throw mapErr(e); } },
     set: async d => {
+      // The dev preview (js/preview.js) never writes: no cloud save, scores, pool records, run stats or reports
+      if (window.WPD_PREVIEW) return;
       // Other players read this name, so it is the name the player chose in game, never one from their account.
       // A pool record keeps its owner's name when someone else takes one of its Hearts.
       if (me && (/^(champions|rests|inbox)\//.test(path) || (/^pool\//.test(path) && d.owner === me.uid))) d = Object.assign({}, d, { name: publicName() });

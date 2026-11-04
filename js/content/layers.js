@@ -86,7 +86,12 @@ const FATES = {
       { k: 'custom', tier: 'city', name: 'Crossing Day', text: 'Families on the wrong side of a new crack get one day to jump.' },
       { k: 'person', tier: 'city', name: 'The Rift Surveyor', text: 'Measures the cracks every dawn. Has stopped telling anyone the numbers.' },
     ] },
-  goldenage: { name: 'A Golden Age', line: 'Nothing was wrong at all. It was entered anyway.', crises: ['crisis_goldenage_1', 'crisis_goldenage_2'],
+  goldenage: { name: 'A Golden Age', line: 'Nothing was wrong at all. It was entered anyway.',
+    // lineBy: the line for a world type whose own flavour already says something is wrong (fateLine)
+    lineBy: { drowned: 'The isles stopped sinking for a whole year. It was entered anyway.', burning: 'The war paused for a harvest festival. It was entered anyway.',
+      hollow: 'The dead have rested for a whole season. It was entered anyway.', verdant: 'The forest has not eaten anyone in years. It was entered anyway.',
+      sky: 'No city has fallen from the sky in a generation. It was entered anyway.', iron: 'The siege lifted last spring. It was entered anyway.',
+      steppes: 'The storm has been almost gentle lately. It was entered anyway.' }, crises: ['crisis_goldenage_1', 'crisis_goldenage_2'],
     ends: { lifted: 'still nothing wrong. The System has stopped checking.', sealed: 'the festival square is ash. Something is finally wrong.' }, mods: { golden: 9, none: 3 },
     stages: ['the festival has a new song. It is about you.', 'still nothing wrong. The System is checking again.'],
     promises: ['keep things exactly as they are', 'come home in time for the festival'],
@@ -96,6 +101,8 @@ const FATES = {
       { k: 'person', tier: 'city', name: 'The Retired General', text: 'Never fought a battle. Writes very good poems about it.' },
     ] },
 };
+// A Fate's line for a world type: its lineBy entry for that type, else its line
+function fateLine(F, type) { return (F.lineBy && F.lineBy[type]) || F.line; }
 const PEOPLES = {
   // roles follow "You were a ...", so each starts with a consonant sound; epithets follow a champion's name
   temple: { name: 'Temple State', line: 'Ruled by priests, who rule by omens.',
@@ -114,7 +121,7 @@ const PEOPLES = {
       { k: 'custom', tier: 'city', name: 'The Guild Seal', text: 'Nothing is legal without one. Seals are sold separately.' },
       { k: 'person', tier: 'city', name: 'The Guildmaster', text: 'Owns a share of everything, including you.' },
     ] },
-  clans: { name: 'The Clans', line: 'Twelve clans, one old feud, and a council that never ends.',
+  clans: { name: 'The Clans', clash: ['steppes'], line: 'Twelve clans, one old feud, and a council that never ends.',
     custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' },
     roles: ['clan runner', 'feud keeper'], epithets: ['of the Twelve', 'the Feud-Born'],
     entries: [
@@ -130,7 +137,8 @@ const PEOPLES = {
       { k: 'custom', tier: 'city', name: 'Examination Day', text: 'Every adult sits the exams again each year. Failing is public.' },
       { k: 'person', tier: 'city', name: 'The Chief Librarian', text: 'Has read everything. Has opinions about all of it.' },
     ] },
-  council: { name: 'Free Council', line: 'No kings. Every question goes to a vote, eventually.',
+  // clash: world types whose own rulers this People contradicts; such a world opens with a power struggle (events/peoples.js)
+  council: { name: 'Free Council', clash: ['iron', 'burning'], line: 'No kings. Every question goes to a vote, eventually.',
     custom: { name: 'The Long Vote', text: 'In round 2 the Council votes on a Tournament Amendment. You get a vote.' }, visit: { at: 2, event: 'council_vote' },
     roles: ['ward speaker', 'ballot counter'], epithets: ['the Elected', 'the Free'],
     entries: [
@@ -138,7 +146,7 @@ const PEOPLES = {
       { k: 'custom', tier: 'city', name: 'The Long Vote', text: 'The vote on the new town clock has run for nine years.' },
       { k: 'person', tier: 'city', name: 'The Speaker', text: 'Chosen by lot. Still trying to give the job back.' },
     ] },
-  crown: { name: 'The Old Crown', line: 'A dynasty older than the maps, and still in charge.',
+  crown: { name: 'The Old Crown', clash: ['burning', 'iron'], line: 'A dynasty older than the maps, and still in charge.',
     custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' },
     roles: ['palace page', 'royal taster'], epithets: ['the Loyal', 'the Crown-Sworn'],
     entries: [
@@ -147,7 +155,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Old Monarch', text: 'Has reigned so long the coins show them at three ages.' },
     ] },
   exiles: { name: 'Exiles', line: 'Descended from refugees of a world already erased.',
-    custom: { name: 'Kin of the erased', text: 'Beat an Erased champion or a filed record and get a Heart back.' },
+    custom: { name: 'Salvage Rights', text: 'Beat an Erased champion or a filed record and get a Heart back.' },
     roles: ['refugee scout', 'name keeper'], epithets: ['the Displaced', 'of No Shore'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Landing', text: 'Where the first refugees arrived. Their boats are kept as a monument.' },

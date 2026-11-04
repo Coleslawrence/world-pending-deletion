@@ -1,4 +1,6 @@
 const G = require('../js/core.js');
+// Glitched prefixes cost the System's notice, so the bot only takes one when no normal prefix fits
+const glitchLast = ms => ms.filter(m => !G.PREFIXES[m].glitch).concat(ms.filter(m => G.PREFIXES[m].glitch));
 const RV = { E: 1, D: 2, C: 3, B: 4, A: 5, S: 6 };
 function choosePlayer(f) {
   const A = f.A, B = f.B, ready = A.skills.map((s, i) => ({ s, i })).filter(x => G.canUse(x.s));
@@ -8,6 +10,7 @@ function choosePlayer(f) {
   ready.forEach(({ s, i }) => {
     const fx = s.def.fx, p = s.power;
     let sc = ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) * 1.6 + (fx.poison || 0) * 2.5 + (fx.bleed || 0) * 1.5 + (fx.detonate ? B.burn * fx.detonate : 0) + (fx.malice ? fx.malice * 2 : 0) + (fx.blockDmg ? A.block * fx.blockDmg : 0) + (fx.brk || 0) * 0.6) * p;
+    if (fx.replay) sc = f.lastPlayerSkill ? 15 * p : 0; // Error: worth a strong skill once there's one to repeat
     // Press a nearly broken guard: a hit that breaks it costs the opponent its turn
     if (B.breakMax && ((fx.dmg || 0) * (fx.hits || 1) + (fx.brk || 0)) * p >= B.breakMax - B.brk) sc += 12;
     if (fx.execute && B.hp / B.maxHp <= fx.execute) sc *= fx.execMult;
@@ -97,7 +100,7 @@ function shop(run, meta, opts) {
 function pending(run, meta) {
   while (run.pending.length) {
     const p = run.pending.shift();
-    if (p.type === 'rune') { for (const m of p.mods) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    if (p.type === 'rune') { for (const m of glitchLast(p.mods)) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
     if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
@@ -144,7 +147,7 @@ function playRun(meta, verbose, opts = {}) {
     pending(run, meta);
     if (k === 'infirmary') G.infirmary(run);
     if (k === 'sanctum') G.sanctum(run);
-    if (k === 'enchanter') { const ms = G.rollPrefixes(G.districtUp(run, 'enchanter') ? 4 : 3, null, null, run); for (const m of ms) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    if (k === 'enchanter') { const ms = G.rollPrefixes(G.districtUp(run, 'enchanter') ? 4 : 3, null, null, run); for (const m of glitchLast(ms)) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     shop(run, meta, { reroll: true, xp: true, picky: opts.picky });
     pending(run, meta); arrange(run);
     if (opts.snap) opts.snap('shop', run);

@@ -3,6 +3,8 @@
 // Oaken Tower style: you answer the trouble (pay now, the Fate eases) or use it (power now, the Fate worsens).
 // The Fate track runs from -2 (sealed) to +2 (lifted); FATES[x].crises in layers.js lists the two events, and
 // FATES[x].ends the closing line for each ending. Crisis events never turn up in the Undercity.
+// The fiction (lore audit, 2 Nov): the System airs the crisis live, your choice is what you say on air, and it plays out
+// on the Hearts you carry, which are real pieces of your world.
 // Each crisis keeps one option with no price ("use it"), so there is always something to pick.
 // Numbers are first drafts: balance is deferred to the single balance pass.
 'use strict';
@@ -12,7 +14,7 @@ const liftMod = (run, h, m) => { if (run.world.mod === m) h.apply({ mod: 'none' 
 // The Long Night: Hearts and the Record
 EVENTS.crisis_longnight_1 = { crisis: true, fate: 'longnight', title: 'The Candles Run Low', text: run => `${run.world.name} enters its twelfth year without a sunrise. The Lamp Ward has three nights of oil left.`, opts: [
   { label: 'Buy lamp oil', desc: 'Pay 8 gold. Keep the Lamp Ward lit.', pay: 8, then: { ward: 1, fate: 1 }, go: (run, h) => h.say('[Oil delivered. The Lamp Ward stays lit. Something there is watching over you.]') },
-  { label: 'Stand watch all night', desc: 'Someone has to keep the fires going.', then: { next: { weaken: 2 }, fate: 1 }, go: (run, h) => h.say('[You kept the fires lit until dawn. Dawn did not come. You start your next fight Weakened for 2 turns.]') },
+  { label: 'Keep watch on air', desc: 'Stay up with them all night, live.', then: { next: { weaken: 2 }, fate: 1 }, go: (run, h) => h.say('[You kept them company on air until dawn. Dawn did not come. You start your next fight Weakened for 2 turns.]') },
   { label: 'Sell the candles', desc: 'They fetch a good price in the dark.', then: { gold: 12, fate: -1 }, go: (run, h) => h.say('[Sold. +12 gold. Behind you, one window goes dark, then another.]') }] };
 EVENTS.crisis_longnight_2 = { crisis: true, fate: 'longnight', title: 'The Dark Holds', text: run => `The last lamp oil in ${run.world.name} has been shared out. People sit together in the dark and listen for news of you.`, opts: [
   { label: 'Light the last lamps', desc: 'Pay 12 gold. Every window you can.', pay: 12, then: { restore: 1, fate: 1 }, go: (run, h) => h.say('[Lamps lit. In the light, people find what they thought was lost.]') },
@@ -22,7 +24,7 @@ EVENTS.crisis_longnight_2 = { crisis: true, fate: 'longnight', title: 'The Dark 
 // The Grey Plague: Poison
 EVENTS.crisis_plague_1 = { crisis: true, fate: 'plague', title: 'The Grey Mark', text: run => `The Grey Plague has reached the capital of ${run.world.name}. The Plague Doctor has a new cure to try, and nobody to pay for it.`, opts: [
   { label: 'Fund the cure', desc: 'Pay 8 gold. The Plague Doctor has a new one.', pay: 8, then: { stats: { VIT: 1 }, fate: 1 }, go: (run, h) => h.say('[The cure half works. That is a first. +1 VIT from the doctor\'s spare tonic.]') },
-  { label: 'Tend the sick yourself', desc: 'You have stood worse than a cough.', then: { next: { poison: 6 }, fate: 1 }, go: (run, h) => h.say('[You carried the sick to the Quarantine Wall. You start your next fight with 6 Poison.]') },
+  { label: 'Hold the sick Heart close', desc: 'You have stood worse than a cough.', then: { next: { poison: 6 }, fate: 1 }, go: (run, h) => h.say('[You held the sick piece of your world close. It held on. You start your next fight with 6 Poison.]') },
   { label: 'Carry it into the arena', desc: 'Let your opponents share it.', then: { always: { foe: { poison: 2 }, next: { poison: 1 } }, fate: -1 }, go: (run, h) => h.say('[Every opponent now starts with 2 Poison. So do you, a little.]') }] };
 EVENTS.crisis_plague_2 = { crisis: true, fate: 'plague', title: 'Half the Doors', text: run => `Half the doors in ${run.world.name} carry the grey mark. The quarantine is failing.`, opts: [
   { label: 'Hold the wall', desc: 'Pay 12 gold. Guards, food and chalk. Lots of chalk.', pay: 12, then: { ward: 1, fate: 1 }, go: (run, h) => h.say('[The wall holds. Your next loss costs no Heart.]') },
@@ -66,17 +68,17 @@ EVENTS.crisis_lastgen_1 = { crisis: true, fate: 'lastgen', title: 'The Youngest 
   { label: 'Spend the future', desc: 'Take what the next generation would have had.', go: (run, h) => { const k = h.pick(STATS); run.stats[k] += 2; h.say(`[+2 ${k}. It was meant for someone else.]`); }, then: { erase: 1, fate: -1 } }] };
 EVENTS.crisis_lastgen_2 = { crisis: true, fate: 'lastgen', title: 'Empty Cradles', text: run => `${run.world.name} has started naming the empty cradles after you. There are a lot of them.`, opts: [
   { label: 'Carve the Naming Stone', desc: 'Pay 12 gold. Make room for new names.', pay: 12, then: { heart: 1, fate: 1 }, go: (run, h) => h.say('[Room made. The Record gains an entry.]') },
-  { label: 'Visit the Silent Nursery', desc: 'It will take the whole night.', then: { restore: 1, next: { weaken: 2 }, fate: 1 }, go: (run, h) => h.say('[You stayed until morning. You start your next fight Weakened for 2 turns.]') },
+  { label: 'Sit with the Silent Nursery', desc: 'Hold its Heart all night, on air.', then: { restore: 1, next: { weaken: 2 }, fate: 1 }, go: (run, h) => h.say('[You stayed until morning. You start your next fight Weakened for 2 turns.]') },
   { label: 'Take their tomorrow', desc: 'There is nobody to give it to.', go: (run, h) => { const a = h.shuffle(STATS.slice()); run.stats[a[0]] += 2; run.stats[a[1]] += 1; h.say(`[+2 ${a[0]}, +1 ${a[1]}. Taken.]`); }, then: { erase: 1, fate: -1 } }] };
 
 // The Sundering: pieces against the Record
 EVENTS.crisis_sundering_1 = { crisis: true, fate: 'sundering', title: 'A New Crack', text: run => `A new crack opened across ${run.world.name} overnight. Families on the wrong side have one day to jump.`, opts: [
   { label: 'Build rope bridges', desc: 'Pay 8 gold. Get everyone across.', pay: 8, then: { ward: 2, fate: 1 }, go: (run, h) => h.say('[Everyone crossed. Your next 2 losses cost no Heart.]') },
-  { label: 'Hold the rift shut', desc: 'With your hands, if needed.', then: { max_hp: -0.05, ward: 1, fate: 1 }, go: (run, h) => h.say('[It closed a little. Your next loss costs no Heart.]') },
+  { label: 'Hold the rift shut', desc: 'Squeeze the cracked Heart with your hands.', then: { max_hp: -0.05, ward: 1, fate: 1 }, go: (run, h) => h.say('[It closed a little. Your next loss costs no Heart.]') },
   { label: 'Push the crack wider', desc: 'Something valuable is falling out.', then: { piece: 'A', erase: 1, fate: -1 }, go: (run, h) => h.say('[You caught it. Something else fell in.]') }] };
 EVENTS.crisis_sundering_2 = { crisis: true, fate: 'sundering', title: 'Two Halves', text: run => `The rift splits ${run.world.name} in two. Both halves are watching you.`, opts: [
   { label: 'Mend the rift', desc: 'Pay 12 gold. Stone, mortar, a lot of workers.', pay: 12, then: { restore: 2, fate: 1 }, go: (run, h) => h.say('[Mended. Some of what fell in has climbed back out.]') },
-  { label: 'Carry the halves together', desc: 'It is very heavy. You are very stubborn.', then: { ward: 2, foe: { trait: 1 }, fate: 1 }, go: (run, h) => h.say('[It holds. Your next 2 losses cost no Heart. Your next opponent saw how tired you are, and has an extra trait.]') },
+  { label: 'Carry the halves together', desc: 'Both halves of its Heart. Very heavy. You are very stubborn.', then: { ward: 2, foe: { trait: 1 }, fate: 1 }, go: (run, h) => h.say('[It holds. Your next 2 losses cost no Heart. Your next opponent saw how tired you are, and has an extra trait.]') },
   { label: 'Split it for good', desc: 'Two worlds. Twice the plunder.', then: { piece: 'A', rune: 1, erase: 1, mod: 'bloodmoon', fate: -1 }, go: (run, h) => h.say('[Split. Everyone is angrier now.]') }] };
 
 // A Golden Age: notice and gold
@@ -87,4 +89,4 @@ EVENTS.crisis_goldenage_1 = { crisis: true, fate: 'goldenage', title: 'The Syste
 EVENTS.crisis_goldenage_2 = { crisis: true, fate: 'goldenage', title: 'A Song About You', text: run => `The festival in ${run.world.name} has a new song. It is about you. The System is listening to it.`, opts: [
   { label: 'Fund the festival', desc: 'Pay 12 gold. Let them sing it louder.', pay: 12, then: { restore: 1, fate: 1 }, go: (run, h) => { h.say('[They sing it louder. The System hums along, by accident.]'); if (run.world.mod === 'none') h.apply({ mod: 'golden' }); } },
   { label: 'Cancel the song', desc: 'Nobody needs to hear it.', then: { notice: -2, max_hp: -0.05, fate: 1 }, go: (run, h) => h.say('[Cancelled. The square is quiet. The System moves on.]') },
-  { label: 'Burn the festival square', desc: 'Give the System its reason.', then: { piece: 'A', notice: 2, fate: -1 }, go: (run, h) => h.say('[It burns well. Nothing in this world will be golden again.]') }] };
+  { label: 'Burn the festival square', desc: 'Hold its Heart to a flame. Give the System its reason.', then: { piece: 'A', notice: 2, fate: -1 }, go: (run, h) => h.say('[It burns well. Nothing in this world will be golden again.]') }] };

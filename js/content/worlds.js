@@ -14,9 +14,11 @@ const LORE = {};
 // What each Final Champion says to an S-rank Entrant, by Final Champion id
 const FINAL_GREET = {};
 const MODIFIERS = {
-  none: { name: 'Clear Skies', desc: 'No modifier.' },
+  none: { name: 'Standard Rules', desc: 'No modifier.' },
   bloodmoon: { name: 'Blood Moon', desc: 'Everyone deals 20% more damage.' },
   famine: { name: 'Famine', desc: 'Healing after fights and at the Infirmary is halved.' },
-  golden: { name: 'Golden Age', desc: '+2 gold every round.' },
+  golden: { name: 'Rich Tithes', desc: '+2 gold every round.' },
   restless: { name: 'Restless Dead', desc: 'Erased champions appear more often.' },
+  // glitch: never in the normal draw. A world offer is sometimes one, and Pending World runs on one each Glitch Day (core.js)
+  corrupted: { name: 'Corrupted Save', desc: 'Glitches turn up twice as often.', glitch: true },
 };

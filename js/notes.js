@@ -5,6 +5,64 @@
 // The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
+    id: '2026-11-04', release: 'wpd-v13', title: "[System Notice: Broadcast Update]", pages: [
+      { h: "On Air", sys: "[The tournament is now broadcast in full. Every screen. All the time.]", items: [
+        "[The interface has been redesigned for viewers. Entrants were not consulted.]",
+        "[The previous look remains under Settings, Look, Classic. For archival purposes.]",
+        "[Your status now fits in one strip. Tap yourself for details. The System already has.]",
+        "[Hints no longer obstruct your choices. They wait their turn.]"] },
+      { h: "Pairing", sys: "[There are more worlds than finals. Worlds will now be judged in pairs.]", items: [
+        "[Your world is paired with another at the start. Its finalist meets you in round 8.]",
+        "[Finalists carry their world's Final Champion. Its power, not its manners.]",
+        "[Win, and the other world is erased in this tournament. Outcomes vary.]",
+        "[Your own finalist is filed. It will defend your world in other finals.]"] },
+      { h: "Unscheduled Content", sys: "[Some content is not behaving as filed. It remains available.]", items: [
+        "[Glitched prefixes may appear on runes and at the Enchanter. They break one rule each.]",
+        "[The Enchanter now offers Corrupt. Two results are rolled. You keep one. Neither is safe.]",
+        "[Some gear has been spliced. Some gear is MissingNo. Neither was ordered.]",
+        "[Some skills are unstable. Err̷or and Stack Overfl̷ow should not exist. They do.]"] },
+      { h: "Bug Bounty", sys: "[Using glitched content draws the System's notice. Reporting it does not.]", items: [
+        "[Glitched events now occur in the Undercity. Please report them. Or don't.]",
+        "[Some opponents carry glitched traits. Their records are being reviewed.]",
+        "[Every Friday is Glitch Day. Pending World loads from a Corrupted Save.]",
+        "[The Archive now keeps a Known Issues log. First reports earn a Bug Bounty.]"] },
+      { h: "Broadcast", sys: "[Certain moments are now broadcast. Volume cannot be adjusted.]", items: [
+        "[Gatekeepers and Finals now open live. Tap to skip the introductions.]",
+        "[Fate Crises are now aired as they happen. Speak clearly.]",
+        "[Erased and spared worlds are announced at full volume. As is tradition.]"] },
+      { h: "Integrity", sys: "[The interface now takes damage. It was not consulted.]", items: [
+        "[Below half health, the screen tears. Heal, and it mends. Mostly.]",
+        "[A blow that would tear it is outlined first. Consider that a courtesy.]",
+        "[Each world you lose is cut from the title screen. Look at them.]",
+        "[Settings > Motion: Reduced keeps the interface intact. Cowardly, but permitted.]"] },
+      { h: "Known Issues", sys: "[The System is operating normally. Please disregard the following.]", items: [
+        "[Long winning streaks may cause the interface to flicker. This is your fault.]",
+        "[The System's own events may display corrections. The corrections are correct.]",
+        "[Any option you did not expect was inserted by mistake. You may still pick it.]",
+        "[Early rounds now hit harder and later rounds softer. The curve was smoothed.]"] },
+      { h: "Politics", sys: "[Divine and civil affairs have been adjusted. Nobody was consulted.]", items: [
+        "[Silent worlds are now silent. No wagers. Favour is held until the Fate is lifted.]",
+        "[Zealots now answer to War. Ruin did not object. Ruin rarely objects.]",
+        "[Some worlds have two governments. Both will ask for your name on air.]",
+        "[Champions and rivals now speak. Their statements are entered into the record.]"] },
+      { h: "Clarifications", sys: "[Several statements have been corrected. The originals were also correct.]", items: [
+        "[Modifiers renamed: Standard Rules and Rich Tithes. The weather was never involved.]",
+        "[Crises now air live. What you say on air happens to the Hearts you carry.]",
+        "[Erased records are erased in this tournament only. Outcomes vary.]",
+        "[Rank letters carry no official meaning. The System will keep assigning them.]"] },
+      { h: "Conveniences", sys: "[The System has added comforts. Do not get used to them.]", items: [
+        "[Event results now stay on screen until you have read them. All of them.]",
+        "[Fights now make noise, and a Break looks like it hurts. It does.]",
+        "[Settings now exist: sound, vibration, shake, motion and text size.]",
+        "[Keyboards are now recognised. Number keys pick, Enter confirms, Esc retreats.]"] },
+      { h: "Legibility", sys: "[Complaints about readability have been processed. Reluctantly.]", items: [
+        "[Archetypes now have shapes. Colour was apparently not enough.]",
+        "[Long names no longer get cut. The System had hoped you would shorten them.]",
+        "[System notices now wait at the bottom of the screen, out of your way.]",
+        "[Being Noticed now explains itself. Tap it, if you must know.]"] },
+    ],
+  },
+  {
     id: '2026-11-02', release: 'wpd-v12', title: "[System Notice: Customs Update]", pages: [
       { h: "Fates", sys: "[Your world's trouble is now your problem. It was always your problem.]", items: [
         "[In rounds 3 and 5, your world's Fate demands an answer. Answer it, or use it.]",

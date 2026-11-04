@@ -177,7 +177,9 @@
   "thunder_wrath",
   "heavens_fury",
   "eye_of_storm",
-  "attack"
+  "attack",
+  "error_skill",
+  "stack_overflow"
  ],
  "gear": [
   "ember_gauntlets",
@@ -203,7 +205,8 @@
   "storm_ring",
   "soul_lantern",
   "plague_censer",
-  "misers_ring"
+  "misers_ring",
+  "missingno"
  ],
  "archetypes": [
   "pyre",
@@ -234,7 +237,8 @@
   "bloodmoon",
   "famine",
   "golden",
-  "restless"
+  "restless",
+  "corrupted"
  ],
  "fates": [
   "longnight",
@@ -477,6 +481,11 @@
   "locker_zero",
   "double_or_nothing",
   "hotfix",
+  "item_duplication",
+  "option_not_found",
+  "deja_vu",
+  "out_of_bounds",
+  "patch_window",
   "crisis_longnight_1",
   "crisis_longnight_2",
   "crisis_plague_1",
@@ -493,7 +502,8 @@
   "crisis_sundering_2",
   "crisis_goldenage_1",
   "crisis_goldenage_2",
-  "council_vote"
+  "council_vote",
+  "power_struggle"
  ],
  "chains": [
   "official",
@@ -510,7 +520,11 @@
   "smouldering",
   "barbed",
   "leeching",
-  "braced"
+  "braced",
+  "replicated",
+  "desynced",
+  "corrupted",
+  "clipping"
  ],
  "eventOptions": {
   "merchant": 7,
@@ -535,6 +549,11 @@
   "locker_zero": 3,
   "double_or_nothing": 3,
   "hotfix": 4,
+  "item_duplication": 3,
+  "option_not_found": 4,
+  "deja_vu": 3,
+  "out_of_bounds": 3,
+  "patch_window": 3,
   "crisis_longnight_1": 3,
   "crisis_longnight_2": 3,
   "crisis_plague_1": 3,
@@ -551,7 +570,8 @@
   "crisis_sundering_2": 3,
   "crisis_goldenage_1": 3,
   "crisis_goldenage_2": 3,
-  "council_vote": 3
+  "council_vote": 3,
+  "power_struggle": 2
  },
  "lore": {
   "drowned": {
@@ -970,6 +990,7 @@
   "perHit",
   "pierce",
   "reflect",
-  "selfDmg"
+  "selfDmg",
+  "stack"
  ]
 }

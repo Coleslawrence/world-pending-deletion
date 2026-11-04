@@ -46,7 +46,7 @@ function batch(b) {
     add(s.arch, top, won);
     r.run.history.forEach(h => { add(s.round, h.round, !h.won); s.archRound[top] = s.archRound[top] || {}; add(s.archRound[top], h.round, !h.won); });
     r.run.gifts.forEach(g => add(s.gift, g, won));
-    add(s.final, G.WORLD_TYPES[r.w.type].final, won);
+    add(s.final, G.finalId(r.run), won);
   }
   return s;
 }

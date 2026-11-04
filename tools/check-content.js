@@ -72,14 +72,14 @@ if (saved) {
 // ---------- Fields: required ones present, nothing unknown (a typo is an unknown field) ----------
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
-  skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks']],
-  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix']],
+  skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
+  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice']],
   archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
-  gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], []],
-  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting']],
-  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends']],
-  peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit']],
-  modifiers: [C.MODIFIERS, ['name', 'desc'], []],
+  gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
+  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting', 'ruler']],
+  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy']],
+  peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit', 'clash']],
+  modifiers: [C.MODIFIERS, ['name', 'desc'], ['glitch']],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
   gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc', 'flavour'], ['lock', 'arch', 'p', 'theme']],
   titles: [C.TITLES, ['name', 'cond', 'desc', 'flavour'], ['first', 'p', 'feat', 'n', 'theme']],
@@ -88,11 +88,11 @@ const SCHEMA = {
   quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme']],
   outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
-  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit']],
+  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit', 'glitch']],
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
-  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits']],
+  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits', 'glitch']],
 };
-const OPTION = [['label', 'desc'], ['check', 'roll', 'fail', 'pay', 'payHeart', 'can', 'then', 'go', 'reveal']], THEN = Object.keys(C.OUTCOMES);
+const OPTION = [['label', 'desc'], ['check', 'roll', 'fail', 'pay', 'payHeart', 'can', 'then', 'go', 'reveal', 'glitch']], THEN = Object.keys(C.OUTCOMES);
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
   need.filter(f => d[f] == null).forEach(f => err(`${kind} ${k}`, `missing ${f}`));
   Object.keys(d).filter(f => !need.includes(f) && !may.includes(f)).forEach(f => err(`${kind} ${k}`, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
@@ -111,7 +111,7 @@ Object.values(C.SKILLS).forEach(s => {
   s.tags.forEach(t => ref(w, isArch(t), `tag ${t} is not an archetype`));
   ref(w, C.RANKS.includes(s.rank), `rank ${s.rank} is not one of ${C.RANKS.join(' ')}`);
   (s.evo || []).forEach(e => ref(w, C.SKILLS[e] && C.SKILLS[e].base === s.id, `evolution ${e} is missing`));
-  if (!s.basic && !s.base) ref(w, (s.evo || []).length === 2, 'needs two ★3 evolutions');
+  if (!s.basic && !s.base && !s.glitch) ref(w, (s.evo || []).length === 2, 'needs two ★3 evolutions'); // glitched skills never evolve
 });
 Object.entries(C.GEAR).forEach(([k, g]) => {
   const w = 'gear ' + k;
@@ -234,7 +234,16 @@ Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
   Object.keys(T.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies`));
   ref(w, T.passives || T.traits, 'needs passives or traits, or it does nothing');
 });
-ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).length), 'one whole number per round, no more than the pool holds');
+// Known Issues: each points at real glitched content (or names itself), once each
+const ISSUE_OF = { prefix: G.PREFIXES, gear: C.GEAR, skill: C.SKILLS, event: C.EVENTS, trait: C.TRAIT_POOL, mod: C.MODIFIERS };
+G.KNOWN_ISSUES.forEach((K, i) => {
+  const w = 'known issue ' + (K.id || i), src = ISSUE_OF[K.of];
+  ref(w, K.of === 'other' ? typeof K.name === 'string' : src && src[K.id], K.of === 'other' ? 'an other issue needs a name' : `${K.of} ${K.id} does not exist`);
+  ref(w, K.of === 'other' || !src || !src[K.id] || src[K.id].glitch || src[K.id].corrupt, `${K.of} ${K.id} is not glitched`);
+  ref(w, typeof K.text === 'string' && K.text.length > 0, 'needs text');
+  ref(w, G.KNOWN_ISSUES.filter(x => x.of === K.of && x.id === K.id).length === 1, 'listed twice');
+});
+ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).filter(k => !C.TRAIT_POOL[k].glitch).length), 'one whole number per round, no more than the pool holds');
 Object.entries(C.ENEMIES).forEach(([k, e]) => {
   const w = 'enemies ' + k;
   traitCheck(w, Object.fromEntries(MECHANICS.filter(t => e[t] != null).map(t => [t, e[t]])));
@@ -456,7 +465,7 @@ Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => own(h.name, 'Hidden Path ' + 
 Object.entries(C.TRAIT_POOL).forEach(([k, T]) => own(T.name, 'enemy trait ' + k));
 Object.entries(G.REACTIONS).forEach(([k, r]) => own(r.name, 'reaction ' + k));
 Object.entries(G.MILESTONES).forEach(([k, m]) => own(m.name, 'milestone ' + k));
-Object.entries(G.PREFIXES).forEach(([k, p]) => own(p.name, 'rune ' + k));
+Object.entries(G.PREFIXES).filter(([, p]) => !p.hide).forEach(([k, p]) => own(p.name, 'rune ' + k)); // [REDACTED] stand-ins share its name on purpose
 Object.entries(owners).filter(([, w]) => w.length > 1).forEach(([n, w]) => err(`name "${n}"`, `used by ${w.join(' and ')}. One name, one thing`));
 
 // ---------- The effect lists in docs/CONTENT.md, written from the content itself ----------

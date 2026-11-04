@@ -1,6 +1,6 @@
 # Adding content
 
-All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), enemy move roles (`moves.js`), archetypes, skills, gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers, districts and runes are still in `js/core.js`.
+All of the game's content lives in `js/content/`: the effect registry (`effects.js`), the feat list (`feats.js`), the outcome list (`outcomes.js`), enemy move roles (`moves.js`), archetypes, skills, rune prefixes (`prefixes.js`), gear, gods, world packs, enemies, Undercity events and chains, Gifts, Titles, quests and Hidden Paths. Wagers and districts are still in `js/core.js`.
 
 ## Where things go
 
@@ -20,6 +20,7 @@ All of the game's content lives in `js/content/`: the effect registry (`effects.
 | A wager or Trial condition | `WAGER_FEATS` in `js/core.js`: the feats a god will bet on |
 | A new outcome (something given or set as a consequence) | `js/content/outcomes.js` (its words and whether it is announced last), plus the code in `js/core.js` that applies it (`OUTCOME_APPLY`) |
 | A new feat (a measured deed) | `js/content/feats.js`: when it is measured, its words, and how it is checked against the fight tally |
+| Glitched content | Mark it `glitch: true` where it lives: a prefix in `prefixes.js`, gear in `gear.js`, a skill in `skills/glitched.js`, an event in `events/glitch.js`, a trait in `traits.js`, a world modifier in `worlds.js`. Name it with one corrupted letter. Glitches only turn up where `glitchesOn(run)` (never Pending World except on Glitch Day), and each needs a Known Issues entry in `glitches.js` |
 | A new passive effect | `js/content/effects.js` (its phrase, how it combines, whether enemies can carry it), plus the code in `js/core.js` that reads it |
 
 A new file needs a `<script>` tag in `index.html`, before `js/core.js`, and an entry in the `CORE` list in `sw.js`.
@@ -135,7 +136,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `critBonus` | 1 | Precise Strike (0.5) | +50% critical chance. | no |
 | `cruel` | 3 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5) | ×2 damage if the opponent has 2 or more effects. | yes |
 | `detonate` | 3 | Ignite (2), Combust (3), Wildfire (2) | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `dmg` | 150 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 151 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `doom` | 3 | Doom (26), Swift Doom (22), Inevitable Doom (40) | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
 | `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
@@ -163,9 +164,11 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `poison` | 22 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
 | `regen` | 3 | Consecrate (4), Hallowed Ground (7), Holy Fire (4) | Heal 4 at the start of your next 3 turns. | yes |
+| `replay` | 1 | Err̷or (1) | (works with other keys on the same skill) | yes |
 | `riposte` | 3 | Riposte (1.5), Perfect Riposte (2.5), Parry Master (1.5) | Until your next turn, damage you block is dealt back ×1.5. | yes |
-| `selfDmg` | 2 | Berserk (3), Blood Rage (4) | Costs 3 HP. | no |
+| `selfDmg` | 3 | Berserk (3), Err̷or (6), Blood Rage (4) | Costs 3 HP. | no |
 | `siphon` | 3 | Siphon (1), Soul Siphon (1), Hex Siphon (1) | Steal the opponent's Block and remove their Power. | yes |
+| `stack` | 1 | Stack Overfl̷ow (0.25) | (works with other keys on the same skill) | no |
 | `stun` | 9 | Thunderclap (1), Thunder God's Wrath (1), Stunning Bash (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
 | `stunIfWeak` | 4 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 7 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
@@ -197,7 +200,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `critBonus` | 5 | duelist_rapier (0.1), Lucky Star (0.1), Mirror Breaker (0.08), … | +10% critical chance. | add |  |  |  |
 | `critMult` | 1 | Executioner (1.75) | Critical hits deal ×1.75 instead of ×1.5. | set |  |  |  |
-| `dmgPct` | 6 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
+| `dmgPct` | 7 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
 | `dodge` | 4 | shadow_leathers (0.06), Elf-touched (0.1), Skyfall (0.05), … | +6% dodge. | add |  |  |  |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
@@ -222,7 +225,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
 | `hitHeal` | 1 | pilgrim_mace (2) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
 | `lastWords` | 1 | Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP. | set |  |  |  |
-| `lifesteal` | 4 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
+| `lifesteal` | 5 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDR` | 1 | Comeback Kid (0.2) | Below 25% HP, take 20% less damage. | set |  | rate |  |
 | `lowHpDmg` | 2 | Berserker's Blood (0.3), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
 | `lowLifesteal` | 1 | soul_lantern (0.25) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
@@ -276,13 +279,13 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `adapt` | 1 | Kaito Ren (0.6) |
 | `aura` | 2 | Emperor Kharros the Ashen (0.7), trait Smouldering (1.5) |
 | `briar` | 2 | The Thorn Mother (1), trait Barbed (1) |
-| `dodge` | 2 | Lyss of the Thorn (0.05), trait Elusive (0.12) |
+| `dodge` | 3 | Lyss of the Thorn (0.05), trait Elusive (0.12), trait Cl̷ipping (0.25) |
 | `enrage` | 3 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5), trait Frenzied (0.5) |
 | `enrageMult` | 3 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4) |
 | `flood` | 1 | The Leviathan Queen (3) |
 | `forge` | 1 | The Forge King (3) |
-| `revive` | 1 | The Bone Saint (0.3) |
-| `twincast` | 1 | The Archmage Who Fell Upward (3) |
+| `revive` | 2 | The Bone Saint (0.3), trait Repl̷icated (0.3) |
+| `twincast` | 2 | The Archmage Who Fell Upward (3), trait Desy̷nced (3) |
 
 ### The wheel, from `js/content/archetypes.js`
 
@@ -324,13 +327,13 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 28 (quests, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 5 (events) |
+| `gold` | 8 | 8 gold |  | 32 (quests, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
 | `heart` | 1 | +1 max Heart |  | 9 (quests, events) |
 | `rune` | 1 | a rune |  | 7 (quests, events) |
 | `piece` | "B" | a free B-rank piece |  | 19 (quests, events) |
 | `next` | {"bribe":true} | a mark on your next fight |  | 18 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 10 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 12 (events) |
 | `max_hp` | -0.1 | −10% max HP |  | 6 (events) |
 | `restore` | 1 | 1 Heart restored |  | 8 (events) |
 | `erase` | 1 | 1 Heart erased |  | 5 (events) |
@@ -338,11 +341,11 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `respec` | true | your stat points to place again |  | 1 (events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 6 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
-| `ward` | 1 | a ward on your next loss |  | 9 (events) |
-| `mod` | "none" | the world modifier Clear Skies |  | 2 (events) |
+| `ward` | 1 | a ward on your next loss |  | 10 (events) |
+| `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 4 (events) |
 | `fate` | 1 | your world's Fate eased | yes | 56 (events) |
-| `notice` | 1 | the System's notice | yes | 43 (events) |
+| `notice` | 1 | the System's notice | yes | 54 (events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 8 (quests, events) |
 
