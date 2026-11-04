@@ -292,7 +292,7 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank() }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank() }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
   if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); return n; }
@@ -1191,6 +1191,39 @@ function corrupt(run, u, o, msgs) {
   return true;
 }
 
+// ---------- Known Issues (js/content/glitches.js) ----------
+// After each fight, every glitch the run has met (held, carved, fought, visited or loaded) that the Archive has not logged
+// yet is logged, and pays a Bug Bounty (not in Pending World, which pays no Echoes).
+const BUG_BOUNTY = 3;
+const issueKey = K => K.of + ':' + K.id;
+function issueName(K) {
+  const src = { prefix: PREFIXES, gear: GEAR, skill: SKILLS, trait: TRAIT_POOL, mod: MODIFIERS }[K.of];
+  return K.of === 'event' ? (EVENTS[K.id] || {}).title : src ? (src[K.id] || {}).name : K.name;
+}
+function issuesSeen(run, f) {
+  const out = new Set(), add = (of, id) => out.add(of + ':' + id);
+  allPieces(run).concat(run.phantom ? [run.phantom] : []).forEach(p => {
+    if (/^x_/.test(p.id)) add('other', 'spliced'); else if (/^u_/.test(p.id)) add('other', 'unstable');
+    else if (GEAR[p.id] && GEAR[p.id].glitch) add('gear', p.id); else if (SKILLS[p.id] && SKILLS[p.id].glitch) add('skill', p.id);
+    if (p.corrupt) add('other', 'corrupt');
+    (p.mods || []).forEach(m => { const P = PREFIXES[m]; if (!P) return; if (P.hide) add('prefix', 'redacted'); else if (P.glitch || P.corrupt) add('prefix', m); });
+  });
+  if (run.phantom) add('other', 'phantom');
+  (run.seen || []).forEach(k => EVENTS[k] && EVENTS[k].glitch && add('event', k));
+  ((f && f.spec && f.spec.traits) || []).forEach(k => TRAIT_POOL[k] && TRAIT_POOL[k].glitch && add('trait', k));
+  if (MODIFIERS[run.world.mod] && MODIFIERS[run.world.mod].glitch) add('mod', run.world.mod);
+  return out;
+}
+function fileIssues(run, f, meta, msgs) {
+  if (!meta || !meta.archive || run.practice) return;
+  const A = meta.archive, seen = issuesSeen(run, f); A.issues = A.issues || {};
+  KNOWN_ISSUES.forEach(K => {
+    const k = issueKey(K); if (!seen.has(k) || A.issues[k]) return;
+    A.issues[k] = true; const pay = !run.daily; if (pay) meta.echoes += BUG_BOUNTY;
+    msgs.push({ t: 'loot', text: `[Known issue logged: ${issueName(K)}.${pay ? ` Bug Bounty: +${BUG_BOUNTY} Echoes.` : ''}]` });
+  });
+}
+
 // ---------- Quests ----------
 // Which feats each moment can measure: a fight settles both 'win' and 'fight' feats
 const QUEST_AT = { fight: ['win', 'fight'], merge: ['merge'], path: ['path'], shop: ['shop'], wager: ['wager'] };
@@ -2076,6 +2109,7 @@ function resolveFight(run, f, meta, rng) {
   // Glitches settled by the fight: Overflow carries into the next one only after a win; [REDACTED] prefixes used are disclosed
   run.overflow = won && f.overflowOut ? f.overflowOut : 0;
   Object.keys(f.disclosed || {}).forEach(u => { const p = findPiece(run, +u); if (p) p.p.mods = p.p.mods.map(bareMod); });
+  fileIssues(run, f, meta, msgs);
   allPieces(run).filter(p => GEAR[p.id] && GEAR[p.id].rolling).forEach(p => rollMissing(p, lr));
   if (run.phantom && !run.practice && --run.phantom.left <= 0) { msgs.push({ t: 'loss', text: `[Hotfix applied: Phantom ${pieceDef(run.phantom.id).name} removed.]` }); run.phantom = null; }
   f.rx.forEach(k => meta.archive.reactions[k] = true);
@@ -2456,7 +2490,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
