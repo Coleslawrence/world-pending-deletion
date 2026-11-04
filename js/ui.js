@@ -57,19 +57,50 @@ function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'd
 const toastQ = [];
 const toastMs = (text, t) => Math.min(9000, 2400 + text.length * 45) + (t === 'broadcast' ? 1200 : 0);
 const bigToast = (text, t) => ['level', 'class', 'broadcast', 'merge'].includes(t) || /Heart/.test(text);
-function toast(text, t = 'sys', onTap, cause) { toastQ.push({ text, t, onTap, cause }); pumpToasts(); }
+// Repeats of the same kind of notice from the same cause merge into one card (training 6 times shows the newest
+// level, not 6 cards). Only one tap-to-dismiss card shows at a time, with a count of the ones waiting behind it,
+// and none show while a sheet is open, so they never stack over the shop.
+const STAY_MAX = 1;
+const toastKey = (text, t, cause) => t + '|' + (cause || '') + '|' + text.replace(/\d+/g, '#');
+function toast(text, t = 'sys', onTap, cause) {
+  const key = toastKey(text, t, cause);
+  const q = toastQ.find(x => x.key === key); if (q) { q.text = text; q.onTap = onTap || q.onTap; return; }
+  const el = [...toastsEl.querySelectorAll('.toast:not(.out)')].find(x => x.key === key);
+  if (el) { el.querySelector('.msg').textContent = text; el.onTap = onTap || el.onTap; if (el.timer) { clearTimeout(el.timer); el.timer = setTimeout(() => dropToast(el), toastMs(text, t)); } return; }
+  toastQ.push({ text, t, onTap, cause, key }); pumpToasts();
+}
+const isStay = x => ui.screen !== 'fight' && bigToast(x.text, x.t);
 function pumpToasts() {
-  if (!toastQ.length || pumpToasts.gap || toastsEl.querySelectorAll(toastsEl.classList.contains('under') ? '.toast:not(.out):not(.stay)' : '.toast:not(.out)').length >= (ui.screen === 'fight' ? 2 : 3)) return;
-  const { text, t, onTap, cause } = toastQ.shift(), stay = ui.screen !== 'fight' && bigToast(text, t);
-  const el = document.createElement('div'); el.className = 'toast t-' + t + (stay ? ' stay' : ''); el.onTap = onTap;
+  if (!pumpToasts.gap) {
+    const under = toastsEl.classList.contains('under'), live = [...toastsEl.querySelectorAll('.toast:not(.out)')];
+    const stays = live.filter(x => x.classList.contains('stay')).length, cap = ui.screen === 'fight' ? 2 : 3;
+    const i = toastQ.findIndex(x => !isStay(x) || (!under && stays < STAY_MAX));
+    if (i >= 0 && live.length < cap) { showToast(toastQ.splice(i, 1)[0]); pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280); }
+  }
+  waitCount();
+}
+function showToast(Q) {
+  const { text, t, onTap, cause, key } = Q, stay = isStay(Q);
+  const el = document.createElement('div'); el.className = 'toast t-' + t + (stay ? ' stay' : ''); el.onTap = onTap; el.key = key; el.q = Q;
   if (cause) { const c = document.createElement('small'); c.className = 'cause'; c.textContent = cause; el.appendChild(c); }
-  el.appendChild(document.createTextNode(text));
-  if (stay) { const x = document.createElement('span'); x.className = 'tx'; x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; el.appendChild(x); }
+  const m = document.createElement('span'); m.className = 'msg'; m.textContent = text; el.appendChild(m);
+  if (stay) { const x = document.createElement('span'); x.className = 'tx'; x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; el.appendChild(x); const w = document.createElement('small'); w.className = 'wait'; el.appendChild(w); }
   placeToasts(); toastsEl.appendChild(el);
   if (!stay) el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
-  pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280);
 }
-function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => el.remove(), 350); pumpToasts(); }
+// The tap-to-dismiss card says how many more are waiting behind it
+function waitCount() {
+  const n = toastQ.filter(isStay).length;
+  toastsEl.querySelectorAll('.toast.stay:not(.out) .wait').forEach(w => { w.textContent = n ? `[${n} more notice${n > 1 ? 's' : ''} after this]` : ''; });
+}
+// A sheet opened: waiting cards go back to the front of the queue (not hidden in place) and come back when it closes
+function setUnder(on) {
+  if (toastsEl.classList.contains('under') === on) return;
+  toastsEl.classList.toggle('under', on);
+  if (on) [...toastsEl.querySelectorAll('.toast.stay:not(.out)')].reverse().forEach(el => { toastQ.unshift(el.q); el.remove(); });
+  pumpToasts();
+}
+function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => { el.remove(); pumpToasts(); }, 350); pumpToasts(); }
 function clearToasts() { toastQ.length = 0; toastsEl.querySelectorAll('.toast').forEach(el => clearTimeout(el.timer)); toastsEl.replaceChildren(); }
 toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast'); if (!el) return; dropToast(el); if (el.onTap) el.onTap(); });
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
@@ -1440,7 +1471,7 @@ function render() {
   if (scr === 'fight') updateFight();
   fitNames();
   pulseChanged();
-  toastsEl.classList.toggle('under', !!app.querySelector('.sheet')); // notices that wait for a tap step aside while a sheet is open
+  setUnder(!!app.querySelector('.sheet')); // notices that wait for a tap step aside while a sheet is open
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
   if (fbFocus) { const el = document.getElementById('fb-text'); if (el) { el.focus(); el.setSelectionRange(fbFocus[0], fbFocus[1]); } }
