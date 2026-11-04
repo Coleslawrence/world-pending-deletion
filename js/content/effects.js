@@ -129,6 +129,8 @@ const EFFECTS = {
   luckyCut: { how: 'set', say: () => 'A critical hit from a die skill showing 6 hits once more.', theme: ['dicer', 'blade'] },
   ironOdds: { how: 'set', say: () => 'Block from a die skill showing 5 or 6 is doubled.', theme: ['dicer', 'bastion'] },
   savingGrace: { how: 'set', say: () => 'Healing from a die skill showing 6 is doubled.', theme: ['dicer', 'zealot'] },
+  chanceBonus: { say: v => `Chance options in events +${v}%.` },
+  goldPerWin: { say: v => `+${v} gold after each win.` },
   chanceFloor: { how: 'set', say: v => `Your first chance option each round can't be under ${v}%.` },
   sleeveFix: { how: 'set', say: () => 'Once per fight, a die that rolls 1 becomes a 6.', theme: 'dicer' },
   // Reactions

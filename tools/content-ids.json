@@ -253,7 +253,8 @@
  "gods": [
   "war",
   "trick",
-  "ruin"
+  "ruin",
+  "house"
  ],
  "worlds": [
   "drowned",
@@ -262,7 +263,8 @@
   "verdant",
   "sky",
   "iron",
-  "steppes"
+  "steppes",
+  "marches"
  ],
  "modifiers": [
   "none",
@@ -304,6 +306,7 @@
   "lyss",
   "masked",
   "kaito",
+  "delphine",
   "calder",
   "leviathan",
   "kharros",
@@ -311,6 +314,7 @@
   "thorn_mother",
   "archmage",
   "forge_king",
+  "dealer",
   "herald",
   "proctor",
   "legend",
@@ -323,6 +327,7 @@
   "hedgewitch",
   "prodigy",
   "runesmith",
+  "loadeddice",
   "lightningrod",
   "appraisal",
   "monarch",
@@ -353,6 +358,7 @@
   "treasure",
   "chosen_war",
   "chosen_trick",
+  "chosen_house",
   "chosen_ruin",
   "ironwill",
   "dragon",
@@ -397,6 +403,7 @@
   "thornbane",
   "skyfall",
   "forgebreaker",
+  "housebreaker",
   "stormbreaker",
   "ascendant",
   "pathfinder",
@@ -829,6 +836,36 @@
     "The windbreak wall",
     "Your mother Ilse",
     "Your rival Brun"
+   ]
+  },
+  "marches": {
+   "roles": [
+    "dice-caller",
+    "debt clerk",
+    "toll keeper",
+    "card painter",
+    "lot runner"
+   ],
+   "promises": [
+    "pay back what the family owes",
+    "win the house back at the Table",
+    "never bet the farm again"
+   ],
+   "entries": [
+    "The Table of Lots",
+    "The Even Throw",
+    "The Border Stones",
+    "The Unpaid Debt",
+    "The Counting House",
+    "The Dice Market",
+    "Settling Day",
+    "Magistrate Oriane",
+    "The Loser's Toast",
+    "The Lot Bridge",
+    "The family counting room",
+    "The corner card table",
+    "Your father Belmar",
+    "Your rival Pen"
    ]
   },
   "fate longnight": {

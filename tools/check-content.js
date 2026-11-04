@@ -393,7 +393,7 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
   if (!N) return err(w, `tier ${e.tier} has no numbers in moves.js (tiers ${Object.keys(C.MOVE_NUMBERS).join(', ')})`);
   budget(w, 'hp', e.hp, N.hp);
   const roles = moves.map(m => C.moveRole(m.fx || {}, e.tier));
-  moves.forEach((m, i) => { const r = roles[i], d = C.moveDmg(m.fx || {}); if (r === 'strike' || r === 'big') budget(`${w} move ${m.n}`, `${r} damage`, d, N[r]); if (r === 'guard') budget(`${w} move ${m.n}`, 'guard Block', m.fx.block, N.guard); });
+  moves.forEach((m, i) => { const r = roles[i], d = C.moveDmg(m.fx || {}); if (r === 'strike' || r === 'big') budget(`${w} move ${m.n}`, `${r} damage`, d, N[r]); if (r === 'guard') budget(`${w} move ${m.n}`, 'guard Block', (m.fx.block || 0) + (m.fx.blockPip || 0) * 3.5, N.guard); });
   budget(w, 'damage per turn over its script', Math.round(10 * e.script.reduce((a, i) => a + C.moveDmg(e.skills[i].fx || {}), 0) / e.script.length) / 10, N.dpt);
   const has = { damage: moves.some(m => C.moveDmg(m.fx || {}) > 0), trait: MECHANICS.some(t => e[t] != null) || !!e.phase };
   (C.MOVE_NEEDS[e.tier] || []).forEach(need => { if (!need.split('|').some(r => has[r] != null ? has[r] : roles.includes(r))) warn(w, `a tier ${e.tier} enemy needs ${need.replace(/\|/g, ' or ')} (it has ${roles.join(', ')}${has.trait ? ', a trait' : ''})`); });
