@@ -82,7 +82,7 @@ function fitNames() {
   });
 }
 // Short archetype tags for the shop chips on narrow phones
-const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM' };
+const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM', dicer: 'GMB' };
 // Fights: under the opponent's panel. Elsewhere: just above the bottom buttons (or an open sheet's), clear of the
 // header and the screen's instructions
 function placeToasts() {
@@ -809,7 +809,7 @@ function titleChunks() {
 function fightHTML() {
   const f = ui.fight;
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
-  return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
+  return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn rr-btn" id="rrBtn" data-act="reroll-mode" hidden></button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
@@ -869,13 +869,19 @@ function updateFight() {
     const btn = (s, i, wide) => {
       const d = s.def, cd = s.cd > 0, prev = previewSkill(f, s);
       const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
-      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
-        <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
+      const off = ui.reroll ? !(can && s.pip && !cd) : (!can || cd) && !ui.info;
+      const die = s.pip ? `<span class="sk-die ${s.jackpot ? 'jp' : ''}" aria-label="Die shows ${s.pip}${s.jackpot ? ', Jackpot' : ''}">${DIE_FACES[s.pip - 1]}</span>` : '';
+      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''} ${ui.reroll && s.pip ? 'rr' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${off ? 'disabled' : ''}>
+        <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${die}${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
         ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}<span class="sk-fx">${esc(prev)}</span>${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
     };
     const list = f.A.skills.slice(1).map((s, i) => btn(s, i + 1));
     while (list.length < run.slots) list.push('<div class="sk empty">Empty slot</div>');
     sk.innerHTML = list.join('') + btn(f.A.skills[0], 0, true);
+    // The Gambler's rerolls: tap the die in the top bar, then a skill, to reroll its die
+    const rb = document.getElementById('rrBtn'), rr = f.A.rerolls > 0 && f.A.skills.some(s => s.pip) && !f.over;
+    if (!rr) ui.reroll = false;
+    if (rb) { rb.hidden = !rr; rb.disabled = !can; rb.classList.toggle('on', !!ui.reroll); rb.textContent = `${DIE_FACES[4]}${f.A.rerolls || 0}`; rb.setAttribute('aria-label', ui.reroll ? 'Cancel reroll' : `Reroll a die, ${f.A.rerolls || 0} left. Tap this, then a skill`); rb.setAttribute('aria-pressed', ui.reroll ? 'true' : 'false'); }
   }
 }
 function floatAt(side, text, cls) {
@@ -953,6 +959,7 @@ async function onUse(i) {
   const f = ui.fight; if (!f || ui.busy || f.phase !== 'player') return;
   const s = f.A.skills[i];
   if (ui.info) { ui.sheet = { type: 'skillinfo', i }; return render(); }
+  if (ui.reroll) { ui.reroll = false; rerollDie(f, i); return updateFight(); }
   if (!canUse(s)) return;
   ui.busy = true; f.replied = true;
   const before = f.log.length;
@@ -1557,6 +1564,7 @@ function onAct(el) {
     case 'use': return onUse(+d.i);
     case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
+    case 'reroll-mode': ui.reroll = !ui.reroll; return updateFight();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
     case 'note-ok': if (ui.notes) ui.notes.shift(); // falls through: the next card, or on with the run
     case 'result-ok': {

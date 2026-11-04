@@ -49,6 +49,10 @@ function states() {
     out.forEach(s => { s.run.name = 'Oringe waan the Unbowed'; s.run.world.name = 'Morgravel-under-Ash'; s.run.champ = s.run.name + ' of ' + s.run.world.name; });
     const mid = out.find(s => s.label === 'r5-shop') || out[0];
     out.unshift({ label: 'title', stage: 'title', run: mid.run }, { label: 'worlds', stage: 'worlds', run: mid.run });
+    // A Gambler bar: dice on the skill buttons and the Reroll button beside Attack
+    const dice = JSON.parse(JSON.stringify(mid.run)), ids = ['coin_toss', 'hedge', 'double_down', 'snake_eyes', 'jackpot', 'loaded_die'];
+    dice.bar = dice.bar.map((p, i) => ({ id: ids[i], star: 2, mods: [], u: 'dice' + i }));
+    out.push({ label: 'r5-fight-dice', stage: 'fight', run: dice });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };

@@ -8,7 +8,7 @@ const STAT_INFO = {
   AGI: { name: 'Agility', short: 'Bladedancer and Venom skills, dodge' },
   INT: { name: 'Intelligence', short: 'Pyre and Arcanist skills' },
   VIT: { name: 'Vitality', short: 'HP, Bastion and Zealot skills' },
-  LUK: { name: 'Luck', short: 'Critical hits' },
+  LUK: { name: 'Luck', short: 'Gambler skills, critical hits' },
 };
 // Every stat has three faces. Power: the archetypes whose skills it powers (STAT_INFO above, +7% a point). Finesse: one
 // way it makes you better at fighting. Resistance: one enemy status it shrugs off. Faces are for you, not enemies, and

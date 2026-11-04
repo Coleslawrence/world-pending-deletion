@@ -108,6 +108,14 @@ const EFFECTS = {
   stunBurn: { say: v => `Your Stuns and Interrupts also apply ${v} Burn.`, theme: ['storm', 'pyre'] },
   stunHeal: { say: v => `Your Stuns and Interrupts heal you ${v}.`, theme: ['storm', 'zealot'] },
   weakPoison: { say: v => `Weaken you apply also applies ${v} Poison.`, theme: ['storm', 'venom'] },
+  // Dice (Gambler): every die is rolled at the start of your turn and shown on its skill before you pick
+  dieMin: { how: 'set', say: v => `Your dice never roll below ${v}.`, theme: 'dicer' },
+  rerolls: { say: v => `Start each fight with ${v} reroll${v > 1 ? 's' : ''}. Tap Reroll, then a skill, to reroll its die.`, theme: 'dicer' },
+  jackpot: { how: 'set', say: v => `Jackpot: when two of your dice show the same number, both skills are ${pct(v)} stronger.`, theme: 'dicer' },
+  rakeReroll: { say: v => `After a Jackpot, gain ${v} reroll${v > 1 ? 's' : ''}.`, theme: 'dicer' },
+  firstSix: { how: 'set', say: () => 'Your first die each fight rolls 6.', theme: 'dicer' },
+  sixGold: { say: v => `+${v} gold after each win where you rolled a 6.`, theme: 'dicer' },
+  sleeveFix: { how: 'set', say: () => 'Once per fight, a die that rolls 1 becomes a 6.', theme: 'dicer' },
   // Reactions
   reactMult: { how: 'mul', say: v => `Reactions are ${pct(v - 1)} stronger.` },
   reactHeal: { how: 'set', say: v => `Toxic Flare and Cauterise heal you ${v}.` },

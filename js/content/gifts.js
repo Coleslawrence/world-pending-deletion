@@ -35,7 +35,7 @@ const GIFTS = {
   lucky: { name: 'Lucky Star', cat: 'fortune', cost: 2, desc: '+10% critical chance and better shop odds.', p: { critBonus: 0.1 }, flavour: "Born under a good star. The star is still watching." },
   golden: { name: 'Golden Touch', cat: 'fortune', cost: 3, desc: 'Interest cap rises from 5 to 8.', flavour: "Coin sticks to you. Nobody can say why." },
   breath: { name: 'Second Breath', cat: 'fortune', cost: 3, desc: 'Once per run, survive a killing blow with 1 HP.', flavour: "Once, you should have died. You did not." },
-  gambler: { name: 'Gambler', cat: 'fortune', cost: 2, desc: 'Winning a wager pays 15 gold instead of 10.', lock: 'high_roller', flavour: "You never bet what you cannot afford. You can afford a lot." },
+  gambler: { name: 'Big Spender', cat: 'fortune', cost: 2, desc: 'Winning a wager pays 15 gold instead of 10.', lock: 'high_roller', flavour: "You never bet what you cannot afford. You can afford a lot." },
   haggler: { name: 'Haggler', cat: 'fortune', cost: 2, desc: 'The first piece you buy each round costs 1 less.', lock: 'echo', flavour: "You have never paid full price in your life." },
   treasure: { name: 'Treasure Sense', cat: 'fortune', cost: 2, desc: 'Beating a hard opponent also pays 5 gold.', lock: 'underdog', flavour: "The strong carry the best loot. You can always tell." },
   chosen_war: { name: 'Chosen of War', cat: 'divine', cost: 2, desc: 'Start with 4 Favour with the God of War: their gift arrives at once.', flavour: "The God of War marked you before you were born." },

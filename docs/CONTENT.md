@@ -130,49 +130,65 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `bleed` | 12 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
 | `block` | 44 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 7 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
+| `blockPip` | 3 | Hedge Your Bet (3), Insurance (3), Side Bet (2) | (works with other keys on the same skill) | yes |
+| `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
 | `brk` | 18 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
 | `burn` | 25 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
+| `bust` | 2 | Double Down (6), All In (8) | (works with other keys on the same skill) | yes |
+| `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
+| `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
 | `cleanse` | 14 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `critBonus` | 1 | Precise Strike (0.5) | +50% critical chance. | no |
 | `cruel` | 3 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5) | ×2 damage if the opponent has 2 or more effects. | yes |
+| `dbl` | 1 | Double or Nothing (4) | (works with other keys on the same skill) | yes |
 | `detonate` | 3 | Ignite (2), Combust (3), Wildfire (2) | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `dmg` | 151 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `die` | 12 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
+| `dieMin` | 1 | Two-Headed Coin (4) | (works with other keys on the same skill) | yes |
+| `dmg` | 157 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmgAll` | 3 | Jackpot (3), Progressive Jackpot (3), Cash Out (3) | Deal 3 per pip across all your shown dice. | yes |
+| `dmgPip` | 7 | Coin Toss (2), Double Down (6), Double or Nothing (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 3 | Doom (26), Swift Doom (22), Inevitable Doom (40) | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
 | `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
 | `drainPoison` | 1 | Wither (1) | Heal equal to the opponent's Poison. | no |
 | `empower` | 8 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
-| `evade` | 5 | Smoke Bomb (1), Vanish (2), Caltrops (1), … | Evade the next attack. | yes |
+| `evade` | 6 | Smoke Bomb (1), Vanish (2), Caltrops (1), … | Evade the next attack. | yes |
 | `execMult` | 6 | Execute (2.5), Soul Harvest (2), Decapitate (3), … | (works with other keys on the same skill) | yes |
 | `execute` | 6 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
-| `focus` | 3 | Focus (0.6), Deep Focus (1), Spellweave (0.5) | Your next damaging skill deals 60% more. | yes |
+| `focus` | 6 | Focus (0.6), Loaded Die (0.2), Deep Focus (1), … | Your next damaging skill deals 60% more. | yes |
 | `haste` | 4 | Time Warp (2), Spellweave (1), Haste (3), … | Your other cooldowns drop by 2. | yes |
 | `heal` | 16 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 6 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
+| `healPip` | 1 | Insurance (1) | (works with other keys on the same skill) | yes |
 | `hits` | 36 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
 | `interrupt` | 3 | Counterspell (1), Nullify (1), Spell Theft (1) | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
 | `leech` | 3 | Leech (3), Blood Leech (6), Parasite (3) | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
 | `lifesteal` | 9 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
 | `malice` | 3 | Malice (3), Spite (5), Torment (3) | +3 for each effect on the opponent. | yes |
-| `mark` | 3 | Mark Prey (2), Hunter's Mark (3), Deadly Mark (2) | Mark the opponent: they take 30% more damage for 2 turns. | yes |
+| `mark` | 6 | Mark Prey (2), House Edge (3), Hunter's Mark (3), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | no |
 | `momentum` | 3 | Momentum (4), Unstoppable (7), Avalanche (3) | +4 damage for each turn in a row you've used a damaging skill. | yes |
 | `nextCrit` | 1 | Deadly Mark (1) | Your next hit is a critical. | no |
 | `perHit` | 12 | Flame Wave (1), Thousand Cuts (1), Fire Rain (1), … | (works with other keys on the same skill) | no |
 | `pierce` | 7 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
 | `poison` | 22 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
 | `regen` | 3 | Consecrate (4), Hallowed Ground (7), Holy Fire (4) | Heal 4 at the start of your next 3 turns. | yes |
 | `replay` | 1 | Err̷or (1) | (works with other keys on the same skill) | yes |
+| `reroll` | 2 | Loaded Die (1), Sleight of Hand (1) | Reroll your other dice. | yes |
 | `riposte` | 3 | Riposte (1.5), Perfect Riposte (2.5), Parry Master (1.5) | Until your next turn, damage you block is dealt back ×1.5. | yes |
-| `selfDmg` | 3 | Berserk (3), Err̷or (6), Blood Rage (4) | Costs 3 HP. | no |
+| `rollTwice` | 3 | House Edge (3), Stacked Deck (4), Marked Cards (3) | For 3 turns, your dice roll twice and keep the higher. | yes |
+| `selfDmg` | 3 | Berserk (3), Err̷or (6), Blood Rage (4) | Costs 3 HP. | yes |
+| `setSix` | 1 | Weighted Die (1) | Set your lowest die to 6. | yes |
 | `siphon` | 3 | Siphon (1), Soul Siphon (1), Hex Siphon (1) | Steal the opponent's Block and remove their Power. | yes |
+| `snake` | 3 | Snake Eyes (45), Boxcars (45), Long Odds (60) | (works with other keys on the same skill) | yes |
 | `stack` | 1 | Stack Overfl̷ow (0.25) | (works with other keys on the same skill) | no |
 | `stun` | 9 | Thunderclap (1), Thunder God's Wrath (1), Stunning Bash (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
 | `stunIfWeak` | 4 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 7 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
-| `weaken` | 25 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 26 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -200,6 +216,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `critBonus` | 5 | duelist_rapier (0.1), Lucky Star (0.1), Mirror Breaker (0.08), … | +10% critical chance. | add |  |  |  |
 | `critMult` | 1 | Executioner (1.75) | Critical hits deal ×1.75 instead of ×1.5. | set |  |  |  |
+| `dieMin` | 1 | Gambler 2 (2) | Your dice never roll below 2. | set |  |  | Gambler |
 | `dmgPct` | 7 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
 | `dodge` | 4 | shadow_leathers (0.06), Elf-touched (0.1), Skyfall (0.05), … | +6% dodge. | add |  |  |  |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
@@ -212,6 +229,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `firstEvade` | 2 | shadow_leathers (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
 | `firstFree` | 1 | Arcanist 4 (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
 | `firstHit` | 3 | First Strike (1), First Blood (0.5), Arcane Mind (0.3) | Your first damaging skill each fight deals double. | add |  |  |  |
+| `firstSix` | 1 | weighted_dice (1) | Your first die each fight rolls 6. | set |  |  | Gambler |
 | `firstStun` | 1 | thunder_maul (1) | Your first damaging skill each fight Stuns. | set |  |  | Stormcaller |
 | `flareFull` | 1 | Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
 | `flatDR` | 3 | Thick Skin (2), Ser Calder (2), trait Armoured (2) | Every hit you take deals 2 less damage. | add |  | flat, scales with power |  |
@@ -224,6 +242,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `heartOnWin` | 1 | Reaper 6 (1) | Each win restores 1 Heart. | set |  |  | Reaper |
 | `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
 | `hitHeal` | 1 | pilgrim_mace (2) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
+| `jackpot` | 1 | Gambler 6 (0.5) | Jackpot: when two of your dice show the same number, both skills are 50% stronger. | set |  |  | Gambler |
 | `lastWords` | 1 | Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP. | set |  |  |  |
 | `lifesteal` | 5 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDR` | 1 | Comeback Kid (0.2) | Below 25% HP, take 20% less damage. | set |  | rate |  |
@@ -245,11 +264,15 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `quickPoison` | 1 | Apothecary (2) | Quick skills apply 2 Poison. | add |  |  | Arcanist, Venom |
 | `quickStun` | 1 | Tempest Mage (0.25) | Damaging Quick skills have a 25% chance to Stun. | add |  |  | Arcanist, Stormcaller |
 | `quickTwice` | 1 | Arcanist 6 (1) | Quick skills cast twice. | set |  |  | Arcanist |
+| `rakeReroll` | 1 | croupiers_rake (1) | After a Jackpot, gain 1 reroll. | add |  |  | Gambler |
 | `reactHeal` | 1 | Dragon Blood (5) | Toxic Flare and Cauterise heal you 5. | set |  |  |  |
 | `reactMult` | 2 | Catalyst (1.5), Alchemist (1.2) | Reactions are 50% stronger. | mul |  |  |  |
 | `reapBlood` | 1 | Reaper 2 (0.15) | The first time you hit an opponent below half HP, heal 15% of your max HP. | set |  |  | Reaper |
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
 | `regen` | 6 | Zealot 4 (2), prayer_beads (3), Tidecaller (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
+| `rerolls` | 1 | Gambler 4 (2) | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
+| `sixGold` | 1 | gilded_coin (1) | +1 gold after each win where you rolled a 6. | add |  |  | Gambler |
+| `sleeveFix` | 1 | sharps_sleeve (1) | Once per fight, a die that rolls 1 becomes a 6. | set |  |  | Gambler |
 | `sluggish` | 1 | Sluggish (1) | Start every fight Weakened. | set |  |  |  |
 | `startBlock` | 6 | chain_mail (8), Legion Deserter (15), Untouched (8), … | Start each fight with 8 Block. | add | yes | flat, scales with power | Bastion |
 | `startBlockPct` | 2 | Iron Body (0.1), trait Braced (0.15) | Start each fight with Block equal to 10% of your max HP. | add |  | rate | Bastion |
@@ -297,10 +320,11 @@ Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (
 | Venom | AGI | Bane | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` | Pyre, Bladedancer | fang, rot, drip, plague, patience, thorn |
 | Bladedancer | AGI | Might | Never stops moving: a hundred cuts beat one. | `bleed` `hits` `perHit` `mark` `critBonus` `cruel` `riposte` `evade` `alwaysCrit` `nextCrit` | Reaper, Venom | edge, dance, cut, flurry, quick, step |
 | Bastion | VIT | Ward | Takes the hit, then gives it back. | `thorns` `blockDmg` `riposte` `keep` `reflect` | Zealot | wall, iron, shield, anvil, stand, weight |
-| Arcanist | INT | Sway | Does more in a turn than anyone should. | `focus` `pierce` `siphon` `haste` `evade` `interrupt` `hits` `mirror` | Stormcaller, Pyre | glyph, mind, spell, time, trick, sky |
+| Arcanist | INT | Sway | Does more in a turn than anyone should. | `focus` `pierce` `siphon` `haste` `evade` `interrupt` `hits` `mirror` | Stormcaller, Gambler, Pyre | glyph, mind, spell, time, trick, sky |
 | Zealot | VIT | Mend | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` | Bastion | light, prayer, vow, saint, tide, undying |
 | Reaper | STR | Might | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` | Bladedancer, Stormcaller | scythe, grave, harvest, end, hollow, bone |
-| Stormcaller | STR | Sway | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` | Arcanist, Reaper | thunder, lightning, crack, break, sky, gale |
+| Stormcaller | STR | Sway | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` | Arcanist, Gambler, Reaper | thunder, lightning, crack, break, sky, gale |
+| Gambler | LUK | Sway | Makes its own luck, then bets all of it. | `die` `dmgPip` `blockPip` `healPip` `dieMin` `dbl` `snake` `boxcars` `bust` `bustAt` `dmgAll` `cashOut` `progressive` `reroll` `setSix` `rollTwice` `mark` | Arcanist, Stormcaller | dice, coin, card, odds, stake, jackpot |
 
 ### Enemy move roles and tier numbers, from `js/content/moves.js`
 

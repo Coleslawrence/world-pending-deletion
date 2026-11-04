@@ -28,17 +28,27 @@ function choosePlayer(f) {
     if (fx.thorns) sc += fx.thorns * p * 0.6;
     if (fx.regen) sc += fx.regen * p * 2;
     if (fx.mark || fx.focus || fx.haste || fx.siphon) sc += 12;
+    // Dice skills arrive resolved for this turn's roll (fx.dmgPip, fx.blockPip, fx.healPip, fx.dbl, fx.snake, fx.boxcars,
+    // fx.bust, fx.bustAt, fx.dmgAll, fx.progressive, fx.cashOut and fx.dieMin become plain dmg, block, heal, stun and
+    // selfDmg; s.def.pip is the roll), so the lines above already score them. See resolveDice in core.js.
+    if (s.def.pip && fx.selfDmg) sc -= fx.selfDmg;
+    if (fx.reroll || fx.setSix) sc += 8 + (fx.setSix ? 6 : 0);
+    if (fx.rollTwice) sc += 10;
     if (s.def.quick) sc += 1000;
     if (sc > bs) { bs = sc; best = { s, i }; }
   });
   return best.i;
+}
+// The Gambler's rerolls: spend them on a die showing 1 or 2
+function rerollLow(f) {
+  for (let g = 0; g < 5 && f.A.rerolls > 0; g++) { const i = f.A.skills.findIndex(s => s.pip && s.pip <= 2 && G.canUse(s)); if (i < 0 || !G.rerollDie(f, i)) break; }
 }
 function fight(run) {
   const f = G.newFight(run);
   const rr = G.rivalReplies(run, f); if (rr.length) G.rivalReply(run, f, rr[0]); // a rival reply when one is shown
   let guard = 0;
   while (!f.over && guard++ < 300) {
-    if (f.phase === 'player') G.playerAct(f, choosePlayer(f));
+    if (f.phase === 'player') { rerollLow(f); G.playerAct(f, choosePlayer(f)); }
     else if (f.phase === 'stunned') G.skipPlayer(f);
     if (!f.over && f.phase === 'enemy') G.enemyTurn(f);
   }
@@ -163,7 +173,7 @@ function playRun(meta, verbose, opts = {}) {
   }
   return { result: 'stuck', w, run };
 }
-module.exports = { playRun, choosePlayer };
+module.exports = { playRun, choosePlayer, rerollLow };
 if (require.main === module) {
   if (process.argv[2] === 'v') { const meta = G.newMeta(); for (let i = 0; i < (+process.argv[3] || 1); i++) console.log(playRun(meta, true).result); }
   else {
