@@ -9,6 +9,7 @@
 //   heart: n           max Hearts (and Hearts) +n; the World Record grows with it
 //   rune: n            n rune choices to make (three offered each time)
 //   piece: 'B'         a free piece of that rank from your archetypes' pool
+//   experimental: n    n Experimental gear pieces (gear.js, experimental: true) you don't have yet, at random
 //   next: { bribe: true }   flags for the next fight (the ones core.js reads)
 //   foe: { weaken: 2, poison: 4, burn: 4, hp: -0.1, trait: 1 }   your next opponent starts with these (hp: a share more or less; trait: n extra pool traits)
 //   max_hp: -0.1       a share of max HP, gained or lost for the rest of the run (lost at most half)
@@ -32,6 +33,7 @@ const OUTCOMES = {
   heart: { say: n => `+${n} max Heart${n === 1 ? '' : 's'}` },
   rune: { say: n => n === 1 ? 'a rune' : `${n} runes` },
   piece: { say: r => `a free ${r}-rank piece` },
+  experimental: { say: n => n === 1 ? 'an Experimental item' : `${n} Experimental items` },
   next: { say: () => 'a mark on your next fight' },
   foe: { say: () => 'a mark on your next opponent' },
   max_hp: { say: v => `${v > 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)}% max HP` },

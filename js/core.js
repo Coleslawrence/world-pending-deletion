@@ -582,7 +582,7 @@ function hasFreeSlot(run, id) { return isGear(id) ? !run.gear[GEAR[id].slot] : r
 function addPiece(run, id, mods, msgs, star) {
   const p = { u: ++run.uid, id, star: star || 1, mods: (mods || []).slice() };
   if (GEAR[id] && GEAR[id].rolling) rollMissing(p, stream(run, 'loot'));
-  if (isGear(id) && !run.gear[GEAR[id].slot]) run.gear[GEAR[id].slot] = p;
+  if (isGear(id) && !GEAR[id].consumable && !run.gear[GEAR[id].slot]) run.gear[GEAR[id].slot] = p;
   else if (!isGear(id) && run.bar.includes(null)) run.bar[run.bar.indexOf(null)] = p;
   else run.bench.push(p);
   checkMerges(run, msgs);
@@ -637,6 +637,7 @@ function evolve(run, u, evoId, meta) {
 function movePiece(run, u, dest, msgs) {
   const src = findPiece(run, u); if (!src) return false;
   if (src.at === 'gear' && dest !== 'bench') return false;
+  if (dest !== 'bench' && GEAR[src.p.id] && GEAR[src.p.id].consumable) return false; // used, never equipped
   const p = src.p, hpFrac = run.hp / maxHp(run);
   if (dest === 'bench') { if (src.at === 'bench') return false; if (run.bench.length >= 8) return false; removePiece(run, u); run.bench.push(p); }
   else if (dest.bar != null) {
@@ -951,6 +952,18 @@ function merchantPiece(run, rng, msgs, tries, got) {
   let id = pick(pool, rng); for (let k = 1; k < tries; k++) { const o = pick(pool, rng); if (pieceDef(o).rank === 'B') id = o; }
   givePiece(run, id, msgs, got || '[Acquired: {item}]');
 }
+// Unsigned Patch: the three rules offered (kept on the run, so leaving and coming back can't reroll them), and removing one
+function patchOffer(run, rng) { if (!run.patchOffer) run.patchOffer = shuffle(Object.keys(PATCH_RULES).filter(k => !PATCH_RULES[k].can || PATCH_RULES[k].can(run)), stream(run, 'patch', rng)).slice(0, 3); return run.patchOffer; }
+function usePatch(run, u, key, meta, msgs, rng) {
+  const f = findPiece(run, u), R = PATCH_RULES[key];
+  if (!f || !GEAR[f.p.id] || !GEAR[f.p.id].consumable || !R || !(run.patchOffer || []).includes(key)) return false;
+  removePiece(run, u); run.patchOffer = null; (run.patched = run.patched || []).push(key);
+  const h = eventKit(run, meta, stream(run, 'patch', rng), msgs); h.from = 'Unsigned Patch';
+  msgs.push({ t: 'class', text: R.say });
+  if (R.then) h.apply(R.then);
+  if (R.go) R.go(run, h);
+  return true;
+}
 // A piece given as a reward: the line says how you got it ({item} is its name), the message carries the piece so the result
 // can show its card, and the piece keeps the line (p.got) so its details say where it came from for the rest of the run
 function givePiece(run, id, msgs, got) {
@@ -967,6 +980,8 @@ function eventKit(run, meta, rng, msgs) {
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
     apply: T => { const ctx = { run, h: kit, msgs, from: kit.from }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
     custom: () => customPaid(run, msgs),
+    // chance(p): true that share of the time; give(id, got): a set piece, with its line (as h.piece)
+    chance: p => rnd(rng) < p, give: (id, got) => pieceDef(id) && givePiece(run, id, msgs, got),
     heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
     // Glitch events (events/glitch.js)
     phantom: n => { const g = pick(GEAR_SLOTS.map(k => run.gear[k]).filter(Boolean), rng); if (!g) return; run.phantom = { id: g.id, star: g.star, roll: g.roll, left: n }; msgs.push({ t: 'skill', text: `[Phantom ${pieceDef(g.id).name} acquired. It takes no slot. A hotfix is scheduled in ${n} fights.]` }); },
@@ -1075,6 +1090,7 @@ const OUTCOME_APPLY = {
   heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
   rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run), got: c.gotRune || (c.label ? `[${c.label}: a rune.]` : null) }); },
   piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || `[${c.label || 'Reward'}: {item}]`); },
+  experimental: (v, c) => { for (let i = 0; i < v; i++) { const have = allPieces(c.run).map(p => p.id), ids = Object.keys(GEAR).filter(k => GEAR[k].experimental && !have.includes(k)); const id = pick(ids, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || '[Experimental equipment issued: {item}.]'); } },
   next: (v, c) => { Object.assign(c.run.nextFlags, v); addMark(c, 'next', markNext(v)); },
   foe: (v, c) => {
     const F = c.run.nextFlags;
@@ -1093,6 +1109,7 @@ const OUTCOME_APPLY = {
   amend: (v, c) => { c.run.amend = v; c.msgs.push({ t: 'class', text: `[Amendment passed: ${AMENDMENTS[v].name}. ${AMENDMENTS[v].say}]` }); },
   restore: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.min(c.run.maxHearts, c.run.hearts + v); const k = c.run.hearts - b; if (k) { c.msgs.push({ t: 'loot', text: `[+${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); restoreRecord(c.run, k, c.msgs); } },
   notice: (v, c) => {
+    if (c.run.noticeOff) return; // an Unsigned Patch removed the System's monitoring
     const was = noticeOf(c.run); c.run.notice = Math.max(0, Math.min(TUNE.noticeMax, (c.run.notice || 0) + v)); const now = noticeOf(c.run);
     if (now > was) c.msgs.push({ t: 'class', text: `[The System takes notice. Opponents +${noticePct(c.run)}%.]` });
     else if (now < was) c.msgs.push({ t: 'sys', text: now ? `[The System looks elsewhere. Opponents +${noticePct(c.run)}%.]` : '[The System looks elsewhere. Notice cleared.]' });
@@ -1371,7 +1388,7 @@ function buildPlayer(run) {
 }
 function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
 // The System's notice: +TUNE.notice per straight win, never in the Elite bracket or practice
-function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
+function noticeOf(run) { return run.elite || run.practice || run.noticeOff ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
 function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
 function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); }
 function amendOf(run) { return run.amend && !run.elite && !run.practice ? AMENDMENTS[run.amend] || {} : {}; }
@@ -1632,6 +1649,7 @@ function dmgMult(f, X, Y) {
     if (P.burnExec && Y.burn > 0 && half(Y)) m *= 1 + P.burnExec;
   }
   if (P.blockDmgPct) m *= 1 + Math.min(0.4, X.block / 200);
+  if (P.countdown) m *= 0.8; // Countdown Collar (experimental)
   return m;
 }
 function hit(f, X, Y, raw, o = {}) {
@@ -1644,10 +1662,16 @@ function hit(f, X, Y, raw, o = {}) {
   if (Y.P.lowDR && Y.hp < Y.maxHp * 0.25) d *= 1 - Y.P.lowDR;
   if (Y.P.flatDR && !o.isThorns) d -= Y.P.flatDR;
   d = Math.max(0, Math.round(d));
+  // Delay Engine (experimental): the hit is stored, to strike all at once later (startTurn)
+  if (X.P.suspend && !o.released && !o.isThorns) { X.bank = (X.bank || 0) + d; ev(f, { k: 'miss', side: Y.side, text: 'Stored' }); return 0; }
   let absorbed = 0;
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   const rest = d - absorbed;
-  Y.hp -= rest;
+  // Pain Link (experimental): every hit is split evenly between both fighters
+  if ((X.P.painLink || Y.P.painLink) && rest > 1) { const share = Math.floor(rest / 2); Y.hp -= rest - share; X.hp -= share; ev(f, { k: 'hit', side: X.side, amt: share, blocked: 0, thorns: true }); }
+  else Y.hp -= rest;
+  // Mirror Cuirass (experimental): once per fight, below the line, the two fighters' HP shares trade places
+  if (Y.P.swapHp && !Y.swapped && Y.hp > 0 && X.hp > 0 && Y.hp < Y.maxHp * Y.P.swapHp) { Y.swapped = true; const a = Y.hp / Y.maxHp, b = X.hp / X.maxHp; Y.hp = Math.round(b * Y.maxHp); X.hp = Math.max(1, Math.round(a * X.maxHp)); say(f, `[Mirror Cuirass: HP reflected. ${Y.isPlayer ? 'You' : Y.name} ${Math.round(b * 100)}%, ${X.isPlayer ? 'you' : X.name} ${Math.round(a * 100)}%.]`, 'class'); }
   if (X.P.reapBlood && !Y.bloodied && Y.hp > 0 && half(Y)) { Y.bloodied = true; heal(f, X, X.maxHp * X.P.reapBlood); say(f, '[Reaper: first blood. You feed on it.]', 'class'); } // Reaper: heal on bringing a foe below half
   if (Y.isPlayer) { f.tally.blocked += absorbed; f.tally.taken += rest; if (o.src) f.tally.hurtBy[o.src] = (f.tally.hurtBy[o.src] || 0) + rest; }
   if (X.isPlayer) { f.tally.bigHit = Math.max(f.tally.bigHit, d); if (o.src) f.dealt[o.src] = (f.dealt[o.src] || 0) + rest; if (Y.hp <= 0) f.tally.overkill = Math.max(f.tally.overkill, -Y.hp); }
@@ -1823,7 +1847,8 @@ function rerollDie(f, idx) {
 function useSkill(f, X, s, opt) {
   opt = opt || {};
   const Y = opp(f, X);
-  let def = s.def, p = s.power;
+  let def = s.def, p = s.power * (opt.mult || 1);
+  if (X.P.echoNext && !opt.echo && !def.cheat) X.echoQ = s; // Echo Chamber (experimental): plays again next turn
   if (def.fx.mirror) {
     const last = f.lastPlayerSkill;
     if (last) { def = Object.assign({}, last.def); say(f, `[${X.name} copies ${last.def.name}.]`, 'loss'); }
@@ -1978,6 +2003,10 @@ function startTurn(f, X, first) {
   }
   checkRevive(f, X);
   if (X.hp <= 0) return false;
+  // Experimental gear (gear.js): the Countdown Collar's deletion, the Delay Engine's release, the Echo Chamber's replay
+  if (X.isPlayer && P.countdown && f.turn >= P.countdown && Y.hp > 0) { Y.hp = 0; say(f, `[Countdown complete. ${Y.name} has been deleted.]`, 'class'); ev(f, { k: 'hit', side: Y.side, amt: 0, blocked: 0, tag: 'Deleted' }); return true; }
+  if (P.suspend && X.bank > 0 && f.turn % P.suspend === 0 && Y.hp > 0) { const v = X.bank; X.bank = 0; say(f, `[Delay Engine: ${v} stored damage released.]`, 'skill'); hit(f, X, Y, v * 1.5, { released: 1, noDodge: 1, noCrit: 1, src: 'Delay Engine' }); if (Y.hp <= 0) return true; }
+  if (X.echoQ && Y.hp > 0) { const q = X.echoQ; X.echoQ = null; say(f, `[Echo Chamber: ${q.def.name} plays again.]`, 'skill'); useSkill(f, X, q, { echo: true, mult: P.echoNext }); if (Y.hp <= 0 || X.hp <= 0) return X.hp > 0; }
   if (X.stun > 0) { X.stun = 0; say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} stunned and lose${X.isPlayer ? '' : 's'} the turn.]`, X.isPlayer ? 'loss' : 'skill'); ev(f, { k: 'stunned', side: X.side }); return false; }
   return true;
 }
@@ -2276,6 +2305,7 @@ function resolveFight(run, f, meta, rng) {
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
     if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
@@ -2611,5 +2641,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, DIE_FACES, dmgMult, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, DIE_FACES, dmgMult, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

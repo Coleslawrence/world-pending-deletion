@@ -32,9 +32,30 @@ const GEAR = {
   sharps_sleeve: { name: "Cardsharp's Sleeve", slot: 'armour', tags: ['dicer'], rank: 'C', stats: { LUK: 2, AGI: 1 }, pas: {}, fix: { sleeveFix: 1 }, text: () => 'Once per fight, a die that rolls 1 becomes a 6.', flavour: "Deep pockets, sewn by someone who has done this before." },
   // Glitched gear (glitch: true): only ever offered as a rare glitch in the gear shop, and buying one raises the System's
   // notice. rolling: its passive is another gear piece's, re-rolled after every fight (kept on the piece as roll).
+  // Experimental gear (experimental: true): prototypes testing mechanics the tournament does not have yet. Only Field Test's
+  // "Field-test it" issues one (the outcome experimental), never a shop; one of a kind, so they never merge.
+  // consumable: sits on the bench and is used once (Use, in its details), then deleted. Unsigned Patch removes one rule.
+  delay_engine: { name: 'Delay Engine', slot: 'weapon', tags: [], rank: 'B', experimental: true, stats: { STR: 1, INT: 1 }, pas: {}, fix: { suspend: 3 }, text: () => 'Your hits deal nothing when they land. The damage is stored and all of it strikes at once at the start of every 3rd turn, +50%.', flavour: '[Prototype. Mechanic not yet approved. Do not file complaints.]' },
+  mirror_cuirass: { name: 'Mirror Cuirass', slot: 'armour', tags: [], rank: 'B', experimental: true, stats: { VIT: 2 }, pas: {}, fix: { swapHp: 0.3 }, text: () => "Once per fight, when a hit takes you below 30% HP, your HP and your opponent's trade places, as shares of max HP.", flavour: '[Earlier test subjects were not reflected upon.]' },
+  echo_chamber: { name: 'Echo Chamber', slot: 'accessory', tags: [], rank: 'B', experimental: true, stats: { INT: 1, LUK: 1 }, pas: {}, fix: { echoNext: 0.5 }, text: () => 'Every skill you use plays again at the start of your next turn, at half power.', flavour: '[Every skill you use plays again. Every skill you use plays again.]' },
+  countdown_collar: { name: 'Countdown Collar', slot: 'accessory', tags: [], rank: 'B', experimental: true, stats: { VIT: 1, AGI: 1 }, pas: {}, fix: { countdown: 12 }, text: () => 'You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted and you win.', flavour: '[Ticking is a normal part of operation.]' },
+  pain_link: { name: 'Pain Link', slot: 'accessory', tags: [], rank: 'B', experimental: true, stats: { VIT: 2 }, pas: {}, fix: { painLink: 0.5 }, text: () => 'Every hit, yours or theirs, is split evenly between you and your opponent.', flavour: '[Fair for both parties. Comfortable for neither.]' },
+  unsigned_patch: { name: 'Unsigned Patch', slot: 'accessory', tags: [], rank: 'S', experimental: true, consumable: true, stats: {}, pas: {}, text: () => 'Single use, outside fights. Choose one of three rules to remove for the rest of the run. Then it deletes itself.', flavour: '[Publisher: unknown. Install anyway?]' },
   missingno: { name: 'Missin\u0337gNo.', slot: 'accessory', tags: [], rank: 'B', glitch: true, rolling: true, stats: { LUK: 2 }, pas: {}, text: () => "Works as another gear piece's passive, re-rolled after every fight.", flavour: '[Known issue: item data unreadable. Please do not equip.]' },
 };
 const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
+// The Unsigned Patch also turns up, very rarely (this share of the time), after hard wins and in the Large Chest
+const RARE_PATCH = 0.02;
+// The rules an Unsigned Patch can remove: three that can apply are offered, the player keeps one. then: outcomes (outcomes.js);
+// go(run): anything else. say: the System's line once it is installed
+const PATCH_RULES = {
+  slots: { name: 'Four skill slots', text: 'Your skill bar gets a fifth slot.', can: run => run.slots < 5, go: run => { run.slots++; run.bar.push(null); }, say: '[Rule removed: four skill slots. Slot 5 installed.]' },
+  hearts: { name: "A world's Hearts are counted", text: '+2 Hearts, above your world\'s count.', then: { heart: 2 }, say: '[Rule removed: Heart count. Two more pieces of your world now exist. Do not ask where from.]' },
+  notice: { name: 'The System is watching', text: 'Notice is cleared, and can never rise again this run.', go: run => { run.notice = 0; run.noticeOff = true; }, say: '[Rule removed: monitoring. The System can no longer see you. It is looking.]' },
+  measure: { name: 'Opponents are built to your measure', text: 'Every opponent has 10% less HP for the rest of the run.', then: { always: { foe: { hp: -0.1 } } }, say: '[Rule removed: fair matchmaking. Opponents now arrive slightly unfinished.]' },
+  final: { name: 'The Final Champion is final', text: 'Your Final Champion starts with 30% less HP.', can: run => !run.elite && (run.finalCut || 0) < 0.3, go: run => { run.finalCut = 0.3; }, say: '[Rule removed: final means final. Your Final Champion has been partially uninstalled.]' },
+  fate: { name: 'Fate is fixed', text: "Your world's Fate is rewritten as another, back at the middle of its track.", can: run => FATES[run.world.fate] && run.round < 5, go: (run, h) => { const o = Object.keys(FATES).filter(k => k !== run.world.fate && FATES[k].crises); if (o.length) { run.world.fate = h.pick(o); run.fateTrack = 0; } }, say: "[Rule removed: Fate. Your world's future has been replaced with a different one.]" },
+};
 // Spliced gear: two real pieces stitched into one glitched piece, id 'x_<a>__<b>'. It has both passives, the slot of the
 // first, both pieces' class tags, and a stat line from neither. Made on demand, so saved runs and records register theirs.
 function spliceId(a, b) { return 'x_' + a + '__' + b; }

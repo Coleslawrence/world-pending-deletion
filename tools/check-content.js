@@ -73,7 +73,7 @@ if (saved) {
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
-  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice']],
+  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice', 'experimental', 'consumable']],
   archetypes: [C.ARCH, ['name', 'stat', 'disc', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'guest2', 'mids', 'setting', 'ruler']],
@@ -134,8 +134,9 @@ const outcomeUses = {};
 const outcomeOk = (where, T, what) => {
   if (!T || typeof T !== 'object') return err(where, 'outcomes are an object like { gold: 8 } (see outcomes.js)');
   // got: the line for its piece, saying how you got it. Events must say it; quests and the like fall back to "[Reward: X]"
-  if (T.piece != null && /^event /.test(what)) ref(where, typeof T.got === 'string', "an event's piece needs got: a System line saying how you got it, with {item} for its name");
-  if (T.got != null) ref(where, T.piece != null && typeof T.got === 'string' && /^\[.*\{item\}.*\]$/.test(T.got), 'got goes with piece: a System line in [brackets] with {item} where the piece\'s name goes');
+  if ((T.piece != null || T.experimental != null) && /^event /.test(what)) ref(where, typeof T.got === 'string', "an event's piece needs got: a System line saying how you got it, with {item} for its name");
+  if (T.experimental != null) ref(where, Number.isInteger(T.experimental) && T.experimental > 0, 'experimental is a whole number of items above 0');
+  if (T.got != null) ref(where, (T.piece != null || T.experimental != null) && typeof T.got === 'string' && /^\[.*\{item\}.*\]$/.test(T.got), 'got goes with piece: a System line in [brackets] with {item} where the piece\'s name goes');
   if (T.rune != null && /^event /.test(what)) ref(where, typeof T.gotRune === 'string', "an event's rune needs gotRune: a System line saying where the rune came from");
   if (T.gotRune != null) ref(where, T.rune != null && /^\[.*\]$/.test(T.gotRune), 'gotRune goes with rune: a System line in [brackets]');
   Object.entries(T).forEach(([k, v]) => {
@@ -507,7 +508,7 @@ function effectDoc() {
     '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
     '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
     '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
-    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', ward: 1, mod: 'none', always: { foe: { poison: 2 } }, fate: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
+    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', experimental: 1, next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', ward: 1, mod: 'none', always: { foe: { poison: 2 } }, fate: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
     '', '### Feats (`feat`), from `js/content/feats.js`',
     '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
     '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',

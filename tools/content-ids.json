@@ -231,6 +231,12 @@
   "weighted_dice",
   "gilded_coin",
   "sharps_sleeve",
+  "delay_engine",
+  "mirror_cuirass",
+  "echo_chamber",
+  "countdown_collar",
+  "pain_link",
+  "unsigned_patch",
   "missingno"
  ],
  "archetypes": [
@@ -438,6 +444,7 @@
   "heart",
   "rune",
   "piece",
+  "experimental",
   "next",
   "foe",
   "max_hp",
