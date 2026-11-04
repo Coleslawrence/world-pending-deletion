@@ -716,6 +716,12 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .ev-ch span { font-family: var(--f-m); font-size: var(--fs-1); border: 1px solid; border-radius: var(--r-s); padding: 3px 8px; }
 .ev-ch .good { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, transparent); } .ev-ch .bad { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 50%, transparent); }
 .ev-res .ev-out { animation: tin .25s ease-out; }
+.ev-item { margin: 6px 0 8px; border: 1px solid color-mix(in srgb, var(--good) 45%, transparent); border-radius: var(--r-s); }
+.ev-item > summary { cursor: pointer; padding: 8px 10px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; color: var(--good); font-weight: 600; }
+.ev-item > summary small { color: var(--muted); font-weight: 400; margin-left: auto; }
+.ev-item[open] > summary small { display: none; }
+.ev-item .srow { margin: 0 6px 6px; }
+.got-h { margin: 10px 0 4px; } .msgs.got li { color: var(--muted); }
 /* Break and reaction impact (#15) */
 .foe, .me { position: relative; }
 .stamp { position: absolute; left: 50%; top: 42%; z-index: 6; pointer-events: none; font-family: var(--f-d); letter-spacing: .12em; white-space: nowrap; transform: translate(-50%, -50%) rotate(-8deg); animation: stampin .9s ease-out forwards; }

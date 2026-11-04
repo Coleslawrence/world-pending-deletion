@@ -100,7 +100,7 @@ Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).for
 Object.entries(C.EVENTS).forEach(([k, E]) => (E.opts || []).forEach((o, i) => {
   const w = `event ${k} option ${i + 1}`;
   Object.keys(o).filter(f => !OPTION[0].includes(f) && !OPTION[1].includes(f)).forEach(f => err(w, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
-  Object.keys(o.then || {}).filter(f => !THEN.includes(f)).forEach(f => err(w, `unknown outcome then.${f}; outcomes (outcomes.js) are ${THEN.join(', ')}, anything else goes in go`));
+  Object.keys(o.then || {}).filter(f => !THEN.includes(f) && f !== 'got' && f !== 'gotRune').forEach(f => err(w, `unknown outcome then.${f}; outcomes (outcomes.js) are ${THEN.join(', ')}, anything else goes in go`));
 }));
 
 // ---------- References: everything named points at something real ----------
@@ -133,7 +133,13 @@ const nextRead = new Set([...core.matchAll(/nextFlags\.(\w+)/g)].map(m => m[1]))
 const outcomeUses = {};
 const outcomeOk = (where, T, what) => {
   if (!T || typeof T !== 'object') return err(where, 'outcomes are an object like { gold: 8 } (see outcomes.js)');
+  // got: the line for its piece, saying how you got it. Events must say it; quests and the like fall back to "[Reward: X]"
+  if (T.piece != null && /^event /.test(what)) ref(where, typeof T.got === 'string', "an event's piece needs got: a System line saying how you got it, with {item} for its name");
+  if (T.got != null) ref(where, T.piece != null && typeof T.got === 'string' && /^\[.*\{item\}.*\]$/.test(T.got), 'got goes with piece: a System line in [brackets] with {item} where the piece\'s name goes');
+  if (T.rune != null && /^event /.test(what)) ref(where, typeof T.gotRune === 'string', "an event's rune needs gotRune: a System line saying where the rune came from");
+  if (T.gotRune != null) ref(where, T.rune != null && /^\[.*\]$/.test(T.gotRune), 'gotRune goes with rune: a System line in [brackets]');
   Object.entries(T).forEach(([k, v]) => {
+    if (k === 'got' || k === 'gotRune') return;
     if (!C.OUTCOMES[k]) return err(where, `unknown outcome ${k}; outcomes (outcomes.js) are ${THEN.join(', ')}`);
     (outcomeUses[k] = outcomeUses[k] || []).push(what);
     if (k === 'gold') ref(where, Number.isInteger(v) && v > 0, 'gold is a whole number above 0');
@@ -155,6 +161,8 @@ const outcomeOk = (where, T, what) => {
     if (k === 'erase') ref(where, Number.isInteger(v) && v > 0, 'erase is a whole number above 0');
   });
 };
+// h.piece(tries, got) in an event's go: the got line says how you got the piece, as an outcome's got does
+fs.readdirSync(path.join(ROOT, 'js/content/events')).filter(f => f.endsWith('.js')).forEach(f => [...read('js/content/events/' + f).matchAll(/h\.piece\(([^)]*)\)/g)].forEach(m => { if (!/^\s*\d+\s*,\s*'\[.*\{item\}.*\]'\s*$/.test(m[1])) err('events/' + f, `h.piece(${m[1]}) needs a got line: h.piece(tries, '[... {item} ...]')`); }));
 Object.entries(C.QUESTS).forEach(([k, q]) => { outcomeOk('quests ' + k, q.reward, 'quest ' + k); if (q.reward && q.reward.chain != null) err('quests ' + k, 'chain is an event outcome'); });
 Object.keys(C.OUTCOMES).forEach(k => { if (typeof C.OUTCOMES[k].say !== 'function') err('outcomes ' + k, 'say(v) gives the words players read for it'); });
 const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.fate ? !!C.FATES[c.fate] : c.people ? !!C.PEOPLES[c.people] : c.luck === true);
