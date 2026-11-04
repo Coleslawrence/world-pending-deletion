@@ -1,7 +1,7 @@
 // ===== [World Pending Deletion] — content: Undercity events that stand alone =====
 // Option positions are permanent (run summaries store picks by place), so a reworked option keeps its place.
 'use strict';
-EVENTS.merchant = { fate: 'hunger', people: 'league', title: 'Hooded merchant', theme: ['reaper', 'venom'], text: 'A merchant in the tunnels sells forbidden techniques. The price is a little of your life.', opts: [
+EVENTS.merchant = { fate: 'hunger', people: 'league', title: 'Hooded merchant', theme: ['reaper'], text: 'A merchant in the tunnels sells forbidden techniques. The price is a little of your life.', opts: [
   { label: 'Buy a technique', desc: 'Pay the way he asks. In blood.', then: { max_hp: -0.1, piece: 'B' } },
   { check: { stat: 'INT', hard: true }, label: 'Copy his best scroll', desc: 'Read it while he counts your coins.', then: { piece: 'B', notice: 1 } },
   { check: { luck: true }, label: 'Rummage through the crates', desc: 'He is not watching them.', go: (run, h) => { h.say('[Nobody saw. No price was paid.]'); h.piece(1); } },

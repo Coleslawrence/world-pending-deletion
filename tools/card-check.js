@@ -65,7 +65,7 @@ if (args.includes('--new')) {
     .replace('# <Kind>: <Name>', `# ${K}: ${name}`).replace('**Status:** Proposed', '**Status:** Draft').replace('<YYYY-MM-DD>', today)
     .replace(/(\*\*Card for:\*\*) <[^>\n]*>/, `$1 ${kind}`).replace(/(\*\*Source:\*\*) <[^\n]*>/, src ? `$1 ${src}` : '$&')
     .replace('`<id>`', '`' + id + '`').replace('<Name, and any other new name>', name)
-    .replace(/(\*\*World, god or archetype:\*\*) <[^\n]*>/, theme ? `$1 ${theme.split('+').map(t => G.ARCH[t].name).join(' + ')} (wheel theme ${theme})` : '$&');
+    .replace(/(\*\*World, god or archetype:\*\*) <[^\n]*>/, theme ? `$1 ${theme.split('+').map(t => G.ARCH[t].name).join(' + ')} (theme ${theme})` : '$&');
   fs.writeFileSync(file, card);
   console.log(`wrote ${file} (id ${id}). Fill it in, then run node tools/card-check.js ${DIR}`);
   process.exit(0);
