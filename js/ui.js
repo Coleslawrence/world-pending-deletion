@@ -1025,8 +1025,15 @@ function pieceSheet() {
   if (f.at === 'bar') run.bar.forEach((b, i) => { if (i !== f.i) acts.push(`<button class="btn small ghost" data-act="move" data-u="${p.u}" data-to="bar" data-i="${i}">To slot ${i + 1}</button>`); });
   const where = f.at === 'bench' ? 'On your bench' : f.at === 'bar' ? `Skill slot ${f.i + 1}` : 'Equipped';
   const canSell = ui.screen === 'shop';
-  return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
+  return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + gotHTML(p) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
     canSell ? `<button class="btn ghost danger-t" data-act="sell" data-u="${p.u}">Sell · ${sellValue(p)}g</button><button class="btn primary" data-act="close">Done</button>` : `<button class="btn primary" data-act="close">Done</button>`);
+}
+// Where a piece and its prefixes came from: the lines kept when they were given (p.got, p.mgot)
+function gotHTML(p) {
+  const mods = (p.mods || []).map(bareMod), rows = [];
+  if (p.got) rows.push(`<li><b>${esc(pieceDef(p.id).name)}</b>: ${esc(p.got)}</li>`);
+  Object.entries(p.mgot || {}).forEach(([m, t]) => { if (mods.includes(bareMod(m)) && PREFIXES[bareMod(m)]) rows.push(`<li><b>${esc(PREFIXES[bareMod(m)].name)}</b>: ${esc(t)}</li>`); });
+  return rows.length ? `<h4 class="got-h">How you got it</h4><ul class="msgs got">${rows.join('')}</ul>` : '';
 }
 // The first time a stat line is offered, the System says so once
 function statLinesNotice() {
@@ -1050,7 +1057,9 @@ function evDiff(a, run) {
 }
 function evResultSheet() {
   const R = ui.sheet;
-  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>`).join('');
+  // An item reward: its line, then its card folded underneath, so you can see what you got without leaving
+  const card = m => { if (!m.item || !pieceDef(m.item)) return ''; const f = m.u != null && findPiece(run, m.u), q = f ? f.p : { star: 1, mods: [] }; return `<details class="ev-item"><summary>${esc(pieceDef(m.item).name)} <small>tap to view</small></summary>${pieceBody(m.item, q.star, q.mods)}</details>`; };
+  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${card(m)}`).join('');
   const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
   return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
 }
@@ -1093,7 +1102,8 @@ function enchantSheet(mods, from) {
   }
   if (sel == null) {
     const corruptBtn = from !== 'rune' && corruptTargets(run).length ? `<button class="choice glitch" data-act="ench-mod" data-i="corrupt"><div class="sr-h"><span class="sr-name"><em class="pfx">Corr\u0337upt a skill</em></span></div><div class="sr-desc">Two results are rolled and you keep one: a star, a prefix or a glitch. The skill then takes no more prefixes.</div></button>` : '';
-    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
+    const runeGot = from === 'rune' && run.pending[0] && run.pending[0].got;
+    const body = `${runeGot ? `<p class="sh-p sysl">${esc(runeGot)}</p>` : ''}<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
     return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
   }
   const m = mods[sel];
@@ -1499,7 +1509,7 @@ function onAct(el) {
       const fromRune = !ui.sheet && run.pending[0] && run.pending[0].type === 'rune';
       const mods = fromRune ? run.pending[0].mods : ui.enchantMods, m = mods[ui.enchantSel];
       const f = findPiece(run, +d.u);
-      if (f && applyPrefix(run, +d.u, m, msgs)) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill'); pushMsgs(msgs); }
+      if (f && applyPrefix(run, +d.u, m, msgs, null, fromRune ? run.pending[0].got : '[Carved by the Enchanter, for a price.]')) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill'); pushMsgs(msgs); }
       ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
     }
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }

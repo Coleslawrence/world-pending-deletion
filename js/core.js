@@ -944,16 +944,24 @@ function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.ma
 // and a { step, due } there brings back the chain's next event on that round.
 // A consequence revealed after the choice: lose a share of max HP and say how much
 function lose(run, f, msgs, text) { const b = run.hp; run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * f)); msgs.push({ t: 'loss', text: `[${text} −${b - run.hp} HP.]` }); }
-function merchantPiece(run, rng, msgs, tries) {
+function merchantPiece(run, rng, msgs, tries, got) {
   const pool = poolIds(run).filter(x => ['C', 'B'].includes(pieceDef(x).rank)); if (!pool.length) return;
   let id = pick(pool, rng); for (let k = 1; k < tries; k++) { const o = pick(pool, rng); if (pieceDef(o).rank === 'B') id = o; }
-  msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs);
+  givePiece(run, id, msgs, got || '[Acquired: {item}]');
+}
+// A piece given as a reward: the line says how you got it ({item} is its name), the message carries the piece so the result
+// can show its card, and the piece keeps the line (p.got) so its details say where it came from for the rest of the run
+function givePiece(run, id, msgs, got) {
+  const text = got.replace('{item}', pieceDef(id).name), m = { t: 'loot', text, item: id };
+  if (msgs) msgs.push(m);
+  const p = addPiece(run, id, [], msgs); p.got = text; m.u = p.u;
+  return p;
 }
 // What an option's go(run, h) can use, since content cannot call the rules directly
 function eventKit(run, meta, rng, msgs) {
   const kit = {
     meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
-    lose: (f, text) => lose(run, f, msgs, text), piece: tries => merchantPiece(run, rng, msgs, tries), eraseRecord: n => eraseRecord(run, n, msgs),
+    lose: (f, text) => lose(run, f, msgs, text), piece: (tries, got) => merchantPiece(run, rng, msgs, tries, got), eraseRecord: n => eraseRecord(run, n, msgs),
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
     apply: T => { const ctx = { run, h: kit, msgs }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
     custom: () => customPaid(run, msgs),
@@ -1063,8 +1071,8 @@ const OUTCOME_APPLY = {
   gold: (v, c) => { c.run.gold += v; },
   stats: (v, c) => Object.entries(v).forEach(([k, n]) => c.run.stats[k] += n),
   heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
-  rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run) }); },
-  piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) { c.msgs && c.msgs.push({ t: 'loot', text: `[${c.label || 'Reward'}: ${pieceDef(id).name}]` }); addPiece(c.run, id, [], c.msgs); } },
+  rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run), got: c.gotRune || (c.label ? `[${c.label}: a rune.]` : null) }); },
+  piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || `[${c.label || 'Reward'}: {item}]`); },
   next: (v, c) => { Object.assign(c.run.nextFlags, v); },
   foe: (v, c) => {
     const F = c.run.nextFlags;
@@ -1146,15 +1154,19 @@ function visitDue(run) {
 // Marks that last the run (the outcome always) go on every fight, as next and foe marks do on one
 function applyAlways(run) { const A = run.always; if (!A) return; const c = { run, msgs: [] }; ['next', 'foe'].forEach(k => A[k] && OUTCOME_APPLY[k](A[k], c)); }
 // Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
-function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
+// A set of outcomes may carry got: the line for its piece, saying how you got it ({item} is the piece's name), and gotRune:
+// the line for its rune, shown on the rune pick and kept by the prefix carved from it
+function applyOutcomes(T, ctx, late) { const c = T.got || T.gotRune ? Object.assign({}, ctx, T.got && { got: T.got }, T.gotRune && { gotRune: T.gotRune }) : ctx; Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], c); }); }
 // A corrupted skill takes no more prefixes
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && !p.corrupt && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
 // Carve prefix m into piece u. [REDACTED] becomes a hidden glitch that fits the skill; a glitch raises the System's notice.
-function applyPrefix(run, u, m, msgs, rng) {
+// got: where the prefix came from, kept on the piece (p.mgot, by prefix) for its details
+function applyPrefix(run, u, m, msgs, rng, got) {
   const f = findPiece(run, u); if (!f || f.p.corrupt || !prefixOk(f.p.id, m, f.p.mods)) return false;
   if (m === 'redacted') { const have = f.p.mods.map(bareMod), ks = GLITCH_PREFIXES.filter(k => !have.includes(k) && prefixOk(f.p.id, k, f.p.mods)); m = 'r_' + pick(ks, stream(run, 'loot', rng)); }
   if (f.p.mods.length >= MAX_MODS) f.p.mods.shift();
   f.p.mods.push(m);
+  if (got) { f.p.mgot = f.p.mgot || {}; f.p.mgot[m] = got; }
   if (PREFIXES[m].glitch) OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] });
   return true;
 }
@@ -2164,7 +2176,7 @@ function resolveFight(run, f, meta, rng) {
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
-    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run) });
+    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
