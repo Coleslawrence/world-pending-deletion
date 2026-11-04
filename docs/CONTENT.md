@@ -199,7 +199,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `critBonus` | 5 | duelist_rapier (0.1), Lucky Star (0.1), Mirror Breaker (0.08), … | +10% critical chance. | add |  |  |  |
 | `critMult` | 1 | Executioner (1.75) | Critical hits deal ×1.75 instead of ×1.5. | set |  |  |  |
-| `dmgPct` | 6 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
+| `dmgPct` | 7 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
 | `dodge` | 4 | shadow_leathers (0.06), Elf-touched (0.1), Skyfall (0.05), … | +6% dodge. | add |  |  |  |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
@@ -224,7 +224,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `hitBurn` | 1 | Cinderblade (1) | Multi-hit skills apply 1 Burn per hit. | add |  |  | Bladedancer, Pyre |
 | `hitHeal` | 1 | pilgrim_mace (2) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
 | `lastWords` | 1 | Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 25% of your max HP. | set |  |  |  |
-| `lifesteal` | 4 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
+| `lifesteal` | 5 | Reaper 4 (0.3), Vampirism (0.08), Bloodthirsty (0.05), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDR` | 1 | Comeback Kid (0.2) | Below 25% HP, take 20% less damage. | set |  | rate |  |
 | `lowHpDmg` | 2 | Berserker's Blood (0.3), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
 | `lowLifesteal` | 1 | soul_lantern (0.25) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
@@ -278,13 +278,13 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `adapt` | 1 | Kaito Ren (0.6) |
 | `aura` | 2 | Emperor Kharros the Ashen (0.7), trait Smouldering (1.5) |
 | `briar` | 2 | The Thorn Mother (1), trait Barbed (1) |
-| `dodge` | 2 | Lyss of the Thorn (0.05), trait Elusive (0.12) |
+| `dodge` | 3 | Lyss of the Thorn (0.05), trait Elusive (0.12), trait Cl̷ipping (0.25) |
 | `enrage` | 3 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5), trait Frenzied (0.5) |
 | `enrageMult` | 3 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4) |
 | `flood` | 1 | The Leviathan Queen (3) |
 | `forge` | 1 | The Forge King (3) |
-| `revive` | 1 | The Bone Saint (0.3) |
-| `twincast` | 1 | The Archmage Who Fell Upward (3) |
+| `revive` | 2 | The Bone Saint (0.3), trait Repl̷icated (0.3) |
+| `twincast` | 2 | The Archmage Who Fell Upward (3), trait Desy̷nced (3) |
 
 ### The wheel, from `js/content/archetypes.js`
 

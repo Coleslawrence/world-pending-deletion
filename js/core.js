@@ -495,6 +495,18 @@ function glitchGear(id, pool, rng) {
 // A skill offer comes up glitched with GLITCH_SKILL chance: an Unstable copy of it when it has two evolutions, else Error
 // or Stack Overflow (js/content/skills/glitched.js)
 const GLITCH_SKILL = 0.04;
+// Traits from the pool for an opponent: n normal ones (not in have). Where glitches are on, the last one is sometimes a
+// glitched trait instead. Glitched traits never enter the normal draw, so Pending World draws exactly as before
+const GLITCH_TRAIT = 0.15;
+function rollTraits(run, n, rng, have) {
+  have = have || [];
+  const out = shuffle(Object.keys(TRAIT_POOL).filter(k => !TRAIT_POOL[k].glitch && !have.includes(k)), rng).slice(0, n);
+  if (out.length && glitchesOn(run) && rnd(rng) < GLITCH_TRAIT) {
+    const g = Object.keys(TRAIT_POOL).filter(k => TRAIT_POOL[k].glitch && !have.includes(k));
+    if (g.length) out[out.length - 1] = pick(g, rng);
+  }
+  return out;
+}
 function glitchSkill(id, rng) {
   if (rnd(rng) >= GLITCH_SKILL) return id;
   if (SKILLS[id].evo && rnd(rng) < 0.6 && unstableSkill('u_' + id)) return 'u_' + id;
@@ -798,7 +810,7 @@ function makeChoices(run, meta, rng) {
   // A Gatekeeper: at a GATES round the hard rival guards the way on, with an extra trait, a second phase and a better reward
   if (GATES.includes(run.round) && hard.kind === 'rival' && !run.practice) hard.gate = true;
   // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
-  [easy, hard].forEach(c => { const n = run.practice || c.summoned || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = shuffle(Object.keys(TRAIT_POOL), rng).slice(0, n); });
+  [easy, hard].forEach(c => { const n = run.practice || c.summoned || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = rollTraits(run, n, rng); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -1048,7 +1060,7 @@ const OUTCOME_APPLY = {
     if (v.poison) F.foePoison = (F.foePoison || 0) + v.poison;
     if (v.burn) F.foeBurn = (F.foeBurn || 0) + v.burn;
     if (v.hp) F.foeHp = (F.foeHp || 1) * (1 + v.hp);
-    if (v.trait) { const have = F.foeTraits || [], add = shuffle(Object.keys(TRAIT_POOL).filter(k => !have.includes(k)), stream(c.run, 'opps')).slice(0, v.trait); F.foeTraits = have.concat(add); }
+    if (v.trait) { const have = F.foeTraits || [], add = rollTraits(c.run, v.trait, stream(c.run, 'opps'), have); F.foeTraits = have.concat(add); }
   },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
@@ -1072,11 +1084,11 @@ const OUTCOME_APPLY = {
 // A summoned opponent: { who: 'copy' | 'erased' | a rival id, bounty?: outcomes for beating them, traits?: n }. An Erased champion
 // when there is none to send falls back to an unmet rival; summoned rivals are Veterans
 function summonSpec(run, v, rng) {
-  let spec = v.spec ? Object.assign({}, v.spec, { hard: true, traits: (v.spec.traits || []).concat(shuffle(Object.keys(TRAIT_POOL).filter(k => !(v.spec.traits || []).includes(k)), rng).slice(0, v.traits || 0)) }) : null;
+  let spec = v.spec ? Object.assign({}, v.spec, { hard: true, traits: (v.spec.traits || []).concat(rollTraits(run, v.traits || 0, rng, v.spec.traits)) }) : null;
   if (spec && spec.kind !== 'rival' && spec.kind !== 'monster' && spec.kind !== 'erased' && spec.kind !== 'champion') spec = null;
   if (!spec && v.who === 'copy') { const snap = snapshot(run); snap.champ = `${run.champ} (copy)`; spec = { kind: 'erased', snap, hard: true }; }
   if (!spec && v.who === 'erased') { const pool = run.seed ? [] : (META ? META.erased : []).concat(SHARED.erased).filter(s => !run.met.includes('snap:' + s.at)); if (pool.length) spec = { kind: 'erased', snap: pick(pool, rng), hard: true }; }
-  if (!spec) { const id = ENEMIES[v.who] ? v.who : pick(RIVALS.filter(r => !run.met.includes(r)), rng) || pick(RIVALS, rng); spec = { kind: 'rival', id, hard: true, traits: shuffle(Object.keys(TRAIT_POOL), rng).slice(0, v.traits || 1) }; }
+  if (!spec) { const id = ENEMIES[v.who] ? v.who : pick(RIVALS.filter(r => !run.met.includes(r)), rng) || pick(RIVALS, rng); spec = { kind: 'rival', id, hard: true, traits: rollTraits(run, v.traits || 1, rng) }; }
   spec.summoned = true; if (v.bounty) spec.bounty = v.bounty; if (v.say) spec.say = v.say;
   return spec;
 }
@@ -2432,7 +2444,7 @@ function choosePerk(run, meta, k, msgs) {
 
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,

@@ -519,7 +519,11 @@
   "smouldering",
   "barbed",
   "leeching",
-  "braced"
+  "braced",
+  "replicated",
+  "desynced",
+  "corrupted",
+  "clipping"
  ],
  "eventOptions": {
   "merchant": 7,
