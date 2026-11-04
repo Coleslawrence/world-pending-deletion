@@ -53,6 +53,10 @@ function states() {
     const dice = JSON.parse(JSON.stringify(mid.run)), ids = ['coin_toss', 'hedge', 'double_down', 'snake_eyes', 'jackpot', 'loaded_die'];
     dice.bar = dice.bar.map((p, i) => ({ id: ids[i], star: 2, mods: [], u: 'dice' + i }));
     out.push({ label: 'r5-fight-dice', stage: 'fight', run: dice });
+    // A Jinx bar: Misfortune and Curse chips and the Jinx button beside the shown move
+    const jx = JSON.parse(JSON.stringify(mid.run)), jids = ['evil_eye', 'ill_omen', 'knock_wood', 'thirteenth', 'calamity', 'pass_curse'];
+    jx.bar = jx.bar.map((p, i) => ({ id: jids[i], star: 2, mods: [], u: 'jinx' + i })); jx.gear.accessory = { id: 'black_cat_collar', star: 3, mods: [], u: 'jinxg' };
+    out.push({ label: 'r5-fight-jinx', stage: 'fight', run: jx });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };

@@ -244,6 +244,7 @@ const UNLOCKS = {
   arch_arcanist: { name: 'Archetype: Arcanist', desc: 'Quick skills and cooldown tricks join the pool.', cost: 20 },
   arch_storm: { name: 'Archetype: Stormcaller', desc: 'Stuns and Interrupts join the pool.', cost: 20 },
   arch_dicer: { name: 'Archetype: Gambler', desc: 'Dice, rerolls and Jackpots join the pool.', cost: 20 },
+  arch_jinx: { name: 'Archetype: Jinx', desc: 'Omens, jinxed moves and Curse join the pool.', cost: 20 },
   reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 15 },
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 25 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 15 },
@@ -1631,11 +1632,14 @@ function newFight(run, rng) {
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
     X.rerolls = P.rerolls || 0; X.firstSix = !!P.firstSix; X.sleeve = !!P.sleeveFix; X.jackpots = 0;
+    X.curse = Math.min(CURSE_MAX, P.startCurse || 0); X.misfortune = 0; X.omens = [];
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
   GEAR_SLOTS.forEach(k => { const g = run.gear[k]; if (g && GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll]) say(f, `[${GEAR[g.id].name} reads as ${GEAR[g.roll].name}: ${gearText(g.roll, g.star)}]`, 'skill'); });
   // Overflow from your last win: the overkill lands before this fight starts (at most a quarter of their HP)
   if (run.overflow > 0 && !run.practice) { const v = Math.min(run.overflow, Math.round(B.maxHp * 0.25)); B.hp -= v; say(f, `[Overflow: ${v} damage carried over from your last fight.]`, 'skill'); }
+  if (A.P.startMisf) B.misfortune += A.P.startMisf; // Black Cat Collar
+  A.isJinx = A.skills.some(s => s.def.tags && s.def.tags.includes('jinx')) || !!A.P.jinxCheap; // the Jinx button needs a Jinx skill
   planIntent(f, B);
   startTurn(f, A, true);
   return f;
@@ -1653,6 +1657,7 @@ function dmgMult(f, X, Y) {
   if (f.bloodmoon) m *= 1.2;
   if (X.enrage && X.hp / X.maxHp <= X.enrage) m *= X.enrageMult;
   if (P.dmgPct) m *= 1 + P.dmgPct;
+  if (X.curse) m *= 1 + CURSE_DMG * X.curse; // Curse: your skills hit harder
   if (P.lowHpDmg && half(X)) m *= 1 + P.lowHpDmg;
   if (Y) {
     if (P.vsHalf && half(Y)) m *= 1 + P.vsHalf;
@@ -1678,12 +1683,14 @@ function hit(f, X, Y, raw, o = {}) {
   if (o.resist) d *= o.resist;
   if (Y.P.lowDR && Y.hp < Y.maxHp * 0.25) d *= 1 - Y.P.lowDR;
   if (Y.P.flatDR && !o.isThorns) d -= Y.P.flatDR;
+  if (Y.curse) d *= 1 + CURSE_TAKEN * Y.curse; // Curse: and so do theirs
   d = Math.max(0, Math.round(d));
   // Delay Engine (experimental): the hit is stored, to strike all at once later (startTurn)
   if (X.P.suspend && !o.released && !o.isThorns) { X.bank = (X.bank || 0) + d; ev(f, { k: 'miss', side: Y.side, text: 'Stored' }); return 0; }
   let absorbed = 0;
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   const rest = d - absorbed;
+  if (absorbed > 0 && rest === 0 && Y.P.blockMisf && !o.isThorns) addMisfortune(f, X, Y.P.blockMisf); // Bad Landing
   // Pain Link (experimental): every hit is split evenly between both fighters
   if ((X.P.painLink || Y.P.painLink) && rest > 1) { const share = Math.floor(rest / 2); Y.hp -= rest - share; X.hp -= share; ev(f, { k: 'hit', side: X.side, amt: share, blocked: 0, thorns: true }); }
   else Y.hp -= rest;
@@ -1731,7 +1738,7 @@ function addStatus(f, X, Y, kind, v) {
   const P = X.P;
   if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0) + (P.burnLowDie ? lowDie(X) : 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
   if (kind === 'poison') { v += (P.poisonPlus || 0) + (P.dotPlus || 0); Y.poison += v; }
-  if (kind === 'bleed') { v += (P.bleedPlus || 0) + (P.dotPlus || 0); Y.bleed += v; if (P.healOnBleed) heal(f, X, P.healOnBleed); if (P.bleedPoison) Y.poison += P.bleedPoison; }
+  if (kind === 'bleed') { v += (P.bleedPlus || 0) + (P.dotPlus || 0) + (P.bleedMisf ? P.bleedMisf * Math.floor((Y.misfortune || 0) / 3) : 0); Y.bleed += v; if (P.healOnBleed) heal(f, X, P.healOnBleed); if (P.bleedPoison) Y.poison += P.bleedPoison; }
   if (X.isPlayer) f.tally.maxPoison = Math.max(f.tally.maxPoison, Y.poison);
   react(f, X, Y, kind);
 }
@@ -1783,6 +1790,7 @@ function stunTarget(f, X, Y) {
   if (Y.hp <= 0) return;
   if (resistance(Y, 'stun') && rnd(f.rng) < resistance(Y, 'stun')) { say(f, '[You shrug off the Stun.]', 'class'); return; }
   Y.stun = Math.max(Y.stun, 1);
+  if (X.P.stunMisf) addMisfortune(f, Y, X.P.stunMisf); // Ill Wind
   interrupt(f, X, Y, true);
   if (X.P.stunWeaken) Y.weaken = Math.max(Y.weaken, X.P.stunWeaken);
   react(f, X, Y);
@@ -1866,6 +1874,77 @@ function rerollDie(f, idx) {
   say(f, `[Reroll: ${s.def.name} ${was} \u2192 ${s.pip}.]`, 'skill');
   return true;
 }
+// ---------- Jinx ----------
+// Misfortune (on the opponent, never fades) pays to jinx the opponent's shown move: when it fires it goes wrong for its
+// user, by the move's role (JINX_COST in moves.js). Every jinx gives you 1 Curse (+6% skill damage, +4% damage taken
+// a stack, up to 10). Omens are traps keyed to the shown move: if it attacks (or guards) next, the Omen fires.
+const CURSE_DMG = 0.06, CURSE_TAKEN = 0.04, CURSE_MAX = 10, OMEN_MAX = 3;
+function jinxRole(f, s) {
+  const fx = s.def.fx, k = intentText(f, s, f.B).kind;
+  if (fx.heal || fx.regen || fx.healMissing) return 'sustain';
+  return k === 'big' ? 'big' : k === 'attack' ? 'strike' : fx.block && !fx.dmg ? 'guard' : 'setup';
+}
+function jinxCost(f) {
+  const A = f.A, B = f.B, s = B.intent; if (!s) return null;
+  if (A.P.jinxFree && !A.jinxedOnce) return 0;
+  return Math.max(0, JINX_COST[jinxRole(f, s)] + (B.jinxTax || 0) - (A.P.jinxCheap || 0) - (A.jinxDisc || 0));
+}
+// Can the player jinx the shown move now: the button only shows when this is true
+function canJinx(f) {
+  const A = f.A, B = f.B;
+  if (f.phase !== 'player' || f.over || !B.intent || B.jinxed || B.stun > 0 || B.unjinxable || A.jinxTurn === f.turn) return false;
+  if (!A.isJinx) return false;
+  return (B.misfortune || 0) >= jinxCost(f);
+}
+function addCurse(f, X, n) {
+  const was = X.curse || 0; X.curse = Math.min(CURSE_MAX, was + n);
+  if (X.P.curseBlock && X.curse > was) gainBlock(f, X, X.P.curseBlock * (X.curse - was)); // Mirror-Shard Mail
+  if (X.curse >= CURSE_MAX && was < CURSE_MAX && X.isPlayer) say(f, '[Entrant is carrying more bad luck than is advisable.]', 'loss');
+}
+function addMisfortune(f, Y, n) { if (n > 0 && Y.hp > 0) Y.misfortune = (Y.misfortune || 0) + n; }
+// Jinx the shown move (free: Calamity). Returns false when it can't be done.
+function jinxMove(f, free) {
+  const A = f.A, B = f.B;
+  if (!free && !canJinx(f)) return false;
+  if (free && (!B.intent || B.jinxed || B.stun > 0)) return false;
+  const cost = free ? 0 : jinxCost(f), first = !A.jinxedOnce;
+  B.misfortune -= cost; B.jinxed = true; A.jinxedOnce = true; f.tally.jinxes = (f.tally.jinxes || 0) + 1;
+  if (!free) { A.jinxTurn = f.turn; A.jinxDisc = 0; }
+  say(f, `[${B.intent.def.name} jinxed${cost ? ` for ${cost} Misfortune` : ''}. It will go wrong.]`, 'class');
+  if (!(A.P.jinxFree && first)) addCurse(f, A, 1);
+  if (A.coinStun) B.coinStun = true; // Cursed Coin
+  if (A.P.jinxReroll && A.skills.some(s => s.pip)) { rollDice(f, A, A.skills.filter(s => s.pip)); say(f, '[Rigged Game: your dice roll again.]', 'skill'); }
+  if (A.P.jinxHeal) heal(f, A, A.maxHp * A.P.jinxHeal);
+  if (A.P.jinxDoom && B.doomT > 0) { B.doomT = 1; say(f, '[Bad End: Doom falls now.]', 'skill'); }
+  return true;
+}
+// A jinxed move fires: it goes wrong for its user, by its role
+function fireJinx(f, B, s) {
+  const A = opp(f, B), fx = s.def.fx, p = s.power, role = jinxRole(f, s);
+  ev(f, { k: 'use', side: B.side, name: s.def.name });
+  say(f, '[Jinxed. The odds were posted.]', 'class');
+  const self = Math.round(((fx.dmg || 0) * (fx.hits || 1)) * p * dmgMult(f, B, A));
+  if (role === 'strike' || role === 'big') { hit(f, A, B, self, { noDodge: true, noCrit: true, pierce: true, src: 'Jinx' }); if (role === 'big' && B.hp > 0) stunTarget(f, A, B); }
+  else if (role === 'guard') A.jinxBlock = (A.jinxBlock || 0) + Math.round((fx.block || 0) * p); // lands on your next turn, after Block resets
+  else if (role === 'sustain') hit(f, A, B, Math.round(((fx.heal || 0) * p) || (fx.healMissing ? (B.maxHp - B.hp) * fx.healMissing : 0) || (fx.regen || 0) * p * 3), { noDodge: true, noCrit: true, pierce: true, src: 'Jinx' });
+  else { if (fx.empower) A.empower = Math.max(A.empower, fx.empower + 1); if (fx.block) A.jinxBlock = (A.jinxBlock || 0) + Math.round(fx.block * p); if (fx.evade) A.evade += fx.evade; if (fx.focus) A.focus = fx.focus; if (!fx.empower && !fx.block && !fx.evade) say(f, `[${s.def.name} fizzles.]`, 'class'); }
+  B.jinxed = false;
+  if (B.coinStun && B.hp > 0) { B.coinStun = false; B.stun = Math.max(B.stun, 1); say(f, `[Cursed Coin: ${B.name} loses their next turn.]`, 'class'); }
+}
+// Omens fire after the opponent's move, if it matched
+function fireOmens(f, B, s, role) {
+  const A = opp(f, B); if (!B.omens || !B.omens.length || B.hp <= 0) return;
+  const hit1 = B.omens.filter(o => (o.on === 'attack' && (role === 'strike' || role === 'big')) || (o.on === 'guard' && role === 'guard'));
+  if (!hit1.length) return;
+  B.omens = B.omens.filter(o => !hit1.includes(o));
+  hit1.forEach(o => {
+    say(f, '[Omen fulfilled.]', 'class');
+    if (o.dmg) hit(f, A, B, o.dmg, { noDodge: true, noCrit: true, pierce: true, src: 'Omen' });
+    if (o.on === 'guard' && B.block > 0) B.block = Math.round(B.block / 2);
+    addMisfortune(f, B, (o.misf || 0) + (A.P.omenPlus || 0));
+    if (A.P.omenWeaken) { B.weaken = Math.max(B.weaken, A.P.omenWeaken); react(f, A, B); }
+  });
+}
 function useSkill(f, X, s, opt) {
   opt = opt || {};
   const Y = opp(f, X);
@@ -1914,14 +1993,17 @@ function useSkill(f, X, s, opt) {
   if (fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: fx.selfDmg, kind: 'self' }); }
   let m = dmgMult(f, X, Y);
   const resist = Y.adapt && X.isPlayer && f.tally.mostUsed === s.key ? Y.adapt : 0;
-  const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum);
+  const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity);
+  if (fx.calamity && X.isPlayer) jinxMove(f, true); // Calamity: jinx the shown move for free first
   if (damaging && X.focus) { m *= 1 + X.focus; X.focus = 0; }
   if (damaging && !def.quick && X.aq) { m *= 1 + X.aq; X.aq = 0; }
   if (damaging && X.firstHit && !opt.echo) { m *= 1 + X.firstHit; X.firstHit = 0; }
   const src = def.name;
   let dealt = 0;
-  if (fx.dmg || fx.blockDmg || fx.malice) {
+  if (fx.dmg || fx.blockDmg || fx.malice || fx.perMisf || fx.calamity) {
     let base = (fx.dmg || 0) * p;
+    if (fx.perMisf) base += (fx.perMisf * (Y.misfortune || 0) + (fx.perCurse || 0) * (X.curse || 0)) * p; // Thirteenth Hour
+    if (fx.calamity) base += fx.calamity * (Y.misfortune || 0) * p;
     if (fx.blockDmg) base += X.block * fx.blockDmg;
     if (fx.malice) base += fx.malice * p * effectCount(Y);
     if (fx.momentum) base += fx.momentum * p * (X.streak || 0);
@@ -1942,6 +2024,7 @@ function useSkill(f, X, s, opt) {
   if (!fx.perHit) applyStatus(f, X, Y, fx, p);
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
   if (damaging && X.P.poisonOnHit && dealt > 0) addStatus(f, X, Y, 'poison', X.P.poisonOnHit);
+  if (damaging && X.P.hitMisf && dealt > 0) addMisfortune(f, Y, X.P.hitMisf); // Bent Horseshoe
   if (fx.block) gainBlock(f, X, fx.block * p);
   if (fx.heal) heal(f, X, fx.heal * p);
   if (fx.healMissing) heal(f, X, (X.maxHp - X.hp) * fx.healMissing);
@@ -1961,6 +2044,14 @@ function useSkill(f, X, s, opt) {
   if (fx.mark) { Y.marked = Math.max(Y.marked || 0, fx.mark); react(f, X, Y); }
   if (fx.focus) X.focus = fx.focus;
   if (fx.rollTwice) X.rollTwiceT = fx.rollTwice;
+  if (fx.misf) addMisfortune(f, Y, fx.misf);
+  if (fx.misfT) { Y.misfT = 3; Y.misfTv = fx.misfT; } // Bad Penny
+  if (fx.omenAtk || fx.omenGuard) { Y.omens = (Y.omens || []).slice(-(OMEN_MAX - (fx.omenGuard && fx.omenAtk ? 2 : 1))); if (fx.omenAtk) Y.omens.push({ on: 'attack', dmg: Math.round(fx.omenAtk * p), misf: 3 }); if (fx.omenGuard) Y.omens.push({ on: 'guard', misf: 3 }); }
+  if (fx.jinxDisc) X.jinxDisc = fx.jinxDisc;
+  if (fx.uncurse) X.curse = Math.max(0, (X.curse || 0) - fx.uncurse);
+  if (fx.coinStun) X.coinStun = true;
+  if (fx.passCurse) { const n = Math.max(0, (X.curse || 0) - (fx.curseKeep || 0)); if (n) { addMisfortune(f, Y, n * fx.passCurse); X.curse -= n; say(f, `[${n} Curse passed on: +${n * fx.passCurse} Misfortune.]`, 'class'); if (fx.curseDmg) dealt += hit(f, X, Y, fx.curseDmg * n * p, { src: def.name }); } }
+  if (fx.calamity) { if (fx.keepHalf) Y.misfortune = Math.floor((Y.misfortune || 0) / 2); else Y.misfortune = 0; addCurse(f, X, 3); }
   if (fx.reroll || fx.setSix) {
     const dice = X.skills.filter(o => o !== s && o.baseDef && o.baseDef.fx.die);
     if (fx.reroll) rollDice(f, X, dice);
@@ -1987,6 +2078,7 @@ function useSkill(f, X, s, opt) {
     if (P.quickPoison) addStatus(f, X, Y, 'poison', P.quickPoison);
     if (P.quickBlock) X.block += P.quickBlock;
     if (P.quickHeal) heal(f, X, P.quickHeal);
+    if (P.quickMisf) addMisfortune(f, Y, P.quickMisf); // Hex Glyph
     if (P.quickReroll) { const lo = X.skills.filter(o => o.pip).sort((a, b) => a.pip - b.pip)[0]; if (lo) { const was = lo.pip; rollDice(f, X, [lo]); if (X.isPlayer) say(f, `[Card Trick: ${lo.def.name} ${was} \u2192 ${lo.pip}.]`, 'skill'); } }
     if (P.quickEvade) X.evade = Math.max(X.evade, 1);
     if (P.quickStun && damaging && Y.hp > 0 && rnd(f.rng) < P.quickStun) { say(f, '[Tempest Mage: Stun!]', 'skill'); stunTarget(f, X, Y); }
@@ -2006,11 +2098,13 @@ function startTurn(f, X, first) {
     if (X.forge) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
   }
   if (X.forge) X.block += X.forge;
+  if (X.jinxBlock) { gainBlock(f, X, X.jinxBlock); say(f, `[The jinxed guard is yours: +${X.jinxBlock} Block.]`, 'class'); X.jinxBlock = 0; }
   X.thorns = 0; X.riposte = 0;
   if (X.regenT > 0) { heal(f, X, X.regen); X.regenT--; }
   if (P.regen) heal(f, X, P.regen);
   if (X.leechT > 0) { const v = Math.min(X.leech * (X.poison > 0 && X.blight ? 2 : 1), Math.max(0, X.hp)); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' }); heal(f, Y, Math.min(v, X.leech)); X.leechT--; if (Y.isPlayer) f.dealt['Leech'] = (f.dealt['Leech'] || 0) + v; }
   if (X.doomT > 0) { X.doomT--; if (X.doomT === 0) { X.hp -= X.doom; ev(f, { k: 'dot', side: X.side, amt: X.doom, kind: 'doom' }); say(f, `[Doom falls on ${X.isPlayer ? 'you' : X.name}: ${X.doom} damage.]`, 'skill'); if (Y.isPlayer) f.dealt['Doom'] = (f.dealt['Doom'] || 0) + X.doom; X.doom = 0; } }
+  if (X.misfT > 0) { X.misfT--; addMisfortune(f, X, X.misfTv || 0); }
   if (!X.isPlayer && X.aura) addStatus(f, X, Y, 'burn', Math.round(X.aura));
   if (!X.isPlayer && X.briar) addStatus(f, X, Y, 'bleed', Math.round(X.briar));
   const turns = X.isPlayer ? f.turn : (X.turns || 0);
@@ -2019,10 +2113,11 @@ function startTurn(f, X, first) {
     const v = Math.round(X.burn * (1 - resistance(X, 'burn'))); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
     if (Y.isPlayer) f.dealt['Burn'] = (f.dealt['Burn'] || 0) + v; else f.tally.hurtBy['Burn'] = (f.tally.hurtBy['Burn'] || 0) + v;
     if (Y.P.burnHeal) heal(f, Y, v * Y.P.burnHeal);
+    if (Y.P.burnMisf) addMisfortune(f, X, Y.P.burnMisf); // Black Candle
     const fade = X.burnFade != null ? X.burnFade : 0.3; X.burn = Math.max(0, X.burn - Math.ceil(X.burn * fade));
   }
   if (X.poison > 0) {
-    const v = Math.round(X.poison * (Y.P.poisonMult || 1) * (1 - resistance(X, 'poison')));
+    const v = Math.round(X.poison * (Y.P.poisonMult || 1) * (Y.P.poisonMisf && (X.misfortune || 0) >= 5 ? 1 + Y.P.poisonMisf : 1) * (1 - resistance(X, 'poison'))); // Evil Draught
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
     if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
@@ -2037,6 +2132,7 @@ function startTurn(f, X, first) {
   return true;
 }
 function endTurn(f, X, usedKey) {
+  if (X.isPlayer) { X.jinxDisc = 0; X.coinStun = false; }
   if (X.weaken > 0) X.weaken--;
   if (X.marked > 0) { X.marked--; if (!X.marked) X.hemo = false; }
   if (X.empower > 0) X.empower--;
@@ -2056,7 +2152,7 @@ function playerAct(f, idx) {
   f.events = [];
   useSkill(f, A, s);
   checkPhase(f, f.B, true);
-  s.cd = s.def.cd || 0;
+  s.cd = s.def.fx.killReset && f.B.hp <= 0 ? 0 : s.def.cd || 0; // Last Hour
   if (s.def.quick) s.cd += 1; // quick skills tick at the end of this same turn
   if (s.def.quick && A.quickFree > 0) { A.quickFree--; s.cd = 1; say(f, `[Hourglass: ${s.def.name} has no cooldown.]`, 'skill'); }
   else if (A.firstFree && !s.def.basic && !s.def.cheat) { A.firstFree = false; s.cd = s.def.quick ? 1 : 0; say(f, `[Archmage: ${s.def.name} has no cooldown.]`, 'skill'); }
@@ -2102,8 +2198,9 @@ function enemyTurn(f) {
   if (checkOver(f)) return;
   if (can) {
     if (B.flood && B.turns % B.flood === 0) { const T = f.A.block < B.block ? f.A : f.A.block > B.block ? B : f.A; T.weaken = Math.max(T.weaken, 2); say(f, `[The arena floods. ${T === f.A ? 'You are' : B.name + ' is'} Weakened.]`, T === f.A ? 'loss' : 'skill'); ev(f, { k: 'flood' }); react(f, B, T); }
-    const s = B.intent || B.skills[0];
-    useSkill(f, B, s);
+    const s = B.intent || B.skills[0], role = (B.omens && B.omens.length) || B.jinxed ? jinxRole(f, s) : null;
+    if (B.jinxed) fireJinx(f, B, s); else useSkill(f, B, s);
+    if (role) fireOmens(f, B, s, role);
     if (!s.def.fx.mirror) f.lastEnemySkill = { def: s.def, power: s.power };
     if (B.twincast && B.turns % B.twincast === 0 && f.A.hp > 0) { say(f, `[${B.name} casts twice!]`, 'loss'); useSkill(f, B, s, { echo: true }); }
     s.cd = s.def.cd || 0;
@@ -2178,6 +2275,14 @@ function previewSkill(f, s) {
   if (fx.mark) parts.push(`Mark ${fx.mark}t`);
   if (fx.focus) parts.push(`Next +${fx.focus * 100}%`);
   if (fx.haste) parts.push(`Cooldowns −${fx.haste}`);
+  if (fx.perMisf || fx.calamity) { const Y = f ? f.B : null, mi = Y ? Y.misfortune || 0 : 0, cu = X ? X.curse || 0 : 0; parts.unshift(`${Math.round(((fx.dmg || 0) + (fx.perMisf || 0) * mi + (fx.perCurse || 0) * cu + (fx.calamity || 0) * mi) * p * m)} dmg`); if (fx.calamity) parts.push('Jinx'); }
+  if (fx.misf) parts.push(`Misfortune ${fx.misf}`);
+  if (fx.omenAtk) parts.push(`Omen ${Math.round(fx.omenAtk * p)}${fx.omenGuard ? ' · guard' : ''}`);
+  if (fx.passCurse) parts.push(`Pass ${X ? Math.max(0, (X.curse || 0) - (fx.curseKeep || 0)) : ''} Curse`);
+  if (fx.jinxDisc) parts.push(`Jinx −${fx.jinxDisc}`);
+  if (fx.rollTwice) parts.push('Roll twice');
+  if (fx.reroll) parts.push('Reroll dice');
+  if (fx.setSix) parts.push('Lowest die 6');
   if (fx.interrupt) parts.push('Interrupt');
   if (fx.regen) parts.push(`Regen ${Math.round(fx.regen * p)}×3`);
   if (fx.doom) parts.push(`Doom ${Math.round(fx.doom * p)}`);
@@ -2250,6 +2355,17 @@ function describe(def, p = 1) {
   }
   if (fx.dmgAll) r.unshift(`Deal ${n(fx.dmgAll)} per pip across all your shown dice${fx.progressive ? ', +1 per pip for each Jackpot this fight' : ''}.`);
   if (fx.cashOut) r.push(`Heal ${fx.cashOut * 100}% of the damage dealt.`);
+  if (fx.misf) r.push(`Misfortune ${fx.misf}.`);
+  if (fx.misfT) r.push(`Then Misfortune ${fx.misfT} each turn for 3 turns.`);
+  if (fx.omenAtk) r.push(`Omen: if the opponent attacks next, it takes ${n(fx.omenAtk)} and gains 3 Misfortune.`);
+  if (fx.omenGuard) r.push('Omen: if it guards next, it loses half its Block and gains 3 Misfortune.');
+  if (fx.jinxDisc) r.push(`Your next jinx this turn costs ${fx.jinxDisc} less.`);
+  if (fx.uncurse) r.push(`Remove ${fx.uncurse} Curse.`);
+  if (fx.passCurse) r.push(`Move ${fx.curseKeep ? `all but ${fx.curseKeep} of your` : 'all your'} Curse onto the opponent as ${fx.passCurse === 2 ? 'double' : fx.passCurse + '×'} the Misfortune${fx.curseDmg ? `, and deal ${n(fx.curseDmg)} per Curse moved` : ''}.`);
+  if (fx.perMisf) r.push(`Deal ${n(fx.perMisf)} per Misfortune on the opponent plus ${n(fx.perCurse || 0)} per Curse on you.`);
+  if (fx.killReset) r.push('No cooldown if it kills.');
+  if (fx.coinStun) r.push('A move you jinx this turn also Stuns its user next turn.');
+  if (fx.calamity) { if (fx.dmg) r.shift(); r.unshift(`Jinx the shown move for free, then deal ${n(fx.dmg || 0)} + ${n(fx.calamity)} per Misfortune and ${fx.keepHalf ? 'halve' : 'clear'} it. You take 3 Curse.`); }
   if (fx.rollTwice) r.push(`For ${fx.rollTwice} turns, your dice roll twice and keep the higher.`);
   if (fx.reroll) r.push('Reroll your other dice.');
   if (fx.setSix) r.push('Set your lowest die to 6.');
@@ -2669,5 +2785,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
