@@ -39,7 +39,7 @@ function glitchesOn(run) { return !!run && (!run.daily || glitchDay(run.daily));
 // Glitch Day: one game day a week (GLITCH_DAY.weekday, 0 = Sunday) Pending World runs on a Corrupted Save, with glitches
 // on. Days before GLITCH_DAY.from never are, so shipping it never changes a day already played.
 // SHIP STEP: set from to the first glitch weekday after the release that ships Glitch Day.
-const GLITCH_DAY = { weekday: 5, from: '2026-11-13' };
+const GLITCH_DAY = { weekday: 5, from: '2026-11-06' };
 function glitchDay(date) { return !!date && date >= GLITCH_DAY.from && new Date(date + 'T00:00:00Z').getUTCDay() === GLITCH_DAY.weekday; }
 // A Corrupted Save world doubles every glitch chance
 function glitchMul(run) { return run && run.world && run.world.mod === 'corrupted' ? 2 : 1; }
