@@ -1969,6 +1969,15 @@ function fireOmens(f, B, s, role) {
     if (A.P.omenWeaken) { B.weaken = Math.max(B.weaken, A.P.omenWeaken); react(f, A, B); }
   });
 }
+// Read skills (fx.read): stronger when the opponent's shown move is that kind (intentText's kind; a big attack counts as an
+// attack). readFx is merged over fx when the read lands; readMult multiplies the skill's power.
+const READ_WORD = { attack: 'an attack', defend: 'a defend', debuff: 'a debuff' };
+function readHits(f, X, fx) {
+  if (!f || !fx.read || !X.isPlayer) return false;
+  const Y = opp(f, X); if (!Y.intent || Y.stun > 0) return false;
+  const k = intentText(f, Y.intent, Y).kind; return (k === 'big' ? 'attack' : k) === fx.read;
+}
+function readDef(def) { const fx = Object.assign({}, def.fx, def.fx.readFx); delete fx.read; delete fx.readFx; delete fx.readMult; return Object.assign({}, def, { fx }); }
 function useSkill(f, X, s, opt) {
   opt = opt || {};
   const Y = opp(f, X);
@@ -1995,6 +2004,10 @@ function useSkill(f, X, s, opt) {
     else say(f, '[Error: no previous action to repeat.]', 'skill');
     if (def.fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(def.fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: def.fx.selfDmg, kind: 'self' }); }
     return;
+  }
+  if (def.fx.read && readHits(f, X, def.fx)) {
+    const rm = def.fx.readFx.readMult || 1; def = readDef(def); p *= rm;
+    f.tally.reads = (f.tally.reads || 0) + 1; say(f, `[Read: ${def.name} answers ${READ_WORD[s.def.fx.read]}.]`, 'skill');
   }
   const fx = def.fx;
   // Jackpot: this skill's die matches another shown die
@@ -2279,6 +2292,7 @@ function intentInfo(f) {
   return r;
 }
 function previewSkill(f, s) {
+  if (s.def.fx.read && f && readHits(f, f.A, s.def.fx)) return 'Read · ' + previewSkill(f, { def: readDef(s.def), power: s.power * (s.def.fx.readFx.readMult || 1) });
   const X = f ? f.A : null, def = s.def, fx = def.fx, p = s.power, m = X ? dmgMult(f, X, f.B) : 1;
   const parts = [];
   if (fx.dmg || fx.blockDmg || fx.malice) { let v = (fx.dmg || 0) * p; if (fx.blockDmg && X) v += X.block * fx.blockDmg; if (fx.malice && f) v += fx.malice * p * effectCount(f.B); v = Math.round(v * m * (X && X.focus ? 1 + X.focus : 1) * (X && X.aq && !def.quick ? 1 + X.aq : 1)); parts.push(fx.hits ? `${v}×${fx.hits}` : `${v} dmg`); }
@@ -2401,6 +2415,11 @@ function describe(def, p = 1) {
   if (fx.rollTwice) r.push(`For ${fx.rollTwice} turns, your dice roll twice and keep the higher.`);
   if (fx.reroll) r.push('Reroll your other dice.');
   if (fx.setSix) r.push('Set your lowest die to 6.');
+  if (fx.read) {
+    const rm = fx.readFx.readMult, rd = readDef(def);
+    r.push(rm ? `Read: if the opponent's shown move is ${READ_WORD[fx.read]}, it has ${rm === 2 ? 'double' : rm + '×'} power.`
+      : `Read: if the opponent's shown move is ${READ_WORD[fx.read]}, instead: ${describe(Object.assign({}, rd, { quick: false }), p)}`);
+  }
   if (def.quick) r.push("Quick: doesn't end your turn.");
   return r.join(' ');
 }
@@ -2807,7 +2826,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
-  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, gearStats, isGear, pieceDef, baseId,
+  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,

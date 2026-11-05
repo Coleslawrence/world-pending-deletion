@@ -41,6 +41,8 @@ jobs:
         run: node tools/ally-pieces-test.js
       - name: Opening draft test
         run: node tools/draft-test.js
+      - name: Read skills test
+        run: node tools/read-test.js
 
   balance:
     name: Balance gate

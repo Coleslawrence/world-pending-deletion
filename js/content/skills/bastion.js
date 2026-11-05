@@ -7,6 +7,7 @@ sk('retribution', 'Retribution', ['bastion'], 'D', 3, { block: 6, thorns: 8 }, [
 sk('riposte', 'Riposte', ['bastion', 'blade'], 'C', 3, { block: 6, riposte: 1.5 }, [['perfect_riposte', 'Perfect Riposte', { block: 10, riposte: 2.5 }], ['parry_master', 'Parry Master', { block: 6, riposte: 1.5, evade: 1 }]]);
 sk('unbreakable', 'Unbreakable', ['bastion'], 'B', 4, { block: 20, cleanse: 1 }, [['immovable', 'Immovable', { block: 30, cleanse: 1 }], ['iron_skin', 'Iron Skin', { block: 18, cleanse: 1, thorns: 6 }]]);
 sk('bulwark_slam', 'Bulwark Slam', ['bastion'], 'A', 3, { dmg: 4, blockDmg: 1.2 }, [['titan_slam', 'Titan Slam', { dmg: 6, blockDmg: 1.6 }], ['shield_quake', 'Shield Quake', { dmg: 4, blockDmg: 1.2, stun: 1 }, 4]]);
+sk('brace_for_it', 'Brace for It', ['bastion'], 'D', 2, { block: 6, read: 'attack', readFx: { block: 18, thorns: 6 } }, [['riposte_stance', 'Riposte Stance', { block: 6, read: 'attack', readFx: { block: 16, riposte: 1 } }], ['steady_footing', 'Steady Footing', { block: 10, regen: 3, read: 'attack', readFx: { block: 20, regen: 3 } }]]);
 flav({
   iron_guard: "Feet planted, shield up. The oldest lesson in the Iron Hold.",
   fortress: "They hit the shield. The shield does not notice.",
@@ -29,4 +30,7 @@ flav({
   bulwark_slam: "Everything you have stopped, delivered all at once.",
   titan_slam: "The arena floor remembers this one.",
   shield_quake: "The ground jumps. So do they, and they land badly.",
+  brace_for_it: "You saw it coming. That is most of the work.",
+  riposte_stance: "You let the blow land on the shield, then hand it back.",
+  steady_footing: "Feet set, breath slow. The arena can wait.",
 });
