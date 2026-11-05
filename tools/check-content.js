@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope).
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -127,6 +127,8 @@ Object.entries(C.GEAR).forEach(([k, g]) => {
   Object.keys(g.top || {}).forEach(k => { ref(w, !!C.EFFECTS[k], `top effect ${k} is not in effects.js`); ref(w, !(k in (g.pas || {})) && !(k in (g.fix || {})), `top effect ${k} repeats one it already has; ★3 adds a new line`); });
 });
 Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, !!C.DISCIPLINES[a.disc], `Discipline ${a.disc} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
+// Path evolutions: two advanced classes per archetype; the first keeps tier 3, the second brings its own words and effects
+archs.forEach(a => { const w = 'archetypes ADVANCE ' + a, v = C.ADVANCE[a]; ref(w, Array.isArray(v) && v.length === 2 && v.every(o => o.name), 'needs two advanced classes, each with a name'); if (!v || !v[1]) return; ref(w, !v[0].p && !v[0].b, "the first keeps tier 3 as written (no b or p of its own)"); ref(w, typeof v[1].b === 'string' && /\.$/.test(v[1].b) && v[1].p, 'the second needs b (words, ending with a full stop) and p (effects)'); Object.keys(v[1].p || {}).forEach(k => ref(w, !!C.EFFECTS[k], `effect ${k} is not in effects.js`)); });
 archs.forEach((a, i) => archs.slice(0, i).forEach(b => ref('archetypes ' + a, C.ARCH[a].stat !== C.ARCH[b].stat || C.ARCH[a].disc !== C.ARCH[b].disc, `shares its grid cell (${C.ARCH[a].stat} ${C.ARCH[a].disc}) with ${b}; every archetype needs a cell of its own`)));
 C.START_ARCH.forEach(a => ref('archetypes START_ARCH', isArch(a), `${a} is not an archetype`));
 Object.entries(C.GODS).forEach(([k, g]) => {
@@ -320,6 +322,7 @@ Object.values(C.SKILLS).filter(s => s.base).forEach(s => Object.entries(s.fx).fo
 Object.values(C.ENEMIES).forEach(e => e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.entries(m.fx || {}).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
 Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix, g.top)).forEach(([k, v]) => use('gear', k, id, v)));
 Object.values(C.ARCH).forEach(a => a.p.forEach((p, i) => Object.entries(p).forEach(([k, v]) => use('arch', k, `${a.name} ${[2, 4, 6][i]}`, v))));
+Object.entries(C.ADVANCE).forEach(([a, v]) => v.forEach(o => Object.entries(o.p || {}).forEach(([k, x]) => use('arch', k, o.name, x))));
 Object.values(C.HIDDEN_PATHS).forEach(h => Object.entries(h.fx).forEach(([k, v]) => use('path', k, h.name, v)));
 Object.values(C.GIFTS).forEach(g => Object.entries(g.p || {}).forEach(([k, v]) => use('gift', k, g.name, v)));
 Object.values(C.TITLES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('title', k, t.name, v)));
@@ -347,6 +350,7 @@ Object.entries(C.EFFECTS).forEach(([k, E]) => {
 // Words match mechanics: a description has to state any rule its effects carry that players couldn't guess (must in effects.js)
 const described = [];
 Object.entries(C.ARCH).forEach(([k, a]) => a.b.forEach((b, i) => described.push([`archetypes ${k} tier ${i + 1}`, b, a.p[i]])));
+Object.entries(C.ADVANCE).forEach(([k, v]) => v.forEach(o => o.p && described.push([`archetypes ADVANCE ${k} ${o.name}`, o.b, o.p])));
 Object.entries(C.GEAR).forEach(([k, g]) => { try { described.push(['gear ' + k, g.text(G.gearPas(k, 1)), Object.assign({}, g.pas, g.fix)]); } catch (e) { /* reported above */ } });
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => described.push(['paths ' + k, h.desc, h.fx]));
 Object.entries(C.GODS).forEach(([k, g]) => described.push(['gods ' + k, g.blessing, g.bless]));
@@ -475,6 +479,7 @@ const owners = {};
 const own = (name, what) => { (owners[name] = owners[name] || []).push(what); };
 Object.values(C.SKILLS).forEach(s => own(s.name, 'skill ' + s.id));
 Object.entries(C.GEAR).forEach(([k, g]) => own(g.name, 'gear ' + k));
+Object.entries(C.ADVANCE).forEach(([k, v]) => v.forEach(o => own(o.name, 'advanced class ' + k)));
 Object.entries(C.ARCH).forEach(([k, a]) => { own(a.name, 'archetype ' + k); own(a.path, 'path name of ' + k); });
 Object.entries(C.GIFTS).forEach(([k, g]) => own(g.name, 'Gift ' + k));
 Object.entries(C.TITLES).forEach(([k, t]) => own(t.name, 'Title ' + k));

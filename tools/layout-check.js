@@ -65,6 +65,8 @@ function states() {
     dr.draft = ['snake_eyes', 'double_down', 'thirteenth', 'pass_curse', 'evil_eye', 'loaded_die'];
     dr.gearDraft = G.rollGearDraft(dr, Math.random); if (dr.gearDraft.length < 2) dr.gearDraft = Object.keys(G.GEAR).slice(0, 2);
     out.push({ label: 'draft', stage: 'draft', run: dr });
+    // Path evolution card: the two advanced classes for an archetype at 6 pieces
+    out.push({ label: 'path-evolution', stage: 'shop', run: mid.run, pending: [{ type: 'adv', arch: 'reaper' }] });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };
@@ -144,14 +146,14 @@ function inspect() {
       await page.goto(url);
       await page.evaluate(([rk, mk, r, m]) => { localStorage.clear(); localStorage.setItem(rk, JSON.stringify(r)); localStorage.setItem(mk, JSON.stringify(m)); localStorage.setItem('wpd-news-seen', '99'); }, ['le-run-1', 'le-meta-1', run, meta]);
       await page.goto(url); await page.addStyleTag({ content: insets });
-      await page.evaluate(([stage, sheet]) => {
-        ui.sheet = null; run.pending = [];
+      await page.evaluate(([stage, sheet, pending]) => {
+        ui.sheet = null; run.pending = pending || [];
         if (stage === 'fight') startFightUI();
         else if (stage === 'worlds') onAct({ dataset: { act: 'new' } });
         else { ui.screen = stage; ui.sheet = sheet || null; render(); }
-      }, [st.stage, st.sheet]);
+      }, [st.stage, st.sheet, st.pending]);
       await page.evaluate(() => document.fonts.ready);
-      await page.waitForTimeout(st.stage === 'fight' ? 900 : st.sheet ? 450 : 150);
+      await page.waitForTimeout(st.stage === 'fight' ? 900 : st.sheet || st.pending ? 450 : 150);
       const bad = await page.evaluate(inspect);
       if (bad.length) fails++;
       console.log(`${bad.length ? 'FAIL' : 'ok  '} ${S.name} ${st.label}${bad.length ? '\n     ' + bad.slice(0, 8).join('\n     ') + (bad.length > 8 ? `\n     ... ${bad.length - 8} more` : '') : ''}`);

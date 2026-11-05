@@ -25,6 +25,23 @@ const ARCH = {
   dicer: { name: 'Gambler', stat: 'LUK', disc: 'sway', theme: 'Dice, rerolls and Jackpots', path: 'Cardsharp', line: 'Makes its own luck, then bets all of it.', owns: ['die', 'dmgPip', 'blockPip', 'healPip', 'dieMin', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'cashOut', 'progressive', 'reroll', 'setSix', 'rollTwice', 'mark', 'dieStun'], words: ['dice', 'coin', 'card', 'odds', 'stake', 'jackpot'], b: ['Your dice never roll below 2.', 'Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die.', 'Jackpot: when two of your dice show the same number, both skills are 50% stronger.'], p: [{ dieMin: 2 }, { rerolls: 2 }, { jackpot: 0.5 }] },
   jinx: { name: 'Jinx', stat: 'LUK', disc: 'bane', theme: 'Omens, jinxed moves and Curse', path: 'Hexbringer', line: 'Everything goes wrong, for them. The rest it carries.', owns: ['misf', 'misfT', 'omenAtk', 'omenGuard', 'jinxDisc', 'uncurse', 'passCurse', 'curseDmg', 'curseKeep', 'perMisf', 'perCurse', 'killReset', 'coinStun', 'calamity', 'keepHalf', 'augury', 'portent', 'misfPerBurn'], words: ['crow', 'omen', 'mirror', 'curse', 'ladder', 'thirteen'], b: ['Jinxing costs 1 less Misfortune.', 'When an Omen fires, it adds 2 more Misfortune.', 'The first move you jinx each fight costs nothing and gives no Curse.'], p: [{ jinxCheap: 1 }, { omenPlus: 2 }, { jinxFree: 1 }] },
 };
+// Path evolution: the first time an archetype reaches 6 pieces in a run, its Path evolves into one of two advanced
+// classes. The first keeps tier 3 as written above (b[2], p[2]); the second swaps it for its own b and p. The pick
+// lasts the run. World Records and pool builds keep the first.
+const ADVANCE = {
+  pyre: [{ name: 'Everflame' }, { name: 'Cinder Warden', b: 'Thorns also apply 4 Burn. Heal 20% of the Burn damage your opponent takes.', p: { thornBurn: 4, burnHeal: 0.2 } }],
+  venom: [{ name: 'Plague Lord' }, { name: 'Blight Leech', b: 'Heal 30% of Poison damage dealt (max 30% from all sources).', p: { poisonHeal: 0.3 } }],
+  blade: [{ name: 'Blood Dancer' }, { name: 'Swordmaster', b: '+15% critical chance. Critical hits deal ×2 instead of ×1.5.', p: { critBonus: 0.15, critMult: 2 } }],
+  bastion: [{ name: 'Iron Colossus' }, { name: 'Thornguard', b: 'Thorns and Riposte deal 100% more.', p: { thornMult: 2 } }],
+  arcanist: [{ name: 'Timeweaver' }, { name: 'Spellblade', b: 'Quick skills: 1 more turn shorter cooldown. After a Quick skill, your next skill deals 30% more.', p: { quickCd: 1, afterQuick: 0.3 } }],
+  zealot: [{ name: 'Living Saint' }, { name: 'Undying', b: 'Heal 15% of the damage you deal. Heal 3 at the start of each of your turns.', p: { lifesteal: 0.15, regen: 3 } }],
+  reaper: [{ name: 'Harbinger' }, { name: 'Headsman', b: '+50% damage to opponents below 30% HP. The first time you hit an opponent below half HP, heal 15% of your max HP.', p: { execBonus: 0.5, reapBlood: 0.15 } }],
+  storm: [{ name: 'Thunderlord' }, { name: 'Tempest', b: 'Whenever you Stun or Interrupt, you are Empowered for 2 turns. Your Stuns and Interrupts deal 10 more damage.', p: { stunEmpower: 2, stunDmg: 10 } }],
+  dicer: [{ name: 'Whale' }, { name: 'Card Counter', b: 'Your dice never roll below 3. Start each fight with 1 more reroll.', p: { dieMin: 3, rerolls: 1 } }],
+  jinx: [{ name: 'Hexlord' }, { name: 'Doomsayer', b: 'When an Omen fires, it adds 3 more Misfortune and Weakens its target for 2 turns.', p: { omenPlus: 3, omenWeaken: 2 } }],
+};
+// The tier 3 words and effects a run has for an archetype: its Path evolution's, once picked
+function advOf(adv, k) { const i = adv && adv[k] || 0, o = ADVANCE[k] && ADVANCE[k][i]; return o && o.p ? o : { name: ADVANCE[k] ? ADVANCE[k][0].name : null, b: ARCH[k].b[2], p: ARCH[k].p[2] }; }
 const ARCH_KEYS = Object.keys(ARCH);
 const START_ARCH = ['pyre', 'venom', 'blade', 'bastion', 'zealot', 'reaper'];
 // The Disciplines: the grid's columns. A new Discipline is never added; a new archetype takes a free cell.

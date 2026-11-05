@@ -43,6 +43,8 @@ jobs:
         run: node tools/draft-test.js
       - name: Read skills test
         run: node tools/read-test.js
+      - name: Path evolution test
+        run: node tools/advance-test.js
 
   balance:
     name: Balance gate

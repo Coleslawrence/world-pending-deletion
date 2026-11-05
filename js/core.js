@@ -640,6 +640,13 @@ function evolve(run, u, evoId, meta) {
   run.pending = run.pending.filter(p => !(p.type === 'evo' && p.u === u));
   return true;
 }
+// Choose a Path evolution (i: 0 keeps tier 3 as written, 1 the alternative)
+function advance(run, k, i) {
+  if (!ADVANCE[k] || !ADVANCE[k][i]) return false;
+  run.adv = run.adv || {}; run.adv[k] = i;
+  run.pending = run.pending.filter(p => !(p.type === 'adv' && p.arch === k));
+  return true;
+}
 // Move a piece to a destination: { bar: i } | { gear: slot } | 'bench'
 function movePiece(run, u, dest, msgs) {
   const src = findPiece(run, u); if (!src) return false;
@@ -728,6 +735,11 @@ function worldFirst(run, key, text, titleId, msgs) {
 }
 function checkPath(run, msgs) {
   const c = runCounts(run);
+  // Path evolution: the first time an archetype reaches 6, choose its advanced class (kept for the run)
+  ARCH_KEYS.forEach(k => {
+    if ((c[k] || 0) < 6 || !ADVANCE[k] || (run.adv && run.adv[k] != null) || run.pending.some(p => p.type === 'adv' && p.arch === k)) return;
+    run.pending.push({ type: 'adv', arch: k }); msgs && msgs.push({ t: 'class', text: `[${ARCH[k].path}: 6 pieces. The Path can evolve. Choose what it becomes.]` });
+  });
   const top = Object.keys(c).filter(k => c[k] >= 4).sort((a, b) => c[b] - c[a])[0];
   if (top && run.path !== top) { run.path = top; msgs && msgs.push({ t: 'class', text: `[Path recognised: ${ARCH[top].path}.]` }); questEvent(run, 'path', {}, msgs); }
   if (!top) run.path = null;
@@ -767,7 +779,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   x = x || {};
   const c = archCounts(barPieces, gearPieces, gifts), lm = 1 + 0.08 * ((lvl || 1) - 1);
   // Archetype bonuses, then gear (both grow with level), then everything else. Effects and how they combine: effects.js
-  ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach(p => addEffects(P, p, lm)));
+  ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach((p, i) => addEffects(P, i === 2 ? advOf(x.adv, k).p : p, lm)));
   gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll] ? g.roll : g.id, g.star), lm));
   if (P.goldDmg) addEffects(P, { dmgPct: Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10)) }); // per 10 gold held when the fight starts, up to +25%
   const hp = hiddenPathOf(c);
@@ -782,7 +794,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
-function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold }); }
+function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold, adv: run.adv }); }
 
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
@@ -2826,7 +2838,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
-  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, gearStats, isGear, pieceDef, baseId,
+  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
