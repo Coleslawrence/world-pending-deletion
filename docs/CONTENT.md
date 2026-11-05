@@ -150,12 +150,12 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 21 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 1 | Two-Headed Coin (4) | (works with other keys on the same skill) | yes |
 | `dieStun` | 3 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6) | (works with other keys on the same skill) | yes |
-| `dmg` | 214 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 217 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 3 | Jackpot (3), Progressive Jackpot (3), Cash Out (3) | Deal 3 per pip across all your shown dice. | yes |
 | `dmgPip` | 15 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 5 | Doom (26), Swift Doom (22), Inevitable Doom (40), … | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
-| `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
+| `doublePoison` | 5 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
 | `drainPoison` | 1 | Wither (1) | Heal equal to the opponent's Poison. | no |
 | `empower` | 13 | War Cry (2), Bonfire (2), Spell Theft (2), … | Deal 30% more damage for 2 turns. | yes |
 | `evade` | 8 | Smoke Bomb (1), Vanish (2), Caltrops (1), … | Evade the next attack. | yes |
@@ -163,7 +163,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `execute` | 9 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
 | `focus` | 13 | Focus (0.6), Read the Glyph (0.2), Loaded Die (0.2), … | Your next damaging skill deals 60% more. | yes |
 | `haste` | 5 | Time Warp (2), Spellweave (1), Haste (3), … | Your other cooldowns drop by 2. | yes |
-| `heal` | 21 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
+| `heal` | 22 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 6 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 1 | Insurance (1) | (works with other keys on the same skill) | yes |
 | `hits` | 43 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
@@ -172,10 +172,10 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
 | `keepHalf` | 1 | Aftermath (1) | (works with other keys on the same skill) | no |
 | `killReset` | 3 | Silent Kill (1), Mercy Kill (1), Last Hour (1) | No cooldown if it kills. | no |
-| `leech` | 3 | Leech (3), Blood Leech (6), Parasite (3) | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
-| `lifesteal` | 12 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
-| `malice` | 3 | Malice (3), Spite (5), Torment (3) | +3 for each effect on the opponent. | yes |
-| `mark` | 12 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
+| `leech` | 4 | Leech (3), Blood Leech (6), Parasite (3), … | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
+| `lifesteal` | 13 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
+| `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
+| `mark` | 13 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | no |
 | `misf` | 9 | Crooked Odds (2), Evil Eye (2), Cursed Coin (5), … | Misfortune 2. | yes |
 | `misfPerBurn` | 3 | Bad Wick (3), Wax and Ash (2), Ember Omen (3) | Then Misfortune 1 for every 3 Burn on the opponent. | yes |
@@ -189,13 +189,13 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perHit` | 14 | Flame Wave (1), Thousand Cuts (1), Fire Rain (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 3 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3) | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
 | `pierce` | 10 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
-| `poison` | 26 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `poison` | 32 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
-| `read` | 29 | Backdraft ("attack"), Seep ("defend"), Sidestep ("attack"), … | (works with other keys on the same skill) | yes |
-| `readFx` | 29 | Backdraft ({"burn":4,"detonate":1}), Seep ({"poison":7}), Sidestep ({"dmg":4,"evade":1,"mark":2}), … | (works with other keys on the same skill) | yes |
+| `read` | 30 | Backdraft ("attack"), Seep ("defend"), Sidestep ("attack"), … | (works with other keys on the same skill) | yes |
+| `readFx` | 30 | Backdraft ({"burn":4,"detonate":1}), Seep ({"poison":7}), Sidestep ({"dmg":4,"evade":1,"mark":2}), … | (works with other keys on the same skill) | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
-| `regen` | 7 | Consecrate (4), Cinder Shell (2), Mending Guard (3), … | Heal 4 at the start of your next 3 turns. | yes |
+| `regen` | 8 | Consecrate (4), Cinder Shell (2), Symbiote (2), … | Heal 4 at the start of your next 3 turns. | yes |
 | `replay` | 1 | Err̷or (1) | (works with other keys on the same skill) | yes |
 | `reroll` | 5 | Loaded Die (1), Crooked Odds (1), Sleight of Hand (1), … | Reroll your other dice. | yes |
 | `riposte` | 4 | Riposte (1.5), Perfect Riposte (2.5), Parry Master (1.5), … | Until your next turn, damage you block is dealt back ×1.5. | yes |
@@ -206,10 +206,10 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `snake` | 3 | Snake Eyes (45), Boxcars (45), Long Odds (60) | (works with other keys on the same skill) | yes |
 | `stack` | 1 | Stack Overfl̷ow (0.25) | (works with other keys on the same skill) | no |
 | `stun` | 12 | Thunderclap (1), Thunder God's Wrath (1), Flashpoint (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
-| `stunIfWeak` | 5 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
+| `stunIfWeak` | 6 | Overload (1), Numbing Needles (1), Jolt (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 8 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
-| `weaken` | 41 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 44 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
