@@ -47,7 +47,7 @@ if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
 function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
 function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; meta.savedAt = Date.now(); lsSet(META_KEY, meta); if (typeof schedulePush === 'function') schedulePush(); }
-function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
+function stageScreen() { if (run.startPts != null && run.stage === 'choose') return 'kitstats'; return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
 // ---------- Toasts ----------
 // Notices wait their turn instead of pushing each other off screen: a few show at once, each stays long enough to
@@ -524,7 +524,7 @@ function titleHTML() {
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
     <div class="t-stats"><div><b>${meta.wins}</b><span>spared</span></div><div><b>${meta.erased.length}</b><span>erased</span></div><div><b>${meta.echoes}</b><span>Echoes</span></div><button data-act="sheet" data-s="halls"><b>${meta.rank ? meta.rank.letter : 'F'}</b><span>Entrant Rank</span></button></div>
     <div class="stack">
-      ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${saved.daily ? 'Pending World: ' : ''}${esc(saved.world.name)}, ${saved.stage === 'draft' ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
+      ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${saved.daily ? 'Pending World: ' : ''}${esc(saved.world.name)}, ${saved.stage === 'draft' || saved.startPts != null ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
       ${dailyButton(canResume && saved)}
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
@@ -556,7 +556,7 @@ function worldsHTML() {
 // ---------- Awakening ----------
 // In Pending World the record and the System Offer come from the day's seed, and Echo unlocks don't count
 function newAw(w, date) {
-  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
+  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
     offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta, awRng('offer')), title: null };
 }
 // Everything the System draws at an Awakening comes from a seed: the day's in Pending World, otherwise one drawn when
@@ -578,18 +578,18 @@ function giftRow(k, a, w) {
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
   const chk = giftCheck(w, a.gifts, a.patron, a.offer, a.sysPts);
-  const tabs = [['id', 'Name'], ['stats', 'Stats' + (a.pts ? ` · ${a.pts}` : '')], ['gifts', `Gifts · ${chk.left}`], ['patron', 'Patron']];
+  // In the order they depend on each other: the Patron sets the Gift Points (Faithless adds 2), and stats wait for the
+  // opening draft, when the skills they power are known
+  const tabs = [['id', 'Name'], ['patron', 'Patron'], ['gifts', `Gifts · ${chk.left}`]];
+  const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
   let body = '';
   if (a.tab === 'id') {
     body = `<label class="fld"><span>Champion's name</span><input id="aw-name" maxlength="18" value="${esc(a.name)}" autocomplete="off"></label>
       <div class="fld"><span>Sigil</span><div class="sigrow">${SIGILS.map((g, i) => `<button class="sigb ${a.sigil === i ? 'on' : ''}" data-act="aw-sigil" data-i="${i}" style="color:${SIGIL_COLS[a.color]}" aria-label="Sigil ${i + 1}">${g}</button>`).join('')}</div></div>
       <div class="fld"><span>Colour</span><div class="sigrow">${SIGIL_COLS.map((c, i) => `<button class="colb ${a.color === i ? 'on' : ''}" data-act="aw-color" data-i="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('')}</div></div>
       <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>
+      ${titles.length ? `<div class="fld"><span>Title</span></div>` + titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : ''}
       ${a.practice ? '' : `<p class="sh-p bio">${bioHTML(a.record, w.type, w.name)}</p><p class="sh-p sysl">[Filing world record: ${esc(w.name)}. ${a.record.ids.length} entries.]</p>`}`;
-  } else if (a.tab === 'stats') {
-    const roll = a.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="aw-unroll">Place 4 myself</button></div>`
-      : a.rollUsed || a.practice ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="aw-roll">Roll</button></div>`;
-    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>${roll}` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${a.stats[k]}</span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
   } else if (a.tab === 'gifts') {
     const allowed = giftsAllowed(w);
     const list = allowed.filter(k => GIFTS[k].cat === a.cat).sort((x, y) => giftUnlocked(y, awMeta()) - giftUnlocked(x, awMeta())).map(k => giftRow(k, a, w)).join('');
@@ -601,14 +601,12 @@ function awakenHTML() {
       <div class="aw-tools"><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
       <p class="sh-p fine">Unspent points become 3 gold each. Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ') || 'none'}.</p>`;
   } else {
-    const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
     body = `<p class="sh-p">Pledge to a god for 2 Favour with them; their wagers come up more often. Win wagers to reach 4 Favour (a free B-rank piece) and 8 (a blessing for the run).</p>` +
       Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b></span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
-      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>` +
-      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
+      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>`;
   }
-  const ready = a.name.trim() && a.pts === 0 && a.patron && chk.ok;
-  const why = !a.name.trim() ? 'Name your champion' : a.pts ? `Place ${a.pts} stat point${a.pts > 1 ? 's' : ''}` : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
+  const ready = a.name.trim() && a.patron && chk.ok;
+  const why = !a.name.trim() ? 'Name your champion' : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
   return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="${ui.daily ? 'back-title' : 'back-worlds'}" aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : 'Step 2 of 3'} · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
     <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${a.tab === k ? 'on' : ''}" data-act="aw-tab" data-t="${k}" role="tab">${l}</button>`).join('')}</div>
     <section class="aw-body sysw">${body}</section>
@@ -616,7 +614,11 @@ function awakenHTML() {
 }
 
 // ---------- Draft ----------
+// The opening draft is three steps: 3 of 6 skills, then 1 of 2 gear, then the opening stat points (kitStatsHTML)
+function draftEyebrow(step) { return `${run.daily ? 'Pending World' : 'Step 3 of 3'} · ${step}`; }
 function draftHTML() {
+  const gd = run.gearDraft || [];
+  if (run.draftPicked && gd.length) return gearDraftHTML(gd);
   const cards = run.draft.map(id => {
     const d = SKILLS[id], on = ui.draftSel.includes(id);
     return `<button class="scard ${on ? 'on' : ''} ${mainTag(id)}" data-act="draft-pick" data-id="${id}">
@@ -624,18 +626,37 @@ function draftHTML() {
       <div class="sc-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}</div>
       <div class="sc-desc">${esc(describe(d))}</div></button>`;
   }).join('');
-  // Pick Your Kit: 1 of 2 gear pieces, under the skills
-  const gd = run.gearDraft || [], gearOn = gd.includes(ui.draftGear) ? ui.draftGear : null;
-  const kit = gd.length ? `<h3 class="kit-h">[Standard issue: choose 1 piece of gear]</h3>${gd.map(id => { const g = GEAR[id];
+  const n = ui.draftSel.length, next = gd.length ? 'Next: gear' : 'Confirm';
+  return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Skills')}</div><h2>[Skill selection: choose 3]</h2></div></div>
+    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.${gd.length ? ' Rerolling also redraws the gear on offer.' : ''}</p>
+    <div class="sgrid">${cards}</div>
+    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-skills" ${n === 3 ? '' : 'disabled'}>${n === 3 ? next : `Skills ${n}/3`}</button></div></main>`;
+}
+// Pick Your Kit: 1 of 2 gear pieces, once the skills are chosen
+function gearDraftHTML(gd) {
+  const gearOn = gd.includes(ui.draftGear) ? ui.draftGear : null;
+  const cards = gd.map(id => { const g = GEAR[id];
     return `<button class="scard ${gearOn === id ? 'on' : ''} ${mainTag(id)}" data-act="draft-gear" data-id="${id}">
       <div class="sc-h"><span class="sc-name">${esc(g.name)}</span>${rk(g.rank)}</div>
       <div class="sc-meta">${tagNames(id)}<span class="tagn">${g.slot[0].toUpperCase() + g.slot.slice(1)}</span></div>
-      <div class="sc-desc">${Object.entries(gearStats(id, 1)).map(([k, v]) => `+${v} ${k}`).join(', ')}. ${esc(gearText(id, 1))}</div></button>`; }).join('')}` : '';
-  const ready = ui.draftSel.length === 3 && (!gd.length || gearOn);
-  return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">Step 3 of 3 · Opening draft</div><h2>[Skill selection: choose 3]</h2></div></div>
-    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.</p>
-    <div class="sgrid">${cards}${kit}</div>
-    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-ok" ${ready ? '' : 'disabled'}>${ready ? 'Confirm' : ui.draftSel.length < 3 ? `Skills ${ui.draftSel.length}/3` : 'Pick 1 gear'}</button></div></main>`;
+      <div class="sc-desc">${Object.entries(gearStats(id, 1)).map(([k, v]) => `+${v} ${k}`).join(', ')}. ${esc(gearText(id, 1))}</div></button>`; }).join('');
+  return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="draft-back" aria-label="Back to skills">‹</button><div><div class="eyebrow">${draftEyebrow('Gear')}</div><h2>[Standard issue: choose 1 piece of gear]</h2></div></div>
+    <p class="hint">Your skills: ${run.draftPicked.map(id => esc(SKILLS[id].name)).join(', ')}.</p>
+    <div class="sgrid">${cards}</div>
+    <div class="foot"><button class="btn primary" data-act="draft-ok" ${gearOn ? '' : 'disabled'}>${gearOn ? 'Next: stats' : 'Pick 1 gear'}</button></div></main>`;
+}
+// The opening stat points, placed once the skills and gear they work with are known
+function kitStatsHTML() {
+  const pts = run.startPts, fl = run.statFloor, s = effStats(run);
+  // Which stats the chosen skills draw power from
+  const uses = {}; allPieces(run).forEach(p => { const d = SKILLS[p.id]; const k = d && skillStat(d); if (k) (uses[k] = uses[k] || []).push(d.name); });
+  const gifts = [hasGift(run, 'bornlucky') && `${GIFTS.bornlucky.name} +2 LUK`, hasGift(run, 'latebloomer') && `${GIFTS.latebloomer.name} −1 to each`].filter(Boolean);
+  const roll = run.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="kit-unroll">Place 4 myself</button></div>`
+    : run.rollUsed ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="kit-roll">Roll</button></div>`;
+  const rows = STATS.map(k => `<div class="strow kit"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${uses[k] ? 'Powers ' + esc(uses[k].join(', ')) : STAT_INFO[k].short}</small></span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="-1" ${run.stats[k] <= fl[k] ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="1" ${pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
+  return `<main class="screen select awaken"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Stats')}</div><h2>[Calibrating your champion]</h2></div></div>
+    <section class="aw-body sysw"><p class="sh-p">${pts ? `<b class="pts">${pts} point${pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.${gifts.length ? ` Gifts: ${esc(gifts.join(', '))}.` : ''}</p>${roll}${rows}</section>
+    <div class="foot"><button class="btn primary" data-act="kit-ok" ${pts ? 'disabled' : ''}>${pts ? `Place ${pts} stat point${pts > 1 ? 's' : ''}` : 'Enter the tournament'}</button></div></main>`;
 }
 
 // ---------- Choose opponent ----------
@@ -1465,6 +1486,7 @@ function render() {
   else if (scr === 'worlds') h = worldsHTML();
   else if (scr === 'awaken') h = awakenHTML();
   else if (scr === 'draft') h = draftHTML();
+  else if (scr === 'kitstats') h = kitStatsHTML();
   else if (scr === 'choose') h = chooseHTML();
   else if (scr === 'shop') h = shopHTML();
   else if (scr === 'district') h = districtHTML();
@@ -1513,9 +1535,6 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(awRng('roll')); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
-    case 'aw-unroll': { const A = ui.aw; A.stats = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; A.pts = 4; A.rolled = false; return render(); }
-    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (A.rolled) return; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
     case 'aw-cat': ui.aw.cat = d.c; return render();
     case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
     case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
@@ -1525,7 +1544,7 @@ function onAct(el) {
     case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
       const A = ui.aw;
-      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, startPts: 4, rollSeed: 'aw:' + ui.seed + ':' + ui.world + ':roll', gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       pushMsgs(run.log.slice(), true);
@@ -1561,7 +1580,15 @@ function onAct(el) {
     case 'draft-pick': { const i = ui.draftSel.indexOf(d.id); if (i >= 0) ui.draftSel.splice(i, 1); else if (ui.draftSel.length < 3) ui.draftSel.push(d.id); return render(); }
     case 'draft-gear': ui.draftGear = ui.draftGear === d.id ? null : d.id; return render();
     case 'draft-reroll': rerollDraft(run); ui.draftSel = []; ui.draftGear = null; saveRun(); return render();
-    case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta, undefined, ui.draftGear); ui.draftGear = null; ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
+    // Skills first, then the gear pick on its own screen (kept in the run, so Continue comes back to it)
+    case 'draft-skills': if (ui.draftSel.length !== 3) return render(); if ((run.gearDraft || []).length) { run.draftPicked = ui.draftSel.slice(); saveRun(); return render(); } // falls through when there is no gear to pick
+    case 'draft-ok': { const ids = run.draftPicked || ui.draftSel.slice(); if (ids.length !== 3) return render(); delete run.draftPicked; confirmDraft(run, ids, run.practice ? META : meta, undefined, ui.draftGear); ui.draftGear = null; ui.draftSel = []; ui.pick = null; ui.wagerOn = false; saveRun(); return go(stageScreen()); }
+    case 'draft-back': ui.draftSel = run.draftPicked || []; delete run.draftPicked; saveRun(); return render();
+    // Opening stats, after the draft: place 4 points or roll once
+    case 'kit-stat': if (startStat(run, d.k, +d.d)) saveRun(); return render();
+    case 'kit-roll': if (rollStart(run)) { saveRun(); toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); } return render();
+    case 'kit-unroll': if (unrollStart(run, 4)) saveRun(); return render();
+    case 'kit-ok': if (placeStartStats(run, msgs)) { pushMsgs(msgs, false); saveRun(); } return go(stageScreen());
     case 'pick-opp': { chooseOpponent(run, +d.i, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; ui.distDone = null; saveRun(); return go('district'); }
     case 'wager': ui.wagerOn = !ui.wagerOn; return render();
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
@@ -1662,10 +1689,10 @@ const PRACTICE = {
 };
 const ownsStar = (id, st) => run && allPieces(run).some(p => p.id === id && p.star >= st);
 const COACH = [
-  { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, stats, Gifts and a Patron god. For practice I've filled it in.", wait: 'next' },
+  { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, a Patron god and Gifts. For practice I've filled it in.", wait: 'next' },
   { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks and cheat skills, bought with Gift Points. Weaker worlds give more points. Open the Gifts tab.', wait: 'aw-tab' },
   { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (15 Block at the start of every fight) and Catalyst (stronger reactions). Tap Awaken.", wait: 'aw-ok' },
-  { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-ok' },
+  { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-skills' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Tap the Goblin to face it.', wait: 'pick-opp' },

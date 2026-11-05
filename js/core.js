@@ -429,6 +429,9 @@ function newRun(world, setup, meta, rng) {
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (G.includes('bornlucky')) run.stats.LUK += 2;
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
+  // Opening stat points: placed after the opening draft, once the skills and gear are known (placeStartStats).
+  // floor: the stats before any are placed, Gifts included; rollSeed: where the once-only roll comes from.
+  if (setup.startPts) Object.assign(run, { startPts: setup.startPts, statFloor: Object.assign({}, run.stats), rollSeed: setup.seed ? setup.seed + ':roll' : setup.rollSeed || 'roll:' + world.name, rolled: false, rollUsed: false });
   // System quests: two visible, every hidden one quietly active
   const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
@@ -1363,6 +1366,34 @@ function rollGearDraft(run, rng) {
   const other = rest.find(id => !out.length || GEAR[id].slot !== GEAR[out[0]].slot) || rest[0];
   if (other) out.push(other);
   return out.slice(0, 2);
+}
+// The opening stat points, after the draft: place them one at a time, or roll ROLL_PTS once (seeded per Awakening, so
+// it can't be fished for). Nothing counts until placeStartStats.
+function startStat(run, k, d) {
+  if (run.startPts == null || run.rolled || !STATS.includes(k)) return false;
+  if (d > 0 && run.startPts > 0) { run.stats[k]++; run.startPts--; return true; }
+  if (d < 0 && run.stats[k] > run.statFloor[k]) { run.stats[k]--; run.startPts++; return true; }
+  return false;
+}
+function rollStart(run) {
+  if (run.startPts == null || run.rollUsed) return false;
+  const r = rollStats(seedRng(run.rollSeed));
+  STATS.forEach(k => run.stats[k] = run.statFloor[k] + r[k] - 2);
+  run.startPts = 0; run.rolled = run.rollUsed = true; return true;
+}
+function unrollStart(run, pts) {
+  if (run.startPts == null || !run.rolled) return false;
+  run.stats = Object.assign({}, run.statFloor); run.startPts = pts; run.rolled = false; return true;
+}
+function placeStartStats(run, msgs) {
+  if (run.startPts == null || run.startPts > 0) return false;
+  const floor = run.statFloor, before = Object.assign({}, run.stats);
+  // HP was set from the floor stats at the start: give the run the Max HP its placed points add
+  run.stats = floor; const hp0 = maxHp(run); run.stats = before;
+  run.hp += maxHp(run) - hp0;
+  ['startPts', 'statFloor', 'rollSeed', 'rolled', 'rollUsed'].forEach(k => delete run[k]);
+  checkMilestones(run, msgs);
+  return true;
 }
 function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng)); return true; }
 // gear: the gear piece picked (one of run.gearDraft). Left out (the bot, sims), the first offer is taken.
@@ -2847,7 +2878,7 @@ if (typeof module !== 'undefined') module.exports = {
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
-  rollDraft, rollGearDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
+  rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
