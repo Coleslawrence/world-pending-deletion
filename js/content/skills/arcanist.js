@@ -1,15 +1,15 @@
 // ===== [World Pending Deletion] — content: skills: Arcanist =====
 'use strict';
-sk('spark', 'Spark', ['arcanist', 'storm'], 'E', 2, { dmg: 6 }, [['arc_spark', 'Arc Spark', { dmg: 10 }], ['static_spark', 'Static Spark', { dmg: 6, weaken: 1 }]], { quick: true });
-sk('focus', 'Focus', ['arcanist'], 'E', 3, { focus: 0.6 }, [['deep_focus', 'Deep Focus', { focus: 1 }], ['spellweave', 'Spellweave', { focus: 0.5, haste: 1 }]], { quick: true });
-sk('mana_shield', 'Mana Shield', ['arcanist', 'bastion'], 'E', 3, { block: 12 }, [['arcane_ward', 'Arcane Ward', { block: 20 }], ['retort_ward', 'Retort Ward', { block: 10, thorns: 6 }]]);
-sk('frost_lance', 'Frost Lance', ['arcanist'], 'E', 2, { dmg: 11, weaken: 2 }, [['glacial_spear', 'Glacial Spear', { dmg: 15, weaken: 2 }], ['deep_freeze', 'Deep Freeze', { dmg: 8, stun: 1 }, 4]]);
-sk('arcane_missiles', 'Arcane Missiles', ['arcanist'], 'D', 2, { dmg: 3, hits: 4, pierce: 1 }, [['arcane_barrage', 'Arcane Barrage', { dmg: 3, hits: 6, pierce: 1 }], ['mana_lance', 'Mana Lance', { dmg: 16, pierce: 1 }]]);
-sk('counterspell', 'Counterspell', ['arcanist', 'storm'], 'C', 3, { dmg: 7, interrupt: 1 }, [['nullify', 'Nullify', { dmg: 12, interrupt: 1 }], ['spell_theft', 'Spell Theft', { dmg: 7, interrupt: 1, empower: 2 }]]);
-sk('siphon', 'Siphon', ['arcanist'], 'C', 3, { siphon: 1 }, [['soul_siphon', 'Soul Siphon', { siphon: 1, heal: 5 }], ['hex_siphon', 'Hex Siphon', { siphon: 1, weaken: 1 }]], { quick: true });
-sk('time_warp', 'Time Warp', ['arcanist'], 'B', 6, { haste: 2 }, [['haste', 'Haste', { haste: 3 }], ['chrono_loop', 'Chrono Loop', { haste: 2 }, 4]], { quick: true });
-sk('cataclysm', 'Arcane Cataclysm', ['arcanist'], 'A', 4, { dmg: 24, pierce: 1 }, [['singularity', 'Singularity', { dmg: 34, pierce: 1 }], ['starfall', 'Starfall', { dmg: 8, hits: 4, pierce: 1 }]]);
-sk('read_the_glyph', 'Read the Glyph', ['arcanist'], 'D', 2, { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1 } }, [['unwrite', 'Unwrite', { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1, haste: 1 } }], ['glyph_breaker', 'Glyph Breaker', { dmg: 5, focus: 0.2, read: 'defend', readFx: { dmg: 10, pierce: 1, focus: 0.2 } }]], { quick: true });
+sk('spark', 'Spark', ['arcanist', 'storm'], 'E', 2, { dmg: 6 }, [['arc_spark', 'Arc Spark', { dmg: 10 }], ['static_spark', 'Static Spark', { dmg: 6, weaken: 1 }], ['kindling_spark', 'Kindling Spark', { dmg: 6, burn: 3 }]], { quick: true });
+sk('focus', 'Focus', ['arcanist'], 'E', 3, { focus: 0.6 }, [['deep_focus', 'Deep Focus', { focus: 1 }], ['spellweave', 'Spellweave', { focus: 0.5, haste: 1 }], ['clear_mind', 'Clear Mind', { focus: 0.6, cleanse: 1 }]], { quick: true });
+sk('mana_shield', 'Mana Shield', ['arcanist', 'bastion'], 'E', 3, { block: 12 }, [['arcane_ward', 'Arcane Ward', { block: 20 }], ['retort_ward', 'Retort Ward', { block: 10, thorns: 6 }], ['charged_ward', 'Charged Ward', { block: 12, focus: 0.2 }]]);
+sk('frost_lance', 'Frost Lance', ['arcanist'], 'E', 2, { dmg: 11, weaken: 2 }, [['glacial_spear', 'Glacial Spear', { dmg: 15, weaken: 2 }], ['deep_freeze', 'Deep Freeze', { dmg: 8, stun: 1 }, 4], ['frostbite', 'Frostbite', { dmg: 11, weaken: 2, brk: 8 }]]);
+sk('arcane_missiles', 'Arcane Missiles', ['arcanist'], 'D', 2, { dmg: 3, hits: 4, pierce: 1 }, [['arcane_barrage', 'Arcane Barrage', { dmg: 3, hits: 6, pierce: 1 }], ['mana_lance', 'Mana Lance', { dmg: 16, pierce: 1 }], ['homing_missiles', 'Homing Missiles', { dmg: 3, hits: 4, pierce: 1, critBonus: 0.25 }]]);
+sk('counterspell', 'Counterspell', ['arcanist', 'storm'], 'C', 3, { dmg: 7, interrupt: 1 }, [['nullify', 'Nullify', { dmg: 12, interrupt: 1 }], ['spell_theft', 'Spell Theft', { dmg: 7, interrupt: 1, empower: 2 }], ['spell_ward', 'Spell Ward', { dmg: 7, interrupt: 1, block: 10 }]]);
+sk('siphon', 'Siphon', ['arcanist'], 'C', 3, { siphon: 1 }, [['soul_siphon', 'Soul Siphon', { siphon: 1, heal: 5 }], ['hex_siphon', 'Hex Siphon', { siphon: 1, weaken: 1 }], ['mana_leak', 'Mana Leak', { siphon: 1, focus: 0.4 }]], { quick: true });
+sk('time_warp', 'Time Warp', ['arcanist'], 'B', 6, { haste: 2 }, [['haste', 'Haste', { haste: 3 }], ['chrono_loop', 'Chrono Loop', { haste: 2 }, 4], ['stolen_moment', 'Stolen Moment', { haste: 2, block: 10 }]], { quick: true });
+sk('cataclysm', 'Arcane Cataclysm', ['arcanist'], 'A', 4, { dmg: 24, pierce: 1 }, [['singularity', 'Singularity', { dmg: 34, pierce: 1 }], ['starfall', 'Starfall', { dmg: 8, hits: 4, pierce: 1 }], ['unmaking', 'Unmaking', { dmg: 20, pierce: 1, weaken: 2 }]]);
+sk('read_the_glyph', 'Read the Glyph', ['arcanist'], 'D', 2, { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1 } }, [['unwrite', 'Unwrite', { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1, haste: 1 } }], ['glyph_breaker', 'Glyph Breaker', { dmg: 5, focus: 0.2, read: 'defend', readFx: { dmg: 10, pierce: 1, focus: 0.2 } }], ['counter_glyph', 'Counter-Glyph', { focus: 0.2, read: 'defend', readFx: { focus: 0.2, siphon: 1 } }]], { quick: true });
 flav({
   spark: "The first spell every apprentice learns, and the last one they forget.",
   arc_spark: "The spark jumps the gap before you have finished pointing.",
@@ -41,4 +41,14 @@ flav({
   read_the_glyph: "Every ward is written in something. You can read most things.",
   unwrite: "You find the line holding it together and take it out.",
   glyph_breaker: "The ward was well written. You were a harsh critic.",
+  kindling_spark: "A small spark, aimed somewhere flammable.",
+  clear_mind: "Everything that does not matter falls away, poisons included.",
+  charged_ward: "The ward hums. Whatever it stops, it keeps for later.",
+  frostbite: "The cold gets into the joints of their guard.",
+  homing_missiles: "They know where the weak points are better than you do.",
+  spell_ward: "You stop the spell and keep a little of it as a shield.",
+  mana_leak: "What you take from them goes straight into your next spell.",
+  stolen_moment: "A second borrowed from the clock, spent on standing still.",
+  unmaking: "Less an explosion than an edit.",
+  counter_glyph: "You write over their ward in your own hand.",
 });
