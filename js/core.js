@@ -490,20 +490,47 @@ function effStats(run) {
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
 function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0))); }
-// Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
-// points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
+// Levels come from fighting: after every battle (win or lose) the System offers a level, which is +1 level (Max HP +4,
+// better shop odds) and +1 stat point, or a Gift drawn at random in its place. Level stops at LEVEL_MAX.
+// Stat points can also be bought with gold, one at a time, at a rising price (Train). Bought points never raise the level.
 const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
+const LEVEL_MAX = 9;
 function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)]; return hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p; }
-function levelFor(bought) { return Math.min(9, 1 + Math.floor(bought / 2)); }
 function trainStat(run, k, msgs) {
   if (!STATS.includes(k)) return false;
   const pr = pointPrice(run); if (run.gold < pr) return false;
-  const before = maxHp(run), lv = run.level;
+  const before = maxHp(run);
   run.gold -= pr; run.stats[k]++; run.bought = (run.bought || 0) + 1;
-  if (hasGift(run, 'latebloomer') && run.bought % 2 === 0) run.statPts++;
-  run.level = levelFor(run.bought); run.hp += maxHp(run) - before;
-  if (run.level > lv) msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. Shop odds improved.]` });
+  run.hp += maxHp(run) - before;
   if (run.milestones) checkMilestones(run, msgs);
+  return true;
+}
+// The Gift offered in place of a level: any Gift the mid-run Gift offer could hold, not owned yet
+function midGiftPool(run) {
+  const M = run.seed && META ? levelMeta(META) : META;
+  return Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
+}
+function levelPerk(run, rng) { const pool = midGiftPool(run); return pool.length ? pick(pool, rng) : null; }
+function offerLevel(run, rng) {
+  if (run.elite || run.level >= LEVEL_MAX || run.pending.some(p => p.type === 'levelup')) return;
+  run.pending.push({ type: 'levelup', perk: levelPerk(run, rng) });
+}
+// Take the level (choice 'level') or the Gift shown in its place (choice 'perk')
+function takeLevel(run, choice, msgs) {
+  const i = run.pending.findIndex(p => p.type === 'levelup'); if (i < 0) return false;
+  const p = run.pending[i];
+  if (choice === 'perk' && p.perk && !hasGift(run, p.perk)) {
+    run.pending.splice(i, 1);
+    applyGift(run, p.perk, null);
+    msgs && msgs.push({ t: 'class', text: `[Level declined. Gift granted: ${GIFTS[p.perk].name}.]` });
+    return true;
+  }
+  run.pending.splice(i, 1);
+  const before = maxHp(run);
+  run.level = Math.min(LEVEL_MAX, run.level + 1); run.statPts++;
+  if (hasGift(run, 'latebloomer')) run.statPts++;
+  run.hp += maxHp(run) - before;
+  msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. +1 stat point${hasGift(run, 'latebloomer') ? ', +1 from Late Bloomer' : ''}. Shop odds improved.]` });
   return true;
 }
 
@@ -1351,9 +1378,7 @@ function completeQuest(run, q, msgs) {
 function extraGiftOffers(run, rng) {
   const c = runCounts(run);
   const top = Object.keys(c).filter(k => run.arch.includes(k)).sort((a, b) => c[b] - c[a])[0] || run.arch[0];
-  const M = run.seed && META ? levelMeta(META) : META;
-  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
-  return ['aff_' + top].concat(shuffle(pool, rng).slice(0, 2));
+  return ['aff_' + top].concat(shuffle(midGiftPool(run), rng).slice(0, 2));
 }
 function applyGift(run, k, msgs) {
   if (!GIFTS[k] || hasGift(run, k)) return false;
@@ -2621,7 +2646,7 @@ function resolveFight(run, f, meta, rng) {
   // A shared champion that beats you earns its owner's champion RP (see champWin)
   if (!won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
-  if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
+  if (!res.death && !res.spared && !res.eliteOver) { offerLevel(run, stream(run, 'level', rng)); enterChoose(run, meta, rng, msgs); }
   return res;
 }
 function startElite(run, meta, rng) {
@@ -2898,7 +2923,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, levelPerk, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
