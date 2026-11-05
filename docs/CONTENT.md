@@ -129,17 +129,17 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bleed` | 15 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 63 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 65 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 9 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 5 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
-| `brk` | 22 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
+| `brk` | 24 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
 | `burn` | 32 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `bust` | 3 | Double Down (6), All In (8), Delphine Coyle: Double or Nothing (5) | (works with other keys on the same skill) | yes |
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
 | `calamity` | 3 | Calamity (4), Catastrophe (5), Aftermath (4) | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
 | `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
-| `cleanse` | 16 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
+| `cleanse` | 17 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `coinStun` | 3 | Cursed Coin (1), Bad Penny (1), Heads I Win (1) | A move you jinx this turn also Stuns its user next turn. | yes |
 | `critBonus` | 3 | Precise Strike (0.5), Exposing Strike (0.5), Homing Missiles (0.25) | +50% critical chance. | no |
 | `cruel` | 4 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5), … | ×2 damage if the opponent has 2 or more effects. | yes |
@@ -150,14 +150,14 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 21 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 1 | Two-Headed Coin (4) | (works with other keys on the same skill) | yes |
 | `dieStun` | 3 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6) | (works with other keys on the same skill) | yes |
-| `dmg` | 204 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 209 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 3 | Jackpot (3), Progressive Jackpot (3), Cash Out (3) | Deal 3 per pip across all your shown dice. | yes |
 | `dmgPip` | 15 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 5 | Doom (26), Swift Doom (22), Inevitable Doom (40), … | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomT` | 1 | Swift Doom (2) | (works with other keys on the same skill) | no |
 | `doublePoison` | 4 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
 | `drainPoison` | 1 | Wither (1) | Heal equal to the opponent's Poison. | no |
-| `empower` | 10 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
+| `empower` | 12 | War Cry (2), Spell Theft (2), Rally (1), … | Deal 30% more damage for 2 turns. | yes |
 | `evade` | 8 | Smoke Bomb (1), Vanish (2), Caltrops (1), … | Evade the next attack. | yes |
 | `execMult` | 9 | Execute (2.5), Soul Harvest (2), Decapitate (3), … | (works with other keys on the same skill) | yes |
 | `execute` | 9 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
@@ -166,7 +166,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `heal` | 20 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 6 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 1 | Insurance (1) | (works with other keys on the same skill) | yes |
-| `hits` | 41 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
+| `hits` | 42 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
 | `interrupt` | 4 | Counterspell (1), Nullify (1), Spell Theft (1), … | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
 | `jinxDisc` | 4 | Knock on Wood (2), Sore Loser (2), Touch Wood (2), … | Your next jinx this turn costs 2 less. | yes |
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
@@ -205,11 +205,11 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `siphon` | 4 | Siphon (1), Soul Siphon (1), Hex Siphon (1), … | Steal the opponent's Block and remove their Power. | yes |
 | `snake` | 3 | Snake Eyes (45), Boxcars (45), Long Odds (60) | (works with other keys on the same skill) | yes |
 | `stack` | 1 | Stack Overfl̷ow (0.25) | (works with other keys on the same skill) | no |
-| `stun` | 9 | Thunderclap (1), Thunder God's Wrath (1), Stunning Bash (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
-| `stunIfWeak` | 4 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
+| `stun` | 11 | Thunderclap (1), Thunder God's Wrath (1), Stunning Bash (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
+| `stunIfWeak` | 5 | Overload (1), Jolt (1), Supercharge (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 8 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
-| `weaken` | 37 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 39 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
