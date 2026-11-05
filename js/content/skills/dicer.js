@@ -9,7 +9,15 @@ sk('double_down', 'Double Down', ['dicer'], 'D', 3, { die: 1, dmgPip: 6, bust: 6
 sk('snake_eyes', 'Snake Eyes', ['dicer'], 'C', 3, { die: 1, dmg: 8, snake: 45 }, [['boxcars', 'Boxcars', { die: 1, dmg: 8, snake: 45, boxcars: 1 }], ['long_odds', 'Long Odds', { die: 1, dmg: 8, snake: 60 }]]);
 sk('house_edge', 'House Edge', ['dicer'], 'B', 4, { mark: 3, rollTwice: 3 }, [['stacked_deck', 'Stacked Deck', { mark: 3, rollTwice: 4 }], ['marked_cards', 'Marked Cards', { mark: 3, rollTwice: 3, weaken: 2 }]]);
 sk('jackpot', 'Jackpot', ['dicer'], 'A', 5, { dmgAll: 3 }, [['progressive', 'Progressive Jackpot', { dmgAll: 3, progressive: 1 }], ['cash_out', 'Cash Out', { dmgAll: 3, cashOut: 0.5 }]]);
+sk('thunder_dice', 'Thunder Dice', ['dicer', 'storm'], 'D', 3, { die: 1, dmg: 4, dmgPip: 2, dieStun: 6 }, [['rolling_thunder', 'Rolling Thunder', { die: 1, dmg: 4, dmgPip: 2, dieStun: 5 }], ['storm_front', 'Storm Front', { die: 1, dmg: 4, dmgPip: 2, weaken: 1, dieStun: 6 }]]);
+sk('crooked_odds', 'Crooked Odds', ['dicer', 'jinx'], 'E', 2, { reroll: 1, misf: 2 }, [['sore_loser', 'Sore Loser', { reroll: 1, misf: 2, jinxDisc: 2 }], ['loaded_luck', 'Loaded Luck', { reroll: 1, block: 6 }]], { quick: true });
 flav({
+  thunder_dice: "Two bones carved from a tree the lightning picked twice.",
+  rolling_thunder: "The odds are bad. The storm doesn't read them.",
+  storm_front: "Not every roll lands the bolt. Every roll brings the weather.",
+  crooked_odds: "[Dice re-thrown. Result filed against the opponent.]",
+  sore_loser: "Lose the roll, win the argument.",
+  loaded_luck: "Bad luck happens to other people. You make sure of it.",
   coin_toss: "Heads, it hurts. Tails, it also hurts.",
   double_nothing: "The coin spins a long time. Everyone watches it but you.",
   two_headed: "It is not cheating if nobody asks to see the other side.",

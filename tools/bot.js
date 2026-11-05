@@ -38,6 +38,8 @@ function choosePlayer(f) {
     if (fx.perMisf) sc += (fx.perMisf * (B.misfortune || 0) + (fx.perCurse || 0) * (A.curse || 0)) * p;
     if (fx.calamity) sc += fx.calamity * (B.misfortune || 0) * p + (intent.kind === 'big' ? 20 : 0);
     if (fx.misf) sc += fx.misf * 2 + (fx.misfT || 0) * 3;
+    // fx.dieStun is worked into fx.stun by resolveDice before the bot looks, so the Stun line above scores it
+    if (fx.misfPerBurn) sc += Math.floor(((B.burn || 0) + (fx.burn || 0)) / fx.misfPerBurn) * 2;
     if (fx.omenAtk) sc += B.omens && B.omens.length >= 3 ? 0 : fx.omenAtk * p * 0.7 + (fx.omenGuard ? 4 : 0);
     if (fx.passCurse) sc = (A.curse || 0) >= 6 ? 40 + (fx.curseDmg || 0) * A.curse * p : 0;
     if (fx.coinStun) sc += 4;

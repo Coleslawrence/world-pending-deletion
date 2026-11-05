@@ -1303,7 +1303,7 @@ function completeQuest(run, q, msgs) {
   const Q = QUESTS[q.id]; q.done = true;
   if (META) META.archive.quests[q.id] = true;
   msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${outcomeText(Q.reward)}.]` });
-  const ctx = { run, h: eventKit(run, META, undefined, msgs), msgs, label: 'Quest reward' };
+  const ctx = { run, h: eventKit(run, META, stream(run, 'quest'), msgs), msgs, label: 'Quest reward' };
   applyOutcomes(Q.reward, ctx, false); applyOutcomes(Q.reward, ctx, true);
 }
 // ---------- Additional Gift (after round 4) ----------
@@ -1834,6 +1834,7 @@ function rollPip(f, X, s) {
   if (X.firstSix) { X.firstSix = false; v = 6; }
   if (v === 1 && X.sleeve) { X.sleeve = false; v = 6; if (X.isPlayer) say(f, "[Cardsharp's Sleeve: a 1 becomes a 6.]", 'skill'); }
   if (v === 6) X.rolledSix = true;
+  if (v === 1 && X.P.oneMisf) addMisfortune(f, X === f.A ? f.B : f.A, X.P.oneMisf); // Unlucky Number
   return v;
 }
 function rollDice(f, X, only) {
@@ -1857,11 +1858,12 @@ function resolveDice(X) {
       if (X.P.ironOdds && fx.block && v >= 5) fx.block *= 2; // Iron Odds
       if (X.P.savingGrace && fx.heal && v === 6) fx.heal *= 2; // Saving Grace
       if (X.P.sixStun && v === 6) fx.stun = 1; // Thunder Roll
+      if (fx.dieStun && v >= fx.dieStun) fx.stun = 1; // Thunder Dice
     }
     if (fx.dmgAll) fx.dmg = (fx.dmg || 0) + (fx.dmgAll + (fx.progressive ? X.jackpots || 0 : 0)) * sum;
     if (fx.cashOut) fx.lifesteal = fx.cashOut;
     const die = !!fx.die;
-    ['die', 'dmgPip', 'blockPip', 'healPip', 'dieMin', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
+    ['die', 'dmgPip', 'blockPip', 'healPip', 'dieMin', 'dieStun', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
     s.jackpot = die && pips.filter(x => x === v).length >= 2;
     s.def = Object.assign({}, b, { fx, pip: die ? v : null, jackpot: s.jackpot });
   });
@@ -2035,7 +2037,7 @@ function useSkill(f, X, s, opt) {
   if (fx.evade) X.evade += fx.evade;
   if (fx.nextCrit) X.critNext = true;
   if (fx.thorns) X.thorns = Math.max(X.thorns, fx.thorns * p);
-  if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); X.burn = 0; X.poison = 0; X.bleed = 0; X.weaken = 0; }
+  if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); const keepPoison = Y.P && Y.P.misfNoCleanse && (X.misfortune || 0) >= Y.P.misfNoCleanse; X.burn = 0; if (!keepPoison) X.poison = 0; else say(f, '[Bad Water: the Poison stays.]'); X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
   if (ls && dealt > 0) heal(f, X, dealt * ls);
   if (damaging && dealt > 0 && X.P.hitHeal) heal(f, X, X.P.hitHeal);
@@ -2046,6 +2048,7 @@ function useSkill(f, X, s, opt) {
   if (fx.focus) X.focus = fx.focus;
   if (fx.rollTwice) X.rollTwiceT = fx.rollTwice;
   if (fx.misf) addMisfortune(f, Y, fx.misf);
+  if (fx.misfPerBurn) addMisfortune(f, Y, Math.floor((Y.burn || 0) / fx.misfPerBurn)); // Bad Wick
   if (fx.misfT) { Y.misfT = 3; Y.misfTv = fx.misfT; } // Bad Penny
   if (fx.omenAtk || fx.omenGuard) { Y.omens = (Y.omens || []).slice(-(OMEN_MAX - (fx.omenGuard && fx.omenAtk ? 2 : 1))); if (fx.omenAtk) Y.omens.push({ on: 'attack', dmg: Math.round(fx.omenAtk * p), misf: 3 }); if (fx.omenGuard) Y.omens.push({ on: 'guard', misf: 3 }); }
   if (fx.jinxDisc) X.jinxDisc = fx.jinxDisc;
@@ -2282,6 +2285,7 @@ function previewSkill(f, s) {
   if (fx.haste) parts.push(`Cooldowns −${fx.haste}`);
   if (fx.perMisf || fx.calamity) { const Y = f ? f.B : null, mi = Y ? Y.misfortune || 0 : 0, cu = X ? X.curse || 0 : 0; parts.unshift(`${Math.round(((fx.dmg || 0) + (fx.perMisf || 0) * mi + (fx.perCurse || 0) * cu + (fx.calamity || 0) * mi) * p * m)} dmg`); if (fx.calamity) parts.push('Jinx'); }
   if (fx.misf) parts.push(`Misfortune ${fx.misf}`);
+  if (fx.misfPerBurn) parts.push(`Misfortune per ${fx.misfPerBurn} Burn`);
   if (fx.omenAtk) parts.push(`Omen ${Math.round(fx.omenAtk * p)}${fx.omenGuard ? ' · guard' : ''}`);
   if (fx.passCurse) parts.push(`Pass ${X ? Math.max(0, (X.curse || 0) - (fx.curseKeep || 0)) : ''} Curse`);
   if (fx.jinxDisc) parts.push(`Jinx −${fx.jinxDisc}`);
@@ -2355,12 +2359,14 @@ function describe(def, p = 1) {
     if (fx.healPip) r.push(`Heal ${n(fx.healPip)} per pip.`);
     if (fx.dbl) r.push(`On ${fx.dbl}+ deal double, otherwise half.`);
     if (fx.dieMin) r.push(`This die never rolls below ${fx.dieMin}.`);
+    if (fx.dieStun) r.push(fx.dieStun >= 6 ? 'On a 6, Stun.' : `On a ${fx.dieStun} or more, Stun.`);
     if (fx.bust) r.push(`On a ${fx.bustAt ? '1 or 2' : '1'}, you take ${fx.bust}.`);
     r.unshift('Rolls a die each turn, shown before you pick.');
   }
   if (fx.dmgAll) r.unshift(`Deal ${n(fx.dmgAll)} per pip across all your shown dice${fx.progressive ? ', +1 per pip for each Jackpot this fight' : ''}.`);
   if (fx.cashOut) r.push(`Heal ${fx.cashOut * 100}% of the damage dealt.`);
   if (fx.misf) r.push(`Misfortune ${fx.misf}.`);
+  if (fx.misfPerBurn) r.push(`Then Misfortune 1 for every ${fx.misfPerBurn} Burn on the opponent.`);
   if (fx.misfT) r.push(`Then Misfortune ${fx.misfT} each turn for 3 turns.`);
   if (fx.omenAtk) r.push(`Omen: if the opponent attacks next, it takes ${n(fx.omenAtk)} and gains 3 Misfortune.`);
   if (fx.omenGuard) r.push('Omen: if it guards next, it loses half its Block and gains 3 Misfortune.');
