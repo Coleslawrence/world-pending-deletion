@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope).
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -73,7 +73,7 @@ if (saved) {
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
-  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice', 'experimental', 'consumable']],
+  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'top', 'glitch', 'rolling', 'splice', 'experimental', 'consumable']],
   archetypes: [C.ARCH, ['name', 'stat', 'disc', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'guest2', 'mids', 'setting', 'ruler']],
@@ -119,6 +119,12 @@ Object.entries(C.GEAR).forEach(([k, g]) => {
   g.tags.forEach(t => ref(w, isArch(t), `tag ${t} is not an archetype`));
   ref(w, C.RANKS.includes(g.rank), `rank ${g.rank} is unknown`);
   Object.keys(g.stats).forEach(s => ref(w, C.STATS.includes(s), `stat ${s} is unknown`));
+  if (g.glitch || g.experimental) return;
+  // The rank ladder: rank sets the stat budget, and every piece gains one more effect at ★3
+  const budget = C.GEAR_BUDGET[g.rank] - (g.slot === 'accessory' ? 1 : 0), sum = Object.values(g.stats).reduce((a, b) => a + b, 0);
+  ref(w, sum === budget, `a ${g.rank}-rank ${g.slot} gives ${budget} stat points at ★1 (GEAR_BUDGET), not ${sum}`);
+  ref(w, g.top && Object.keys(g.top).length === 1, 'needs top: the one effect it gains at ★3');
+  Object.keys(g.top || {}).forEach(k => { ref(w, !!C.EFFECTS[k], `top effect ${k} is not in effects.js`); ref(w, !(k in (g.pas || {})) && !(k in (g.fix || {})), `top effect ${k} repeats one it already has; ★3 adds a new line`); });
 });
 Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, !!C.DISCIPLINES[a.disc], `Discipline ${a.disc} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
 archs.forEach((a, i) => archs.slice(0, i).forEach(b => ref('archetypes ' + a, C.ARCH[a].stat !== C.ARCH[b].stat || C.ARCH[a].disc !== C.ARCH[b].disc, `shares its grid cell (${C.ARCH[a].stat} ${C.ARCH[a].disc}) with ${b}; every archetype needs a cell of its own`)));
@@ -312,7 +318,7 @@ const use = (kind, key, who, v) => { const u = (uses[kind] = uses[kind] || {}); 
 Object.values(C.SKILLS).filter(s => !s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.SKILLS).filter(s => s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.ENEMIES).forEach(e => e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.entries(m.fx || {}).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
-Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix)).forEach(([k, v]) => use('gear', k, id, v)));
+Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix, g.top)).forEach(([k, v]) => use('gear', k, id, v)));
 Object.values(C.ARCH).forEach(a => a.p.forEach((p, i) => Object.entries(p).forEach(([k, v]) => use('arch', k, `${a.name} ${[2, 4, 6][i]}`, v))));
 Object.values(C.HIDDEN_PATHS).forEach(h => Object.entries(h.fx).forEach(([k, v]) => use('path', k, h.name, v)));
 Object.values(C.GIFTS).forEach(g => Object.entries(g.p || {}).forEach(([k, v]) => use('gift', k, g.name, v)));
@@ -374,7 +380,7 @@ Object.entries(C.EVENTS).forEach(([k, E]) => { if (E.theme != null) { if (E.them
 ['GIFTS', 'TITLES', 'QUESTS'].forEach(L => Object.entries(C[L]).forEach(([k, d]) => { if (d.theme != null) themeOk(`${L.toLowerCase()} ${k}`, d.theme); }));
 const effectThemes = p => Object.keys(p || {}).flatMap(k => [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []));
 const themedFits = (where, themes, p) => Object.keys(p || {}).forEach(k => { const th = [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []); if (th.length && !th.some(o => [].concat(themes).some(t => C.themeNear(t).includes(o)))) warn(where, `uses ${k}, a ${th.map(a => C.ARCH[a].name).join('/')} effect, outside its allies on the grid (a pie break: fine if meant, or retag it)`); });
-Object.entries(C.GEAR).forEach(([k, g]) => themedFits('gear ' + k, g.tags, Object.assign({}, g.pas, g.fix)));
+Object.entries(C.GEAR).forEach(([k, g]) => themedFits('gear ' + k, g.tags, Object.assign({}, g.pas, g.fix, g.top)));
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => themedFits('paths ' + k, k.split('+'), h.fx));
 Object.entries(C.GIFTS).forEach(([k, g]) => { if (g.theme != null) themedFits('gifts ' + k, g.theme, g.p); });
 Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
