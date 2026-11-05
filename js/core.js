@@ -375,6 +375,29 @@ function offerWorlds(meta, rng) {
   }
   return out;
 }
+// Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built
+// around the layer you name: a world type, a Fate or a People. Everything else about it is drawn as usual. Only layers
+// that can come up for you are listed (a type whose home class is still locked can't). Pending World ignores it.
+const STEER_COST = 5;
+const STEER_KINDS = { type: 'A kind of world', fate: 'What is going wrong there', people: 'Who lives there' };
+function steerTypes(meta) { const open = unlockedArch(meta); return Object.keys(WORLD_TYPES).filter(k => open.includes(WORLD_TYPES[k].home)); }
+function steerOptions(meta) {
+  const types = steerTypes(meta), fits = L => types.some(t => suits(L, t));
+  return { type: types, fate: Object.keys(FATES).filter(k => fits(FATES[k])), people: Object.keys(PEOPLES).filter(k => fits(PEOPLES[k])) };
+}
+function steerWorld(meta, kind, key, rng) {
+  const L = kind === 'fate' ? FATES[key] : kind === 'people' ? PEOPLES[key] : null;
+  const types = kind === 'type' ? [key] : steerTypes(meta).filter(t => suits(L, t));
+  if (!types.length) return null;
+  let w = null;
+  for (let i = 0; i < 40 && !(w && w[kind] === key); i++) w = genWorld(rng, worldCap(meta), types);
+  if (w[kind] !== key) { // force the asked-for layer onto the last draw; a new Fate brings its own modifier
+    w[kind] = key;
+    if (kind === 'fate') { const M = FATES[key].mods; w.mod = M ? wpick(Object.keys(M), Object.values(M), rng) : wpick(modKeys(), MOD_W, rng); }
+  }
+  w.steered = kind;
+  return w;
+}
 // World Pulse: one System line about your world at the start of each round from round 2. In rounds 3 and 5 the Fate's
 // trouble grows (its stages); otherwise it is about an entry still standing, and how your last fight went. Words only.
 function worldPulse(run, rng) {
@@ -2875,7 +2898,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

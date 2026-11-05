@@ -538,7 +538,7 @@ function worldsHTML() {
     const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod], F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix];
     const classes = w.v >= 2 ? worldArch(w, meta.unlocks) : [T.home];
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
-      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${rankChip(w.rank)}</div>
+      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${rankChip(w.rank)}</div>
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
       <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
@@ -549,7 +549,7 @@ function worldsHTML() {
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
     <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.</p>
-    <div class="picks">${cards}</div>
+    <div class="picks">${cards}</div>${canSteer() ? `<button class="btn ghost small" data-act="sheet" data-s="steer">${ui.worlds.some(x => x.steered) ? 'Ask for a different world' : 'Ask the System for a world'} (${STEER_COST} Echoes)</button>` : ''}
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
 }
 
@@ -1451,9 +1451,18 @@ function hallsSheet() {
   const others = cloud.shared.length ? `<h4>Other entrants' champions</h4><p class="sh-p fine">Shared by people who play this game with you. They can appear in your tournaments.</p><div class="cards">${cloud.shared.map(x => `<p class="sh-p fine">${x.kind === 'spared' ? 'Champion of' : 'Erased in'} ${esc(ownerName(x.snap.owner))}'s tournament</p>` + runCard(x.snap, { erased: x.kind === 'erased' })).join('')}</div>` : (cloud.on ? '<h4>Other entrants\' champions</h4><p class="sh-p fine">None shared yet. When people you share this game with share their champions, they appear here and in your brackets.</p>' : '');
   return sheetWrap('The Halls', `${rankHTML()}${cloud.on && cloud.tester === false ? `<p class="sh-p fine">${PENDING} Sharing champions opens once you are approved.</p>` : ''}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div><h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
+// Steer the next world: one requested world joins the offer (asking again replaces it). Only shown when you can pay.
+function canSteer() { return !ui.daily && meta.echoes >= STEER_COST && ui.worlds && ui.worlds.length > 0; }
+function steerSheet() {
+  const O = steerOptions(meta), name = { type: k => WORLD_TYPES[k].name, fate: k => FATES[k].name, people: k => PEOPLES[k].name }, line = { type: k => WORLD_TYPES[k].flavour, fate: k => FATES[k].line, people: k => PEOPLES[k].line };
+  const tabs = Object.keys(STEER_KINDS), tab = ui.steerTab && O[ui.steerTab] ? ui.steerTab : 'type';
+  const head = `<div class="row3">${tabs.map(k => `<button class="btn small ${k === tab ? 'primary' : 'ghost'}" data-act="steer-tab" data-k="${k}">${{ type: 'World', fate: 'Fate', people: 'People' }[k]}</button>`).join('')}</div>`;
+  const list = O[tab].map(k => `<button class="choice" data-act="steer" data-kind="${tab}" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(name[tab](k))}</span><span class="price">${STEER_COST} Echoes</span></div><div class="sr-desc">${esc(line[tab](k))}</div></button>`).join('');
+  return sheetWrap('[Request a world]', `<p class="sh-p">Name one thing about the world you want to fight for. The System will find one to match and add it to the offer. You have <b>${meta.echoes}</b> Echoes.</p>${head}<p class="sh-p fine">${esc(STEER_KINDS[tab])}</p>${list}`, `<button class="btn primary" data-act="close">Close</button>`);
+}
 function echoesSheet() {
   const list = Object.entries(UNLOCKS).map(([k, u]) => `<div class="choice static"><div class="sr-h"><span class="sr-name">${esc(u.name)}</span><span class="price">${u.cost} Echoes</span></div><div class="sr-desc">${esc(u.desc)}</div>${meta.unlocks[k] ? '<span class="tag">Unlocked</span>' : `<button class="btn small" data-act="unlock" data-k="${k}" ${meta.echoes < u.cost ? 'disabled' : ''}>Unlock</button>`}</div>`).join('');
-  return sheetWrap('Echoes', `<p class="sh-p">Echoes are fragments of the worlds you fought for. You have <b>${meta.echoes}</b>. They buy options, never raw power.</p>${list}`, `<button class="btn primary" data-act="close">Close</button>`);
+  return sheetWrap('Echoes', `<p class="sh-p">Echoes are fragments of the worlds you fought for. You have <b>${meta.echoes}</b>. They buy options, never raw power.</p>${list}<p class="sh-p fine">Echoes also let you ask the System for a world of your choosing, ${STEER_COST} Echoes a time, on the world choice screen.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function shareBlock(s, erased) {
   if (FIREBASE && !cloud.on && s) return `<p class="sh-p fine center">Sign in from the menu to share champions with other players.</p>`;
@@ -1496,7 +1505,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1522,7 +1531,7 @@ function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
+    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); if (meta.steer) ui.worlds.push(meta.steer); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
@@ -1531,6 +1540,14 @@ function onAct(el) {
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
     case 'pick-world': ui.world = +d.i; return render();
+    case 'steer-tab': ui.steerTab = d.k; return render();
+    case 'steer': {
+      if (!canSteer()) return render();
+      const w = steerWorld(meta, d.kind, d.k); if (!w) return render();
+      meta.echoes -= STEER_COST; meta.steer = w; saveMeta(); // kept until a run starts, so a reload doesn't lose what you paid for
+      ui.worlds = ui.worlds.filter(x => !x.steered).concat(w); ui.world = ui.worlds.length - 1; ui.sheet = null;
+      toast(`[Request granted: ${w.name}. -${STEER_COST} Echoes.]`, 'level'); return render();
+    }
     case 'world-ok': ui.aw = newAw(ui.worlds[ui.world]); return go('awaken');
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
@@ -1547,6 +1564,7 @@ function onAct(el) {
       run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, startPts: 4, rollSeed: 'aw:' + ui.seed + ':' + ui.world + ':roll', gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
+      if (!run.daily && !run.practice && meta.steer) { delete meta.steer; saveMeta(); } // a requested world is spent once a run starts
       pushMsgs(run.log.slice(), true);
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
     }
