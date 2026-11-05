@@ -33,6 +33,18 @@ jobs:
         run: node tools/daily.js 2026-11-01
       - name: World Record checks
         run: node tools/record.js
+      - name: Dice checks (Gambler)
+        run: node tools/dice-test.js
+      - name: Jinx checks
+        run: node tools/jinx-test.js
+      - name: Ally pieces test
+        run: node tools/ally-pieces-test.js
+      - name: Opening draft test
+        run: node tools/draft-test.js
+      - name: Read skills test
+        run: node tools/read-test.js
+      - name: Path evolution test
+        run: node tools/advance-test.js
 
   balance:
     name: Balance gate

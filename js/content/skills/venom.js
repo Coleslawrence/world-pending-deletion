@@ -1,12 +1,13 @@
 // ===== [World Pending Deletion] — content: skills: Venom =====
 'use strict';
-sk('venom_blade', 'Venom Blade', ['venom', 'blade'], 'E', 1, { dmg: 5, poison: 2 }, [['viper_fang', 'Viper Fang', { dmg: 7, poison: 4 }], ['toxic_flurry', 'Toxic Flurry', { dmg: 3, hits: 3, poison: 1, perHit: 1 }]]);
-sk('hex', 'Hex', ['venom', 'storm'], 'E', 2, { weaken: 2, poison: 2 }, [['curse_of_frailty', 'Curse of Frailty', { weaken: 3, poison: 4 }], ['wither', 'Wither', { weaken: 2, poison: 2, drainPoison: 1 }]]);
-sk('drain_life', 'Drain Life', ['venom', 'reaper'], 'E', 2, { dmg: 8, lifesteal: 0.5 }, [['soul_drain', 'Soul Drain', { dmg: 12, lifesteal: 0.6 }], ['blood_pact', 'Blood Pact', { dmg: 8, lifesteal: 1 }]]);
-sk('plague_cloud', 'Plague Cloud', ['venom'], 'D', 3, { poison: 6 }, [['pestilence', 'Pestilence', { poison: 10 }], ['rot', 'Rot', { poison: 6, bleed: 4 }]]);
-sk('malice', 'Malice', ['venom'], 'D', 1, { dmg: 4, malice: 3 }, [['spite', 'Spite', { dmg: 4, malice: 5 }], ['torment', 'Torment', { dmg: 6, malice: 3, weaken: 1 }]]);
-sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech', 'Blood Leech', { leech: 6 }], ['parasite', 'Parasite', { leech: 3, poison: 3 }]]);
-sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }]]);
+sk('venom_blade', 'Venom Blade', ['venom', 'blade'], 'E', 1, { dmg: 5, poison: 2 }, [['viper_fang', 'Viper Fang', { dmg: 7, poison: 4 }], ['toxic_flurry', 'Toxic Flurry', { dmg: 3, hits: 3, poison: 1, perHit: 1 }], ['numbing_blade', 'Numbing Blade', { dmg: 5, poison: 2, weaken: 1 }]]);
+sk('hex', 'Hex', ['venom', 'storm'], 'E', 2, { weaken: 2, poison: 2 }, [['curse_of_frailty', 'Curse of Frailty', { weaken: 3, poison: 4 }], ['wither', 'Wither', { weaken: 2, poison: 2, drainPoison: 1 }], ['hex_of_ruin', 'Hex of Ruin', { weaken: 2, poison: 2, mark: 2 }]]);
+sk('drain_life', 'Drain Life', ['venom', 'reaper'], 'E', 2, { dmg: 8, lifesteal: 0.5 }, [['soul_drain', 'Soul Drain', { dmg: 12, lifesteal: 0.6 }], ['blood_pact', 'Blood Pact', { dmg: 8, lifesteal: 1 }], ['sapping_drain', 'Sapping Drain', { dmg: 8, lifesteal: 0.5, poison: 3 }]]);
+sk('plague_cloud', 'Plague Cloud', ['venom'], 'D', 3, { poison: 6 }, [['pestilence', 'Pestilence', { poison: 10 }], ['rot', 'Rot', { poison: 6, bleed: 4 }], ['choking_cloud', 'Choking Cloud', { poison: 6, weaken: 2 }]]);
+sk('malice', 'Malice', ['venom'], 'D', 1, { dmg: 4, malice: 3 }, [['spite', 'Spite', { dmg: 4, malice: 5 }], ['torment', 'Torment', { dmg: 6, malice: 3, weaken: 1 }], ['gloat', 'Gloat', { dmg: 4, malice: 3, heal: 4 }]]);
+sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech', 'Blood Leech', { leech: 6 }], ['parasite', 'Parasite', { leech: 3, poison: 3 }], ['symbiote', 'Symbiote', { leech: 3, regen: 2 }]]);
+sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }], ['numbing_needles', 'Numbing Needles', { poison: 4, doublePoison: 1, stunIfWeak: 1 }]]);
+sk('seep', 'Seep', ['venom'], 'D', 2, { poison: 3, read: 'defend', readFx: { poison: 7 } }, [['stagnant_pool', 'Stagnant Pool', { poison: 3, read: 'defend', readFx: { poison: 6, weaken: 2 } }], ['rising_damp', 'Rising Damp', { poison: 4, read: 'defend', readFx: { poison: 6, doublePoison: 1 } }], ['soak', 'Soak', { poison: 3, read: 'defend', readFx: { poison: 5, siphon: 1 } }]]);
 flav({
   venom_blade: "A thin coat of green on a thin blade.",
   viper_fang: "Bitten, not cut. The difference shows later.",
@@ -29,4 +30,15 @@ flav({
   toxic_needles: "Nobody counted the needles. It felt like more than a thousand.",
   venom_storm: "The air itself is poison now.",
   needle_rain: "Silver needles, falling like rain. There is no shelter.",
+  seep: "It finds the ones who stand still.",
+  stagnant_pool: "Still water breeds the worst things.",
+  rising_damp: "It climbs the walls of whatever they hide behind.",
+  numbing_blade: "They feel the cut later. They feel the weakness now.",
+  hex_of_ruin: "A curse that points them out to everything else.",
+  sapping_drain: "You take some of their life and leave something worse behind.",
+  choking_cloud: "Hard to swing a weapon while coughing.",
+  gloat: "Their suffering is good for your health.",
+  symbiote: "It feeds on them, and it shares.",
+  numbing_needles: "A weakened body gives up on standing altogether.",
+  soak: "It soaks through the shield and takes it with it.",
 });

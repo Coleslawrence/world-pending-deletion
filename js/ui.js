@@ -47,23 +47,60 @@ if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
 function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
 function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; meta.savedAt = Date.now(); lsSet(META_KEY, meta); if (typeof schedulePush === 'function') schedulePush(); }
-function stageScreen() { return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
+function stageScreen() { if (run.startPts != null && run.stage === 'choose') return 'kitstats'; return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
 // ---------- Toasts ----------
 // Notices wait their turn instead of pushing each other off screen: a few show at once, each stays long enough to
 // read (longer lines stay longer), and a tap clears one early so the next comes in. Missed ones are in the System log.
+// Each can name its cause (what you did that made it happen) above the line. Big ones (Hearts, levels, quests, Notice,
+// broadcasts) stay until tapped, outside fights, so nothing that matters goes by unread.
 const toastQ = [];
 const toastMs = (text, t) => Math.min(9000, 2400 + text.length * 45) + (t === 'broadcast' ? 1200 : 0);
-function toast(text, t = 'sys', onTap) { toastQ.push({ text, t, onTap }); pumpToasts(); }
-function pumpToasts() {
-  if (!toastQ.length || pumpToasts.gap || toastsEl.querySelectorAll('.toast:not(.out)').length >= (ui.screen === 'fight' ? 2 : 3)) return;
-  const { text, t, onTap } = toastQ.shift();
-  const el = document.createElement('div'); el.className = 'toast t-' + t; el.textContent = text; el.onTap = onTap;
-  placeToasts(); toastsEl.appendChild(el);
-  el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
-  pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280);
+const bigToast = (text, t) => ['level', 'class', 'broadcast', 'merge'].includes(t) || /Heart/.test(text);
+// Repeats of the same kind of notice from the same cause merge into one card (training 6 times shows the newest
+// level, not 6 cards). Only one tap-to-dismiss card shows at a time, with a count of the ones waiting behind it,
+// and none show while a sheet is open, so they never stack over the shop.
+const STAY_MAX = 1;
+const toastKey = (text, t, cause) => t + '|' + (cause || '') + '|' + text.replace(/\d+/g, '#');
+function toast(text, t = 'sys', onTap, cause) {
+  const key = toastKey(text, t, cause);
+  const q = toastQ.find(x => x.key === key); if (q) { q.text = text; q.onTap = onTap || q.onTap; return; }
+  const el = [...toastsEl.querySelectorAll('.toast:not(.out)')].find(x => x.key === key);
+  if (el) { el.querySelector('.msg').textContent = text; el.onTap = onTap || el.onTap; if (el.timer) { clearTimeout(el.timer); el.timer = setTimeout(() => dropToast(el), toastMs(text, t)); } return; }
+  toastQ.push({ text, t, onTap, cause, key }); pumpToasts();
 }
-function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => el.remove(), 350); pumpToasts(); }
+const isStay = x => ui.screen !== 'fight' && bigToast(x.text, x.t);
+function pumpToasts() {
+  if (!pumpToasts.gap) {
+    const under = toastsEl.classList.contains('under'), live = [...toastsEl.querySelectorAll('.toast:not(.out)')];
+    const stays = live.filter(x => x.classList.contains('stay')).length, cap = ui.screen === 'fight' ? 2 : 3;
+    const i = toastQ.findIndex(x => !isStay(x) || (!under && stays < STAY_MAX));
+    if (i >= 0 && live.length < cap) { showToast(toastQ.splice(i, 1)[0]); pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280); }
+  }
+  waitCount();
+}
+function showToast(Q) {
+  const { text, t, onTap, cause, key } = Q, stay = isStay(Q);
+  const el = document.createElement('div'); el.className = 'toast t-' + t + (stay ? ' stay' : ''); el.onTap = onTap; el.key = key; el.q = Q;
+  if (cause) { const c = document.createElement('small'); c.className = 'cause'; c.textContent = cause; el.appendChild(c); }
+  const m = document.createElement('span'); m.className = 'msg'; m.textContent = text; el.appendChild(m);
+  if (stay) { const x = document.createElement('span'); x.className = 'tx'; x.setAttribute('aria-hidden', 'true'); x.textContent = '×'; el.appendChild(x); const w = document.createElement('small'); w.className = 'wait'; el.appendChild(w); }
+  placeToasts(); toastsEl.appendChild(el);
+  if (!stay) el.timer = setTimeout(() => dropToast(el), toastMs(text, t));
+}
+// The tap-to-dismiss card says how many more are waiting behind it
+function waitCount() {
+  const n = toastQ.filter(isStay).length;
+  toastsEl.querySelectorAll('.toast.stay:not(.out) .wait').forEach(w => { w.textContent = n ? `[${n} more notice${n > 1 ? 's' : ''} after this]` : ''; });
+}
+// A sheet opened: waiting cards go back to the front of the queue (not hidden in place) and come back when it closes
+function setUnder(on) {
+  if (toastsEl.classList.contains('under') === on) return;
+  toastsEl.classList.toggle('under', on);
+  if (on) [...toastsEl.querySelectorAll('.toast.stay:not(.out)')].reverse().forEach(el => { toastQ.unshift(el.q); el.remove(); });
+  pumpToasts();
+}
+function dropToast(el) { if (el.classList.contains('out')) return; clearTimeout(el.timer); el.classList.add('out'); setTimeout(() => { el.remove(); pumpToasts(); }, 350); pumpToasts(); }
 function clearToasts() { toastQ.length = 0; toastsEl.querySelectorAll('.toast').forEach(el => clearTimeout(el.timer)); toastsEl.replaceChildren(); }
 toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast'); if (!el) return; dropToast(el); if (el.onTap) el.onTap(); });
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
@@ -76,7 +113,7 @@ function fitNames() {
   });
 }
 // Short archetype tags for the shop chips on narrow phones
-const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM' };
+const ARCH_TAG = { pyre: 'PYR', venom: 'VEN', blade: 'BLD', bastion: 'BAS', arcanist: 'ARC', zealot: 'ZEA', reaper: 'REA', storm: 'STM', dicer: 'GMB', jinx: 'JNX' };
 // Fights: under the opponent's panel. Elsewhere: just above the bottom buttons (or an open sheet's), clear of the
 // header and the screen's instructions
 function placeToasts() {
@@ -87,18 +124,30 @@ function placeToasts() {
   if (!r || !r.height) { toastsEl.style.top = ''; toastsEl.style.bottom = ''; toastsEl.classList.remove('low'); return; }
   toastsEl.style.top = 'auto'; toastsEl.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`; toastsEl.classList.add('low');
 }
+// A sheet slides up when it opens: notices placed during the slide sat too low, over its buttons, so place them again
+document.addEventListener('animationend', e => { if (e.target.classList && e.target.classList.contains('sheet')) placeToasts(); });
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 const TOAST_MAX = 5;
-function pushMsgs(msgs, logged) {
+// cause: what the player did, shown above each notice ("Bought Iron Fang", "Infirmary")
+function pushMsgs(msgs, logged, cause) {
   if (!logged) msgs.forEach(m => logRun(m.text, m.t));
   const show = msgs.filter(m => !/^\[(Erasing|World): /.test(m.text)).sort((a, b) => (TOAST_RANK[a.t] ?? 9) - (TOAST_RANK[b.t] ?? 9));
-  show.slice(0, TOAST_MAX).forEach(m => toast(m.text, m.t));
+  show.slice(0, TOAST_MAX).forEach(m => toast(m.text, m.t, null, cause));
   const more = show.length - TOAST_MAX;
   if (more > 0 && run) toast(`[${more} more in the System log. Tap to read.]`, 'sys', openLog);
 }
-function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ui.sheet.type === 'result')) return; ui.sheet = { type: 'syslog' }; render(); }
+function openLog() { if (!run || ui.screen === 'fight' || (ui.sheet && ['result', 'note'].includes(ui.sheet.type))) return; ui.sheet = { type: 'syslog' }; render(); }
 
+// A number in the top strip that changed since the last screen pulses (green up, red down), so you see what a result
+// touched. Held while a result sheet covers the strip, so the pulse plays when you can see it.
+function pulseChanged() {
+  if (!run || !document.querySelector('.strip') || (ui.sheet && ['evresult', 'result', 'note'].includes(ui.sheet.type))) return;
+  const now = { run, gold: run.gold, hearts: run.hearts, hp: Math.round(run.hp), notice: noticeOf(run) }, was = ui.pv; ui.pv = now;
+  if (!was || was.run !== run) return;
+  const sel = { gold: '.strip .gold', hearts: '.strip .hcount', hp: '.strip .st-hp', notice: '.ntc' };
+  Object.keys(sel).forEach(k => { if (now[k] === was[k]) return; const el = document.querySelector(sel[k]); if (el) el.classList.add('pulse', (k === 'notice' ? now[k] < was[k] : now[k] > was[k]) ? 'up' : 'down'); });
+}
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial', entrant: 'Filed record' };
 function initials(name) { const w = name.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(x => x && !['the', 'of'].includes(x.toLowerCase())); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
@@ -475,7 +524,7 @@ function titleHTML() {
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
     <div class="t-stats"><div><b>${meta.wins}</b><span>spared</span></div><div><b>${meta.erased.length}</b><span>erased</span></div><div><b>${meta.echoes}</b><span>Echoes</span></div><button data-act="sheet" data-s="halls"><b>${meta.rank ? meta.rank.letter : 'F'}</b><span>Entrant Rank</span></button></div>
     <div class="stack">
-      ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${saved.daily ? 'Pending World: ' : ''}${esc(saved.world.name)}, ${saved.stage === 'draft' ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
+      ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${saved.daily ? 'Pending World: ' : ''}${esc(saved.world.name)}, ${saved.stage === 'draft' || saved.startPts != null ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
       ${dailyButton(canResume && saved)}
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
       <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
@@ -507,7 +556,7 @@ function worldsHTML() {
 // ---------- Awakening ----------
 // In Pending World the record and the System Offer come from the day's seed, and Echo unlocks don't count
 function newAw(w, date) {
-  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, pts: 4, gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
+  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
     offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta, awRng('offer')), title: null };
 }
 // Everything the System draws at an Awakening comes from a seed: the day's in Pending World, otherwise one drawn when
@@ -529,18 +578,18 @@ function giftRow(k, a, w) {
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
   const chk = giftCheck(w, a.gifts, a.patron, a.offer, a.sysPts);
-  const tabs = [['id', 'Name'], ['stats', 'Stats' + (a.pts ? ` · ${a.pts}` : '')], ['gifts', `Gifts · ${chk.left}`], ['patron', 'Patron']];
+  // In the order they depend on each other: the Patron sets the Gift Points (Faithless adds 2), and stats wait for the
+  // opening draft, when the skills they power are known
+  const tabs = [['id', 'Name'], ['patron', 'Patron'], ['gifts', `Gifts · ${chk.left}`]];
+  const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
   let body = '';
   if (a.tab === 'id') {
     body = `<label class="fld"><span>Champion's name</span><input id="aw-name" maxlength="18" value="${esc(a.name)}" autocomplete="off"></label>
       <div class="fld"><span>Sigil</span><div class="sigrow">${SIGILS.map((g, i) => `<button class="sigb ${a.sigil === i ? 'on' : ''}" data-act="aw-sigil" data-i="${i}" style="color:${SIGIL_COLS[a.color]}" aria-label="Sigil ${i + 1}">${g}</button>`).join('')}</div></div>
       <div class="fld"><span>Colour</span><div class="sigrow">${SIGIL_COLS.map((c, i) => `<button class="colb ${a.color === i ? 'on' : ''}" data-act="aw-color" data-i="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('')}</div></div>
       <div class="aw-preview">${crest(a.name, 'me', true, { sigil: a.sigil, color: a.color })}<div><div class="ch-name">${esc(a.name || '…')} of ${esc(w.name)}</div><div class="ch-sub">Entrant of the Grand Tournament. This is how your champion appears in fights and in the Halls.</div></div></div>
+      ${titles.length ? `<div class="fld"><span>Title</span></div>` + titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : ''}
       ${a.practice ? '' : `<p class="sh-p bio">${bioHTML(a.record, w.type, w.name)}</p><p class="sh-p sysl">[Filing world record: ${esc(w.name)}. ${a.record.ids.length} entries.]</p>`}`;
-  } else if (a.tab === 'stats') {
-    const roll = a.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="aw-unroll">Place 4 myself</button></div>`
-      : a.rollUsed || a.practice ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="aw-roll">Roll</button></div>`;
-    body = `<p class="sh-p">${a.pts ? `<b class="pts">${a.pts} point${a.pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.</p>${roll}` + STATS.map(k => `<div class="strow"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${STAT_INFO[k].short}</small></span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="-1" ${a.stats[k] <= 2 ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${a.stats[k]}</span>${a.rolled ? '<span></span>' : `<button class="btn small add" data-act="aw-stat" data-k="${k}" data-d="1" ${a.pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
   } else if (a.tab === 'gifts') {
     const allowed = giftsAllowed(w);
     const list = allowed.filter(k => GIFTS[k].cat === a.cat).sort((x, y) => giftUnlocked(y, awMeta()) - giftUnlocked(x, awMeta())).map(k => giftRow(k, a, w)).join('');
@@ -552,14 +601,12 @@ function awakenHTML() {
       <div class="aw-tools"><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
       <p class="sh-p fine">Unspent points become 3 gold each. Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ') || 'none'}.</p>`;
   } else {
-    const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
     body = `<p class="sh-p">Pledge to a god for 2 Favour with them; their wagers come up more often. Win wagers to reach 4 Favour (a free B-rank piece) and 8 (a blessing for the run).</p>` +
       Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b></span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
-      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>` +
-      `<div class="fld"><span>Title</span></div>` + (titles.length ? titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : '<p class="sh-p fine">No Titles yet. Earn them with feats in the arena; the System announces each one.</p>');
+      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>`;
   }
-  const ready = a.name.trim() && a.pts === 0 && a.patron && chk.ok;
-  const why = !a.name.trim() ? 'Name your champion' : a.pts ? `Place ${a.pts} stat point${a.pts > 1 ? 's' : ''}` : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
+  const ready = a.name.trim() && a.patron && chk.ok;
+  const why = !a.name.trim() ? 'Name your champion' : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
   return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="${ui.daily ? 'back-title' : 'back-worlds'}" aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : 'Step 2 of 3'} · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
     <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${a.tab === k ? 'on' : ''}" data-act="aw-tab" data-t="${k}" role="tab">${l}</button>`).join('')}</div>
     <section class="aw-body sysw">${body}</section>
@@ -567,7 +614,11 @@ function awakenHTML() {
 }
 
 // ---------- Draft ----------
+// The opening draft is three steps: 3 of 6 skills, then 1 of 2 gear, then the opening stat points (kitStatsHTML)
+function draftEyebrow(step) { return `${run.daily ? 'Pending World' : 'Step 3 of 3'} · ${step}`; }
 function draftHTML() {
+  const gd = run.gearDraft || [];
+  if (run.draftPicked && gd.length) return gearDraftHTML(gd);
   const cards = run.draft.map(id => {
     const d = SKILLS[id], on = ui.draftSel.includes(id);
     return `<button class="scard ${on ? 'on' : ''} ${mainTag(id)}" data-act="draft-pick" data-id="${id}">
@@ -575,10 +626,37 @@ function draftHTML() {
       <div class="sc-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}</div>
       <div class="sc-desc">${esc(describe(d))}</div></button>`;
   }).join('');
-  return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">Step 3 of 3 · Opening draft</div><h2>[Skill selection: choose 3]</h2></div></div>
-    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.</p>
+  const n = ui.draftSel.length, next = gd.length ? 'Next: gear' : 'Confirm';
+  return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Skills')}</div><h2>[Skill selection: choose 3]</h2></div></div>
+    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.${gd.length ? ' Rerolling also redraws the gear on offer.' : ''}</p>
     <div class="sgrid">${cards}</div>
-    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-ok" ${ui.draftSel.length === 3 ? '' : 'disabled'}>Confirm ${ui.draftSel.length}/3</button></div></main>`;
+    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-skills" ${n === 3 ? '' : 'disabled'}>${n === 3 ? next : `Skills ${n}/3`}</button></div></main>`;
+}
+// Pick Your Kit: 1 of 2 gear pieces, once the skills are chosen
+function gearDraftHTML(gd) {
+  const gearOn = gd.includes(ui.draftGear) ? ui.draftGear : null;
+  const cards = gd.map(id => { const g = GEAR[id];
+    return `<button class="scard ${gearOn === id ? 'on' : ''} ${mainTag(id)}" data-act="draft-gear" data-id="${id}">
+      <div class="sc-h"><span class="sc-name">${esc(g.name)}</span>${rk(g.rank)}</div>
+      <div class="sc-meta">${tagNames(id)}<span class="tagn">${g.slot[0].toUpperCase() + g.slot.slice(1)}</span></div>
+      <div class="sc-desc">${Object.entries(gearStats(id, 1)).map(([k, v]) => `+${v} ${k}`).join(', ')}. ${esc(gearText(id, 1))}</div></button>`; }).join('');
+  return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="draft-back" aria-label="Back to skills">‹</button><div><div class="eyebrow">${draftEyebrow('Gear')}</div><h2>[Standard issue: choose 1 piece of gear]</h2></div></div>
+    <p class="hint">Your skills: ${run.draftPicked.map(id => esc(SKILLS[id].name)).join(', ')}.</p>
+    <div class="sgrid">${cards}</div>
+    <div class="foot"><button class="btn primary" data-act="draft-ok" ${gearOn ? '' : 'disabled'}>${gearOn ? 'Next: stats' : 'Pick 1 gear'}</button></div></main>`;
+}
+// The opening stat points, placed once the skills and gear they work with are known
+function kitStatsHTML() {
+  const pts = run.startPts, fl = run.statFloor, s = effStats(run);
+  // Which stats the chosen skills draw power from
+  const uses = {}; allPieces(run).forEach(p => { const d = SKILLS[p.id]; const k = d && skillStat(d); if (k) (uses[k] = uses[k] || []).push(d.name); });
+  const gifts = [hasGift(run, 'bornlucky') && `${GIFTS.bornlucky.name} +2 LUK`, hasGift(run, 'latebloomer') && `${GIFTS.latebloomer.name} −1 to each`].filter(Boolean);
+  const roll = run.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="kit-unroll">Place 4 myself</button></div>`
+    : run.rollUsed ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="kit-roll">Roll</button></div>`;
+  const rows = STATS.map(k => `<div class="strow kit"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${uses[k] ? 'Powers ' + esc(uses[k].join(', ')) : STAT_INFO[k].short}</small></span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="-1" ${run.stats[k] <= fl[k] ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="1" ${pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
+  return `<main class="screen select awaken"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Stats')}</div><h2>[Calibrating your champion]</h2></div></div>
+    <section class="aw-body sysw"><p class="sh-p">${pts ? `<b class="pts">${pts} point${pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.${gifts.length ? ` Gifts: ${esc(gifts.join(', '))}.` : ''}</p>${roll}${rows}</section>
+    <div class="foot"><button class="btn primary" data-act="kit-ok" ${pts ? 'disabled' : ''}>${pts ? `Place ${pts} stat point${pts > 1 ? 's' : ''}` : 'Enter the tournament'}</button></div></main>`;
 }
 
 // ---------- Choose opponent ----------
@@ -592,7 +670,7 @@ function chooseHTML() {
   const fin = run.choices.length === 1;
   const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
   const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
-  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div></div><div class="col col-b">
+  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
    ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
@@ -793,7 +871,7 @@ function titleChunks() {
 function fightHTML() {
   const f = ui.fight;
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
-  return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
+  return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn rr-btn" id="rrBtn" data-act="reroll-mode" hidden></button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
@@ -823,6 +901,9 @@ function chipsHTML(X, f) {
   if (X.stun > 0) c.push(`<span class="chip stun">Stunned</span>`);
   if (X.enrage && X.hp / X.maxHp <= X.enrage) c.push(`<span class="chip burn">Enraged</span>`);
   if (X.revive) c.push(`<span class="chip evade">Will rise</span>`);
+  if (X.misfortune > 0) c.push(`<span class="chip misf">Misfortune ${X.misfortune}</span>`);
+  (X.omens || []).forEach(o => c.push(`<span class="chip misf" title="Omen: fires if they ${o.on === 'attack' ? 'attack' : 'guard'} next">Omen: ${o.on === 'attack' ? 'attacks' : 'guards'}</span>`));
+  if (X.curse > 0) c.push(`<span class="chip curse" title="+${Math.round(CURSE_DMG * 100 * X.curse)}% skill damage, +${Math.round(CURSE_TAKEN * 100 * X.curse)}% damage taken">Curse ${X.curse}</span>`);
   if (X.isPlayer && run.wagerOn && run.wager) c.push(`<span class="chip wagerc">Wager: ${esc(WAGERS[run.wager.key].text)}</span>`);
   return c.join('');
 }
@@ -841,7 +922,7 @@ function updateFight() {
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
-    else { const i = intentInfo(f); it.className = 'intent k-' + i.kind; it.innerHTML = `<span class="in-l">Next</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>`; }
+    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
@@ -853,13 +934,19 @@ function updateFight() {
     const btn = (s, i, wide) => {
       const d = s.def, cd = s.cd > 0, prev = previewSkill(f, s);
       const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
-      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${(!can || cd) && !ui.info ? 'disabled' : ''}>
-        <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
+      const off = ui.reroll ? !(can && s.pip && !cd) : (!can || cd) && !ui.info;
+      const die = s.pip ? `<span class="sk-die ${s.jackpot ? 'jp' : ''}" aria-label="Die shows ${s.pip}${s.jackpot ? ', Jackpot' : ''}">${DIE_FACES[s.pip - 1]}</span>` : '';
+      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''} ${ui.reroll && s.pip ? 'rr' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${off ? 'disabled' : ''}>
+        <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${die}${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
         ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}<span class="sk-fx">${esc(prev)}</span>${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
     };
     const list = f.A.skills.slice(1).map((s, i) => btn(s, i + 1));
     while (list.length < run.slots) list.push('<div class="sk empty">Empty slot</div>');
     sk.innerHTML = list.join('') + btn(f.A.skills[0], 0, true);
+    // The Gambler's rerolls: tap the die in the top bar, then a skill, to reroll its die
+    const rb = document.getElementById('rrBtn'), rr = f.A.rerolls > 0 && f.A.skills.some(s => s.pip) && !f.over;
+    if (!rr) ui.reroll = false;
+    if (rb) { rb.hidden = !rr; rb.disabled = !can; rb.classList.toggle('on', !!ui.reroll); rb.textContent = `${DIE_FACES[4]}${f.A.rerolls || 0}`; rb.setAttribute('aria-label', ui.reroll ? 'Cancel reroll' : `Reroll a die, ${f.A.rerolls || 0} left. Tap this, then a skill`); rb.setAttribute('aria-pressed', ui.reroll ? 'true' : 'false'); }
   }
 }
 function floatAt(side, text, cls) {
@@ -937,6 +1024,7 @@ async function onUse(i) {
   const f = ui.fight; if (!f || ui.busy || f.phase !== 'player') return;
   const s = f.A.skills[i];
   if (ui.info) { ui.sheet = { type: 'skillinfo', i }; return render(); }
+  if (ui.reroll) { ui.reroll = false; rerollDie(f, i); return updateFight(); }
   if (!canUse(s)) return;
   ui.busy = true; f.replied = true;
   const before = f.log.length;
@@ -957,17 +1045,20 @@ async function onUse(i) {
   if (f.over) { await wait(700); finishFight(); }
 }
 function finishFight() {
-  const f = ui.fight;
+  const f = ui.fight, before = evSnap(run);
   const res = resolveFight(run, f, run.practice ? META : meta);
   poolFile(res);
-  // An ordinary win goes straight on: the reward shows as a notice instead of a sheet. Losses and run endings keep theirs.
-  const plain = res.won && !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  // Every fight that the run goes on from ends on a summary, then each notification it raised as its own card, tapped
+  // away one at a time (ui.notes). Settings > Fast wins sends ordinary wins straight on with notices instead.
+  // Run endings (erased, spared, elite, rewind, practice) keep their own sheets and notices.
+  const goesOn = !res.rewind && !res.death && !res.spared && !res.eliteOver && !res.practiceDone;
+  const plain = res.won && goesOn && SET.fastWins;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
   sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
-  pushMsgs(res.msgs);
-  ui.result = res; ui.erDone = 0; ui.erBusy = false;
+  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); recordRest(res.rested); }
+  if (goesOn && !plain) { res.msgs.forEach(m => logRun(m.text, m.t)); ui.notes = noteList(res.msgs); ui.noteN = ui.notes.length; } else { ui.notes = null; pushMsgs(res.msgs); }
+  ui.result = res; ui.erDone = 0; ui.erBusy = false; res.changes = evDiff(before, run);
   if (res.practiceDone) { ui.practiceAfter = true; }
-  if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); toast(res.msgs[res.msgs.length - 1].text, 'broadcast'); recordRest(res.rested); }
   if (res.fell) recordWin(res.fell);
   if (res.death) { const out = endRun(run, meta, 'erased'); recordRunStats('erased'); ui.end = { kind: 'erased', echoes: out.echoes, snap: out.snap, res, rp: out.rp, opened: out.trial, observed: finishDaily(false), filed: !!run.poolFiled }; lsDel(RUN_KEY); }
   else if (res.spared) { const out = endRun(run, meta, 'spared'); recordRunStats('spared'); run._snapAt = out.snap.at; run.ended = false; ui.end = { kind: 'spared', echoes: out.echoes, snap: out.snap }; }
@@ -986,6 +1077,7 @@ function finishFight() {
 function sheetWrap(title, body, foot, cls, noClose) {
   return `<div class="sheet-bg"><section class="sheet ${cls || ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header class="sh-h"><h3>${esc(title)}</h3>${foot === false || noClose ? '' : '<button class="icon-btn" data-act="close" aria-label="Close">×</button>'}</header><div class="sh-b">${body}</div>${foot && foot !== false ? `<footer class="sh-f">${foot}</footer>` : ''}</section></div>`;
 }
+const orList = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' or ' + a[a.length - 1] : a.join('');
 function pieceBody(id, star, mods, power) {
   star = star || 1; mods = mods || [];
   if (isGear(id)) {
@@ -997,7 +1089,7 @@ function pieceBody(id, star, mods, power) {
   const p = power || skillPower(d, effStats(run), star) * d.powerMult;
   return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${mods.length ? `<em class="pfx">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em> ` : ''}${esc(d.name)}</span>${stars(star)}${rk(effRank(id, mods))}</div>
     <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}${flavHTML(SKILLS[id].flavour)}</div>
-    ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${SKILLS[id].evo.map(e => esc(SKILLS[e].name)).join(' or ')}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
+    ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${orList(SKILLS[id].evo.map(e => esc(SKILLS[e].name)))}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
 }
 function pieceSheet() {
   const S = ui.sheet;
@@ -1014,6 +1106,7 @@ function pieceSheet() {
   const f = findPiece(run, S.u); if (!f) { ui.sheet = null; return ''; }
   const p = f.p, g = isGear(p.id);
   const acts = [];
+  if (g && GEAR[p.id].consumable) return sheetWrap('On your bench', pieceBody(p.id, p.star, p.mods) + gotHTML(p), `<button class="btn ghost" data-act="close">Not yet</button><button class="btn primary" data-act="patch-open" data-u="${p.u}">Use</button>`);
   if (f.at === 'bench') {
     if (g) { const cur = run.gear[GEAR[p.id].slot]; acts.push(`<button class="btn" data-act="move" data-u="${p.u}" data-to="gear">${cur ? 'Swap with ' + esc(GEAR[cur.id].name) : 'Equip'}</button>`); }
     else {
@@ -1025,8 +1118,29 @@ function pieceSheet() {
   if (f.at === 'bar') run.bar.forEach((b, i) => { if (i !== f.i) acts.push(`<button class="btn small ghost" data-act="move" data-u="${p.u}" data-to="bar" data-i="${i}">To slot ${i + 1}</button>`); });
   const where = f.at === 'bench' ? 'On your bench' : f.at === 'bar' ? `Skill slot ${f.i + 1}` : 'Equipped';
   const canSell = ui.screen === 'shop';
-  return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
+  return sheetWrap(where, pieceBody(p.id, p.star, p.mods) + gotHTML(p) + (acts.length && ui.screen === 'shop' ? `<div class="acts">${acts.join('')}</div>` : ui.screen !== 'shop' ? '<p class="sh-p fine">Equip, swap and sell in the shop.</p>' : ''),
     canSell ? `<button class="btn ghost danger-t" data-act="sell" data-u="${p.u}">Sell · ${sellValue(p)}g</button><button class="btn primary" data-act="close">Done</button>` : `<button class="btn primary" data-act="close">Done</button>`);
+}
+// Where a piece and its prefixes came from: the lines kept when they were given (p.got, p.mgot)
+function gotHTML(p) {
+  const mods = (p.mods || []).map(bareMod), rows = [];
+  if (p.got) rows.push(`<li><b>${esc(pieceDef(p.id).name)}</b>: ${esc(p.got)}</li>`);
+  Object.entries(p.mgot || {}).forEach(([m, t]) => { if (mods.includes(bareMod(m)) && PREFIXES[bareMod(m)]) rows.push(`<li><b>${esc(PREFIXES[bareMod(m)].name)}</b>: ${esc(t)}</li>`); });
+  return rows.length ? `<h4 class="got-h">How you got it</h4><ul class="msgs got">${rows.join('')}</ul>` : '';
+}
+// What your choices have set up for later fights (run.marks, from core.js addMark), and which choice set each
+function liveMarks() { return (run.marks || []).filter(m => m.kind !== 'ward' || run.ward > 0); }
+function marksBtn() { const n = liveMarks().length; return n ? `<button class="link mk" data-act="sheet" data-s="marks">[${n} pending effect${n > 1 ? 's' : ''} from your choices] ›</button>` : ''; }
+function marksSheet() {
+  const L = { next: 'Next fight', foe: 'Next fight', stakes: 'Next fight', ward: `Next ${run.ward > 1 ? run.ward + ' losses' : 'loss'}`, always: 'Every fight' };
+  const rows = liveMarks().map(m => `<li><b>${L[m.kind]}</b>: ${esc(m.text.charAt(0).toUpperCase() + m.text.slice(1))}.<br><small>From: ${esc(m.from)}</small></li>`).join('');
+  return sheetWrap('[Pending effects]', `<p class="sh-p">[Effects of your choices, waiting for the arena.]</p><ul class="msgs marks">${rows}</ul>`, '<button class="btn primary" data-act="close">Done</button>');
+}
+// Unsigned Patch (experimental, gear.js): three rules offered, one removed for the rest of the run
+function patchSheet() {
+  const S = ui.sheet, offer = patchOffer(run);
+  const opts = offer.map(k => `<button class="choice glitch" data-act="patch-pick" data-k="${k}"><div class="sr-h"><span class="sr-name">Remove: ${esc(PATCH_RULES[k].name)}</span></div><div class="sr-desc">${esc(PATCH_RULES[k].text)}</div></button>`).join('');
+  return sheetWrap('[Unsigned Patch]', `<p class="sh-p">[Publisher: unknown. This patch removes one rule for the rest of the run. Select the rule.]</p>${opts}`, '<button class="btn ghost" data-act="close">Not yet</button>', 'sys', true);
 }
 // The first time a stat line is offered, the System says so once
 function statLinesNotice() {
@@ -1048,9 +1162,19 @@ function evDiff(a, run) {
   a.ids.filter(k => !b.ids.includes(k) && !b.ids.some(x => x.split(':')[0] === k.split(':')[0])).forEach(k => add(`Lost: ${nm(k)}`, false));
   return out;
 }
+// The messages a fight result shows: erase lines become rows and the defeat lines repeat the summary
+function noteList(msgs) { return msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text)); }
+// One notification after a fight, tapped away before the next
+function noteSheet() {
+  const m = ui.notes[0], i = ui.noteN - ui.notes.length + 1, r = ui.result;
+  return sheetWrap(`[Notification ${i} of ${ui.noteN}]`, `${r ? `<p class="sh-p fine ev-you">After: ${r.won ? 'victory over' : 'defeat by'} ${esc(r.enemy)}</p>` : ''}<div class="sysbox ev-out"><p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}</div>`,
+    `<button class="btn primary" data-act="note-ok">${ui.notes.length > 1 ? 'Next' : 'Continue'}</button>`, 'ev-res note', true);
+}
+// An item reward: its card folded under its line, so you can see what you got without leaving
+function itemCard(m) { if (!m.item || !pieceDef(m.item)) return ''; const f = m.u != null && findPiece(run, m.u), q = f ? f.p : { star: 1, mods: [] }; return `<details class="ev-item"><summary>${esc(pieceDef(m.item).name)} <small>tap to view</small></summary>${pieceBody(m.item, q.star, q.mods)}</details>`; }
 function evResultSheet() {
   const R = ui.sheet;
-  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>`).join('');
+  const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}`).join('');
   const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
   return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
 }
@@ -1058,7 +1182,7 @@ function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
-    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}. Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. What you say on air happens to the Hearts you carry.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
+    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. ${esc(run.world.name)} can hear you. Its Hearts are in your hands.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
     const lead = `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
     return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
@@ -1070,6 +1194,10 @@ function pendingSheet() {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'rune') return enchantSheet(p.mods, 'rune');
+  if (p.type === 'adv') {
+    const A = ARCH[p.arch];
+    return sheetWrap(`[Path evolution · ${A.path}]`, `<p class="sh-p">[${esc(A.name)}: 6 pieces. ${esc(A.path)} can evolve. Choose what it becomes. The choice holds for this run.]</p>` + ADVANCE[p.arch].map((o, i) => { const v = i ? o : advOf({}, p.arch); return `<button class="choice a-${p.arch}" data-act="advance" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(o.name)}</span></div><div class="sr-desc">${esc(v.b)}</div></button>`; }).join(''), false);
+  }
   if (p.type === 'evo') {
     const f = findPiece(run, p.u); if (!f) { run.pending.shift(); return ''; }
     const d = SKILLS[f.p.id];
@@ -1093,7 +1221,8 @@ function enchantSheet(mods, from) {
   }
   if (sel == null) {
     const corruptBtn = from !== 'rune' && corruptTargets(run).length ? `<button class="choice glitch" data-act="ench-mod" data-i="corrupt"><div class="sr-h"><span class="sr-name"><em class="pfx">Corr\u0337upt a skill</em></span></div><div class="sr-desc">Two results are rolled and you keep one: a star, a prefix or a glitch. The skill then takes no more prefixes.</div></button>` : '';
-    const body = `<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
+    const runeGot = from === 'rune' && run.pending[0] && run.pending[0].got;
+    const body = `${runeGot ? `<p class="sh-p sysl">${esc(runeGot)}</p>` : ''}<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
     return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
   }
   const m = mods[sel];
@@ -1140,10 +1269,11 @@ function resultSheet() {
   const lines = [];
   if (r.won) lines.push(`+${r.gold} gold · healed 30%`);
   if (!r.won && !run.elite) lines.push(`A piece of ${esc(run.world.name)} is erased: −${r.heartsLost} Heart${r.heartsLost > 1 ? 's' : ''}. ${run.hearts} left. ${ui.fight && ui.fight.spec.kind === 'final' ? 'You must face the Final Champion again.' : 'The tournament moves on.'}`);
-  // erase lines become rows, and the defeat lines repeat the summary above
-  const shown = r.msgs.filter(m => !/^\[(Erasing|World): |^\[Defeat\. |^\[The Final Champion waits/.test(m.text));
-  const msgs = shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
-  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
+  // erase lines become rows, and the defeat lines repeat the summary above. With notification cards to follow, the
+  // summary says how many instead of listing them
+  const shown = noteList(r.msgs), chips = r.changes && r.changes.length ? `<div class="ev-ch">${r.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
+  const msgs = ui.notes ? (ui.noteN ? `<p class="sh-p fine">[${ui.noteN} notification${ui.noteN > 1 ? 's' : ''} to review.]</p>` : '') : shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${chips ? `<p class="sh-p fine">Altogether this fight:</p>${chips}` : ''}${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
@@ -1176,7 +1306,7 @@ function questList() {
 }
 function archetypesSheet() {
   const c = runCounts(run);
-  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> ${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${esc(b)}</div>`).join('')}</div>`; }).join('');
+  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> ${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${i === 2 && run.adv && run.adv[k] != null ? `<b>${esc(advOf(run.adv, k).name)}:</b> ${esc(advOf(run.adv, k).b)}` : i === 2 && ADVANCE[k] ? `${esc(b)} Or, as ${esc(ADVANCE[k][1].name)}: ${esc(ADVANCE[k][1].b)}` : esc(b)}</div>`).join('')}</div>`; }).join('');
   const hp = run.hiddenPath ? `<div class="archrow hidden"><div class="ar-h"><b>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</b></div><div class="ar-b on">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</div></div>` : '<p class="sh-p fine">Reach 4 pieces in two archetypes at once to unlock a Hidden Path.</p>';
   return sheetWrap('Archetypes this run', `<p class="sh-p fine">Equipped pieces (skill bar and gear) count. Each different piece counts once; pieces with two tags count for both. At 4, the System names your path.</p>${body}${hp}<h4>Reactions</h4><ul class="msgs">${Object.values(REACTIONS).map(R => `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>`).join('')}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
@@ -1233,6 +1363,7 @@ function settingsSheet() {
     + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
     + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
     + row('Fight speed', 'How fast turns play out.', speed)
+    + row('Fast wins', 'Off: every fight ends on a summary, then each notification to tap through. On: ordinary wins go straight on, with notices.', seg('fastWins', [[false, 'Off'], [true, 'On']]))
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
@@ -1355,6 +1486,7 @@ function render() {
   else if (scr === 'worlds') h = worldsHTML();
   else if (scr === 'awaken') h = awakenHTML();
   else if (scr === 'draft') h = draftHTML();
+  else if (scr === 'kitstats') h = kitStatsHTML();
   else if (scr === 'choose') h = chooseHTML();
   else if (scr === 'shop') h = shopHTML();
   else if (scr === 'district') h = districtHTML();
@@ -1364,7 +1496,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1378,6 +1510,8 @@ function render() {
   coachHighlight();
   if (scr === 'fight') updateFight();
   fitNames();
+  pulseChanged();
+  setUnder(!!app.querySelector('.sheet')); // notices that wait for a tap step aside while a sheet is open
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
   if (fbFocus) { const el = document.getElementById('fb-text'); if (el) { el.focus(); el.setSelectionRange(fbFocus[0], fbFocus[1]); } }
@@ -1401,9 +1535,6 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-roll': { const A = ui.aw; if (A.rollUsed) return render(); A.stats = rollStats(awRng('roll')); A.pts = 0; A.rolled = A.rollUsed = true; toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); return render(); }
-    case 'aw-unroll': { const A = ui.aw; A.stats = { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }; A.pts = 4; A.rolled = false; return render(); }
-    case 'aw-stat': { const k = d.k, dv = +d.d, A = ui.aw; if (A.rolled) return; if (dv > 0 && A.pts > 0) { A.stats[k]++; A.pts--; } if (dv < 0 && A.stats[k] > 2) { A.stats[k]--; A.pts++; } return render(); }
     case 'aw-cat': ui.aw.cat = d.c; return render();
     case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
     case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
@@ -1413,7 +1544,7 @@ function onAct(el) {
     case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
     case 'aw-ok': {
       const A = ui.aw;
-      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: A.stats, gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, startPts: 4, rollSeed: 'aw:' + ui.seed + ':' + ui.world + ':roll', gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       pushMsgs(run.log.slice(), true);
@@ -1447,30 +1578,39 @@ function onAct(el) {
   const msgs = [];
   switch (a) {
     case 'draft-pick': { const i = ui.draftSel.indexOf(d.id); if (i >= 0) ui.draftSel.splice(i, 1); else if (ui.draftSel.length < 3) ui.draftSel.push(d.id); return render(); }
-    case 'draft-reroll': rerollDraft(run); ui.draftSel = []; saveRun(); return render();
-    case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta); ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
+    case 'draft-gear': ui.draftGear = ui.draftGear === d.id ? null : d.id; return render();
+    case 'draft-reroll': rerollDraft(run); ui.draftSel = []; ui.draftGear = null; saveRun(); return render();
+    // Skills first, then the gear pick on its own screen (kept in the run, so Continue comes back to it)
+    case 'draft-skills': if (ui.draftSel.length !== 3) return render(); if ((run.gearDraft || []).length) { run.draftPicked = ui.draftSel.slice(); saveRun(); return render(); } // falls through when there is no gear to pick
+    case 'draft-ok': { const ids = run.draftPicked || ui.draftSel.slice(); if (ids.length !== 3) return render(); delete run.draftPicked; confirmDraft(run, ids, run.practice ? META : meta, undefined, ui.draftGear); ui.draftGear = null; ui.draftSel = []; ui.pick = null; ui.wagerOn = false; saveRun(); return go(stageScreen()); }
+    case 'draft-back': ui.draftSel = run.draftPicked || []; delete run.draftPicked; saveRun(); return render();
+    // Opening stats, after the draft: place 4 points or roll once
+    case 'kit-stat': if (startStat(run, d.k, +d.d)) saveRun(); return render();
+    case 'kit-roll': if (rollStart(run)) { saveRun(); toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); } return render();
+    case 'kit-unroll': if (unrollStart(run, 4)) saveRun(); return render();
+    case 'kit-ok': if (placeStartStats(run, msgs)) { pushMsgs(msgs, false); saveRun(); } return go(stageScreen());
     case 'pick-opp': { chooseOpponent(run, +d.i, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; ui.distDone = null; saveRun(); return go('district'); }
     case 'wager': ui.wagerOn = !ui.wagerOn; return render();
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
-    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs); ui.sheet = null; saveRun(); } return render(); }
+    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs, false, `Bought ${pieceDef(it.id).name}`); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
-    case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs); saveRun(); } return render();
+    case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs, false, `Trained ${d.k}`); saveRun(); } return render();
     case 'sell': { const p = findPiece(run, +d.u); const v = sell(run, +d.u); if (v) toast(`[Sold ${pieceDef(p.p.id).name} for ${v}g]`, 'loot'); ui.sheet = null; saveRun(); return render(); }
     case 'move': {
       const u = +d.u, to = d.to;
       const ok = to === 'bench' ? movePiece(run, u, 'bench', msgs) : to === 'gear' ? movePiece(run, u, { gear: GEAR[findPiece(run, u).p.id].slot }, msgs) : movePiece(run, u, { bar: +d.i }, msgs);
       if (!ok) toast('[Not possible: your bench may be full.]', 'loss');
-      ui.sheet = null; pushMsgs(msgs); saveRun(); saveMeta(); return render();
+      ui.sheet = null; pushMsgs(msgs, false, 'Moved a piece'); saveRun(); saveMeta(); return render();
     }
-    case 'shop-done': { if (benchOver()) return render(); if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
+    case 'shop-done': { if (benchOver()) return render(); if (run.stage === 'shop') { leaveShop(run, null, msgs); pushMsgs(msgs, false, 'Left the shop'); saveRun(); } if (run.pending.length || run.stage !== 'ready') return render(); return startFightUI(); }
     case 'district': {
       const k = d.k; if (distFull(k) || !useDistrict(run, k)) return; ui.distDone = k;
       if (k === 'undercity') { const p = run.pending[run.pending.length - 1]; if (p && p.type === 'event') p.from = 'undercity'; }
-      if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot');
-      if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot'); pushMsgs(msgs); }
+      if (k === 'infirmary') toast(`[Treated. +${infirmary(run)} HP]`, 'loot', null, 'Infirmary');
+      if (k === 'sanctum') { toast(`[The world mends. +${sanctum(run, msgs)} Hearts]`, 'loot', null, 'Sanctum'); pushMsgs(msgs, false, 'Sanctum'); }
       if (k === 'scout') ui.sheet = { type: 'scout' };
 
       if (k === 'enchanter') { ui.enchantMods = rollPrefixes(enchantCount(run), null, null, run); ui.enchantSel = null; ui.sheet = { type: 'enchanter' }; }
@@ -1483,35 +1623,43 @@ function onAct(el) {
       run.pending.shift(); saveRun(); saveMeta();
       const lines = msgs.length ? msgs : [{ t: 'sys', text: `[${o.desc}]` }];
       // The outcome stays in the event until Continue; if the event moved the game on (run over, a new screen), toasts as before
-      if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines); return render(); }
+      if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines, false, `${(EVENTS[p.key] || {}).title || 'Event'}: ${o.label}`); return render(); }
       lines.forEach(m => logRun(m.text, m.t));
       ui.sheet = { type: 'evresult', title: (EVENTS[p.key] || {}).title || '[Event]', label: o.label, lines, changes: evDiff(before, run) };
       return render();
     }
-    case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs); saveRun(); return render(); }
-    case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs); saveRun(); return render(); }
+    case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
+    case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
     case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
-    case 'corrupt-do': { const c = run.corrupting; if (c && corrupt(run, c.u, c.opts[+d.i], msgs)) pushMsgs(msgs); run.corrupting = null; ui.sheet = null; saveRun(); return render(); }
+    case 'corrupt-do': { const c = run.corrupting; if (c && corrupt(run, c.u, c.opts[+d.i], msgs)) pushMsgs(msgs, false, 'Corrupted a skill'); run.corrupting = null; ui.sheet = null; saveRun(); return render(); }
     case 'ench-back': ui.enchantSel = null; return render();
     case 'ench-skip': { ui.enchantSel = null; if (ui.sheet) ui.sheet = null; else if (run.pending[0] && run.pending[0].type === 'rune') run.pending.shift(); saveRun(); return render(); }
     case 'ench-apply': {
       const fromRune = !ui.sheet && run.pending[0] && run.pending[0].type === 'rune';
       const mods = fromRune ? run.pending[0].mods : ui.enchantMods, m = mods[ui.enchantSel];
       const f = findPiece(run, +d.u);
-      if (f && applyPrefix(run, +d.u, m, msgs)) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill'); pushMsgs(msgs); }
+      if (f && applyPrefix(run, +d.u, m, msgs, null, fromRune ? run.pending[0].got : '[Carved by the Enchanter, for a price.]')) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill', null, fromRune ? 'Rune' : 'Enchanter'); pushMsgs(msgs, false, `Carved ${PREFIXES[m].name}`); }
       ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
     }
+    case 'advance': { const p = run.pending[0], o = ADVANCE[p.arch][+d.i]; advance(run, p.arch, +d.i); toast(`[Path evolved: ${ARCH[p.arch].path} → ${o.name}]`, 'class'); logRun(`[Path evolved: ${ARCH[p.arch].path} → ${o.name}]`, 'class'); saveRun(); return render(); }
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
-    case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs); saveRun(); } return render();
+    case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs, false, `+1 ${d.k}`); saveRun(); } return render();
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
     case 'use': return onUse(+d.i);
     case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
+    case 'jinx': if (ui.fight && !ui.busy && jinxMove(ui.fight)) { playEvents(ui.fight); updateFight(); } return;
+    case 'reroll-mode': ui.reroll = !ui.reroll; return updateFight();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
+    case 'patch-open': ui.sheet = { type: 'patch', u: +d.u }; saveRun(); return render();
+    case 'patch-pick': { const S = ui.sheet; if (S && usePatch(run, S.u, d.k, meta, msgs)) { sfx('buy'); ui.sheet = null; pushMsgs(msgs, false, 'Unsigned Patch'); saveRun(); saveMeta(); } return render(); }
+    case 'note-ok': if (ui.notes) ui.notes.shift(); // falls through: the next card, or on with the run
     case 'result-ok': {
+      if (ui.notes && ui.notes.length) { ui.sheet = { type: 'note' }; return render(); }
       if (ui.practiceAfter) { ui.practiceAfter = false; ui.result = null; ui.sheet = { type: 'practicedone' }; return render(); }
-      ui.sheet = null; ui.fight = null; ui.result = null;
+      if (ui.result && ui.result.won) while (coachStep() && coachStep().scr === 'fight') coachAdvance(); // tutorial steps that wait on the fight screen are over once it closes
+      ui.notes = null; ui.sheet = null; ui.fight = null; ui.result = null;
       if (ui.end && ui.end.kind === 'erased') return go('end');
       saveRun(); return go(stageScreen());
     }
@@ -1541,10 +1689,10 @@ const PRACTICE = {
 };
 const ownsStar = (id, st) => run && allPieces(run).some(p => p.id === id && p.star >= st);
 const COACH = [
-  { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, stats, Gifts and a Patron god. For practice I've filled it in.", wait: 'next' },
+  { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, a Patron god and Gifts. For practice I've filled it in.", wait: 'next' },
   { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks and cheat skills, bought with Gift Points. Weaker worlds give more points. Open the Gifts tab.', wait: 'aw-tab' },
   { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (15 Block at the start of every fight) and Catalyst (stronger reactions). Tap Awaken.", wait: 'aw-ok' },
-  { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-ok' },
+  { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-skills' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Tap the Goblin to face it.', wait: 'pick-opp' },
@@ -1971,7 +2119,7 @@ function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
-  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
+  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
   if (typing) return;
   const sheet = app.querySelector('.sheet');
   if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }

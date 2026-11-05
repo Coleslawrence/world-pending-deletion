@@ -23,7 +23,7 @@ EVENTS.letter_cache = { chain: 'letter', title: 'The cache', text: "Behind the g
     if (!h.hasGift('lastwords')) { run.gifts.push('lastwords'); h.say('[Hidden Gift acquired: Last Words.]', 'class'); } else { run.gold += 10; h.say('[+10 gold]', 'loot'); }
   } },
   { label: 'Bury it with honours', desc: 'Make sure it meant something.', then: { heart: 1, chain: 'done' }, go: (run, h) => h.say('[Buried with honours. Your world grows by one memory.]') },
-  { check: { stat: 'INT', hard: true }, label: 'Read the rest', desc: 'The handwriting gets smaller near the end.', then: { rune: 1, chain: 'done' }, go: (run, h) => {
+  { check: { stat: 'INT', hard: true }, label: 'Read the rest', desc: 'The handwriting gets smaller near the end.', then: { rune: 1, chain: 'done', gotRune: '[Folded into the last page: a rune, left for whoever read that far.]' }, go: (run, h) => {
     if (h.meta) { h.meta.found = h.meta.found || {}; h.meta.found.letter_note = true; }
     h.say('[The rest of the note: "Count the Entrants. Then count the worlds. They do not match."]', 'class');
   } }] };

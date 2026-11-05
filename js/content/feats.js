@@ -36,6 +36,8 @@ const FEATS = {
   collector: { at: 'merge', say: n => `Own ${NUM_WORDS[n] || n} ★2 pieces at once`, hit: (c, n) => c.pieces().filter(p => p.star >= 2).length >= n, n: 3, must: n => new RegExp(`\\b${num(n)} ★2 pieces`) },
   path: { at: 'path', say: n => `Have the System recognise your path by round ${n}`, hit: (c, n) => c.run.round <= n, n: 5, must: n => new RegExp(`round ${n}`) },
   bankrupt: { at: 'shop', say: () => 'Leave the shop with 0 gold', hit: c => c.run.gold === 0, must: () => /0 gold/ },
+  chances: { at: 'chance', say: n => `Win ${n} chance rolls in one run`, hit: (c, n) => (c.run.chanceWins || 0) >= n, n: 3, must: n => new RegExp(`\\b${n} chance rolls`) },
+  jinxes: { at: 'fight', say: n => `Jinx ${n} moves in a single fight`, hit: (c, n) => (c.T.jinxes || 0) >= n, n: 3, must: n => new RegExp(`\\b${n} moves`) },
   wagers: { at: 'wager', say: n => `Win ${n} wagers in one run`, hit: (c, n) => c.run.wagersWon >= n, n: 3, must: n => new RegExp(`\\b${n} wagers`) },
 };
-const FEAT_ATS = ['win', 'fight', 'merge', 'path', 'shop', 'wager'];
+const FEAT_ATS = ['win', 'fight', 'merge', 'path', 'shop', 'wager', 'chance'];

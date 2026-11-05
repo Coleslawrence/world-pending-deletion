@@ -126,7 +126,7 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   ok(JSON.stringify(a) === JSON.stringify(b) && !('f' in a), 'no layers, no change');
   // Worlds roll layers, and the Fate picks the modifier
   const wr = seeded(5); let n = 0;
-  for (let t = 0; t < 300; t++) { const w = G.offerWorlds(G.newMeta(), wr)[0]; ok(w.v === 2 && w.fate && w.people, 'worlds roll layers'); if (w.fate === 'test_fate') { n++; ok(w.mod === 'bloodmoon', 'the Fate sets the modifier'); } }
+  for (let t = 0; t < 300; t++) { const w = G.offerWorlds(G.newMeta(), wr)[0]; ok(w.v === 2 && w.fate && w.people, 'worlds roll layers'); if (w.fate === 'test_fate') { n++; ok(w.mod === 'bloodmoon' || w.mod === 'corrupted', 'the Fate sets the modifier (a Corrupted Save still overrides it)'); } }
   ok(n > 0, 'the test Fate came up');
   G.WORLD_TYPES.drowned.setting = 'far_future';
   let far = 0; for (let t = 0; t < 200; t++) if (G.buildRecord('drowned', wr, W).ids.includes(202)) far++;

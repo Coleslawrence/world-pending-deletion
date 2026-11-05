@@ -8,7 +8,8 @@ function choosePlayer(f) {
   const low = A.hp / A.maxHp < 0.4;
   let best = ready[0], bs = -1;
   ready.forEach(({ s, i }) => {
-    const fx = s.def.fx, p = s.power;
+    // A Read skill (fx.read, fx.readFx) is scored as what it will do this turn: its readFx version when the shown move matches
+    const rd = s.def.fx.read && G.readHits(f, A, s.def.fx), fx = rd ? G.readDef(s.def).fx : s.def.fx, p = s.power * (rd && s.def.fx.readFx.readMult || 1);
     let sc = ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) * 1.6 + (fx.poison || 0) * 2.5 + (fx.bleed || 0) * 1.5 + (fx.detonate ? B.burn * fx.detonate : 0) + (fx.malice ? fx.malice * 2 : 0) + (fx.blockDmg ? A.block * fx.blockDmg : 0) + (fx.brk || 0) * 0.6) * p;
     if (fx.replay) sc = f.lastPlayerSkill ? 15 * p : 0; // Error: worth a strong skill once there's one to repeat
     // Press a nearly broken guard: a hit that breaks it costs the opponent its turn
@@ -19,6 +20,7 @@ function choosePlayer(f) {
     if (fx.heal) sc += low ? fx.heal * p * 1.5 : 0;
     if (fx.healMissing) sc += low ? (A.maxHp - A.hp) * fx.healMissing * 1.2 : 0;
     if ((fx.stun || fx.interrupt || (fx.stunIfWeak && B.weaken)) && intent.kind === 'big') sc += 25;
+    if (fx.augury) sc += 4; if (fx.portent) sc += 4;
     if (fx.empower) sc += 8; if (fx.evade && intent.kind === 'big') sc += 15;
     if (fx.weaken && (intent.kind === 'attack' || intent.kind === 'big')) sc += 6;
     if (fx.cleanse) sc += (A.poison + A.burn) * 1.5;
@@ -28,17 +30,43 @@ function choosePlayer(f) {
     if (fx.thorns) sc += fx.thorns * p * 0.6;
     if (fx.regen) sc += fx.regen * p * 2;
     if (fx.mark || fx.focus || fx.haste || fx.siphon) sc += 12;
+    // Dice skills arrive resolved for this turn's roll (fx.dmgPip, fx.blockPip, fx.healPip, fx.dbl, fx.snake, fx.boxcars,
+    // fx.bust, fx.bustAt, fx.dmgAll, fx.progressive, fx.cashOut and fx.dieMin become plain dmg, block, heal, stun and
+    // selfDmg; s.def.pip is the roll), so the lines above already score them. See resolveDice in core.js.
+    if (s.def.pip && fx.selfDmg) sc -= fx.selfDmg;
+    if (fx.reroll || fx.setSix) sc += 8 + (fx.setSix ? 6 : 0);
+    // Jinx: Misfortune builds toward jinxing big hits; Curse is passed on at 6 or more
+    if (fx.perMisf) sc += (fx.perMisf * (B.misfortune || 0) + (fx.perCurse || 0) * (A.curse || 0)) * p;
+    if (fx.calamity) sc += fx.calamity * (B.misfortune || 0) * p + (intent.kind === 'big' ? 20 : 0);
+    if (fx.misf) sc += fx.misf * 2 + (fx.misfT || 0) * 3;
+    // fx.dieStun is worked into fx.stun by resolveDice before the bot looks, so the Stun line above scores it
+    if (fx.misfPerBurn) sc += Math.floor(((B.burn || 0) + (fx.burn || 0)) / fx.misfPerBurn) * 2;
+    if (fx.omenAtk) sc += B.omens && B.omens.length >= 3 ? 0 : fx.omenAtk * p * 0.7 + (fx.omenGuard ? 4 : 0);
+    if (fx.passCurse) sc = (A.curse || 0) >= 6 ? 40 + (fx.curseDmg || 0) * A.curse * p : 0;
+    if (fx.coinStun) sc += 4;
+    if (fx.jinxDisc && !G.canJinx(f)) sc -= 6;
+    if (fx.rollTwice) sc += 10;
     if (s.def.quick) sc += 1000;
     if (sc > bs) { bs = sc; best = { s, i }; }
   });
   return best.i;
+}
+// The Jinx: jinx a big hit whenever it can, anything else once Misfortune is plentiful
+function jinxIfWise(f) {
+  if (!G.canJinx(f)) return;
+  const role = G.jinxRole(f, f.B.intent), cost = G.jinxCost(f);
+  if (role === 'big' || (f.B.misfortune || 0) >= cost + 6) G.jinxMove(f);
+}
+// The Gambler's rerolls: spend them on a die showing 1 or 2
+function rerollLow(f) {
+  for (let g = 0; g < 5 && f.A.rerolls > 0; g++) { const i = f.A.skills.findIndex(s => s.pip && s.pip <= 2 && G.canUse(s)); if (i < 0 || !G.rerollDie(f, i)) break; }
 }
 function fight(run) {
   const f = G.newFight(run);
   const rr = G.rivalReplies(run, f); if (rr.length) G.rivalReply(run, f, rr[0]); // a rival reply when one is shown
   let guard = 0;
   while (!f.over && guard++ < 300) {
-    if (f.phase === 'player') G.playerAct(f, choosePlayer(f));
+    if (f.phase === 'player') { rerollLow(f); jinxIfWise(f); G.playerAct(f, choosePlayer(f)); }
     else if (f.phase === 'stunned') G.skipPlayer(f);
     if (!f.over && f.phase === 'enemy') G.enemyTurn(f);
   }
@@ -104,7 +132,8 @@ function pending(run, meta) {
     if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
     if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
-    if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.random() < 0.5 ? 0 : 1], meta); } }
+    if (p.type === 'adv') { run.pending.unshift(p); G.advance(run, p.arch, Math.random() < 0.5 ? 0 : 1); }
+    if (p.type === 'evo') { const f = G.findPiece(run, p.u); if (f) { const evo = G.SKILLS[f.p.id].evo; run.pending.unshift(p); G.evolve(run, p.u, evo[Math.floor(Math.random() * evo.length)], meta); } }
   }
 }
 // Training: 3 points in the main archetype's stat for every 2 in VIT
@@ -163,7 +192,7 @@ function playRun(meta, verbose, opts = {}) {
   }
   return { result: 'stuck', w, run };
 }
-module.exports = { playRun, choosePlayer };
+module.exports = { playRun, choosePlayer, rerollLow, jinxIfWise };
 if (require.main === module) {
   if (process.argv[2] === 'v') { const meta = G.newMeta(); for (let i = 0; i < (+process.argv[3] || 1); i++) console.log(playRun(meta, true).result); }
   else {

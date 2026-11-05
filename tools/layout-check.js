@@ -49,6 +49,29 @@ function states() {
     out.forEach(s => { s.run.name = 'Oringe waan the Unbowed'; s.run.world.name = 'Morgravel-under-Ash'; s.run.champ = s.run.name + ' of ' + s.run.world.name; });
     const mid = out.find(s => s.label === 'r5-shop') || out[0];
     out.unshift({ label: 'title', stage: 'title', run: mid.run }, { label: 'worlds', stage: 'worlds', run: mid.run });
+    // A Gambler bar: dice on the skill buttons and the Reroll button beside Attack
+    const dice = JSON.parse(JSON.stringify(mid.run)), ids = ['coin_toss', 'hedge', 'double_down', 'snake_eyes', 'jackpot', 'loaded_die'];
+    dice.bar = dice.bar.map((p, i) => ({ id: ids[i], star: 2, mods: [], u: 'dice' + i }));
+    out.push({ label: 'r5-fight-dice', stage: 'fight', run: dice });
+    // A Jinx bar: Misfortune and Curse chips and the Jinx button beside the shown move
+    const jx = JSON.parse(JSON.stringify(mid.run)), jids = ['evil_eye', 'ill_omen', 'knock_wood', 'thirteenth', 'calamity', 'pass_curse'];
+    jx.bar = jx.bar.map((p, i) => ({ id: jids[i], star: 2, mods: [], u: 'jinx' + i })); jx.gear.accessory = { id: 'black_cat_collar', star: 3, mods: [], u: 'jinxg' };
+    out.push({ label: 'r5-fight-jinx', stage: 'fight', run: jx });
+    // Choose screen with the longest traits on every opponent, glitch ones included (Corrupted widened a card at 320)
+    const ch = out.find(s => s.label === 'r5-choose');
+    if (ch) { const t = JSON.parse(JSON.stringify(ch.run)); t.choices.forEach(c => c.traits = ['corrupted', 'desynced']); out.push({ label: 'r5-choose-traits', stage: 'choose', run: t }); }
+    // Opening draft: 6 skills, then the 2-gear Standard issue pick, longest names
+    const dr = JSON.parse(JSON.stringify(mid.run)); dr.stage = 'draft';
+    dr.draft = ['snake_eyes', 'double_down', 'thirteenth', 'pass_curse', 'evil_eye', 'loaded_die'];
+    dr.gearDraft = G.rollGearDraft(dr, Math.random); if (dr.gearDraft.length < 2) dr.gearDraft = Object.keys(G.GEAR).slice(0, 2);
+    out.push({ label: 'draft', stage: 'draft', run: dr });
+    const dg = JSON.parse(JSON.stringify(dr)); dg.draftPicked = dr.draft.slice(0, 3);
+    out.push({ label: 'draft-gear', stage: 'draft', run: dg });
+    // Opening stats after the draft, with a Gift note and points left to place
+    const ks = JSON.parse(JSON.stringify(mid.run)); Object.assign(ks, { stage: 'choose', startPts: 2, statFloor: Object.assign({}, ks.stats), rollSeed: 'x', rolled: false, rollUsed: false }); ks.gifts = ks.gifts.concat('bornlucky');
+    out.push({ label: 'kit-stats', stage: 'kitstats', run: ks });
+    // Path evolution card: the two advanced classes for an archetype at 6 pieces
+    out.push({ label: 'path-evolution', stage: 'shop', run: mid.run, pending: [{ type: 'adv', arch: 'reaper' }] });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };
@@ -128,14 +151,14 @@ function inspect() {
       await page.goto(url);
       await page.evaluate(([rk, mk, r, m]) => { localStorage.clear(); localStorage.setItem(rk, JSON.stringify(r)); localStorage.setItem(mk, JSON.stringify(m)); localStorage.setItem('wpd-news-seen', '99'); }, ['le-run-1', 'le-meta-1', run, meta]);
       await page.goto(url); await page.addStyleTag({ content: insets });
-      await page.evaluate(([stage, sheet]) => {
-        ui.sheet = null; run.pending = [];
+      await page.evaluate(([stage, sheet, pending]) => {
+        ui.sheet = null; run.pending = pending || [];
         if (stage === 'fight') startFightUI();
         else if (stage === 'worlds') onAct({ dataset: { act: 'new' } });
         else { ui.screen = stage; ui.sheet = sheet || null; render(); }
-      }, [st.stage, st.sheet]);
+      }, [st.stage, st.sheet, st.pending]);
       await page.evaluate(() => document.fonts.ready);
-      await page.waitForTimeout(st.stage === 'fight' ? 900 : st.sheet ? 450 : 150);
+      await page.waitForTimeout(st.stage === 'fight' ? 900 : st.sheet || st.pending ? 450 : 150);
       const bad = await page.evaluate(inspect);
       if (bad.length) fails++;
       console.log(`${bad.length ? 'FAIL' : 'ok  '} ${S.name} ${st.label}${bad.length ? '\n     ' + bad.slice(0, 8).join('\n     ') + (bad.length > 8 ? `\n     ... ${bad.length - 8} more` : '') : ''}`);

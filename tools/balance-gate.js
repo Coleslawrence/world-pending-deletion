@@ -13,6 +13,8 @@ const i = process.argv.indexOf('--runs'), N = i > 0 ? +process.argv[i + 1] : 100
 const OVERALL_MAX = 3, MAIN_MAX = 6, SPREAD = 10;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wpd-gate-'));
 const ARCHS = Object.keys(require(path.join(HEAD, 'js/core.js')).ARCH);
+// A new archetype has no base to compare with: it is played on this branch only and reported as new
+const BASE_ARCHS = new Set(Object.keys(JSON.parse(require('child_process').execFileSync(process.execPath, ['-e', "process.stdout.write(JSON.stringify(require('./js/core.js').ARCH))"], { cwd: BASE, maxBuffer: 1 << 24 }).toString())));
 
 // One stats.js run; resolves to its spared % (the JSON's spared.pct)
 function sim(dir, tag, args) {
@@ -27,13 +29,14 @@ async function pool(jobs, n) { const res = new Array(jobs.length); let next = 0;
   const jobs = [], keys = [];
   for (const [side, dir] of [['base', BASE], ['head', HEAD]]) {
     keys.push([side, 'overall']); jobs.push(() => sim(dir, side + '-overall', ['--batches', '3']));
-    ARCHS.forEach(a => { keys.push([side, a]); jobs.push(() => sim(dir, side + '-' + a, ['--main', a])); });
+    ARCHS.forEach(a => { if (side === 'base' && !BASE_ARCHS.has(a)) return; keys.push([side, a]); jobs.push(() => sim(dir, side + '-' + a, ['--main', a])); });
   }
   const res = await pool(jobs, Math.max(1, os.cpus().length)), R = { base: {}, head: {} };
   keys.forEach(([side, k], j) => R[side][k] = res[j]);
   const fails = [], f1 = v => v.toFixed(1), sign = d => (d > 0 ? '+' : d < 0 ? '−' : '±') + f1(Math.abs(d));
   const rows = [['overall', OVERALL_MAX]].concat(ARCHS.map(a => [a, MAIN_MAX])).map(([k, max]) => {
     const b = R.base[k], h = R.head[k], d = h - b;
+    if (b == null) return `| ${k} as main (${N} runs) | new | ${f1(h)}% | new | ±${max} |`;
     if (Math.abs(d) > max) fails.push(`${k} moved ${sign(d)} points (limit ${max})`);
     return `| ${k === 'overall' ? `Overall (${N * 3} runs)` : `${k} as main (${N} runs)`} | ${f1(b)}% | ${f1(h)}% | ${sign(d)}${Math.abs(d) > max ? ' ⚠' : ''} | ±${max} |`;
   });

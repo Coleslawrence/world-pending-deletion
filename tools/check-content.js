@@ -9,8 +9,8 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
-// Content names are globals under Node (core.js loads js/content/ into the global scope); WHEEL isn't exported.
-const C = vm.runInThisContext('({ EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, WHEEL, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+// Content names are globals under Node (core.js loads js/content/ into the global scope).
+const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -73,10 +73,10 @@ if (saved) {
 const MECHANICS = G.ENEMY_TRAITS;
 const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
-  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'glitch', 'rolling', 'splice']],
-  archetypes: [C.ARCH, ['name', 'stat', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
+  gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'top', 'glitch', 'rolling', 'splice', 'experimental', 'consumable']],
+  archetypes: [C.ARCH, ['name', 'stat', 'disc', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
-  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'mids', 'setting', 'ruler']],
+  worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'guest2', 'mids', 'setting', 'ruler']],
   fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy']],
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit', 'clash']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], ['glitch']],
@@ -100,7 +100,7 @@ Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).for
 Object.entries(C.EVENTS).forEach(([k, E]) => (E.opts || []).forEach((o, i) => {
   const w = `event ${k} option ${i + 1}`;
   Object.keys(o).filter(f => !OPTION[0].includes(f) && !OPTION[1].includes(f)).forEach(f => err(w, `unknown field ${f} (a typo, or a new field core.js doesn't read)`));
-  Object.keys(o.then || {}).filter(f => !THEN.includes(f)).forEach(f => err(w, `unknown outcome then.${f}; outcomes (outcomes.js) are ${THEN.join(', ')}, anything else goes in go`));
+  Object.keys(o.then || {}).filter(f => !THEN.includes(f) && f !== 'got' && f !== 'gotRune').forEach(f => err(w, `unknown outcome then.${f}; outcomes (outcomes.js) are ${THEN.join(', ')}, anything else goes in go`));
 }));
 
 // ---------- References: everything named points at something real ----------
@@ -111,7 +111,7 @@ Object.values(C.SKILLS).forEach(s => {
   s.tags.forEach(t => ref(w, isArch(t), `tag ${t} is not an archetype`));
   ref(w, C.RANKS.includes(s.rank), `rank ${s.rank} is not one of ${C.RANKS.join(' ')}`);
   (s.evo || []).forEach(e => ref(w, C.SKILLS[e] && C.SKILLS[e].base === s.id, `evolution ${e} is missing`));
-  if (!s.basic && !s.base && !s.glitch) ref(w, (s.evo || []).length === 2, 'needs two ★3 evolutions'); // glitched skills never evolve
+  if (!s.basic && !s.base && !s.glitch) ref(w, (s.evo || []).length === 3, 'needs three ★3 evolutions'); // glitched skills never evolve
 });
 Object.entries(C.GEAR).forEach(([k, g]) => {
   const w = 'gear ' + k;
@@ -119,9 +119,17 @@ Object.entries(C.GEAR).forEach(([k, g]) => {
   g.tags.forEach(t => ref(w, isArch(t), `tag ${t} is not an archetype`));
   ref(w, C.RANKS.includes(g.rank), `rank ${g.rank} is unknown`);
   Object.keys(g.stats).forEach(s => ref(w, C.STATS.includes(s), `stat ${s} is unknown`));
+  if (g.glitch || g.experimental) return;
+  // The rank ladder: rank sets the stat budget, and every piece gains one more effect at ★3
+  const budget = C.GEAR_BUDGET[g.rank] - (g.slot === 'accessory' ? 1 : 0), sum = Object.values(g.stats).reduce((a, b) => a + b, 0);
+  ref(w, sum === budget, `a ${g.rank}-rank ${g.slot} gives ${budget} stat points at ★1 (GEAR_BUDGET), not ${sum}`);
+  ref(w, g.top && Object.keys(g.top).length === 1, 'needs top: the one effect it gains at ★3');
+  Object.keys(g.top || {}).forEach(k => { ref(w, !!C.EFFECTS[k], `top effect ${k} is not in effects.js`); ref(w, !(k in (g.pas || {})) && !(k in (g.fix || {})), `top effect ${k} repeats one it already has; ★3 adds a new line`); });
 });
-Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
-ref('archetypes WHEEL', C.WHEEL.length === archs.length && archs.every(a => C.WHEEL.includes(a)), 'the wheel must hold every archetype exactly once');
+Object.entries(C.ARCH).forEach(([k, a]) => { ref('archetypes ' + k, C.STATS.includes(a.stat), `stat ${a.stat} is unknown`); ref('archetypes ' + k, !!C.DISCIPLINES[a.disc], `Discipline ${a.disc} is unknown`); ref('archetypes ' + k, a.b.length === 3 && a.p.length === 3, 'needs 3 tier bonuses, in b (words) and p (effects)'); });
+// Path evolutions: two advanced classes per archetype; the first keeps tier 3, the second brings its own words and effects
+archs.forEach(a => { const w = 'archetypes ADVANCE ' + a, v = C.ADVANCE[a]; ref(w, Array.isArray(v) && v.length === 2 && v.every(o => o.name), 'needs two advanced classes, each with a name'); if (!v || !v[1]) return; ref(w, !v[0].p && !v[0].b, "the first keeps tier 3 as written (no b or p of its own)"); ref(w, typeof v[1].b === 'string' && /\.$/.test(v[1].b) && v[1].p, 'the second needs b (words, ending with a full stop) and p (effects)'); Object.keys(v[1].p || {}).forEach(k => ref(w, !!C.EFFECTS[k], `effect ${k} is not in effects.js`)); });
+archs.forEach((a, i) => archs.slice(0, i).forEach(b => ref('archetypes ' + a, C.ARCH[a].stat !== C.ARCH[b].stat || C.ARCH[a].disc !== C.ARCH[b].disc, `shares its grid cell (${C.ARCH[a].stat} ${C.ARCH[a].disc}) with ${b}; every archetype needs a cell of its own`)));
 C.START_ARCH.forEach(a => ref('archetypes START_ARCH', isArch(a), `${a} is not an archetype`));
 Object.entries(C.GODS).forEach(([k, g]) => {
   g.arch.forEach(a => ref('gods ' + k, isArch(a), `${a} is not an archetype`));
@@ -133,7 +141,14 @@ const nextRead = new Set([...core.matchAll(/nextFlags\.(\w+)/g)].map(m => m[1]))
 const outcomeUses = {};
 const outcomeOk = (where, T, what) => {
   if (!T || typeof T !== 'object') return err(where, 'outcomes are an object like { gold: 8 } (see outcomes.js)');
+  // got: the line for its piece, saying how you got it. Events must say it; quests and the like fall back to "[Reward: X]"
+  if ((T.piece != null || T.experimental != null) && /^event /.test(what)) ref(where, typeof T.got === 'string', "an event's piece needs got: a System line saying how you got it, with {item} for its name");
+  if (T.experimental != null) ref(where, Number.isInteger(T.experimental) && T.experimental > 0, 'experimental is a whole number of items above 0');
+  if (T.got != null) ref(where, (T.piece != null || T.experimental != null) && typeof T.got === 'string' && /^\[.*\{item\}.*\]$/.test(T.got), 'got goes with piece: a System line in [brackets] with {item} where the piece\'s name goes');
+  if (T.rune != null && /^event /.test(what)) ref(where, typeof T.gotRune === 'string', "an event's rune needs gotRune: a System line saying where the rune came from");
+  if (T.gotRune != null) ref(where, T.rune != null && /^\[.*\]$/.test(T.gotRune), 'gotRune goes with rune: a System line in [brackets]');
   Object.entries(T).forEach(([k, v]) => {
+    if (k === 'got' || k === 'gotRune') return;
     if (!C.OUTCOMES[k]) return err(where, `unknown outcome ${k}; outcomes (outcomes.js) are ${THEN.join(', ')}`);
     (outcomeUses[k] = outcomeUses[k] || []).push(what);
     if (k === 'gold') ref(where, Number.isInteger(v) && v > 0, 'gold is a whole number above 0');
@@ -155,6 +170,8 @@ const outcomeOk = (where, T, what) => {
     if (k === 'erase') ref(where, Number.isInteger(v) && v > 0, 'erase is a whole number above 0');
   });
 };
+// h.piece(tries, got) in an event's go: the got line says how you got the piece, as an outcome's got does
+fs.readdirSync(path.join(ROOT, 'js/content/events')).filter(f => f.endsWith('.js')).forEach(f => [...read('js/content/events/' + f).matchAll(/h\.piece\(([^)]*)\)/g)].forEach(m => { if (!/^\s*\d+\s*,\s*'\[.*\{item\}.*\]'\s*$/.test(m[1])) err('events/' + f, `h.piece(${m[1]}) needs a got line: h.piece(tries, '[... {item} ...]')`); }));
 Object.entries(C.QUESTS).forEach(([k, q]) => { outcomeOk('quests ' + k, q.reward, 'quest ' + k); if (q.reward && q.reward.chain != null) err('quests ' + k, 'chain is an event outcome'); });
 Object.keys(C.OUTCOMES).forEach(k => { if (typeof C.OUTCOMES[k].say !== 'function') err('outcomes ' + k, 'say(v) gives the words players read for it'); });
 const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.fate ? !!C.FATES[c.fate] : c.people ? !!C.PEOPLES[c.people] : c.luck === true);
@@ -195,7 +212,9 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   ref(w, C.LORE[k] && C.LORE[k].entries.length >= 14, 'needs a World Record pool of at least 14 entries in LORE');
   ref(w, t.names.length === 2 && t.names.every(a => a.length >= 4), 'names needs two lists of syllables');
   ref(w, t.champs.length >= 4, 'needs at least 4 champion names');
-  ref(w, t.guest == null || (isArch(t.guest) && t.guest !== t.home && !C.themeNear(t.home).includes(t.guest)), `guest ${t.guest} must be an archetype other than the home class and its two wheel neighbours`);
+  ref(w, t.guest == null || (isArch(t.guest) && t.guest !== t.home && !C.themeNear(t.home).includes(t.guest)), `guest ${t.guest} must be an archetype other than the home class and its allies`);
+  ref(w, t.guest2 == null || (isArch(t.guest2) && t.guest2 !== t.home && t.guest2 !== t.guest && !C.themeNear(t.home).includes(t.guest2)), `guest2 ${t.guest2} must be an archetype other than the home class, its allies and the guest`);
+  ref(w, t.guest2 != null || C.themeAllies(t.home).length >= 2, `home ${t.home} has fewer than two allies on the grid, so the type needs a guest2`);
   ref(w, !t.mids || t.mids.every(m => typeof m === 'string' && m.length <= 3), 'mids are short middle syllables');
 });
 // Fate Crises: each is a crisis event (crisis: true) for one stage round; ends are the closing lines for a lifted or sealed Fate
@@ -226,7 +245,7 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => e.script.forEach(i => ref('enemies
 // Traits: the numbers make sense; phases point at real moves; passives are ones that work on enemies; the trait pool too
 const share = v => typeof v === 'number' && v > 0 && v < 1, every = v => Number.isInteger(v) && v >= 2;
 const TRAIT_OK = { enrage: [share, 'a share of max HP between 0 and 1'], enrageMult: [v => v > 1, 'a damage multiplier above 1'], dodge: [share, 'a chance between 0 and 1'], adapt: [share, 'the share of damage taken from your most used skill, between 0 and 1'],
-  flood: [every, 'every how many turns, 2 or more'], twincast: [every, 'every how many turns, 2 or more'], revive: [share, 'the share of max HP it rises with, between 0 and 1'], aura: [v => v > 0, 'Burn per turn'], briar: [v => v > 0, 'Bleed per turn'], forge: [v => v > 0, 'Block gained per turn'] };
+  flood: [every, 'every how many turns, 2 or more'], twincast: [every, 'every how many turns, 2 or more'], revive: [share, 'the share of max HP it rises with, between 0 and 1'], aura: [v => v > 0, 'Burn per turn'], briar: [v => v > 0, 'Bleed per turn'], forge: [v => v > 0, 'Block gained per turn'], jinxTax: [v => v > 0, 'extra Misfortune its moves cost to jinx'], showNext: [v => v === 1, '1: it shows its next two moves'], hexer: [v => v === 1, '1: it hexes one of your skills each turn'] };
 const traitCheck = (w, o) => Object.entries(o).forEach(([t, v]) => { if (!TRAIT_OK[t]) err(w, `${t} is not a trait (${MECHANICS.join(', ')})`); else if (!TRAIT_OK[t][0](v)) err(w, `${t} is ${JSON.stringify(v)}; it should be ${TRAIT_OK[t][1]}`); });
 Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
   const w = 'trait pool ' + k;
@@ -301,8 +320,9 @@ const use = (kind, key, who, v) => { const u = (uses[kind] = uses[kind] || {}); 
 Object.values(C.SKILLS).filter(s => !s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.SKILLS).filter(s => s.base).forEach(s => Object.entries(s.fx).forEach(([k, v]) => use('skill', k, s.name, v)));
 Object.values(C.ENEMIES).forEach(e => e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.entries(m.fx || {}).forEach(([k, v]) => use('skill', k, `${e.name}: ${m.n}`, v))));
-Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix)).forEach(([k, v]) => use('gear', k, id, v)));
+Object.entries(C.GEAR).forEach(([id, g]) => Object.entries(Object.assign({}, g.pas, g.fix, g.top)).forEach(([k, v]) => use('gear', k, id, v)));
 Object.values(C.ARCH).forEach(a => a.p.forEach((p, i) => Object.entries(p).forEach(([k, v]) => use('arch', k, `${a.name} ${[2, 4, 6][i]}`, v))));
+Object.entries(C.ADVANCE).forEach(([a, v]) => v.forEach(o => Object.entries(o.p || {}).forEach(([k, x]) => use('arch', k, o.name, x))));
 Object.values(C.HIDDEN_PATHS).forEach(h => Object.entries(h.fx).forEach(([k, v]) => use('path', k, h.name, v)));
 Object.values(C.GIFTS).forEach(g => Object.entries(g.p || {}).forEach(([k, v]) => use('gift', k, g.name, v)));
 Object.values(C.TITLES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('title', k, t.name, v)));
@@ -330,6 +350,7 @@ Object.entries(C.EFFECTS).forEach(([k, E]) => {
 // Words match mechanics: a description has to state any rule its effects carry that players couldn't guess (must in effects.js)
 const described = [];
 Object.entries(C.ARCH).forEach(([k, a]) => a.b.forEach((b, i) => described.push([`archetypes ${k} tier ${i + 1}`, b, a.p[i]])));
+Object.entries(C.ADVANCE).forEach(([k, v]) => v.forEach(o => o.p && described.push([`archetypes ADVANCE ${k} ${o.name}`, o.b, o.p])));
 Object.entries(C.GEAR).forEach(([k, g]) => { try { described.push(['gear ' + k, g.text(G.gearPas(k, 1)), Object.assign({}, g.pas, g.fix)]); } catch (e) { /* reported above */ } });
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => described.push(['paths ' + k, h.desc, h.fx]));
 Object.entries(C.GODS).forEach(([k, g]) => described.push(['gods ' + k, g.blessing, g.bless]));
@@ -344,10 +365,10 @@ described.forEach(([w, text, p]) => Object.entries(p || {}).forEach(([k, v]) => 
 }));
 Object.keys(uses.enemy).forEach(k => { if (!new RegExp('\\.' + k + '\\b').test(core)) err('enemy mechanic ' + k, 'core.js never reads it'); });
 
-// ---------- Themes: the wheel is a colour pie; content carries one archetype or two neighbours, and uses what they own ----------
-const themeOk = (where, t) => { const ts = [].concat(t); ts.forEach(a => ref(where, isArch(a), `theme ${a} is not an archetype`)); if (ts.every(isArch)) ref(where, C.themePairOk(ts), `themes ${ts.join(' + ')} are not neighbours on the wheel (a pair has to be)`); };
+// ---------- Themes: the grid is a colour pie; content carries one archetype or two allies, and uses what they own ----------
+const themeOk = (where, t) => { const ts = [].concat(t); ts.forEach(a => ref(where, isArch(a), `theme ${a} is not an archetype`)); if (ts.every(isArch)) ref(where, C.themePairOk(ts), `themes ${ts.join(' + ')} are not allies on the grid (a pair has to be)`); };
 // breaks: effects a skill or enemy borrows on purpose, so the warning is silenced once Slaw has said yes
-const pieBreak = (where, themes, fx, breaks) => { if ((breaks || []).includes(fx)) return; if (!C.themeFits(themes, fx)) warn(where, `uses ${fx}, which ${C.PIE[fx].map(a => C.ARCH[a].name).join(' and ')} own${C.PIE[fx].length === 1 ? 's' : ''}, off its part of the wheel (a pie break: fine if meant, or retag it)`); };
+const pieBreak = (where, themes, fx, breaks) => { if ((breaks || []).includes(fx)) return; if (!C.themeFits(themes, fx)) warn(where, `uses ${fx}, which ${C.PIE[fx].map(a => C.ARCH[a].name).join(' and ')} own${C.PIE[fx].length === 1 ? 's' : ''}, outside its allies on the grid (a pie break: fine if meant, or retag it)`); };
 Object.entries(C.ARCH).forEach(([k, a]) => {
   const w = 'archetypes ' + k;
   ref(w, typeof a.line === 'string' && /\.$/.test(a.line), 'line is one sentence, its philosophy, ending with a full stop');
@@ -357,13 +378,13 @@ Object.entries(C.ARCH).forEach(([k, a]) => {
 // A ★3 evolution may borrow from anywhere: that is where the game blends on purpose
 Object.values(C.SKILLS).filter(s => !s.base).forEach(s => Object.keys(s.fx).forEach(fx => pieBreak('skills ' + s.id, s.tags, fx, s.breaks)));
 Object.entries(C.ENEMIES).forEach(([k, e]) => { if (e.theme == null) return; themeOk('enemies ' + k, e.theme); e.skills.concat(e.phase && e.phase.add || []).forEach(m => Object.keys(m.fx || {}).forEach(fx => pieBreak(`enemies ${k} move ${m.n}`, e.theme, fx, e.breaks))); });
-// Events and chains may also belong to the System itself (theme: 'system'), outside the wheel
+// Events and chains may also belong to the System itself (theme: 'system'), outside the grid
 Object.entries(C.CHAINS).forEach(([k, c]) => { if (c.theme != null && c.theme !== 'system') themeOk('chains ' + k, c.theme); });
 Object.entries(C.EVENTS).forEach(([k, E]) => { if (E.theme != null) { if (E.theme !== 'system') themeOk('event ' + k, E.theme); if (E.chain) warn('event ' + k, "has its own theme as well as its chain's; the chain's is the one that counts"); } });
 ['GIFTS', 'TITLES', 'QUESTS'].forEach(L => Object.entries(C[L]).forEach(([k, d]) => { if (d.theme != null) themeOk(`${L.toLowerCase()} ${k}`, d.theme); }));
 const effectThemes = p => Object.keys(p || {}).flatMap(k => [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []));
-const themedFits = (where, themes, p) => Object.keys(p || {}).forEach(k => { const th = [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []); if (th.length && !th.some(o => [].concat(themes).some(t => C.themeNear(t).includes(o)))) warn(where, `uses ${k}, a ${th.map(a => C.ARCH[a].name).join('/')} effect, off its part of the wheel (a pie break: fine if meant, or retag it)`); });
-Object.entries(C.GEAR).forEach(([k, g]) => themedFits('gear ' + k, g.tags, Object.assign({}, g.pas, g.fix)));
+const themedFits = (where, themes, p) => Object.keys(p || {}).forEach(k => { const th = [].concat(C.EFFECTS[k] && C.EFFECTS[k].theme || []); if (th.length && !th.some(o => [].concat(themes).some(t => C.themeNear(t).includes(o)))) warn(where, `uses ${k}, a ${th.map(a => C.ARCH[a].name).join('/')} effect, outside its allies on the grid (a pie break: fine if meant, or retag it)`); });
+Object.entries(C.GEAR).forEach(([k, g]) => themedFits('gear ' + k, g.tags, Object.assign({}, g.pas, g.fix, g.top)));
 Object.entries(C.HIDDEN_PATHS).forEach(([k, h]) => themedFits('paths ' + k, k.split('+'), h.fx));
 Object.entries(C.GIFTS).forEach(([k, g]) => { if (g.theme != null) themedFits('gifts ' + k, g.theme, g.p); });
 Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
@@ -372,7 +393,7 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
   if (gift) themedFits(w + ' World Gift ' + t.gift, gift.theme != null ? gift.theme : t.home, gift.p);
 });
 Object.keys(C.PIE).forEach(fx => { if (!fxRead.has(fx)) err('archetypes PIE', `${fx} is owned but core.js never reads fx.${fx}`); });
-Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block', 'brk'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the wheel, so any archetype may use it`));
+Object.keys(uses.skill).filter(fx => !C.PIE[fx] && !['dmg', 'block', 'brk'].includes(fx)).forEach(fx => warn('archetypes PIE', `${fx} has no owner on the grid, so any archetype may use it`));
 
 // ---------- Moves and the power budget: every enemy move plays a role, and its numbers sit in its tier (warn only) ----------
 const inRange = (v, [a, b]) => v >= a && v <= b;
@@ -382,7 +403,7 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
   if (!N) return err(w, `tier ${e.tier} has no numbers in moves.js (tiers ${Object.keys(C.MOVE_NUMBERS).join(', ')})`);
   budget(w, 'hp', e.hp, N.hp);
   const roles = moves.map(m => C.moveRole(m.fx || {}, e.tier));
-  moves.forEach((m, i) => { const r = roles[i], d = C.moveDmg(m.fx || {}); if (r === 'strike' || r === 'big') budget(`${w} move ${m.n}`, `${r} damage`, d, N[r]); if (r === 'guard') budget(`${w} move ${m.n}`, 'guard Block', m.fx.block, N.guard); });
+  moves.forEach((m, i) => { const r = roles[i], d = C.moveDmg(m.fx || {}); if (r === 'strike' || r === 'big') budget(`${w} move ${m.n}`, `${r} damage`, d, N[r]); if (r === 'guard') budget(`${w} move ${m.n}`, 'guard Block', (m.fx.block || 0) + (m.fx.blockPip || 0) * 3.5, N.guard); });
   budget(w, 'damage per turn over its script', Math.round(10 * e.script.reduce((a, i) => a + C.moveDmg(e.skills[i].fx || {}), 0) / e.script.length) / 10, N.dpt);
   const has = { damage: moves.some(m => C.moveDmg(m.fx || {}) > 0), trait: MECHANICS.some(t => e[t] != null) || !!e.phase };
   (C.MOVE_NEEDS[e.tier] || []).forEach(need => { if (!need.split('|').some(r => has[r] != null ? has[r] : roles.includes(r))) warn(w, `a tier ${e.tier} enemy needs ${need.replace(/\|/g, ' or ')} (it has ${roles.join(', ')}${has.trait ? ', a trait' : ''})`); });
@@ -458,6 +479,7 @@ const owners = {};
 const own = (name, what) => { (owners[name] = owners[name] || []).push(what); };
 Object.values(C.SKILLS).forEach(s => own(s.name, 'skill ' + s.id));
 Object.entries(C.GEAR).forEach(([k, g]) => own(g.name, 'gear ' + k));
+Object.entries(C.ADVANCE).forEach(([k, v]) => v.forEach(o => own(o.name, 'advanced class ' + k)));
 Object.entries(C.ARCH).forEach(([k, a]) => { own(a.name, 'archetype ' + k); own(a.path, 'path name of ' + k); });
 Object.entries(C.GIFTS).forEach(([k, g]) => own(g.name, 'Gift ' + k));
 Object.entries(C.TITLES).forEach(([k, t]) => own(t.name, 'Title ' + k));
@@ -484,10 +506,10 @@ function effectDoc() {
     ...sorted(C.EFFECTS).map(([k, E]) => { const who = passiveUses(k); let t = ''; try { t = E.say(who.length && typeof who[0][1] === 'number' ? who[0][1] : 1); } catch (e) { /* reported above */ } return row(k, who, ` ${t.replace(/\|/g, '\\|')} | ${E.how || 'add'} | ${E.lvl ? 'yes' : ''} | ${E.enemy ? E.enemy + (E.enemy === 'flat' ? ', scales with power' : '') : ''} | ${[].concat(E.theme || []).map(a => C.ARCH[a] ? C.ARCH[a].name : a).join(', ')} |`); }),
     '', '### Enemy traits (fields on the enemy, or in its phase\'s set)',
     '', '| Key | Used | Examples (value) |', '| --- | --- | --- |', ...sorted(uses.enemy).map(([k, who]) => row(k, who, '')),
-    '', '### The wheel, from `js/content/archetypes.js`',
-    '', 'Each archetype is a theme. Its neighbours on the wheel are its allies; a piece of content carries one archetype, or two neighbours. Owns: the skill effects it owns, which it and its neighbours may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.',
-    '', '| Archetype | Stat | Line | Owns | Allies | Words |', '| --- | --- | --- | --- | --- | --- |',
-    ...C.WHEEL.map(k => { const a = C.ARCH[k], near = C.themeNear(k).slice(1); return `| ${a.name} | ${a.stat} | ${a.line} | ${(a.owns || []).map(x => '`' + x + '`').join(' ')} | ${near.map(n => C.ARCH[n].name).join(', ')} | ${(a.words || []).join(', ')} |`; }),
+    '', '### The grid, from `js/content/archetypes.js`',
+    '', 'Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (' + Object.values(C.DISCIPLINES).map(d => `${d.name}: ${d.line}`).join(' ') + '). Archetypes sharing a stat or a Discipline are allies; a piece of content carries one archetype, or two allies. Owns: the skill effects it owns, which it and its allies may use (`dmg` and `block` are open to all). Passive effects say their own theme in `effects.js`.',
+    '', '| Archetype | Stat | Discipline | Line | Owns | Allies | Words |', '| --- | --- | --- | --- | --- | --- | --- |',
+    ...archs.map(k => { const a = C.ARCH[k], near = C.themeNear(k).slice(1); return `| ${a.name} | ${a.stat} | ${C.DISCIPLINES[a.disc].name} | ${a.line} | ${(a.owns || []).map(x => '`' + x + '`').join(' ')} | ${near.map(n => C.ARCH[n].name).join(', ')} | ${(a.words || []).join(', ')} |`; }),
     '', '### Enemy move roles and tier numbers, from `js/content/moves.js`',
     '', 'A move\'s role is read from its effects (`moveRole`). A big hit is one of at least the tier\'s BIG_HIT damage before the round\'s scaling. Numbers are ranges the checker warns outside of; the balance gate has the last word.',
     '', '| Tier | Who | HP | Strike | Big hit (from) | Guard Block | Damage per turn | Needs |', '| --- | --- | --- | --- | --- | --- | --- | --- |',
@@ -497,7 +519,7 @@ function effectDoc() {
     '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
     '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
     '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
-    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', ward: 1, mod: 'none', always: { foe: { poison: 2 } }, fate: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
+    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', experimental: 1, next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', ward: 1, mod: 'none', always: { foe: { poison: 2 } }, fate: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
     '', '### Feats (`feat`), from `js/content/feats.js`',
     '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
     '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',

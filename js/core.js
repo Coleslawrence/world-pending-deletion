@@ -11,14 +11,16 @@ const VERSION = 5;
 const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 
 // ---------- Archetypes ----------
-function alliesOf(k) { const i = WHEEL.indexOf(k), n = WHEEL.length; return [WHEEL[(i + n - 1) % n], WHEEL[(i + 1) % n]]; }
+function alliesOf(k) { return themeAllies(k); }
 function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 
 // ---------- Gear: stats + one passive, no active skill ----------
 const STAR_MULT = [0, 1, 1.5, 1.6];
 const GEAR_STAR = [0, 1, 1.5, 2], GEAR_STAR_PCT = [0, 1, 1.4, 1.8];
-function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); return Object.assign(o, g.fix || {}); }
-function gearText(id, star) { return GEAR[id].text(gearPas(id, star || 1)); }
+function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); Object.assign(o, g.fix || {}); if (star >= 3 && g.top) Object.assign(o, g.top); return o; }
+// At ★3 a piece gains its top line, worded by effects.js
+function gearTop(id) { const t = GEAR[id].top; return t ? Object.entries(t).map(([k, v]) => EFFECTS[k].say(v)).join(' ') : ''; }
+function gearText(id, star) { star = star || 1; const t = GEAR[id].text(gearPas(id, star)); return star >= 3 && GEAR[id].top ? `${t} ★3: ${gearTop(id)}` : t; }
 function gearStats(id, star) { const o = {}; Object.entries(GEAR[id].stats).forEach(([k, v]) => o[k] = v * (star || 1)); return o; }
 function isGear(id) { return !!GEAR[id]; }
 function pieceDef(id) { return GEAR[id] || SKILLS[id]; }
@@ -243,6 +245,8 @@ const ROUNDS = 8;
 const UNLOCKS = {
   arch_arcanist: { name: 'Archetype: Arcanist', desc: 'Quick skills and cooldown tricks join the pool.', cost: 20 },
   arch_storm: { name: 'Archetype: Stormcaller', desc: 'Stuns and Interrupts join the pool.', cost: 20 },
+  arch_dicer: { name: 'Archetype: Gambler', desc: 'Dice, rerolls and Jackpots join the pool.', cost: 20 },
+  arch_jinx: { name: 'Archetype: Jinx', desc: 'Omens, jinxed moves and Curse join the pool.', cost: 20 },
   reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 15 },
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 25 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 15 },
@@ -321,8 +325,9 @@ function worldName(T, C, rng) {
 }
 // A world (v 2): type, name, rank, its layers, the modifier its Fate brings, and a champion name for the Awakening.
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
-function genWorld(rng, cap) {
-  const types = Object.keys(WORLD_TYPES), type = pick(types, rng), T = WORLD_TYPES[type];
+// types: the world types it may pick from (default: all)
+function genWorld(rng, cap, only) {
+  const types = Object.keys(WORLD_TYPES), type = pick(only || types, rng), T = WORLD_TYPES[type];
   const mix = CONFLUENCE.chance && rnd(rng) < CONFLUENCE.chance ? pick(types.filter(k => k !== type && settingOf(k) === settingOf(type)), rng) || null : null;
   const name = worldName(T, mix && WORLD_TYPES[mix], rng), rank = worldRank(rng, cap);
   const fate = pickKey(FATES, rng, type), people = pickKey(PEOPLES, rng, type), M = fate && FATES[fate].mods;
@@ -338,15 +343,16 @@ function genWorldV1(rng, cap) {
   const rank = worldRank(rng, cap), mod = wpick(modKeys(), MOD_W, rng);
   return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs.slice(0, 6), rng) };
 }
-// A world's class pool: its home, the home's two wheel neighbours and the type's fixed guest. A Confluence world takes
-// both homes and both guests instead. The home always comes; any other class not unlocked yet (or already in) gives way
-// to its nearest free unlocked class on the wheel. Worlds from before v 2 kept a random fourth class (newRun).
+// A world's class pool: its home, the home's first two allies on the grid (with the type's guest2 standing in when the
+// home has only one) and the type's fixed guest. A Confluence world takes both homes and both guests instead. The home
+// always comes; any other class not unlocked yet (or already in) gives way to its nearest free unlocked class: one of
+// its allies first, then any. Worlds from before v 2 kept a random fourth class (newRun).
 function worldArch(world, U) {
-  const T = WORLD_TYPES[world.type], C = world.mix && WORLD_TYPES[world.mix], n = WHEEL.length;
-  const want = C ? [C.home, T.guest, C.guest] : alliesOf(T.home).concat(T.guest), open = unlockedArch({ unlocks: U }), out = [T.home];
+  const T = WORLD_TYPES[world.type], C = world.mix && WORLD_TYPES[world.mix];
+  const near = alliesOf(T.home).slice(0, 2), want = C ? [C.home, T.guest, C.guest] : near.concat(near.length < 2 && T.guest2 ? [T.guest2] : [], T.guest);
+  const open = unlockedArch({ unlocks: U }), out = [T.home];
   want.forEach(k => {
-    const i = WHEEL.indexOf(k);
-    for (let d = 0; d < n; d++) { const c = [WHEEL[(i + d) % n], WHEEL[(i + n - d) % n]].find(x => open.includes(x) && !out.includes(x)); if (c) { out.push(c); break; } }
+    const c = [k].concat(alliesOf(k), ARCH_KEYS).find(x => open.includes(x) && !out.includes(x)); if (c) out.push(c);
   });
   return out;
 }
@@ -360,8 +366,9 @@ function staleWorld(meta, w) {
 }
 function offerWorlds(meta, rng) {
   const n = meta.unlocks.fourth ? 4 : 3, cap = worldCap(meta), out = [], seen = new Set(); let guard = 0;
+  const open = unlockedArch(meta), types = Object.keys(WORLD_TYPES).filter(k => open.includes(WORLD_TYPES[k].home)); // a world whose home class is still locked isn't offered
   while (out.length < n && guard++ < 80) {
-    const w = genWorld(rng, cap), st = staleWorld(meta, w);
+    const w = genWorld(rng, cap, types), st = staleWorld(meta, w);
     if (rnd(rng) < CORRUPT_WORLD) w.mod = 'corrupted';
     if ((seen.has(w.type) && guard < 50) || (st === 2 && guard < 70) || (st === 1 && guard < 40)) continue;
     seen.add(w.type); out.push(w);
@@ -420,7 +427,11 @@ function newRun(world, setup, meta, rng) {
   // Its own stream, so pairing never shifts the draft, shops or opponents (a sim's rng keys it by the world)
   run.pair = genPair(world, setup.seed ? seedRng(setup.seed + ':pair') : rng ? seedRng('pair:' + world.type + ':' + world.name) : undefined);
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
+  if (G.includes('bornlucky')) run.stats.LUK += 2;
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
+  // Opening stat points: placed after the opening draft, once the skills and gear are known (placeStartStats).
+  // floor: the stats before any are placed, Gifts included; rollSeed: where the once-only roll comes from.
+  if (setup.startPts) Object.assign(run, { startPts: setup.startPts, statFloor: Object.assign({}, run.stats), rollSeed: setup.seed ? setup.seed + ':roll' : setup.rollSeed || 'roll:' + world.name, rolled: false, rollUsed: false });
   // System quests: two visible, every hidden one quietly active
   const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
@@ -439,6 +450,7 @@ function newRun(world, setup, meta, rng) {
     if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
   }
   run.draft = rollDraft(run, stream(run, 'draft', rng));
+  run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
   run.chosenNow = true;
   Object.keys(GODS).forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
@@ -580,7 +592,7 @@ function hasFreeSlot(run, id) { return isGear(id) ? !run.gear[GEAR[id].slot] : r
 function addPiece(run, id, mods, msgs, star) {
   const p = { u: ++run.uid, id, star: star || 1, mods: (mods || []).slice() };
   if (GEAR[id] && GEAR[id].rolling) rollMissing(p, stream(run, 'loot'));
-  if (isGear(id) && !run.gear[GEAR[id].slot]) run.gear[GEAR[id].slot] = p;
+  if (isGear(id) && !GEAR[id].consumable && !run.gear[GEAR[id].slot]) run.gear[GEAR[id].slot] = p;
   else if (!isGear(id) && run.bar.includes(null)) run.bar[run.bar.indexOf(null)] = p;
   else run.bench.push(p);
   checkMerges(run, msgs);
@@ -631,10 +643,18 @@ function evolve(run, u, evoId, meta) {
   run.pending = run.pending.filter(p => !(p.type === 'evo' && p.u === u));
   return true;
 }
+// Choose a Path evolution (i: 0 keeps tier 3 as written, 1 the alternative)
+function advance(run, k, i) {
+  if (!ADVANCE[k] || !ADVANCE[k][i]) return false;
+  run.adv = run.adv || {}; run.adv[k] = i;
+  run.pending = run.pending.filter(p => !(p.type === 'adv' && p.arch === k));
+  return true;
+}
 // Move a piece to a destination: { bar: i } | { gear: slot } | 'bench'
 function movePiece(run, u, dest, msgs) {
   const src = findPiece(run, u); if (!src) return false;
   if (src.at === 'gear' && dest !== 'bench') return false;
+  if (dest !== 'bench' && GEAR[src.p.id] && GEAR[src.p.id].consumable) return false; // used, never equipped
   const p = src.p, hpFrac = run.hp / maxHp(run);
   if (dest === 'bench') { if (src.at === 'bench') return false; if (run.bench.length >= 8) return false; removePiece(run, u); run.bench.push(p); }
   else if (dest.bar != null) {
@@ -663,7 +683,7 @@ function archCounts(barPieces, gearPieces, gifts) {
   barPieces.concat(gearPieces).filter(Boolean).forEach(p => {
     const b = baseId(p.id); if (seen.has(b)) return; seen.add(b);
     const tags = pieceDef(b).tags.slice();
-    // Misfiled: the skill also counts as its class's two neighbours on the wheel
+    // Misfiled: the skill also counts as its class's allies on the grid
     if ((p.mods || []).some(m => bareMod(m) === 'misfiled') && tags.length) themeNear(tags[0]).forEach(t => { if (!tags.includes(t)) tags.push(t); });
     tags.forEach(t => c[t] = (c[t] || 0) + 1);
   });
@@ -718,6 +738,11 @@ function worldFirst(run, key, text, titleId, msgs) {
 }
 function checkPath(run, msgs) {
   const c = runCounts(run);
+  // Path evolution: the first time an archetype reaches 6, choose its advanced class (kept for the run)
+  ARCH_KEYS.forEach(k => {
+    if ((c[k] || 0) < 6 || !ADVANCE[k] || (run.adv && run.adv[k] != null) || run.pending.some(p => p.type === 'adv' && p.arch === k)) return;
+    run.pending.push({ type: 'adv', arch: k }); msgs && msgs.push({ t: 'class', text: `[${ARCH[k].path}: 6 pieces. The Path can evolve. Choose what it becomes.]` });
+  });
   const top = Object.keys(c).filter(k => c[k] >= 4).sort((a, b) => c[b] - c[a])[0];
   if (top && run.path !== top) { run.path = top; msgs && msgs.push({ t: 'class', text: `[Path recognised: ${ARCH[top].path}.]` }); questEvent(run, 'path', {}, msgs); }
   if (!top) run.path = null;
@@ -757,7 +782,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   x = x || {};
   const c = archCounts(barPieces, gearPieces, gifts), lm = 1 + 0.08 * ((lvl || 1) - 1);
   // Archetype bonuses, then gear (both grow with level), then everything else. Effects and how they combine: effects.js
-  ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach(p => addEffects(P, p, lm)));
+  ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach((p, i) => addEffects(P, i === 2 ? advOf(x.adv, k).p : p, lm)));
   gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll] ? g.roll : g.id, g.star), lm));
   if (P.goldDmg) addEffects(P, { dmgPct: Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10)) }); // per 10 gold held when the fight starts, up to +25%
   const hp = hiddenPathOf(c);
@@ -772,7 +797,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   return P;
 }
 function favourTiers(run) { const o = {}; Object.keys(GODS).forEach(g => o[g] = run.favour[g] >= 8 ? 2 : run.favour[g] >= 4 ? 1 : 0); return o; }
-function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold }); }
+function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers(run), run.level, { title: run.title, milestones: run.milestones, perks: run.perks, gold: run.gold, adv: run.adv }); }
 
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
@@ -944,19 +969,41 @@ function sanctum(run, msgs) { const b = run.hearts; run.hearts = Math.min(run.ma
 // and a { step, due } there brings back the chain's next event on that round.
 // A consequence revealed after the choice: lose a share of max HP and say how much
 function lose(run, f, msgs, text) { const b = run.hp; run.hp = Math.max(1, run.hp - Math.round(maxHp(run) * f)); msgs.push({ t: 'loss', text: `[${text} −${b - run.hp} HP.]` }); }
-function merchantPiece(run, rng, msgs, tries) {
+function merchantPiece(run, rng, msgs, tries, got) {
   const pool = poolIds(run).filter(x => ['C', 'B'].includes(pieceDef(x).rank)); if (!pool.length) return;
   let id = pick(pool, rng); for (let k = 1; k < tries; k++) { const o = pick(pool, rng); if (pieceDef(o).rank === 'B') id = o; }
-  msgs.push({ t: 'loot', text: `[Acquired: ${pieceDef(id).name}]` }); addPiece(run, id, [], msgs);
+  givePiece(run, id, msgs, got || '[Acquired: {item}]');
+}
+// Unsigned Patch: the three rules offered (kept on the run, so leaving and coming back can't reroll them), and removing one
+function patchOffer(run, rng) { if (!run.patchOffer) run.patchOffer = shuffle(Object.keys(PATCH_RULES).filter(k => !PATCH_RULES[k].can || PATCH_RULES[k].can(run)), stream(run, 'patch', rng)).slice(0, 3); return run.patchOffer; }
+function usePatch(run, u, key, meta, msgs, rng) {
+  const f = findPiece(run, u), R = PATCH_RULES[key];
+  if (!f || !GEAR[f.p.id] || !GEAR[f.p.id].consumable || !R || !(run.patchOffer || []).includes(key)) return false;
+  removePiece(run, u); run.patchOffer = null; (run.patched = run.patched || []).push(key);
+  const h = eventKit(run, meta, stream(run, 'patch', rng), msgs); h.from = 'Unsigned Patch';
+  msgs.push({ t: 'class', text: R.say });
+  if (R.then) h.apply(R.then);
+  if (R.go) R.go(run, h);
+  return true;
+}
+// A piece given as a reward: the line says how you got it ({item} is its name), the message carries the piece so the result
+// can show its card, and the piece keeps the line (p.got) so its details say where it came from for the rest of the run
+function givePiece(run, id, msgs, got) {
+  const text = got.replace('{item}', pieceDef(id).name), m = { t: 'loot', text, item: id };
+  if (msgs) msgs.push(m);
+  const p = addPiece(run, id, [], msgs); p.got = text; m.u = p.u;
+  return p;
 }
 // What an option's go(run, h) can use, since content cannot call the rules directly
 function eventKit(run, meta, rng, msgs) {
   const kit = {
     meta, say: (text, t) => msgs.push({ t: t || 'sys', text }), favour: (god, n) => addFavour(run, god, n, meta, msgs, rng),
-    lose: (f, text) => lose(run, f, msgs, text), piece: tries => merchantPiece(run, rng, msgs, tries), eraseRecord: n => eraseRecord(run, n, msgs),
+    lose: (f, text) => lose(run, f, msgs, text), piece: (tries, got) => merchantPiece(run, rng, msgs, tries, got), eraseRecord: n => eraseRecord(run, n, msgs),
     maxHp: () => maxHp(run), hasGift: k => hasGift(run, k), pick: list => pick(list, rng), shuffle: list => shuffle(list, rng),
-    apply: T => { const ctx = { run, h: kit, msgs }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
+    apply: T => { const ctx = { run, h: kit, msgs, from: kit.from }; applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); },
     custom: () => customPaid(run, msgs),
+    // chance(p): true that share of the time; give(id, got): a set piece, with its line (as h.piece)
+    chance: p => rnd(rng) < p, give: (id, got) => pieceDef(id) && givePiece(run, id, msgs, got),
     heal: (f, text) => { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * f)); msgs.push({ t: 'loot', text: `[${text ? text + ' ' : ''}+${run.hp - b} HP.]` }); },
     // Glitch events (events/glitch.js)
     phantom: n => { const g = pick(GEAR_SLOTS.map(k => run.gear[k]).filter(Boolean), rng); if (!g) return; run.phantom = { id: g.id, star: g.star, roll: g.roll, left: n }; msgs.push({ t: 'skill', text: `[Phantom ${pieceDef(g.id).name} acquired. It takes no slot. A hotfix is scheduled in ${n} fights.]` }); },
@@ -1013,7 +1060,19 @@ function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour 
 // point of the stat + ROLL_LUK per point of LUK, kept between ROLL_MIN and ROLL_MAX. The roll is made when the event appears and kept
 // with the run, so reloading never changes it; a failed roll takes the option's fail branch, which always does something.
 const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, ROLL_MAX = 95;
-function rollChance(run, r) { const s = effStats(run); return Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0)))); }
+function rollChance(run, r) {
+  const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
+  const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
+  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0)); // The House, Loaded Dice
+  return floor && run.chanceFloorAt !== run.round ? Math.max(c2, floor) : c2;
+}
+// A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
+const CHANCE_UNLOCK = 3;
+function chanceWon(run, msgs) {
+  run.chanceWins = (run.chanceWins || 0) + 1;
+  Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === 'chance' && featOk(t.feat, { run }, t.n)) earnTitle(run, k, msgs); });
+  if (run.chanceWins >= CHANCE_UNLOCK && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); }
+}
 function rollTag(run, r) { return `[${r.stat} ${rollChance(run, r)}%]`; }
 function pushEvent(run, key, rng) {
   run.pending.push({ type: 'event', key });
@@ -1036,7 +1095,7 @@ function eventOpt(run, key, idx) { return eventOpts(run, key).includes(idx) ? EV
 function resolveEvent(run, key, idx, meta, rng, msgs) {
   const o = eventOpt(run, key, idx);
   if (!o) return false;
-  msgs = msgs || []; const r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs);
+  msgs = msgs || []; const r = stream(run, 'event', rng), h = eventKit(run, meta, r, msgs); h.from = EVENTS[key].title;
   if (o.pay) run.gold -= o.pay;
   if (o.payHeart) { run.hearts -= o.payHeart; msgs.push({ t: 'loss', text: `[Paid: ${o.payHeart} Heart${o.payHeart > 1 ? 's' : ''}, ${run.hearts} left.]` }); eraseRecord(run, o.payHeart, msgs); }
   // A chance option: the roll made when the event appeared decides which branch happens
@@ -1044,11 +1103,13 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
   if (o.roll) {
     const ch = rollChance(run, o.roll), got = run.rolls && run.rolls[key] != null ? run.rolls[key] : rnd(r) * 100, won = got < ch;
     msgs.push({ t: won ? 'class' : 'loss', text: `[${o.roll.stat} check: ${ch}%. ${won ? 'Success' : 'Failed'}.]` });
+    run.chanceFloorAt = run.round;
+    if (won) chanceWon(run, msgs);
     if (!won) B = o.fail;
     if (run.rolls) delete run.rolls[key];
   }
   const before = msgs.length, T = B.then || {};
-  const ctx = { run, h, msgs, chain: EVENTS[key].chain };
+  const ctx = { run, h, msgs, chain: EVENTS[key].chain, from: EVENTS[key].title };
   applyOutcomes(T, ctx, false);
   if (B.go) B.go(run, h);
   notePick(run, 'e:' + key + '.' + idx);
@@ -1063,9 +1124,10 @@ const OUTCOME_APPLY = {
   gold: (v, c) => { c.run.gold += v; },
   stats: (v, c) => Object.entries(v).forEach(([k, n]) => c.run.stats[k] += n),
   heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
-  rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run) }); },
-  piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) { c.msgs && c.msgs.push({ t: 'loot', text: `[${c.label || 'Reward'}: ${pieceDef(id).name}]` }); addPiece(c.run, id, [], c.msgs); } },
-  next: (v, c) => { Object.assign(c.run.nextFlags, v); },
+  rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run), got: c.gotRune || (c.label ? `[${c.label}: a rune.]` : null) }); },
+  piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || `[${c.label || 'Reward'}: {item}]`); },
+  experimental: (v, c) => { for (let i = 0; i < v; i++) { const have = allPieces(c.run).map(p => p.id), ids = Object.keys(GEAR).filter(k => GEAR[k].experimental && !have.includes(k)); const id = pick(ids, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || '[Experimental equipment issued: {item}.]'); } },
+  next: (v, c) => { Object.assign(c.run.nextFlags, v); addMark(c, 'next', markNext(v)); },
   foe: (v, c) => {
     const F = c.run.nextFlags;
     if (v.weaken) F.foeWeaken = (F.foeWeaken || 0) + v.weaken;
@@ -1073,26 +1135,40 @@ const OUTCOME_APPLY = {
     if (v.burn) F.foeBurn = (F.foeBurn || 0) + v.burn;
     if (v.hp) F.foeHp = (F.foeHp || 1) * (1 + v.hp);
     if (v.trait) { const have = F.foeTraits || [], add = rollTraits(c.run, v.trait, stream(c.run, 'opps'), have); F.foeTraits = have.concat(add); }
+    addMark(c, 'foe', markFoe(v));
   },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
-  stakes: (v, c) => { const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
+  stakes: (v, c) => { addMark(c, 'stakes', ['win', 'lose'].filter(w => v[w]).map(w => `${w === 'win' ? 'Win' : 'Lose'}: ${outcomeText(v[w])}`));  const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
   respec: (v, c) => { const pts = STATS.reduce((n, k) => n + Math.max(0, c.run.stats[k] - 1), 0); STATS.forEach(k => c.run.stats[k] = Math.min(c.run.stats[k], 1)); c.run.statPts += pts; c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: 'level', text: `[Stats reset. ${pts} stat points to place again.]` }); },
   summon: (v, c) => { const s = summonSpec(c.run, v, stream(c.run, 'opps')); if (!s) return; (c.run.summons = c.run.summons || []).push({ round: c.run.round + 1, spec: s }); },
   amend: (v, c) => { c.run.amend = v; c.msgs.push({ t: 'class', text: `[Amendment passed: ${AMENDMENTS[v].name}. ${AMENDMENTS[v].say}]` }); },
   restore: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.min(c.run.maxHearts, c.run.hearts + v); const k = c.run.hearts - b; if (k) { c.msgs.push({ t: 'loot', text: `[+${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); restoreRecord(c.run, k, c.msgs); } },
   notice: (v, c) => {
+    if (c.run.noticeOff) return; // an Unsigned Patch removed the System's monitoring
     const was = noticeOf(c.run); c.run.notice = Math.max(0, Math.min(TUNE.noticeMax, (c.run.notice || 0) + v)); const now = noticeOf(c.run);
     if (now > was) c.msgs.push({ t: 'class', text: `[The System takes notice. Opponents +${noticePct(c.run)}%.]` });
     else if (now < was) c.msgs.push({ t: 'sys', text: now ? `[The System looks elsewhere. Opponents +${noticePct(c.run)}%.]` : '[The System looks elsewhere. Notice cleared.]' });
   },
   fate: (v, c) => moveFate(c.run, v, c.msgs),
-  ward: (v, c) => { c.run.ward = (c.run.ward || 0) + v; c.msgs.push({ t: 'loot', text: `[Warded: your next ${c.run.ward === 1 ? 'loss costs' : c.run.ward + ' losses cost'} no Heart.]` }); },
+  ward: (v, c) => { addMark(c, 'ward', ['A lost fight costs no Heart']);  c.run.ward = (c.run.ward || 0) + v; c.msgs.push({ t: 'loot', text: `[Warded: your next ${c.run.ward === 1 ? 'loss costs' : c.run.ward + ' losses cost'} no Heart.]` }); },
   mod: (v, c) => { if (!MODIFIERS[v] || c.run.world.mod === v) return; c.run.world.mod = v; c.msgs.push({ t: 'class', text: `[World modifier changed: ${MODIFIERS[v].name}. ${MODIFIERS[v].desc}]` }); },
-  always: (v, c) => { const A = c.run.always = c.run.always || {}; ['next', 'foe'].forEach(k => { if (!v[k]) return; A[k] = Object.assign({}, A[k]); Object.entries(v[k]).forEach(([f, n]) => A[k][f] = typeof n === 'number' && typeof A[k][f] === 'number' ? A[k][f] + n : n); OUTCOME_APPLY[k](v[k], c); }); },
+  always: (v, c) => { addMark(c, 'always', [].concat(v.next ? markNext(v.next) : [], v.foe ? markFoe(v.foe) : [])); c = Object.assign({}, c, { from: null }); const A = c.run.always = c.run.always || {}; ['next', 'foe'].forEach(k => { if (!v[k]) return; A[k] = Object.assign({}, A[k]); Object.entries(v[k]).forEach(([f, n]) => A[k][f] = typeof n === 'number' && typeof A[k][f] === 'number' ? A[k][f] + n : n); OUTCOME_APPLY[k](v[k], c); }); },
   chain: (v, c) => { c.run.chains[c.chain] = typeof v === 'string' ? v : { step: v.step, due: c.run.round + v.after }; },
   favour: (v, c) => Object.entries(v).forEach(([g, n]) => c.h.favour(g, n)),
 };
+// Marks: what an event set up for later fights, in words, with the event that set it (c.from), so the run can show them
+// until they happen (run.marks; next, foe and stakes go after the next fight, ward when used up, always never)
+function addMark(c, kind, lines) { if (!c.from || !lines.length) return; (c.run.marks = c.run.marks || []).push({ kind, from: c.from, text: lines.join(', ') }); }
+function markNext(v) {
+  const w = { weaken: n => `you start Weakened ${n} turns`, empower: n => `you start Empowered ${n} turns`, poison: n => `you start with ${n} Poison`, burn: n => `you start with ${n} Burn`, bleed: n => `you start with ${n} Bleed`,
+    bribe: () => 'your opponent starts with less HP', jinxFirst: () => "your opponent's first move goes wrong", heartCut: n => `a loss costs ${n} more Heart${n > 1 ? 's' : ''}`, noWinGold: () => 'a win pays no gold', foePoison: n => `your opponent starts with ${n} Poison` };
+  return Object.entries(v).filter(([k]) => w[k]).map(([k, n]) => w[k](n));
+}
+function markFoe(v) {
+  const w = { weaken: n => `opponent starts Weakened ${n} turns`, poison: n => `opponent starts with ${n} Poison`, burn: n => `opponent starts with ${n} Burn`, hp: n => `opponent ${n > 0 ? '+' : '−'}${Math.round(Math.abs(n) * 100)}% HP`, trait: n => `opponent +${n} trait${n > 1 ? 's' : ''}` };
+  return Object.entries(v).filter(([k]) => w[k]).map(([k, n]) => w[k](n));
+}
 // A summoned opponent: { who: 'copy' | 'erased' | a rival id, bounty?: outcomes for beating them, traits?: n }. An Erased champion
 // when there is none to send falls back to an unmet rival; summoned rivals are Veterans
 function summonSpec(run, v, rng) {
@@ -1146,15 +1222,19 @@ function visitDue(run) {
 // Marks that last the run (the outcome always) go on every fight, as next and foe marks do on one
 function applyAlways(run) { const A = run.always; if (!A) return; const c = { run, msgs: [] }; ['next', 'foe'].forEach(k => A[k] && OUTCOME_APPLY[k](A[k], c)); }
 // Apply a set of outcomes T in the order outcomes.js lists them: the early ones, or (late) the ones announced last
-function applyOutcomes(T, ctx, late) { Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], ctx); }); }
+// A set of outcomes may carry got: the line for its piece, saying how you got it ({item} is the piece's name), and gotRune:
+// the line for its rune, shown on the rune pick and kept by the prefix carved from it
+function applyOutcomes(T, ctx, late) { const c = T.got || T.gotRune ? Object.assign({}, ctx, T.got && { got: T.got }, T.gotRune && { gotRune: T.gotRune }) : ctx; Object.keys(OUTCOMES).forEach(k => { if (T[k] != null && !!OUTCOMES[k].late === !!late) OUTCOME_APPLY[k](T[k], c); }); }
 // A corrupted skill takes no more prefixes
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && !p.corrupt && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
 // Carve prefix m into piece u. [REDACTED] becomes a hidden glitch that fits the skill; a glitch raises the System's notice.
-function applyPrefix(run, u, m, msgs, rng) {
+// got: where the prefix came from, kept on the piece (p.mgot, by prefix) for its details
+function applyPrefix(run, u, m, msgs, rng, got) {
   const f = findPiece(run, u); if (!f || f.p.corrupt || !prefixOk(f.p.id, m, f.p.mods)) return false;
   if (m === 'redacted') { const have = f.p.mods.map(bareMod), ks = GLITCH_PREFIXES.filter(k => !have.includes(k) && prefixOk(f.p.id, k, f.p.mods)); m = 'r_' + pick(ks, stream(run, 'loot', rng)); }
   if (f.p.mods.length >= MAX_MODS) f.p.mods.shift();
   f.p.mods.push(m);
+  if (got) { f.p.mgot = f.p.mgot || {}; f.p.mgot[m] = got; }
   if (PREFIXES[m].glitch) OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] });
   return true;
 }
@@ -1241,7 +1321,7 @@ function completeQuest(run, q, msgs) {
   const Q = QUESTS[q.id]; q.done = true;
   if (META) META.archive.quests[q.id] = true;
   msgs && msgs.push({ t: 'class', text: `[${Q.hidden ? 'Hidden quest' : 'Quest'} complete: ${Q.text} Reward: ${outcomeText(Q.reward)}.]` });
-  const ctx = { run, h: eventKit(run, META, undefined, msgs), msgs, label: 'Quest reward' };
+  const ctx = { run, h: eventKit(run, META, stream(run, 'quest'), msgs), msgs, label: 'Quest reward' };
   applyOutcomes(Q.reward, ctx, false); applyOutcomes(Q.reward, ctx, true);
 }
 // ---------- Additional Gift (after round 4) ----------
@@ -1273,9 +1353,55 @@ function rollDraft(run, rng) {
   while (out.length < 6 && g++ < 200) { const id = pick(pool, rng); if (!out.includes(id)) out.push(id); }
   return shuffle(out, rng);
 }
-function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); return true; }
-function confirmDraft(run, ids, meta, rng) {
+// The opening gear pick (Pick Your Kit): after the 3 skills, 1 of 2 E-rank gear pieces from the run's archetypes, one of
+// them the home archetype's when it has any. Its own stream, so the skill draft, shops and opponents never shift.
+function rollGearDraft(run, rng) {
+  if (run.script && !run.script.gearDraft) return [];
+  if (run.script) return run.script.gearDraft.slice();
+  const ok = id => { const g = GEAR[id]; return g.rank === 'E' && !g.glitch && !g.experimental && !g.consumable && g.tags.some(t => run.arch.includes(t)); };
+  const pool = Object.keys(GEAR).filter(ok), home = pool.filter(id => GEAR[id].tags.includes(run.arch[0]));
+  const out = []; if (home.length) out.push(pick(home, rng));
+  const rest = shuffle(pool.filter(id => !out.includes(id)), rng);
+  // a different slot from the first when one is on offer, so the pick is weapon or armour, not two weapons
+  const other = rest.find(id => !out.length || GEAR[id].slot !== GEAR[out[0]].slot) || rest[0];
+  if (other) out.push(other);
+  return out.slice(0, 2);
+}
+// The opening stat points, after the draft: place them one at a time, or roll ROLL_PTS once (seeded per Awakening, so
+// it can't be fished for). Nothing counts until placeStartStats.
+function startStat(run, k, d) {
+  if (run.startPts == null || run.rolled || !STATS.includes(k)) return false;
+  if (d > 0 && run.startPts > 0) { run.stats[k]++; run.startPts--; return true; }
+  if (d < 0 && run.stats[k] > run.statFloor[k]) { run.stats[k]--; run.startPts++; return true; }
+  return false;
+}
+function rollStart(run) {
+  if (run.startPts == null || run.rollUsed) return false;
+  const r = rollStats(seedRng(run.rollSeed));
+  STATS.forEach(k => run.stats[k] = run.statFloor[k] + r[k] - 2);
+  run.startPts = 0; run.rolled = run.rollUsed = true; return true;
+}
+function unrollStart(run, pts) {
+  if (run.startPts == null || !run.rolled) return false;
+  run.stats = Object.assign({}, run.statFloor); run.startPts = pts; run.rolled = false; return true;
+}
+function placeStartStats(run, msgs) {
+  if (run.startPts == null || run.startPts > 0) return false;
+  const floor = run.statFloor, before = Object.assign({}, run.stats);
+  // HP was set from the floor stats at the start: give the run the Max HP its placed points add
+  run.stats = floor; const hp0 = maxHp(run); run.stats = before;
+  run.hp += maxHp(run) - hp0;
+  ['startPts', 'statFloor', 'rollSeed', 'rolled', 'rollUsed'].forEach(k => delete run[k]);
+  checkMilestones(run, msgs);
+  return true;
+}
+function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng)); return true; }
+// gear: the gear piece picked (one of run.gearDraft). Left out (the bot, sims), the first offer is taken.
+function confirmDraft(run, ids, meta, rng, gear) {
   ids.forEach(id => addPiece(run, id, []));
+  const g = (run.gearDraft || []).includes(gear) ? gear : (run.gearDraft || [])[0];
+  if (g) addPiece(run, g, []);
+  run.gearDraft = [];
   run.draft = [];
   run.shop = null; run.locks = null; refreshShop(run, stream(run, 'shop', rng));
   enterChoose(run, meta, rng);
@@ -1344,7 +1470,7 @@ function buildPlayer(run) {
 }
 function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
 // The System's notice: +TUNE.notice per straight win, never in the Elite bracket or practice
-function noticeOf(run) { return run.elite || run.practice ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
+function noticeOf(run) { return run.elite || run.practice || run.noticeOff ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
 function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
 function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); }
 function amendOf(run) { return run.amend && !run.elite && !run.practice ? AMENDMENTS[run.amend] || {} : {}; }
@@ -1396,7 +1522,7 @@ function gatePhase(t) { return { at: 0.5, say: `[${t.name} will not let you pass
 function enemyMove(x, i, power) { return { key: 'e' + i, def: { id: 'e' + i, name: x.n, fx: x.fx, tags: [], label: x.label }, power, cd: 0 }; }
 // The trait library: fields on an enemy (or in its phase's set) that give it a signature. What each does is in
 // docs/CONTENT.md, "Enemy traits". Amounts that deal or block damage scale with the enemy's power, like its moves.
-const ENEMY_TRAITS = ['enrage', 'enrageMult', 'dodge', 'adapt', 'flood', 'aura', 'revive', 'briar', 'twincast', 'forge'];
+const ENEMY_TRAITS = ['enrage', 'enrageMult', 'dodge', 'adapt', 'flood', 'aura', 'revive', 'briar', 'twincast', 'forge', 'jinxTax', 'showNext', 'hexer'];
 function enemyTraits(t, p) {
   const o = {};
   ENEMY_TRAITS.forEach(k => { if (t[k] != null) o[k] = t[k]; });
@@ -1569,11 +1695,16 @@ function newFight(run, rng) {
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
+    X.rerolls = P.rerolls || 0; X.firstSix = !!P.firstSix; X.sleeve = !!P.sleeveFix; X.jackpots = 0;
+    X.curse = Math.min(CURSE_MAX, P.startCurse || 0); X.misfortune = 0; X.omens = [];
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
   });
   GEAR_SLOTS.forEach(k => { const g = run.gear[k]; if (g && GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll]) say(f, `[${GEAR[g.id].name} reads as ${GEAR[g.roll].name}: ${gearText(g.roll, g.star)}]`, 'skill'); });
   // Overflow from your last win: the overkill lands before this fight starts (at most a quarter of their HP)
   if (run.overflow > 0 && !run.practice) { const v = Math.min(run.overflow, Math.round(B.maxHp * 0.25)); B.hp -= v; say(f, `[Overflow: ${v} damage carried over from your last fight.]`, 'skill'); }
+  if (A.P.startMisf) B.misfortune += A.P.startMisf; // Black Cat Collar
+  if (A.P.firstJinx || run.nextFlags.jinxFirst) B.jinxed = true; // The Crow; feeding the cat
+  A.isJinx = A.skills.some(s => s.def.tags && s.def.tags.includes('jinx')) || !!A.P.jinxCheap; // the Jinx button needs a Jinx skill
   planIntent(f, B);
   startTurn(f, A, true);
   return f;
@@ -1591,6 +1722,7 @@ function dmgMult(f, X, Y) {
   if (f.bloodmoon) m *= 1.2;
   if (X.enrage && X.hp / X.maxHp <= X.enrage) m *= X.enrageMult;
   if (P.dmgPct) m *= 1 + P.dmgPct;
+  if (X.curse) m *= 1 + CURSE_DMG * X.curse; // Curse: your skills hit harder
   if (P.lowHpDmg && half(X)) m *= 1 + P.lowHpDmg;
   if (Y) {
     if (P.vsHalf && half(Y)) m *= 1 + P.vsHalf;
@@ -1604,22 +1736,31 @@ function dmgMult(f, X, Y) {
     if (P.burnExec && Y.burn > 0 && half(Y)) m *= 1 + P.burnExec;
   }
   if (P.blockDmgPct) m *= 1 + Math.min(0.4, X.block / 200);
+  if (P.countdown) m *= 0.8; // Countdown Collar (experimental)
   return m;
 }
 function hit(f, X, Y, raw, o = {}) {
   if (Y.hp <= 0) return 0;
-  if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); return 0; }
-  if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); return 0; }
+  if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; return 0; }
+  if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; return 0; }
   let d = raw, crit = false;
-  if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0))) { crit = true; d *= X.critMult; X.critNext = false; }
+  if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0))) { crit = true; d *= X.critMult; X.critNext = false; X.lastCrit = true; }
   if (o.resist) d *= o.resist;
   if (Y.P.lowDR && Y.hp < Y.maxHp * 0.25) d *= 1 - Y.P.lowDR;
   if (Y.P.flatDR && !o.isThorns) d -= Y.P.flatDR;
+  if (Y.curse) d *= 1 + CURSE_TAKEN * Y.curse; // Curse: and so do theirs
   d = Math.max(0, Math.round(d));
+  // Delay Engine (experimental): the hit is stored, to strike all at once later (startTurn)
+  if (X.P.suspend && !o.released && !o.isThorns) { X.bank = (X.bank || 0) + d; ev(f, { k: 'miss', side: Y.side, text: 'Stored' }); return 0; }
   let absorbed = 0;
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   const rest = d - absorbed;
-  Y.hp -= rest;
+  if (absorbed > 0 && rest === 0 && Y.P.blockMisf && !o.isThorns) addMisfortune(f, X, Y.P.blockMisf); // Bad Landing
+  // Pain Link (experimental): every hit is split evenly between both fighters
+  if ((X.P.painLink || Y.P.painLink) && rest > 1) { const share = Math.floor(rest / 2); Y.hp -= rest - share; X.hp -= share; ev(f, { k: 'hit', side: X.side, amt: share, blocked: 0, thorns: true }); }
+  else Y.hp -= rest;
+  // Mirror Cuirass (experimental): once per fight, below the line, the two fighters' HP shares trade places
+  if (Y.P.swapHp && !Y.swapped && Y.hp > 0 && X.hp > 0 && Y.hp < Y.maxHp * Y.P.swapHp) { Y.swapped = true; const a = Y.hp / Y.maxHp, b = X.hp / X.maxHp; Y.hp = Math.round(b * Y.maxHp); X.hp = Math.max(1, Math.round(a * X.maxHp)); say(f, `[Mirror Cuirass: HP reflected. ${Y.isPlayer ? 'You' : Y.name} ${Math.round(b * 100)}%, ${X.isPlayer ? 'you' : X.name} ${Math.round(a * 100)}%.]`, 'class'); }
   if (X.P.reapBlood && !Y.bloodied && Y.hp > 0 && half(Y)) { Y.bloodied = true; heal(f, X, X.maxHp * X.P.reapBlood); say(f, '[Reaper: first blood. You feed on it.]', 'class'); } // Reaper: heal on bringing a foe below half
   if (Y.isPlayer) { f.tally.blocked += absorbed; f.tally.taken += rest; if (o.src) f.tally.hurtBy[o.src] = (f.tally.hurtBy[o.src] || 0) + rest; }
   if (X.isPlayer) { f.tally.bigHit = Math.max(f.tally.bigHit, d); if (o.src) f.dealt[o.src] = (f.dealt[o.src] || 0) + rest; if (Y.hp <= 0) f.tally.overkill = Math.max(f.tally.overkill, -Y.hp); }
@@ -1660,9 +1801,9 @@ function gainBlock(f, X, v) {
 function addStatus(f, X, Y, kind, v) {
   if (v <= 0 || Y.hp <= 0) return;
   const P = X.P;
-  if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
+  if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0) + (P.burnLowDie ? lowDie(X) : 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
   if (kind === 'poison') { v += (P.poisonPlus || 0) + (P.dotPlus || 0); Y.poison += v; }
-  if (kind === 'bleed') { v += (P.bleedPlus || 0) + (P.dotPlus || 0); Y.bleed += v; if (P.healOnBleed) heal(f, X, P.healOnBleed); if (P.bleedPoison) Y.poison += P.bleedPoison; }
+  if (kind === 'bleed') { v += (P.bleedPlus || 0) + (P.dotPlus || 0) + (P.bleedMisf ? P.bleedMisf * Math.floor((Y.misfortune || 0) / 3) : 0); Y.bleed += v; if (P.healOnBleed) heal(f, X, P.healOnBleed); if (P.bleedPoison) Y.poison += P.bleedPoison; }
   if (X.isPlayer) f.tally.maxPoison = Math.max(f.tally.maxPoison, Y.poison);
   react(f, X, Y, kind);
 }
@@ -1714,6 +1855,7 @@ function stunTarget(f, X, Y) {
   if (Y.hp <= 0) return;
   if (resistance(Y, 'stun') && rnd(f.rng) < resistance(Y, 'stun')) { say(f, '[You shrug off the Stun.]', 'class'); return; }
   Y.stun = Math.max(Y.stun, 1);
+  if (X.P.stunMisf) addMisfortune(f, Y, X.P.stunMisf); // Ill Wind
   interrupt(f, X, Y, true);
   if (X.P.stunWeaken) Y.weaken = Math.max(Y.weaken, X.P.stunWeaken);
   react(f, X, Y);
@@ -1742,10 +1884,148 @@ function interrupt(f, X, Y, stunned) {
 }
 function effectCount(Y) { return (Y.burn > 0) + (Y.poison > 0) + (Y.bleed > 0) + (Y.weaken > 0) + (Y.stun > 0) + (Y.marked > 0); }
 
+// ---------- Dice (Gambler) ----------
+// A die skill (fx.die) rolls 1 to 6 at the start of its owner's turn, and the roll is shown on the skill before the pick,
+// so a roll is never a hidden cost. s.baseDef keeps the skill as written; s.def is that skill with the roll worked into
+// plain numbers, so the button, the bot and the fight all read ordinary effects. Smart opponents roll when they plan.
+const DIE_FACES = ['\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
+function hasDice(X) { return X.skills.some(s => { const fx = (s.baseDef || s.def).fx; return fx.die || fx.dmgAll || fx.reroll || fx.setSix; }); }
+function lowDie(X) { const p = X.skills.filter(s => s.pip).map(s => s.pip); return p.length ? Math.min(...p) : 0; }
+function highDie(X) { const p = X.skills.filter(s => s.pip).map(s => s.pip); return p.length ? Math.max(...p) : 0; }
+function rollPip(f, X, s) {
+  const min = Math.min(6, Math.max(1, X.P.dieMin || 0, s.baseDef.fx.dieMin || 0)), r = () => min + Math.floor(rnd(f.rng) * (7 - min));
+  let v = r(); if (X.rollTwiceT > 0) v = Math.max(v, r());
+  if (X.firstSix) { X.firstSix = false; v = 6; }
+  if (v === 1 && X.sleeve) { X.sleeve = false; v = 6; if (X.isPlayer) say(f, "[Cardsharp's Sleeve: a 1 becomes a 6.]", 'skill'); }
+  if (v === 6) X.rolledSix = true;
+  if (v === 1 && X.P.oneMisf) addMisfortune(f, X === f.A ? f.B : f.A, X.P.oneMisf); // Unlucky Number
+  return v;
+}
+function rollDice(f, X, only) {
+  if (!hasDice(X)) return;
+  X.skills.forEach(s => { if (s.unstable || !s.baseDef) s.baseDef = s.def; if (s.baseDef.fx.die && (!only || only.includes(s))) s.pip = rollPip(f, X, s); });
+  if (!only && X.rollTwiceT > 0) X.rollTwiceT--;
+  resolveDice(X);
+}
+function resolveDice(X) {
+  const pips = X.skills.filter(s => s.baseDef && s.baseDef.fx.die).map(s => s.pip), sum = pips.reduce((a, b) => a + b, 0);
+  X.skills.forEach(s => {
+    const b = s.baseDef; if (!b || !(b.fx.die || b.fx.dmgAll)) return;
+    const fx = Object.assign({}, b.fx), v = s.pip || 0;
+    if (fx.die) {
+      if (fx.dmgPip) fx.dmg = (fx.dmg || 0) + fx.dmgPip * v;
+      if (fx.blockPip) fx.block = (fx.block || 0) + fx.blockPip * v;
+      if (fx.healPip) fx.heal = (fx.heal || 0) + fx.healPip * v;
+      if (fx.dbl) fx.dmg *= v >= fx.dbl ? 2 : 0.5;
+      if (fx.snake && (v === 1 || (fx.boxcars && v === 6))) { fx.dmg = fx.snake; fx.stun = 1; }
+      if (fx.bust && v <= (fx.bustAt || 1)) fx.selfDmg = fx.bust;
+      if (X.P.ironOdds && fx.block && v >= 5) fx.block *= 2; // Iron Odds
+      if (X.P.savingGrace && fx.heal && v === 6) fx.heal *= 2; // Saving Grace
+      if (X.P.sixStun && v === 6) fx.stun = 1; // Thunder Roll
+      if (fx.dieStun && v >= fx.dieStun) fx.stun = 1; // Thunder Dice
+    }
+    if (fx.dmgAll) fx.dmg = (fx.dmg || 0) + (fx.dmgAll + (fx.progressive ? X.jackpots || 0 : 0)) * sum;
+    if (fx.cashOut) fx.lifesteal = fx.cashOut;
+    const die = !!fx.die;
+    ['die', 'dmgPip', 'blockPip', 'healPip', 'dieMin', 'dieStun', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
+    s.jackpot = die && pips.filter(x => x === v).length >= 2;
+    s.def = Object.assign({}, b, { fx, pip: die ? v : null, jackpot: s.jackpot });
+  });
+}
+// Spend a reroll on one of your dice (the Gambler's tier 2). Returns false when there is nothing to reroll.
+function rerollDie(f, idx) {
+  const A = f.A, s = A.skills[idx];
+  if (f.phase !== 'player' || f.over || !(A.rerolls > 0) || !s || !s.baseDef || !s.baseDef.fx.die) return false;
+  A.rerolls--; const was = s.pip;
+  rollDice(f, A, [s]);
+  say(f, `[Reroll: ${s.def.name} ${was} \u2192 ${s.pip}.]`, 'skill');
+  return true;
+}
+// ---------- Jinx ----------
+// Misfortune (on the opponent, never fades) pays to jinx the opponent's shown move: when it fires it goes wrong for its
+// user, by the move's role (JINX_COST in moves.js). Every jinx gives you 1 Curse (+6% skill damage, +4% damage taken
+// a stack, up to 10). Omens are traps keyed to the shown move: if it attacks (or guards) next, the Omen fires.
+const CURSE_DMG = 0.06, CURSE_TAKEN = 0.04, CURSE_MAX = 10, OMEN_MAX = 3;
+function jinxRole(f, s) {
+  const fx = s.def.fx, k = intentText(f, s, f.B).kind;
+  if (fx.heal || fx.regen || fx.healMissing) return 'sustain';
+  return k === 'big' ? 'big' : k === 'attack' ? 'strike' : fx.block && !fx.dmg ? 'guard' : 'setup';
+}
+function jinxCost(f) {
+  const A = f.A, B = f.B, s = B.intent; if (!s) return null;
+  if (A.P.jinxFree && !A.jinxedOnce) return 0;
+  return Math.max(0, JINX_COST[jinxRole(f, s)] + (B.jinxTax || 0) - (A.P.jinxCheap || 0) - (A.jinxDisc || 0));
+}
+// Can the player jinx the shown move now: the button only shows when this is true
+function canJinx(f) {
+  const A = f.A, B = f.B;
+  if (f.phase !== 'player' || f.over || !B.intent || B.jinxed || B.stun > 0 || B.unjinxable || A.jinxTurn === f.turn) return false;
+  if (!A.isJinx || B.noJinxT === f.turn) return false; // Augury: its next move can't be jinxed
+  return (B.misfortune || 0) >= jinxCost(f);
+}
+function addCurse(f, X, n) {
+  const was = X.curse || 0; X.curse = Math.min(CURSE_MAX, was + n);
+  if (X.P.curseBlock && X.curse > was) gainBlock(f, X, X.P.curseBlock * (X.curse - was)); // Mirror-Shard Mail
+  if (X.curse >= CURSE_MAX && was < CURSE_MAX && X.isPlayer) say(f, '[Entrant is carrying more bad luck than is advisable.]', 'loss');
+}
+function addMisfortune(f, Y, n) { if (n > 0 && Y.hp > 0) Y.misfortune = (Y.misfortune || 0) + n; }
+// Jinx the shown move (free: Calamity). Returns false when it can't be done.
+function jinxMove(f, free) {
+  const A = f.A, B = f.B;
+  if (!free && !canJinx(f)) return false;
+  if (free && (!B.intent || B.jinxed || B.stun > 0)) return false;
+  const cost = free ? 0 : jinxCost(f), first = !A.jinxedOnce;
+  B.misfortune -= cost; B.jinxed = true; A.jinxedOnce = true; f.tally.jinxes = (f.tally.jinxes || 0) + 1;
+  if (!free) { A.jinxTurn = f.turn; A.jinxDisc = 0; }
+  say(f, `[${B.intent.def.name} jinxed${cost ? ` for ${cost} Misfortune` : ''}. It will go wrong.]`, 'class');
+  if (!(A.P.jinxFree && first)) addCurse(f, A, 1);
+  if (A.coinStun) B.coinStun = true; // Cursed Coin
+  if (A.P.jinxReroll && A.skills.some(s => s.pip)) { rollDice(f, A, A.skills.filter(s => s.pip)); say(f, '[Rigged Game: your dice roll again.]', 'skill'); }
+  if (A.P.jinxHeal) heal(f, A, A.maxHp * A.P.jinxHeal);
+  if (A.P.jinxDoom && B.doomT > 0) { B.doomT = 1; say(f, '[Bad End: Doom falls now.]', 'skill'); }
+  return true;
+}
+// A jinxed move fires: it goes wrong for its user, by its role
+function fireJinx(f, B, s) {
+  const A = opp(f, B), fx = s.def.fx, p = s.power, role = jinxRole(f, s);
+  ev(f, { k: 'use', side: B.side, name: s.def.name });
+  say(f, '[Jinxed. The odds were posted.]', 'class');
+  const self = Math.round(((fx.dmg || 0) * (fx.hits || 1)) * p * dmgMult(f, B, A));
+  if (role === 'strike' || role === 'big') { hit(f, A, B, self, { noDodge: true, noCrit: true, pierce: true, src: 'Jinx' }); if (role === 'big' && B.hp > 0) stunTarget(f, A, B); }
+  else if (role === 'guard') A.jinxBlock = (A.jinxBlock || 0) + Math.round((fx.block || 0) * p); // lands on your next turn, after Block resets
+  else if (role === 'sustain') hit(f, A, B, Math.round(((fx.heal || 0) * p) || (fx.healMissing ? (B.maxHp - B.hp) * fx.healMissing : 0) || (fx.regen || 0) * p * 3), { noDodge: true, noCrit: true, pierce: true, src: 'Jinx' });
+  else { if (fx.empower) A.empower = Math.max(A.empower, fx.empower + 1); if (fx.block) A.jinxBlock = (A.jinxBlock || 0) + Math.round(fx.block * p); if (fx.evade) A.evade += fx.evade; if (fx.focus) A.focus = fx.focus; if (!fx.empower && !fx.block && !fx.evade) say(f, `[${s.def.name} fizzles.]`, 'class'); }
+  B.jinxed = false;
+  if (B.coinStun && B.hp > 0) { B.coinStun = false; B.stun = Math.max(B.stun, 1); say(f, `[Cursed Coin: ${B.name} loses their next turn.]`, 'class'); }
+}
+// Omens fire after the opponent's move, if it matched
+function fireOmens(f, B, s, role) {
+  const A = opp(f, B); if (!B.omens || !B.omens.length || B.hp <= 0) return;
+  const hit1 = B.omens.filter(o => (o.on === 'attack' && (role === 'strike' || role === 'big')) || (o.on === 'guard' && role === 'guard'));
+  if (!hit1.length) return;
+  B.omens = B.omens.filter(o => !hit1.includes(o));
+  hit1.forEach(o => {
+    say(f, '[Omen fulfilled.]', 'class');
+    if (o.dmg) hit(f, A, B, o.dmg, { noDodge: true, noCrit: true, pierce: true, src: 'Omen' });
+    if (o.on === 'guard' && B.block > 0) B.block = Math.round(B.block / 2);
+    addMisfortune(f, B, (o.misf || 0) + (A.P.omenPlus || 0));
+    if (A.P.omenWeaken) { B.weaken = Math.max(B.weaken, A.P.omenWeaken); react(f, A, B); }
+  });
+}
+// Read skills (fx.read): stronger when the opponent's shown move is that kind (intentText's kind; a big attack counts as an
+// attack). readFx is merged over fx when the read lands; readMult multiplies the skill's power.
+const READ_WORD = { attack: 'an attack', defend: 'a defend', debuff: 'a debuff' };
+function readHits(f, X, fx) {
+  if (!f || !fx.read || !X.isPlayer) return false;
+  const Y = opp(f, X); if (!Y.intent || Y.stun > 0) return false;
+  const k = intentText(f, Y.intent, Y).kind; return (k === 'big' ? 'attack' : k) === fx.read;
+}
+function readDef(def) { const fx = Object.assign({}, def.fx, def.fx.readFx); delete fx.read; delete fx.readFx; delete fx.readMult; return Object.assign({}, def, { fx }); }
 function useSkill(f, X, s, opt) {
   opt = opt || {};
   const Y = opp(f, X);
-  let def = s.def, p = s.power;
+  let def = s.def, p = s.power * (opt.mult || 1);
+  if (X.P.echoNext && !opt.echo && !def.cheat) X.echoQ = s; // Echo Chamber (experimental): plays again next turn
   if (def.fx.mirror) {
     const last = f.lastPlayerSkill;
     if (last) { def = Object.assign({}, last.def); say(f, `[${X.name} copies ${last.def.name}.]`, 'loss'); }
@@ -1768,7 +2048,19 @@ function useSkill(f, X, s, opt) {
     if (def.fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(def.fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: def.fx.selfDmg, kind: 'self' }); }
     return;
   }
+  if (def.fx.read && readHits(f, X, def.fx)) {
+    const rm = def.fx.readFx.readMult || 1; def = readDef(def); p *= rm;
+    f.tally.reads = (f.tally.reads || 0) + 1; say(f, `[Read: ${def.name} answers ${READ_WORD[s.def.fx.read]}.]`, 'skill');
+  }
   const fx = def.fx;
+  // Jackpot: this skill's die matches another shown die
+  if (def.jackpot && !opt.echo) {
+    X.jackpots = (X.jackpots || 0) + 1; if (X.isPlayer) f.tally.jackpots = (f.tally.jackpots || 0) + 1;
+    if (X.P.jackpot) p *= 1 + X.P.jackpot;
+    if (X.P.rakeReroll) X.rerolls = (X.rerolls || 0) + X.P.rakeReroll;
+    if (X.P.jackpotPoison) addStatus(f, X, Y, 'poison', X.P.jackpotPoison); // Poisoned Chalice
+    say(f, X.isPlayer ? '[Jackpot. The House notes it.]' : `[Jackpot for ${X.name}.]`, X.isPlayer ? 'class' : 'loss');
+  }
   if (stackStun) say(f, `[Stack overflow. ${X.isPlayer ? 'You are' : X.name + ' is'} stunned.]`, 'loss');
   if (!opt.echo) ev(f, { k: 'use', side: X.side, name: def.name });
   if (X.bleed > 0 && !opt.echo) {
@@ -1781,22 +2073,27 @@ function useSkill(f, X, s, opt) {
   if (fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: fx.selfDmg, kind: 'self' }); }
   let m = dmgMult(f, X, Y);
   const resist = Y.adapt && X.isPlayer && f.tally.mostUsed === s.key ? Y.adapt : 0;
-  const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum);
+  const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity);
+  if (fx.calamity && X.isPlayer) jinxMove(f, true); // Calamity: jinx the shown move for free first
   if (damaging && X.focus) { m *= 1 + X.focus; X.focus = 0; }
   if (damaging && !def.quick && X.aq) { m *= 1 + X.aq; X.aq = 0; }
   if (damaging && X.firstHit && !opt.echo) { m *= 1 + X.firstHit; X.firstHit = 0; }
   const src = def.name;
   let dealt = 0;
-  if (fx.dmg || fx.blockDmg || fx.malice) {
+  if (fx.dmg || fx.blockDmg || fx.malice || fx.perMisf || fx.calamity) {
     let base = (fx.dmg || 0) * p;
+    if (fx.perMisf) base += (fx.perMisf * (Y.misfortune || 0) + (fx.perCurse || 0) * (X.curse || 0)) * p; // Thirteenth Hour
+    if (fx.calamity) base += fx.calamity * (Y.misfortune || 0) * p;
     if (fx.blockDmg) base += X.block * fx.blockDmg;
     if (fx.malice) base += fx.malice * p * effectCount(Y);
     if (fx.momentum) base += fx.momentum * p * (X.streak || 0);
     if (fx.cruel && effectCount(Y) >= 2) base *= fx.cruel;
-    if (fx.execute && Y.hp / Y.maxHp <= fx.execute) base *= fx.execMult;
+    if (fx.execute && Y.hp / Y.maxHp <= fx.execute + (X.P.execPip || 0) * highDie(X)) base *= fx.execMult; // Dead Man's Hand raises the line
     const hits = fx.hits || 1, heavy = base * m * hits >= Y.maxHp * BREAK.big;
     for (let i = 0; i < hits && Y.hp > 0; i++) {
+      X.lastCrit = false;
       dealt += hit(f, X, Y, base * m, { heavy, pierce: fx.pierce || (X.P.reapPierce && half(Y)), critBonus: fx.critBonus, alwaysCrit: fx.alwaysCrit, resist, src });
+      if (X.lastCrit && X.P.luckyCut && def.pip === 6 && !s.luckyCut && Y.hp > 0) { s.luckyCut = true; say(f, '[Lucky Cut: a six and a critical. Once more.]', 'skill'); dealt += hit(f, X, Y, base * m, { pierce: fx.pierce, resist, src }); } // Lucky Cut
       if (fx.perHit) applyStatus(f, X, Y, fx, p);
       if (hits >= 2 && X.P.hitBurn) addStatus(f, X, Y, 'burn', X.P.hitBurn);
     }
@@ -1807,6 +2104,7 @@ function useSkill(f, X, s, opt) {
   if (!fx.perHit) applyStatus(f, X, Y, fx, p);
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
   if (damaging && X.P.poisonOnHit && dealt > 0) addStatus(f, X, Y, 'poison', X.P.poisonOnHit);
+  if (damaging && X.P.hitMisf && dealt > 0) addMisfortune(f, Y, X.P.hitMisf); // Bent Horseshoe
   if (fx.block) gainBlock(f, X, fx.block * p);
   if (fx.heal) heal(f, X, fx.heal * p);
   if (fx.healMissing) heal(f, X, (X.maxHp - X.hp) * fx.healMissing);
@@ -1816,7 +2114,7 @@ function useSkill(f, X, s, opt) {
   if (fx.evade) X.evade += fx.evade;
   if (fx.nextCrit) X.critNext = true;
   if (fx.thorns) X.thorns = Math.max(X.thorns, fx.thorns * p);
-  if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); X.burn = 0; X.poison = 0; X.bleed = 0; X.weaken = 0; }
+  if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); const keepPoison = Y.P && Y.P.misfNoCleanse && (X.misfortune || 0) >= Y.P.misfNoCleanse; X.burn = 0; if (!keepPoison) X.poison = 0; else say(f, '[Bad Water: the Poison stays.]'); X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
   if (ls && dealt > 0) heal(f, X, dealt * ls);
   if (damaging && dealt > 0 && X.P.hitHeal) heal(f, X, X.P.hitHeal);
@@ -1825,6 +2123,24 @@ function useSkill(f, X, s, opt) {
   if (fx.xbleed) addStatus(f, X, Y, 'bleed', Math.round(fx.xbleed * p));
   if (fx.mark) { Y.marked = Math.max(Y.marked || 0, fx.mark); react(f, X, Y); }
   if (fx.focus) X.focus = fx.focus;
+  if (fx.rollTwice) X.rollTwiceT = fx.rollTwice;
+  if (fx.misf) addMisfortune(f, Y, fx.misf);
+  if (fx.misfPerBurn) addMisfortune(f, Y, Math.floor((Y.burn || 0) / fx.misfPerBurn)); // Bad Wick
+  if (fx.misfT) { Y.misfT = 3; Y.misfTv = fx.misfT; } // Bad Penny
+  if (fx.omenAtk || fx.omenGuard) { Y.omens = (Y.omens || []).slice(-(OMEN_MAX - (fx.omenGuard && fx.omenAtk ? 2 : 1))); if (fx.omenAtk) Y.omens.push({ on: 'attack', dmg: Math.round(fx.omenAtk * p), misf: 3 }); if (fx.omenGuard) Y.omens.push({ on: 'guard', misf: 3 }); }
+  if (fx.jinxDisc) X.jinxDisc = fx.jinxDisc;
+  if (fx.augury) X.noJinxT = f.turn + 1; // the Hanged Augur: its next move can't be jinxed
+  if (fx.portent && Y.isPlayer) { const k = f.tally.mostUsed; if (k && k !== 'attack') { Y.hexKey = k; Y.hexT = f.turn + 1; const s2 = Y.skills.find(o => o.key === k); say(f, `[Portent: ${s2 ? s2.def.name : 'your skill'} is hexed next turn.]`, 'loss'); } }
+  if (fx.uncurse) X.curse = Math.max(0, (X.curse || 0) - fx.uncurse);
+  if (fx.coinStun) X.coinStun = true;
+  if (fx.passCurse) { const n = Math.max(0, (X.curse || 0) - (fx.curseKeep || 0)); if (n) { addMisfortune(f, Y, n * fx.passCurse); X.curse -= n; say(f, `[${n} Curse passed on: +${n * fx.passCurse} Misfortune.]`, 'class'); if (fx.curseDmg) dealt += hit(f, X, Y, fx.curseDmg * n * p, { src: def.name }); } }
+  if (fx.calamity) { if (fx.keepHalf) Y.misfortune = Math.floor((Y.misfortune || 0) / 2); else Y.misfortune = 0; addCurse(f, X, 3); }
+  if (fx.reroll || fx.setSix) {
+    const dice = X.skills.filter(o => o !== s && o.baseDef && o.baseDef.fx.die);
+    if (fx.reroll) rollDice(f, X, dice);
+    if (fx.setSix && dice.length) { const lo = dice.reduce((a, o) => o.pip < a.pip ? o : a); lo.pip = 6; resolveDice(X); }
+    if (dice.length && X.isPlayer) say(f, `[${def.name}: ${dice.map(o => o.pip).join(', ')}.]`, 'skill');
+  }
   if (fx.haste) X.skills.forEach(o => { if (o !== s) o.cd = Math.max(0, o.cd - fx.haste); });
   if (fx.interrupt) interrupt(f, X, Y, false);
   if (fx.stunIfWeak && Y.weaken > 0 && Y.hp > 0) stunTarget(f, X, Y);
@@ -1845,6 +2161,8 @@ function useSkill(f, X, s, opt) {
     if (P.quickPoison) addStatus(f, X, Y, 'poison', P.quickPoison);
     if (P.quickBlock) X.block += P.quickBlock;
     if (P.quickHeal) heal(f, X, P.quickHeal);
+    if (P.quickMisf) addMisfortune(f, Y, P.quickMisf); // Hex Glyph
+    if (P.quickReroll) { const lo = X.skills.filter(o => o.pip).sort((a, b) => a.pip - b.pip)[0]; if (lo) { const was = lo.pip; rollDice(f, X, [lo]); if (X.isPlayer) say(f, `[Card Trick: ${lo.def.name} ${was} \u2192 ${lo.pip}.]`, 'skill'); } }
     if (P.quickEvade) X.evade = Math.max(X.evade, 1);
     if (P.quickStun && damaging && Y.hp > 0 && rnd(f.rng) < P.quickStun) { say(f, '[Tempest Mage: Stun!]', 'skill'); stunTarget(f, X, Y); }
   }
@@ -1858,15 +2176,18 @@ function startTurn(f, X, first) {
   const P = X.P, Y = opp(f, X);
   // Unstable skills: one evolution on odd turns, the other on even ones (shown on the button before you pick)
   if (X.isPlayer) X.skills.forEach(s => { if (!s.unstable) return; s.unstableId = s.unstableId || s.def.id; const ids = SKILLS[s.unstableId].unstable, e = ids[(f.turn + 1) % 2]; s.def = Object.assign(moddedDef(e, s.mods), { name: `${s.unstable.name}: ${SKILLS[e].name}`, cd: s.unstable.cd, id: s.unstableId }); });
+  if (X.isPlayer) rollDice(f, X);
   if (!first) {
     if (X.forge) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
   }
   if (X.forge) X.block += X.forge;
+  if (X.jinxBlock) { gainBlock(f, X, X.jinxBlock); say(f, `[The jinxed guard is yours: +${X.jinxBlock} Block.]`, 'class'); X.jinxBlock = 0; }
   X.thorns = 0; X.riposte = 0;
   if (X.regenT > 0) { heal(f, X, X.regen); X.regenT--; }
   if (P.regen) heal(f, X, P.regen);
   if (X.leechT > 0) { const v = Math.min(X.leech * (X.poison > 0 && X.blight ? 2 : 1), Math.max(0, X.hp)); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' }); heal(f, Y, Math.min(v, X.leech)); X.leechT--; if (Y.isPlayer) f.dealt['Leech'] = (f.dealt['Leech'] || 0) + v; }
   if (X.doomT > 0) { X.doomT--; if (X.doomT === 0) { X.hp -= X.doom; ev(f, { k: 'dot', side: X.side, amt: X.doom, kind: 'doom' }); say(f, `[Doom falls on ${X.isPlayer ? 'you' : X.name}: ${X.doom} damage.]`, 'skill'); if (Y.isPlayer) f.dealt['Doom'] = (f.dealt['Doom'] || 0) + X.doom; X.doom = 0; } }
+  if (X.misfT > 0) { X.misfT--; addMisfortune(f, X, X.misfTv || 0); }
   if (!X.isPlayer && X.aura) addStatus(f, X, Y, 'burn', Math.round(X.aura));
   if (!X.isPlayer && X.briar) addStatus(f, X, Y, 'bleed', Math.round(X.briar));
   const turns = X.isPlayer ? f.turn : (X.turns || 0);
@@ -1875,20 +2196,26 @@ function startTurn(f, X, first) {
     const v = Math.round(X.burn * (1 - resistance(X, 'burn'))); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
     if (Y.isPlayer) f.dealt['Burn'] = (f.dealt['Burn'] || 0) + v; else f.tally.hurtBy['Burn'] = (f.tally.hurtBy['Burn'] || 0) + v;
     if (Y.P.burnHeal) heal(f, Y, v * Y.P.burnHeal);
+    if (Y.P.burnMisf) addMisfortune(f, X, Y.P.burnMisf); // Black Candle
     const fade = X.burnFade != null ? X.burnFade : 0.3; X.burn = Math.max(0, X.burn - Math.ceil(X.burn * fade));
   }
   if (X.poison > 0) {
-    const v = Math.round(X.poison * (Y.P.poisonMult || 1) * (1 - resistance(X, 'poison')));
+    const v = Math.round(X.poison * (Y.P.poisonMult || 1) * (Y.P.poisonMisf && (X.misfortune || 0) >= 5 ? 1 + Y.P.poisonMisf : 1) * (1 - resistance(X, 'poison'))); // Evil Draught
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
     if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
   }
   checkRevive(f, X);
   if (X.hp <= 0) return false;
+  // Experimental gear (gear.js): the Countdown Collar's deletion, the Delay Engine's release, the Echo Chamber's replay
+  if (X.isPlayer && P.countdown && f.turn >= P.countdown && Y.hp > 0) { Y.hp = 0; say(f, `[Countdown complete. ${Y.name} has been deleted.]`, 'class'); ev(f, { k: 'hit', side: Y.side, amt: 0, blocked: 0, tag: 'Deleted' }); return true; }
+  if (P.suspend && X.bank > 0 && f.turn % P.suspend === 0 && Y.hp > 0) { const v = X.bank; X.bank = 0; say(f, `[Delay Engine: ${v} stored damage released.]`, 'skill'); hit(f, X, Y, v * 1.5, { released: 1, noDodge: 1, noCrit: 1, src: 'Delay Engine' }); if (Y.hp <= 0) return true; }
+  if (X.echoQ && Y.hp > 0) { const q = X.echoQ; X.echoQ = null; say(f, `[Echo Chamber: ${q.def.name} plays again.]`, 'skill'); useSkill(f, X, q, { echo: true, mult: P.echoNext }); if (Y.hp <= 0 || X.hp <= 0) return X.hp > 0; }
   if (X.stun > 0) { X.stun = 0; say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} stunned and lose${X.isPlayer ? '' : 's'} the turn.]`, X.isPlayer ? 'loss' : 'skill'); ev(f, { k: 'stunned', side: X.side }); return false; }
   return true;
 }
 function endTurn(f, X, usedKey) {
+  if (X.isPlayer) { X.jinxDisc = 0; X.coinStun = false; }
   if (X.weaken > 0) X.weaken--;
   if (X.marked > 0) { X.marked--; if (!X.marked) X.hemo = false; }
   if (X.empower > 0) X.empower--;
@@ -1906,9 +2233,10 @@ function playerAct(f, idx) {
   if (f.phase !== 'player' || f.over) return false;
   const A = f.A, s = A.skills[idx]; if (!s || !canUse(s)) return false;
   f.events = [];
+  if (A.hexKey === s.key && A.hexT === f.turn) { ev(f, { k: 'use', side: 'A', name: s.def.name }); say(f, `[Hexed. ${s.def.name} goes wrong. +2 Curse.]`, 'loss'); addCurse(f, A, 2); A.hexKey = null; } else
   useSkill(f, A, s);
   checkPhase(f, f.B, true);
-  s.cd = s.def.cd || 0;
+  s.cd = s.def.fx.killReset && f.B.hp <= 0 ? 0 : s.def.cd || 0; // Last Hour
   if (s.def.quick) s.cd += 1; // quick skills tick at the end of this same turn
   if (s.def.quick && A.quickFree > 0) { A.quickFree--; s.cd = 1; say(f, `[Hourglass: ${s.def.name} has no cooldown.]`, 'skill'); }
   else if (A.firstFree && !s.def.basic && !s.def.cheat) { A.firstFree = false; s.cd = s.def.quick ? 1 : 0; say(f, `[Archmage: ${s.def.name} has no cooldown.]`, 'skill'); }
@@ -1929,6 +2257,8 @@ function playerAct(f, idx) {
 function skipPlayer(f) { f.events = []; endTurn(f, f.A, null); if (!checkOver(f)) f.phase = 'enemy'; }
 function scoreSkill(s, low) { const fx = s.def.fx; return ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) + (fx.poison || 0) * 1.5 + (fx.bleed || 0) + (fx.detonate ? 10 : 0) + (fx.doom ? fx.doom * 0.5 : 0) + (fx.blockDmg ? 6 : 0)) * s.power + (low ? ((fx.heal || 0) + (fx.healMissing ? 25 : 0) + (fx.block || 0) * 0.8) * s.power * 2 : (fx.block || 0) * 0.5 * s.power) + (fx.stun ? 8 : 0) + (fx.interrupt ? 6 : 0); }
 function planIntent(f, B) {
+  rollDice(f, B);
+  if (B.hexer) { const A = f.A, can = A.skills.filter(s => s.key !== 'attack' && !s.def.cheat); const s = can.length ? can[Math.floor(rnd(f.rng) * can.length)] : null; A.hexKey = s ? s.key : null; A.hexT = f.turn + 1; } // Mott: one of your skills, shown // an opponent with dice (Delphine Coyle, a Gambler Entrant) rolls as it plans, so you see the roll
   if (B.smart) {
     const ready = B.skills.filter(s => s.cd <= 0);
     let best = ready[0];
@@ -1953,8 +2283,9 @@ function enemyTurn(f) {
   if (checkOver(f)) return;
   if (can) {
     if (B.flood && B.turns % B.flood === 0) { const T = f.A.block < B.block ? f.A : f.A.block > B.block ? B : f.A; T.weaken = Math.max(T.weaken, 2); say(f, `[The arena floods. ${T === f.A ? 'You are' : B.name + ' is'} Weakened.]`, T === f.A ? 'loss' : 'skill'); ev(f, { k: 'flood' }); react(f, B, T); }
-    const s = B.intent || B.skills[0];
-    useSkill(f, B, s);
+    const s = B.intent || B.skills[0], role = (B.omens && B.omens.length) || B.jinxed ? jinxRole(f, s) : null;
+    if (B.jinxed) fireJinx(f, B, s); else useSkill(f, B, s);
+    if (role) fireOmens(f, B, s, role);
     if (!s.def.fx.mirror) f.lastEnemySkill = { def: s.def, power: s.power };
     if (B.twincast && B.turns % B.twincast === 0 && f.A.hp > 0) { say(f, `[${B.name} casts twice!]`, 'loss'); useSkill(f, B, s, { echo: true }); }
     s.cd = s.def.cd || 0;
@@ -2000,10 +2331,11 @@ function intentInfo(f) {
   const r = intentText(f, s, B);
   if (B.twincast && (B.turns + 1) % B.twincast === 0) r.text += ' · twice';
   if (B.flood && (B.turns + 1) % B.flood === 0) r.text += ' · flood';
-  if (f.foresight) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; }
+  if (f.foresight || B.showNext) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; } // the Hanged Augur shows two moves
   return r;
 }
 function previewSkill(f, s) {
+  if (s.def.fx.read && f && readHits(f, f.A, s.def.fx)) return 'Read · ' + previewSkill(f, { def: readDef(s.def), power: s.power * (s.def.fx.readFx.readMult || 1) });
   const X = f ? f.A : null, def = s.def, fx = def.fx, p = s.power, m = X ? dmgMult(f, X, f.B) : 1;
   const parts = [];
   if (fx.dmg || fx.blockDmg || fx.malice) { let v = (fx.dmg || 0) * p; if (fx.blockDmg && X) v += X.block * fx.blockDmg; if (fx.malice && f) v += fx.malice * p * effectCount(f.B); v = Math.round(v * m * (X && X.focus ? 1 + X.focus : 1) * (X && X.aq && !def.quick ? 1 + X.aq : 1)); parts.push(fx.hits ? `${v}×${fx.hits}` : `${v} dmg`); }
@@ -2029,6 +2361,15 @@ function previewSkill(f, s) {
   if (fx.mark) parts.push(`Mark ${fx.mark}t`);
   if (fx.focus) parts.push(`Next +${fx.focus * 100}%`);
   if (fx.haste) parts.push(`Cooldowns −${fx.haste}`);
+  if (fx.perMisf || fx.calamity) { const Y = f ? f.B : null, mi = Y ? Y.misfortune || 0 : 0, cu = X ? X.curse || 0 : 0; parts.unshift(`${Math.round(((fx.dmg || 0) + (fx.perMisf || 0) * mi + (fx.perCurse || 0) * cu + (fx.calamity || 0) * mi) * p * m)} dmg`); if (fx.calamity) parts.push('Jinx'); }
+  if (fx.misf) parts.push(`Misfortune ${fx.misf}`);
+  if (fx.misfPerBurn) parts.push(`Misfortune per ${fx.misfPerBurn} Burn`);
+  if (fx.omenAtk) parts.push(`Omen ${Math.round(fx.omenAtk * p)}${fx.omenGuard ? ' · guard' : ''}`);
+  if (fx.passCurse) parts.push(`Pass ${X ? Math.max(0, (X.curse || 0) - (fx.curseKeep || 0)) : ''} Curse`);
+  if (fx.jinxDisc) parts.push(`Jinx −${fx.jinxDisc}`);
+  if (fx.rollTwice) parts.push('Roll twice');
+  if (fx.reroll) parts.push('Reroll dice');
+  if (fx.setSix) parts.push('Lowest die 6');
   if (fx.interrupt) parts.push('Interrupt');
   if (fx.regen) parts.push(`Regen ${Math.round(fx.regen * p)}×3`);
   if (fx.doom) parts.push(`Doom ${Math.round(fx.doom * p)}`);
@@ -2088,6 +2429,40 @@ function describe(def, p = 1) {
   if (fx.unbound) r.push('No cooldown; using it puts one of your other skills on cooldown.');
   if (fx.overflow) r.push('Damage past 0 HP from its killing blow carries into your next fight.');
   if (fx.selfDmg) r.push(`Costs ${fx.selfDmg} HP.`);
+  if (fx.die) {
+    const base = fx.dmg && (fx.dmgPip || fx.snake) ? n(fx.dmg) : 0;
+    if (fx.snake) r.splice(0, r.length, `On a 1${fx.boxcars ? ' or a 6' : ''}: deal ${n(fx.snake)} and Stun. Otherwise deal ${base}.`);
+    else if (fx.dmgPip) { if (fx.dmg) r.shift(); r.unshift(`Deal ${base ? base + ' + ' : ''}${n(fx.dmgPip)} per pip.`); }
+    if (fx.blockPip) r.push(`Block ${n(fx.blockPip)} per pip.`);
+    if (fx.healPip) r.push(`Heal ${n(fx.healPip)} per pip.`);
+    if (fx.dbl) r.push(`On ${fx.dbl}+ deal double, otherwise half.`);
+    if (fx.dieMin) r.push(`This die never rolls below ${fx.dieMin}.`);
+    if (fx.dieStun) r.push(fx.dieStun >= 6 ? 'On a 6, Stun.' : `On a ${fx.dieStun} or more, Stun.`);
+    if (fx.bust) r.push(`On a ${fx.bustAt ? '1 or 2' : '1'}, you take ${fx.bust}.`);
+    r.unshift('Rolls a die each turn, shown before you pick.');
+  }
+  if (fx.dmgAll) r.unshift(`Deal ${n(fx.dmgAll)} per pip across all your shown dice${fx.progressive ? ', +1 per pip for each Jackpot this fight' : ''}.`);
+  if (fx.cashOut) r.push(`Heal ${fx.cashOut * 100}% of the damage dealt.`);
+  if (fx.misf) r.push(`Misfortune ${fx.misf}.`);
+  if (fx.misfPerBurn) r.push(`Then Misfortune 1 for every ${fx.misfPerBurn} Burn on the opponent.`);
+  if (fx.misfT) r.push(`Then Misfortune ${fx.misfT} each turn for 3 turns.`);
+  if (fx.omenAtk) r.push(`Omen: if the opponent attacks next, it takes ${n(fx.omenAtk)} and gains 3 Misfortune.`);
+  if (fx.omenGuard) r.push('Omen: if it guards next, it loses half its Block and gains 3 Misfortune.');
+  if (fx.jinxDisc) r.push(`Your next jinx this turn costs ${fx.jinxDisc} less.`);
+  if (fx.uncurse) r.push(`Remove ${fx.uncurse} Curse.`);
+  if (fx.passCurse) r.push(`Move ${fx.curseKeep ? `all but ${fx.curseKeep} of your` : 'all your'} Curse onto the opponent as ${fx.passCurse === 2 ? 'double' : fx.passCurse + '×'} the Misfortune${fx.curseDmg ? `, and deal ${n(fx.curseDmg)} per Curse moved` : ''}.`);
+  if (fx.perMisf) r.push(`Deal ${n(fx.perMisf)} per Misfortune on the opponent plus ${n(fx.perCurse || 0)} per Curse on you.`);
+  if (fx.killReset) r.push('No cooldown if it kills.');
+  if (fx.coinStun) r.push('A move you jinx this turn also Stuns its user next turn.');
+  if (fx.calamity) { if (fx.dmg) r.shift(); r.unshift(`Jinx the shown move for free, then deal ${n(fx.dmg || 0)} + ${n(fx.calamity)} per Misfortune and ${fx.keepHalf ? 'halve' : 'clear'} it. You take 3 Curse.`); }
+  if (fx.rollTwice) r.push(`For ${fx.rollTwice} turns, your dice roll twice and keep the higher.`);
+  if (fx.reroll) r.push('Reroll your other dice.');
+  if (fx.setSix) r.push('Set your lowest die to 6.');
+  if (fx.read) {
+    const rm = fx.readFx.readMult, rd = readDef(def);
+    r.push(rm ? `Read: if the opponent's shown move is ${READ_WORD[fx.read]}, it has ${rm === 2 ? 'double' : rm + '×'} power.`
+      : `Read: if the opponent's shown move is ${READ_WORD[fx.read]}, instead: ${describe(Object.assign({}, rd, { quick: false }), p)}`);
+  }
   if (def.quick) r.push("Quick: doesn't end your turn.");
   return r.join(' ');
 }
@@ -2129,7 +2504,7 @@ function resolveFight(run, f, meta, rng) {
   const stakes = run.nextFlags.stakes && run.nextFlags.stakes[won ? 'win' : 'lose'], heartCut = run.nextFlags.heartCut || 0, noWinGold = !!run.nextFlags.noWinGold;
   if (stakes) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Stakes' }; applyOutcomes(stakes, ctx, false); applyOutcomes(stakes, ctx, true); }
   // Flags for "the next fight" (a bribe, poison, a scouted weakness) last until it is decided, so a rewind or a reload keeps them
-  run.nextFlags = {}; applyAlways(run);
+  run.nextFlags = {}; run.marks = (run.marks || []).filter(m => m.kind === 'always' || (m.kind === 'ward' && run.ward > 0)); applyAlways(run);
   const c = featCtx(run, f, won, spec);
   // Titles are earned for feats (titles.js); world firsts for a Final Champion come between the won-fight ones and the any-fight ones
   const titleFeats = at => Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === at && featOk(t.feat, c, t.n)) earnTitle(run, k, msgs); });
@@ -2164,9 +2539,14 @@ function resolveFight(run, f, meta, rng) {
     const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
-    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run) });
+    if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
+    if (runP(run).goldPerWin) { run.gold += runP(run).goldPerWin; msgs.push({ t: 'loot', text: `[The House pays out: +${runP(run).goldPerWin} gold.]` }); }
+    if (META && !META.unlocks.arch_jinx && !run.practice && (spec.id === 'mott' || (f.tally.missed || 0) >= 3)) { META.unlocks.arch_jinx = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Jinx. Please stand well back.]' }); } // beat Mott, or win a fight where 3 attacks missed you
+    if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
+    if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
@@ -2489,7 +2869,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
-  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
+  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
@@ -2498,7 +2878,7 @@ if (typeof module !== 'undefined') module.exports = {
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
-  rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
+  rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

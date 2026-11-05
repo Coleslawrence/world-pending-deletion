@@ -6,7 +6,7 @@
 // the run (level field), that a reroll in round 2 doesn't change round 3's opponents, and that a save reloaded
 // mid-run carries on identically.
 const G = require('../js/core.js');
-const { choosePlayer } = require('./bot.js');
+const { choosePlayer, rerollLow, jinxIfWise } = require('./bot.js');
 const assert = require('assert');
 const date = process.argv[2] || G.dailyDate();
 let checks = 0; const ok = (c, msg) => { assert(c, msg); checks++; };
@@ -40,7 +40,7 @@ function play(o = {}) {
       if (run.pending[0] === p) run.pending.shift();
     }
     const f = G.newFight(run);
-    for (let g = 0; !f.over && g < 300; g++) { if (f.phase === 'player') G.playerAct(f, choosePlayer(f)); else if (f.phase === 'stunned') G.skipPlayer(f); if (!f.over && f.phase === 'enemy') G.enemyTurn(f); }
+    for (let g = 0; !f.over && g < 300; g++) { if (f.phase === 'player') { rerollLow(f); jinxIfWise(f); G.playerAct(f, choosePlayer(f)); } else if (f.phase === 'stunned') G.skipPlayer(f); if (!f.over && f.phase === 'enemy') G.enemyTurn(f); }
     const r = G.resolveFight(run, f, meta);
     T('fight', { round: run.round, won: r.won, turns: f.turn, hp: f.A.hp, enemy: f.B.name, erased: r.erased });
     if (r.rewind) continue;

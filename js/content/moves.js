@@ -11,12 +11,15 @@
 //   setup:   a status, a buff or a trick with little damage behind it
 //   sustain: healing or draining
 const MOVE_ROLES = { strike: 'a plain hit', big: 'a big hit, the one to Block or Stun', guard: 'Block and nothing else', setup: 'a status, buff or trick with little damage', sustain: 'healing or draining' };
+// What jinxing a shown move of each role costs in Misfortune (the Jinx); the role is read from the shown move
+const JINX_COST = { strike: 4, guard: 6, setup: 6, sustain: 6, big: 8 };
 const BIG_HIT = { 1: 18, 2: 16, 3: 14, 4: 20 };
 const SETUP_FX = ['burn', 'poison', 'bleed', 'weaken', 'empower', 'evade', 'mirror', 'cleanse', 'stun', 'doublePoison', 'blockDmg'];
-function moveDmg(fx) { return (fx.dmg || 0) * (fx.hits || 1); }
+// A die move (fx.die) is counted at its average roll, 3.5
+function moveDmg(fx) { return ((fx.dmg || 0) + (fx.dmgPip || 0) * 3.5) * (fx.hits || 1); }
 function moveRole(fx, tier) {
   if (fx.heal || fx.lifesteal || fx.regen) return 'sustain';
-  if (fx.block && !fx.dmg) return 'guard';
+  if ((fx.block || fx.blockPip) && !moveDmg(fx)) return 'guard';
   const d = moveDmg(fx);
   if (d >= (BIG_HIT[tier] || BIG_HIT[4])) return 'big';
   if (d <= 8 && SETUP_FX.some(k => fx[k])) return 'setup';
