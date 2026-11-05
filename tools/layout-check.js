@@ -57,6 +57,9 @@ function states() {
     const jx = JSON.parse(JSON.stringify(mid.run)), jids = ['evil_eye', 'ill_omen', 'knock_wood', 'thirteenth', 'calamity', 'pass_curse'];
     jx.bar = jx.bar.map((p, i) => ({ id: jids[i], star: 2, mods: [], u: 'jinx' + i })); jx.gear.accessory = { id: 'black_cat_collar', star: 3, mods: [], u: 'jinxg' };
     out.push({ label: 'r5-fight-jinx', stage: 'fight', run: jx });
+    // Choose screen with the longest traits on every opponent, glitch ones included (Corrupted widened a card at 320)
+    const ch = out.find(s => s.label === 'r5-choose');
+    if (ch) { const t = JSON.parse(JSON.stringify(ch.run)); t.choices.forEach(c => c.traits = ['corrupted', 'desynced']); out.push({ label: 'r5-choose-traits', stage: 'choose', run: t }); }
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };
