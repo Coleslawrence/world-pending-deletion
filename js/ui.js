@@ -1056,6 +1056,7 @@ function finishFight() {
 function sheetWrap(title, body, foot, cls, noClose) {
   return `<div class="sheet-bg"><section class="sheet ${cls || ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header class="sh-h"><h3>${esc(title)}</h3>${foot === false || noClose ? '' : '<button class="icon-btn" data-act="close" aria-label="Close">×</button>'}</header><div class="sh-b">${body}</div>${foot && foot !== false ? `<footer class="sh-f">${foot}</footer>` : ''}</section></div>`;
 }
+const orList = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' or ' + a[a.length - 1] : a.join('');
 function pieceBody(id, star, mods, power) {
   star = star || 1; mods = mods || [];
   if (isGear(id)) {
@@ -1067,7 +1068,7 @@ function pieceBody(id, star, mods, power) {
   const p = power || skillPower(d, effStats(run), star) * d.powerMult;
   return `<div class="srow ${mainTag(id)}"><div class="sr-h"><span class="sr-name">${mods.length ? `<em class="pfx">${esc(mods.map(m => PREFIXES[m].name).join(' '))}</em> ` : ''}${esc(d.name)}</span>${stars(star)}${rk(effRank(id, mods))}</div>
     <div class="sr-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}<span class="tagn">${d.cd ? d.cd + '-turn cooldown' : 'no cooldown'}</span></div><div class="sr-desc">${esc(describe(d, p))}${flavHTML(SKILLS[id].flavour)}</div>
-    ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${SKILLS[id].evo.map(e => esc(SKILLS[e].name)).join(' or ')}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
+    ${star === 2 && SKILLS[id].evo ? `<div class="sr-next">At ★3 it evolves into ${orList(SKILLS[id].evo.map(e => esc(SKILLS[e].name)))}.</div>` : star === 1 ? '<div class="sr-next">3 copies merge into ★2: +50% power.</div>' : ''}</div>`;
 }
 function pieceSheet() {
   const S = ui.sheet;

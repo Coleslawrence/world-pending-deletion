@@ -111,7 +111,7 @@ Object.values(C.SKILLS).forEach(s => {
   s.tags.forEach(t => ref(w, isArch(t), `tag ${t} is not an archetype`));
   ref(w, C.RANKS.includes(s.rank), `rank ${s.rank} is not one of ${C.RANKS.join(' ')}`);
   (s.evo || []).forEach(e => ref(w, C.SKILLS[e] && C.SKILLS[e].base === s.id, `evolution ${e} is missing`));
-  if (!s.basic && !s.base && !s.glitch) ref(w, (s.evo || []).length === 2, 'needs two ★3 evolutions'); // glitched skills never evolve
+  if (!s.basic && !s.base && !s.glitch) ref(w, [2, 3].includes((s.evo || []).length), 'needs two or three ★3 evolutions'); // glitched skills never evolve
 });
 Object.entries(C.GEAR).forEach(([k, g]) => {
   const w = 'gear ' + k;
