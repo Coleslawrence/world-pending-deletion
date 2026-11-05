@@ -703,6 +703,11 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 
 /* fitNames(): long names shrink a step, then wrap to 2 lines instead of being cut */
 .fit2 { white-space: normal !important; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.12; }
+/* Short phones (320x693 with Display Zoom, 360x640): every fight button stays on screen without scrolling. Your own
+   name keeps to one line (shrunk, then an ellipsis), and on the shortest a skill's effects keep to two lines (the ? mode
+   shows them in full) */
+@container app (max-height: 700px) { .fight .me-name.fit2 { display: block; white-space: nowrap !important; -webkit-line-clamp: none; } }
+@container app (max-height: 640px) { .sk-fx { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; } }
 .achip span i { font-style: normal; } .achip .an-s { display: none; letter-spacing: .04em; }
 @container app (max-width: 479px) { .achip .an-l { display: none; } .achip .an-s { display: inline; } }
 @container app (max-width: 359px) { .achip .dots2 { display: none; } }
@@ -882,6 +887,8 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .sr-q b { flex: none; color: var(--sys); font-weight: 600; }
 .status-row .ntc, .st-inc { white-space: nowrap; flex: none; }
 .opp .nx-traits span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A long trait (Corrupted) must shorten with an ellipsis, not widen the card past a 320-wide screen */
+.op-r > *, .opp .nx-traits span { min-width: 0; }
 .op-meta { font-family: var(--f-b); font-size: var(--fs-2); font-weight: 600; }
 /* Fight: status chips on one line that scrolls sideways; HP numbers in the body font, larger */
 .foe .chips, .me .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-height: 22px; }

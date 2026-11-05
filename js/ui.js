@@ -124,6 +124,8 @@ function placeToasts() {
   if (!r || !r.height) { toastsEl.style.top = ''; toastsEl.style.bottom = ''; toastsEl.classList.remove('low'); return; }
   toastsEl.style.top = 'auto'; toastsEl.style.bottom = `${Math.max(8, window.innerHeight - r.top + 8)}px`; toastsEl.classList.add('low');
 }
+// A sheet slides up when it opens: notices placed during the slide sat too low, over its buttons, so place them again
+document.addEventListener('animationend', e => { if (e.target.classList && e.target.classList.contains('sheet')) placeToasts(); });
 function logRun(text, t) { if (!run) return; run.log.push({ text, t: t || 'sys' }); if (run.log.length > 40) run.log.shift(); }
 const TOAST_RANK = { win: -1, broadcast: 0, merge: 1, class: 1, level: 2, favour: 3, skill: 4, loot: 5, loss: 6, sys: 7 };
 const TOAST_MAX = 5;
