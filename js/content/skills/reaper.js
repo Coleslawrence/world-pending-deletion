@@ -7,6 +7,7 @@ sk('heavy_blow', 'Heavy Blow', ['reaper'], 'D', 3, { dmg: 23 }, [['earthshaker',
 sk('momentum', 'Momentum', ['reaper'], 'C', 1, { dmg: 5, momentum: 4 }, [['unstoppable', 'Unstoppable', { dmg: 5, momentum: 7 }], ['avalanche', 'Avalanche', { dmg: 4, hits: 2, momentum: 3 }]]);
 sk('doom', 'Doom', ['reaper'], 'B', 5, { doom: 26 }, [['swift_doom', 'Swift Doom', { doom: 22, doomT: 2 }], ['inevitable_doom', 'Inevitable Doom', { doom: 40 }]]);
 sk('soul_harvest', 'Soul Harvest', ['reaper'], 'A', 4, { dmg: 14, lifesteal: 0.6, execute: 0.3, execMult: 2 }, [['reaping', 'The Reaping', { dmg: 18, lifesteal: 0.6, execute: 0.3, execMult: 2.5 }], ['soul_feast', 'Soul Feast', { dmg: 14, lifesteal: 1, execute: 0.3, execMult: 2 }]]);
+sk('punish', 'Punish', ['reaper'], 'D', 2, { dmg: 8, read: 'defend', readFx: { dmg: 20, pierce: 1 } }, [['no_hiding', 'No Hiding', { dmg: 8, read: 'defend', readFx: { dmg: 16, pierce: 1, weaken: 2 } }], ['exploit', 'Exploit', { dmg: 10, execute: 0.3, execMult: 2, read: 'defend', readFx: { dmg: 18, pierce: 1, execute: 0.3, execMult: 2 } }]]);
 flav({
   cleave: "A wide swing. It needs no skill, only commitment.",
   great_cleave: "The blade goes all the way round.",
@@ -29,4 +30,7 @@ flav({
   soul_harvest: "The scythe comes back heavier than it left.",
   reaping: "Harvest time, and the field is full.",
   soul_feast: "Nothing is wasted. Every drop comes back to you.",
+  punish: "A raised shield is an admission. You collect on it.",
+  no_hiding: "The shield comes down, and so does everything behind it.",
+  exploit: "Every guard has a gap. You were born knowing where.",
 });

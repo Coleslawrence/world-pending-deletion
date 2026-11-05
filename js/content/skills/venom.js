@@ -7,6 +7,7 @@ sk('plague_cloud', 'Plague Cloud', ['venom'], 'D', 3, { poison: 6 }, [['pestilen
 sk('malice', 'Malice', ['venom'], 'D', 1, { dmg: 4, malice: 3 }, [['spite', 'Spite', { dmg: 4, malice: 5 }], ['torment', 'Torment', { dmg: 6, malice: 3, weaken: 1 }]]);
 sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech', 'Blood Leech', { leech: 6 }], ['parasite', 'Parasite', { leech: 3, poison: 3 }]]);
 sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }]]);
+sk('seep', 'Seep', ['venom'], 'D', 2, { poison: 3, read: 'defend', readFx: { poison: 7 } }, [['stagnant_pool', 'Stagnant Pool', { poison: 3, read: 'defend', readFx: { poison: 6, weaken: 2 } }], ['rising_damp', 'Rising Damp', { poison: 4, read: 'defend', readFx: { poison: 6, doublePoison: 1 } }]]);
 flav({
   venom_blade: "A thin coat of green on a thin blade.",
   viper_fang: "Bitten, not cut. The difference shows later.",
@@ -29,4 +30,7 @@ flav({
   toxic_needles: "Nobody counted the needles. It felt like more than a thousand.",
   venom_storm: "The air itself is poison now.",
   needle_rain: "Silver needles, falling like rain. There is no shelter.",
+  seep: "It finds the ones who stand still.",
+  stagnant_pool: "Still water breeds the worst things.",
+  rising_damp: "It climbs the walls of whatever they hide behind.",
 });

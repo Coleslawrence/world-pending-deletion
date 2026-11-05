@@ -7,6 +7,7 @@ sk('purify', 'Purify', ['zealot'], 'D', 4, { cleanse: 1, heal: 6, brk: 4 }, [['s
 sk('second_wind', 'Second Wind', ['zealot'], 'D', 4, { healMissing: 0.25, brk: 4 }, [['last_breath', 'Last Breath', { healMissing: 0.4, brk: 6 }], ['rally', 'Rally', { healMissing: 0.25, empower: 1, brk: 4 }]]);
 sk('consecrate', 'Consecrate', ['zealot'], 'C', 4, { regen: 4, brk: 4 }, [['hallowed_ground', 'Hallowed Ground', { regen: 7, brk: 6 }], ['holy_fire', 'Holy Fire', { regen: 4, burn: 4, brk: 6 }]]);
 sk('miracle', 'Miracle', ['zealot'], 'A', 6, { healMissing: 0.5, cleanse: 1, block: 10, brk: 10 }, [['resurrection', 'Resurrection', { healMissing: 0.7, cleanse: 1, block: 12, brk: 10 }], ['divine_wrath', 'Divine Wrath', { healMissing: 0.4, dmg: 15, brk: 14 }]]);
+sk('vigil', 'Vigil', ['zealot'], 'D', 2, { heal: 6, read: 'debuff', readFx: { heal: 10, cleanse: 1, block: 8 } }, [['night_watch', 'Night Watch', { heal: 6, regen: 2, read: 'debuff', readFx: { heal: 8, cleanse: 1, regen: 4 } }], ['warding_prayer', 'Warding Prayer', { heal: 6, read: 'debuff', readFx: { heal: 6, cleanse: 1, block: 16 } }]]);
 flav({
   penance: "Every blow a prayer. Every prayer a blow.",
   atonement: "You strike once for every sin of theirs you can name.",
@@ -29,4 +30,7 @@ flav({
   miracle: "The System logs it as an error. The crowd calls it a miracle.",
   resurrection: "You stand up. The healers had already left.",
   divine_wrath: "Mercy, then judgement, in that order.",
+  vigil: "You stayed awake for this. The curse arrives to find you ready.",
+  night_watch: "Someone has to keep the lamps lit.",
+  warding_prayer: "A short prayer, said early, before anyone needed it.",
 });

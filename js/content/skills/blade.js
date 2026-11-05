@@ -8,6 +8,7 @@ sk('precise_strike', 'Precise Strike', ['blade'], 'D', 2, { dmg: 11, critBonus: 
 sk('mark_prey', 'Mark Prey', ['blade'], 'C', 3, { mark: 2 }, [['hunters_mark', "Hunter's Mark", { mark: 3 }], ['deadly_mark', 'Deadly Mark', { mark: 2, nextCrit: 1 }]], { quick: true });
 sk('assassinate', 'Assassinate', ['blade', 'reaper'], 'B', 3, { dmg: 12, cruel: 2 }, [['death_blossom', 'Death Blossom', { dmg: 8, hits: 2, cruel: 2 }], ['coup_de_grace', 'Coup de Grace', { dmg: 16, cruel: 2.5 }]]);
 sk('thousand_cuts', 'Thousand Cuts', ['blade'], 'A', 4, { dmg: 3, hits: 6, bleed: 1, perHit: 1 }, [['dance_of_death', 'Dance of Death', { dmg: 4, hits: 7, bleed: 1, perHit: 1 }], ['crimson_tempest', 'Crimson Tempest', { dmg: 3, hits: 6, bleed: 2, perHit: 1 }]]);
+sk('sidestep', 'Sidestep', ['blade'], 'D', 2, { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 2 } }, [['shadowstep', 'Shadowstep', { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, nextCrit: 1 } }], ['dancing_feint', 'Dancing Feint', { dmg: 4, mark: 1, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 3 } }]], { quick: true });
 flav({
   quick_slash: "Two cuts before the first one starts to sting.",
   flurry: "Steel everywhere at once. The crowd can only count the sparks.",
@@ -33,4 +34,7 @@ flav({
   thousand_cuts: "No single cut is deadly. That is the point.",
   dance_of_death: "The steps are easy. Surviving your partner is not.",
   crimson_tempest: "You spin, and the arena sand turns red around you.",
+  sidestep: "Half a step to the left. The rest is footwork.",
+  shadowstep: "Gone before the blade arrives, back before they notice.",
+  dancing_feint: "You lead, they follow, and they never get the steps right.",
 });

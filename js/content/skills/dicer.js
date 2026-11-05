@@ -11,6 +11,7 @@ sk('house_edge', 'House Edge', ['dicer'], 'B', 4, { mark: 3, rollTwice: 3 }, [['
 sk('jackpot', 'Jackpot', ['dicer'], 'A', 5, { dmgAll: 3 }, [['progressive', 'Progressive Jackpot', { dmgAll: 3, progressive: 1 }], ['cash_out', 'Cash Out', { dmgAll: 3, cashOut: 0.5 }]]);
 sk('thunder_dice', 'Thunder Dice', ['dicer', 'storm'], 'D', 3, { die: 1, dmg: 4, dmgPip: 2, dieStun: 6 }, [['rolling_thunder', 'Rolling Thunder', { die: 1, dmg: 4, dmgPip: 2, dieStun: 5 }], ['storm_front', 'Storm Front', { die: 1, dmg: 4, dmgPip: 2, weaken: 1, dieStun: 6 }]]);
 sk('crooked_odds', 'Crooked Odds', ['dicer', 'jinx'], 'E', 2, { reroll: 1, misf: 2 }, [['sore_loser', 'Sore Loser', { reroll: 1, misf: 2, jinxDisc: 2 }], ['loaded_luck', 'Loaded Luck', { reroll: 1, block: 6 }]], { quick: true });
+sk('call_the_bluff', 'Call the Bluff', ['dicer'], 'D', 2, { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2 } }, [['raise_the_stakes', 'Raise the Stakes', { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2, weaken: 1 } }], ['fold', 'Fold', { die: 1, blockPip: 3, dmgPip: 2, read: 'attack', readFx: { readMult: 2 } }]]);
 flav({
   thunder_dice: "Two bones carved from a tree the lightning picked twice.",
   rolling_thunder: "The odds are bad. The storm doesn't read them.",
@@ -39,4 +40,7 @@ flav({
   jackpot: "Every die you have shown, cashed in at once.",
   progressive: "Each win feeds the pot. The pot is very hungry.",
   cash_out: "Walk away while you are ahead. Walk away healed.",
+  call_the_bluff: "[Bluff called. The House enjoys this part.]",
+  raise_the_stakes: "You push everything in. They blink first.",
+  fold: "Knowing when to fold is also a way to win.",
 });

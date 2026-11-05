@@ -9,6 +9,7 @@ sk('counterspell', 'Counterspell', ['arcanist', 'storm'], 'C', 3, { dmg: 7, inte
 sk('siphon', 'Siphon', ['arcanist'], 'C', 3, { siphon: 1 }, [['soul_siphon', 'Soul Siphon', { siphon: 1, heal: 5 }], ['hex_siphon', 'Hex Siphon', { siphon: 1, weaken: 1 }]], { quick: true });
 sk('time_warp', 'Time Warp', ['arcanist'], 'B', 6, { haste: 2 }, [['haste', 'Haste', { haste: 3 }], ['chrono_loop', 'Chrono Loop', { haste: 2 }, 4]], { quick: true });
 sk('cataclysm', 'Arcane Cataclysm', ['arcanist'], 'A', 4, { dmg: 24, pierce: 1 }, [['singularity', 'Singularity', { dmg: 34, pierce: 1 }], ['starfall', 'Starfall', { dmg: 8, hits: 4, pierce: 1 }]]);
+sk('read_the_glyph', 'Read the Glyph', ['arcanist'], 'D', 2, { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1 } }, [['unwrite', 'Unwrite', { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1, haste: 1 } }], ['glyph_breaker', 'Glyph Breaker', { dmg: 5, focus: 0.2, read: 'defend', readFx: { dmg: 10, pierce: 1, focus: 0.2 } }]], { quick: true });
 flav({
   spark: "The first spell every apprentice learns, and the last one they forget.",
   arc_spark: "The spark jumps the gap before you have finished pointing.",
@@ -37,4 +38,7 @@ flav({
   cataclysm: "The mages of the Sky Reaches banned this one. Twice.",
   singularity: "A point of nothing, very hungry, very briefly.",
   starfall: "You ask the night sky for help. It answers in pieces.",
+  read_the_glyph: "Every ward is written in something. You can read most things.",
+  unwrite: "You find the line holding it together and take it out.",
+  glyph_breaker: "The ward was well written. You were a harsh critic.",
 });

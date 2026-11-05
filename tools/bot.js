@@ -8,7 +8,8 @@ function choosePlayer(f) {
   const low = A.hp / A.maxHp < 0.4;
   let best = ready[0], bs = -1;
   ready.forEach(({ s, i }) => {
-    const fx = s.def.fx, p = s.power;
+    // A Read skill (fx.read, fx.readFx) is scored as what it will do this turn: its readFx version when the shown move matches
+    const rd = s.def.fx.read && G.readHits(f, A, s.def.fx), fx = rd ? G.readDef(s.def).fx : s.def.fx, p = s.power * (rd && s.def.fx.readFx.readMult || 1);
     let sc = ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) * 1.6 + (fx.poison || 0) * 2.5 + (fx.bleed || 0) * 1.5 + (fx.detonate ? B.burn * fx.detonate : 0) + (fx.malice ? fx.malice * 2 : 0) + (fx.blockDmg ? A.block * fx.blockDmg : 0) + (fx.brk || 0) * 0.6) * p;
     if (fx.replay) sc = f.lastPlayerSkill ? 15 * p : 0; // Error: worth a strong skill once there's one to repeat
     // Press a nearly broken guard: a hit that breaks it costs the opponent its turn
