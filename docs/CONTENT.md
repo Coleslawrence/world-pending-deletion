@@ -129,18 +129,18 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bleed` | 15 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 70 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 72 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 9 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 6 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
 | `brk` | 31 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
-| `burn` | 40 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
+| `burn` | 41 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `bust` | 4 | Double Down (6), All In (8), Press Your Luck (6), … | (works with other keys on the same skill) | yes |
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
-| `calamity` | 3 | Calamity (4), Catastrophe (5), Aftermath (4) | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
+| `calamity` | 4 | Calamity (4), Catastrophe (5), Aftermath (4), … | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
 | `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
 | `cleanse` | 20 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
-| `coinStun` | 3 | Cursed Coin (1), Bad Penny (1), Heads I Win (1) | A move you jinx this turn also Stuns its user next turn. | yes |
+| `coinStun` | 4 | Cursed Coin (1), Bad Penny (1), Heads I Win (1), … | A move you jinx this turn also Stuns its user next turn. | yes |
 | `critBonus` | 3 | Precise Strike (0.5), Exposing Strike (0.5), Homing Missiles (0.25) | +50% critical chance. | no |
 | `cruel` | 4 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5), … | ×2 damage if the opponent has 2 or more effects. | yes |
 | `curseDmg` | 1 | Crossed Path (3) | (works with other keys on the same skill) | yes |
@@ -150,7 +150,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 27 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 2 | Two-Headed Coin (4), Hedged Bet (3) | (works with other keys on the same skill) | yes |
 | `dieStun` | 4 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 221 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 223 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgPip` | 19 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 5 | Doom (26), Swift Doom (22), Inevitable Doom (40), … | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
@@ -163,32 +163,32 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `execute` | 9 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
 | `focus` | 15 | Focus (0.6), Read the Glyph (0.2), Loaded Die (0.2), … | Your next damaging skill deals 60% more. | yes |
 | `haste` | 5 | Time Warp (2), Spellweave (1), Haste (3), … | Your other cooldowns drop by 2. | yes |
-| `heal` | 27 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
+| `heal` | 29 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 8 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 2 | Lucky Coin (1), Insurance (1) | (works with other keys on the same skill) | yes |
 | `hits` | 43 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
 | `interrupt` | 4 | Counterspell (1), Nullify (1), Spell Theft (1), … | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
-| `jinxDisc` | 4 | Knock on Wood (2), Sore Loser (2), Touch Wood (2), … | Your next jinx this turn costs 2 less. | yes |
+| `jinxDisc` | 5 | Knock on Wood (2), Sore Loser (2), Touch Wood (2), … | Your next jinx this turn costs 2 less. | yes |
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
 | `keepHalf` | 1 | Aftermath (1) | (works with other keys on the same skill) | no |
 | `killReset` | 3 | Silent Kill (1), Mercy Kill (1), Last Hour (1) | No cooldown if it kills. | no |
 | `leech` | 4 | Leech (3), Blood Leech (6), Parasite (3), … | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
 | `lifesteal` | 14 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
 | `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
-| `mark` | 14 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
+| `mark` | 15 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | no |
-| `misf` | 10 | Crooked Odds (2), Evil Eye (2), Cursed Coin (5), … | Misfortune 2. | yes |
-| `misfPerBurn` | 3 | Bad Wick (3), Wax and Ash (2), Ember Omen (3) | Then Misfortune 1 for every 3 Burn on the opponent. | yes |
+| `misf` | 12 | Crooked Odds (2), Evil Eye (2), Cursed Coin (5), … | Misfortune 2. | yes |
+| `misfPerBurn` | 4 | Bad Wick (3), Wax and Ash (2), Ember Omen (3), … | Then Misfortune 1 for every 3 Burn on the opponent. | yes |
 | `misfT` | 1 | Bad Penny (2) | Then Misfortune 2 each turn for 3 turns. | yes |
 | `momentum` | 4 | Momentum (4), Unstoppable (7), Avalanche (3), … | +4 damage for each turn in a row you've used a damaging skill. | yes |
 | `nextCrit` | 3 | Smoke and Mirrors (1), Deadly Mark (1), Palmed Die (1) | Your next hit is a critical. | no |
-| `omenAtk` | 4 | Ill Omen (12), Dire Omen (18), Twin Omens (12), … | Omen: if the opponent attacks next, it takes 12 and gains 3 Misfortune. | yes |
+| `omenAtk` | 5 | Ill Omen (12), Dire Omen (18), Twin Omens (12), … | Omen: if the opponent attacks next, it takes 12 and gains 3 Misfortune. | yes |
 | `omenGuard` | 1 | Twin Omens (1) | Omen: if it guards next, it loses half its Block and gains 3 Misfortune. | yes |
-| `passCurse` | 3 | Pass the Curse (2), Crossed Path (2), Keep a Little (2) | Move all your Curse onto the opponent as double the Misfortune. | yes |
-| `perCurse` | 3 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3) | (works with other keys on the same skill) | yes |
+| `passCurse` | 4 | Pass the Curse (2), Crossed Path (2), Keep a Little (2), … | Move all your Curse onto the opponent as double the Misfortune. | yes |
+| `perCurse` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | (works with other keys on the same skill) | yes |
 | `perHit` | 14 | Flame Wave (1), Thousand Cuts (1), Fire Rain (1), … | (works with other keys on the same skill) | no |
-| `perMisf` | 3 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3) | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
-| `pierce` | 10 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
+| `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
+| `pierce` | 11 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
 | `poison` | 33 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
@@ -209,7 +209,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `stunIfWeak` | 6 | Overload (1), Numbing Needles (1), Jolt (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 9 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
-| `weaken` | 45 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 49 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
