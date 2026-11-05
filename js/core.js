@@ -17,8 +17,10 @@ function archTier(n) { return n >= 6 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0; }
 // ---------- Gear: stats + one passive, no active skill ----------
 const STAR_MULT = [0, 1, 1.5, 1.6];
 const GEAR_STAR = [0, 1, 1.5, 2], GEAR_STAR_PCT = [0, 1, 1.4, 1.8];
-function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); return Object.assign(o, g.fix || {}); }
-function gearText(id, star) { return GEAR[id].text(gearPas(id, star || 1)); }
+function gearPas(id, star) { const g = GEAR[id], o = {}; Object.entries(g.pas || {}).forEach(([k, v]) => o[k] = Number.isInteger(v) ? Math.round(v * GEAR_STAR[star]) : Math.round(v * GEAR_STAR_PCT[star] * 100) / 100); Object.assign(o, g.fix || {}); if (star >= 3 && g.top) Object.assign(o, g.top); return o; }
+// At ★3 a piece gains its top line, worded by effects.js
+function gearTop(id) { const t = GEAR[id].top; return t ? Object.entries(t).map(([k, v]) => EFFECTS[k].say(v)).join(' ') : ''; }
+function gearText(id, star) { star = star || 1; const t = GEAR[id].text(gearPas(id, star)); return star >= 3 && GEAR[id].top ? `${t} ★3: ${gearTop(id)}` : t; }
 function gearStats(id, star) { const o = {}; Object.entries(GEAR[id].stats).forEach(([k, v]) => o[k] = v * (star || 1)); return o; }
 function isGear(id) { return !!GEAR[id]; }
 function pieceDef(id) { return GEAR[id] || SKILLS[id]; }
@@ -2805,7 +2807,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
-  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearStats, isGear, pieceDef, baseId,
+  VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
