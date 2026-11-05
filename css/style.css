@@ -716,6 +716,7 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .tl-p { display: block; font-size: var(--fs-1); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ntc { font: inherit; padding: 0; color: var(--bad); text-decoration: underline dotted; text-underline-offset: 3px; }
 .strow.s4 .st-v small { display: block; white-space: nowrap; line-height: 1.1; }
+.strow.kit { grid-template-columns: 40px 1fr 40px minmax(32px, auto) 40px; } .strow.kit .st-v small { display: block; white-space: nowrap; line-height: 1.1; }
 /* A soft dark band behind the fight log, so the lines read cleanly over the skyline */
 .log-t { background: radial-gradient(120% 90% at 50% 70%, rgba(18,15,13,.78), rgba(18,15,13,.45) 70%, transparent); border-radius: var(--r-l); }
 .log-t p { text-shadow: 0 0 4px var(--bg), 0 0 1px var(--bg); }

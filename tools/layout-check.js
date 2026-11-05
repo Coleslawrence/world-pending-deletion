@@ -60,11 +60,16 @@ function states() {
     // Choose screen with the longest traits on every opponent, glitch ones included (Corrupted widened a card at 320)
     const ch = out.find(s => s.label === 'r5-choose');
     if (ch) { const t = JSON.parse(JSON.stringify(ch.run)); t.choices.forEach(c => c.traits = ['corrupted', 'desynced']); out.push({ label: 'r5-choose-traits', stage: 'choose', run: t }); }
-    // Opening draft: 6 skills and the 2-gear Standard issue row, longest names
+    // Opening draft: 6 skills, then the 2-gear Standard issue pick, longest names
     const dr = JSON.parse(JSON.stringify(mid.run)); dr.stage = 'draft';
     dr.draft = ['snake_eyes', 'double_down', 'thirteenth', 'pass_curse', 'evil_eye', 'loaded_die'];
     dr.gearDraft = G.rollGearDraft(dr, Math.random); if (dr.gearDraft.length < 2) dr.gearDraft = Object.keys(G.GEAR).slice(0, 2);
     out.push({ label: 'draft', stage: 'draft', run: dr });
+    const dg = JSON.parse(JSON.stringify(dr)); dg.draftPicked = dr.draft.slice(0, 3);
+    out.push({ label: 'draft-gear', stage: 'draft', run: dg });
+    // Opening stats after the draft, with a Gift note and points left to place
+    const ks = JSON.parse(JSON.stringify(mid.run)); Object.assign(ks, { stage: 'choose', startPts: 2, statFloor: Object.assign({}, ks.stats), rollSeed: 'x', rolled: false, rollUsed: false }); ks.gifts = ks.gifts.concat('bornlucky');
+    out.push({ label: 'kit-stats', stage: 'kitstats', run: ks });
     // Path evolution card: the two advanced classes for an archetype at 6 pieces
     out.push({ label: 'path-evolution', stage: 'shop', run: mid.run, pending: [{ type: 'adv', arch: 'reaper' }] });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
