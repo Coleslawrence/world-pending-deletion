@@ -1173,6 +1173,10 @@ function pendingSheet() {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'rune') return enchantSheet(p.mods, 'rune');
+  if (p.type === 'adv') {
+    const A = ARCH[p.arch];
+    return sheetWrap(`[Path evolution · ${A.path}]`, `<p class="sh-p">[${esc(A.name)}: 6 pieces. ${esc(A.path)} can evolve. Choose what it becomes. The choice holds for this run.]</p>` + ADVANCE[p.arch].map((o, i) => { const v = i ? o : advOf({}, p.arch); return `<button class="choice a-${p.arch}" data-act="advance" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(o.name)}</span></div><div class="sr-desc">${esc(v.b)}</div></button>`; }).join(''), false);
+  }
   if (p.type === 'evo') {
     const f = findPiece(run, p.u); if (!f) { run.pending.shift(); return ''; }
     const d = SKILLS[f.p.id];
@@ -1281,7 +1285,7 @@ function questList() {
 }
 function archetypesSheet() {
   const c = runCounts(run);
-  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> ${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${esc(b)}</div>`).join('')}</div>`; }).join('');
+  const body = run.arch.map(k => { const A = ARCH[k], n = c[k] || 0, t = archTier(n); return `<div class="archrow a-${k}"><div class="ar-h"><b><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> ${A.name}</b><span class="fine">${esc(A.theme)} · ${A.stat}</span><span class="ar-n">${n}</span></div>${A.b.map((b, i) => `<div class="ar-b ${t > i ? 'on' : ''}"><span>${[2, 4, 6][i]}</span>${i === 2 && run.adv && run.adv[k] != null ? `<b>${esc(advOf(run.adv, k).name)}:</b> ${esc(advOf(run.adv, k).b)}` : i === 2 && ADVANCE[k] ? `${esc(b)} Or, as ${esc(ADVANCE[k][1].name)}: ${esc(ADVANCE[k][1].b)}` : esc(b)}</div>`).join('')}</div>`; }).join('');
   const hp = run.hiddenPath ? `<div class="archrow hidden"><div class="ar-h"><b>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</b></div><div class="ar-b on">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</div></div>` : '<p class="sh-p fine">Reach 4 pieces in two archetypes at once to unlock a Hidden Path.</p>';
   return sheetWrap('Archetypes this run', `<p class="sh-p fine">Equipped pieces (skill bar and gear) count. Each different piece counts once; pieces with two tags count for both. At 4, the System names your path.</p>${body}${hp}<h4>Reactions</h4><ul class="msgs">${Object.values(REACTIONS).map(R => `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>`).join('')}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
@@ -1611,6 +1615,7 @@ function onAct(el) {
       if (f && applyPrefix(run, +d.u, m, msgs, null, fromRune ? run.pending[0].got : '[Carved by the Enchanter, for a price.]')) { toast(`[${PREFIXES[m].name} carved into ${SKILLS[f.p.id].name}]`, 'skill', null, fromRune ? 'Rune' : 'Enchanter'); pushMsgs(msgs, false, `Carved ${PREFIXES[m].name}`); }
       ui.enchantSel = null; if (fromRune) run.pending.shift(); else ui.sheet = null; saveRun(); return render();
     }
+    case 'advance': { const p = run.pending[0], o = ADVANCE[p.arch][+d.i]; advance(run, p.arch, +d.i); toast(`[Path evolved: ${ARCH[p.arch].path} → ${o.name}]`, 'class'); logRun(`[Path evolved: ${ARCH[p.arch].path} → ${o.name}]`, 'class'); saveRun(); return render(); }
     case 'evolve': { const p = run.pending[0]; const f = findPiece(run, p.u); const from = SKILLS[f.p.id].name; evolve(run, p.u, d.id, meta); toast(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); logRun(`[Skill evolved: ${from} → ${SKILLS[d.id].name}]`, 'skill'); saveRun(); saveMeta(); return render(); }
     case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs, false, `+1 ${d.k}`); saveRun(); } return render();
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
