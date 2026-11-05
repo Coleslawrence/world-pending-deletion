@@ -1,14 +1,14 @@
 // ===== [World Pending Deletion] — content: skills: Bladedancer =====
 'use strict';
-sk('quick_slash', 'Quick Slash', ['blade'], 'E', 1, { dmg: 5, hits: 2 }, [['flurry', 'Flurry of Blades', { dmg: 5, hits: 3 }], ['bleeding_edge', 'Bleeding Edge', { dmg: 4, hits: 2, bleed: 2, perHit: 1 }]]);
-sk('lacerate', 'Lacerate', ['blade'], 'E', 2, { dmg: 4, bleed: 5 }, [['gash', 'Gash', { dmg: 4, bleed: 9 }], ['serrated_strike', 'Serrated Strike', { dmg: 9, bleed: 5 }]]);
-sk('smoke_bomb', 'Smoke Bomb', ['blade', 'arcanist'], 'E', 4, { evade: 1 }, [['vanish', 'Vanish', { evade: 2 }], ['caltrops', 'Caltrops', { evade: 1, bleed: 4 }]], { quick: true });
-sk('fan_of_knives', 'Fan of Knives', ['blade'], 'D', 3, { dmg: 4, hits: 4 }, [['blade_storm', 'Blade Storm', { dmg: 4, hits: 6 }], ['poisoned_knives', 'Poisoned Knives', { dmg: 3, hits: 4, poison: 1, perHit: 1 }]]);
-sk('precise_strike', 'Precise Strike', ['blade'], 'D', 2, { dmg: 11, critBonus: 0.5 }, [['vital_strike', 'Vital Strike', { dmg: 12, alwaysCrit: 1 }], ['heartseeker', 'Heartseeker', { dmg: 15, pierce: 1 }]]);
-sk('mark_prey', 'Mark Prey', ['blade'], 'C', 3, { mark: 2 }, [['hunters_mark', "Hunter's Mark", { mark: 3 }], ['deadly_mark', 'Deadly Mark', { mark: 2, nextCrit: 1 }]], { quick: true });
-sk('assassinate', 'Assassinate', ['blade', 'reaper'], 'B', 3, { dmg: 12, cruel: 2 }, [['death_blossom', 'Death Blossom', { dmg: 8, hits: 2, cruel: 2 }], ['coup_de_grace', 'Coup de Grace', { dmg: 16, cruel: 2.5 }]]);
-sk('thousand_cuts', 'Thousand Cuts', ['blade'], 'A', 4, { dmg: 3, hits: 6, bleed: 1, perHit: 1 }, [['dance_of_death', 'Dance of Death', { dmg: 4, hits: 7, bleed: 1, perHit: 1 }], ['crimson_tempest', 'Crimson Tempest', { dmg: 3, hits: 6, bleed: 2, perHit: 1 }]]);
-sk('sidestep', 'Sidestep', ['blade'], 'D', 2, { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 2 } }, [['shadowstep', 'Shadowstep', { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, nextCrit: 1 } }], ['dancing_feint', 'Dancing Feint', { dmg: 4, mark: 1, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 3 } }]], { quick: true });
+sk('quick_slash', 'Quick Slash', ['blade'], 'E', 1, { dmg: 5, hits: 2 }, [['flurry', 'Flurry of Blades', { dmg: 5, hits: 3 }], ['bleeding_edge', 'Bleeding Edge', { dmg: 4, hits: 2, bleed: 2, perHit: 1 }], ['feint_slash', 'Feint Slash', { dmg: 5, hits: 2, mark: 1 }]]);
+sk('lacerate', 'Lacerate', ['blade'], 'E', 2, { dmg: 4, bleed: 5 }, [['gash', 'Gash', { dmg: 4, bleed: 9 }], ['serrated_strike', 'Serrated Strike', { dmg: 9, bleed: 5 }], ['bloodletting', 'Bloodletting', { dmg: 4, bleed: 5, lifesteal: 0.5 }]]);
+sk('smoke_bomb', 'Smoke Bomb', ['blade', 'arcanist'], 'E', 4, { evade: 1 }, [['vanish', 'Vanish', { evade: 2 }], ['caltrops', 'Caltrops', { evade: 1, bleed: 4 }], ['smoke_and_mirrors', 'Smoke and Mirrors', { evade: 1, nextCrit: 1 }]], { quick: true });
+sk('fan_of_knives', 'Fan of Knives', ['blade'], 'D', 3, { dmg: 4, hits: 4 }, [['blade_storm', 'Blade Storm', { dmg: 4, hits: 6 }], ['poisoned_knives', 'Poisoned Knives', { dmg: 3, hits: 4, poison: 1, perHit: 1 }], ['hamstring_knives', 'Hamstring Knives', { dmg: 4, hits: 4, weaken: 1 }]]);
+sk('precise_strike', 'Precise Strike', ['blade'], 'D', 2, { dmg: 11, critBonus: 0.5 }, [['vital_strike', 'Vital Strike', { dmg: 12, alwaysCrit: 1 }], ['heartseeker', 'Heartseeker', { dmg: 15, pierce: 1 }], ['exposing_strike', 'Exposing Strike', { dmg: 11, critBonus: 0.5, mark: 2 }]]);
+sk('mark_prey', 'Mark Prey', ['blade'], 'C', 3, { mark: 2 }, [['hunters_mark', "Hunter's Mark", { mark: 3 }], ['deadly_mark', 'Deadly Mark', { mark: 2, nextCrit: 1 }], ['bleeding_mark', 'Bleeding Mark', { mark: 2, bleed: 4 }]], { quick: true });
+sk('assassinate', 'Assassinate', ['blade', 'reaper'], 'B', 3, { dmg: 12, cruel: 2 }, [['death_blossom', 'Death Blossom', { dmg: 8, hits: 2, cruel: 2 }], ['coup_de_grace', 'Coup de Grace', { dmg: 16, cruel: 2.5 }], ['silent_kill', 'Silent Kill', { dmg: 12, cruel: 2, killReset: 1 }]]);
+sk('thousand_cuts', 'Thousand Cuts', ['blade'], 'A', 4, { dmg: 3, hits: 6, bleed: 1, perHit: 1 }, [['dance_of_death', 'Dance of Death', { dmg: 4, hits: 7, bleed: 1, perHit: 1 }], ['crimson_tempest', 'Crimson Tempest', { dmg: 3, hits: 6, bleed: 2, perHit: 1 }], ['cutting_wind', 'Cutting Wind', { dmg: 3, hits: 6, bleed: 1, perHit: 1, evade: 1 }]]);
+sk('sidestep', 'Sidestep', ['blade'], 'D', 2, { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 2 } }, [['shadowstep', 'Shadowstep', { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, nextCrit: 1 } }], ['dancing_feint', 'Dancing Feint', { dmg: 4, mark: 1, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 3 } }], ['slipstream', 'Slipstream', { dmg: 4, read: 'attack', readFx: { dmg: 8, evade: 1, haste: 1 } }]], { quick: true });
 flav({
   quick_slash: "Two cuts before the first one starts to sting.",
   flurry: "Steel everywhere at once. The crowd can only count the sparks.",
@@ -37,4 +37,13 @@ flav({
   sidestep: "Half a step to the left. The rest is footwork.",
   shadowstep: "Gone before the blade arrives, back before they notice.",
   dancing_feint: "You lead, they follow, and they never get the steps right.",
+  feint_slash: "The first cut is a lie. The second is not.",
+  bloodletting: "An old cure. It works better on the one holding the knife.",
+  smoke_and_mirrors: "When the smoke clears, you are already behind them.",
+  hamstring_knives: "Aimed low. They will not be lunging for a while.",
+  exposing_strike: "You show everyone exactly where it hurts.",
+  bleeding_mark: "The mark is cut, not painted.",
+  silent_kill: "Nobody heard it. Nobody will hear the next one either.",
+  cutting_wind: "You pass through them like weather.",
+  slipstream: "You ride the wind of their swing straight into your next move.",
 });
