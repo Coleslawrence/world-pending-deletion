@@ -39,6 +39,8 @@ jobs:
         run: node tools/jinx-test.js
       - name: Ally pieces test
         run: node tools/ally-pieces-test.js
+      - name: Opening draft test
+        run: node tools/draft-test.js
 
   balance:
     name: Balance gate

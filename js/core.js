@@ -445,6 +445,7 @@ function newRun(world, setup, meta, rng) {
     if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
   }
   run.draft = rollDraft(run, stream(run, 'draft', rng));
+  run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
   run.chosenNow = true;
   Object.keys(GODS).forEach(g => { if (G.includes('chosen_' + g)) addFavour(run, g, Math.max(0, 4 - run.favour[g]), meta, run.log, stream(run, 'loot', rng)); });
@@ -1335,9 +1336,27 @@ function rollDraft(run, rng) {
   while (out.length < 6 && g++ < 200) { const id = pick(pool, rng); if (!out.includes(id)) out.push(id); }
   return shuffle(out, rng);
 }
-function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); return true; }
-function confirmDraft(run, ids, meta, rng) {
+// The opening gear pick (Pick Your Kit): after the 3 skills, 1 of 2 E-rank gear pieces from the run's archetypes, one of
+// them the home archetype's when it has any. Its own stream, so the skill draft, shops and opponents never shift.
+function rollGearDraft(run, rng) {
+  if (run.script && !run.script.gearDraft) return [];
+  if (run.script) return run.script.gearDraft.slice();
+  const ok = id => { const g = GEAR[id]; return g.rank === 'E' && !g.glitch && !g.experimental && !g.consumable && g.tags.some(t => run.arch.includes(t)); };
+  const pool = Object.keys(GEAR).filter(ok), home = pool.filter(id => GEAR[id].tags.includes(run.arch[0]));
+  const out = []; if (home.length) out.push(pick(home, rng));
+  const rest = shuffle(pool.filter(id => !out.includes(id)), rng);
+  // a different slot from the first when one is on offer, so the pick is weapon or armour, not two weapons
+  const other = rest.find(id => !out.length || GEAR[id].slot !== GEAR[out[0]].slot) || rest[0];
+  if (other) out.push(other);
+  return out.slice(0, 2);
+}
+function rerollDraft(run, rng) { if (run.rerolls <= 0) return false; run.rerolls--; run.draft = rollDraft(run, stream(run, 'draft', rng)); run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng)); return true; }
+// gear: the gear piece picked (one of run.gearDraft). Left out (the bot, sims), the first offer is taken.
+function confirmDraft(run, ids, meta, rng, gear) {
   ids.forEach(id => addPiece(run, id, []));
+  const g = (run.gearDraft || []).includes(gear) ? gear : (run.gearDraft || [])[0];
+  if (g) addPiece(run, g, []);
+  run.gearDraft = [];
   run.draft = [];
   run.shop = null; run.locks = null; refreshShop(run, stream(run, 'shop', rng));
   enterChoose(run, meta, rng);
@@ -2795,7 +2814,7 @@ if (typeof module !== 'undefined') module.exports = {
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
-  rollDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
+  rollDraft, rollGearDraft, rerollDraft, confirmDraft, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

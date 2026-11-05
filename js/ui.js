@@ -624,10 +624,18 @@ function draftHTML() {
       <div class="sc-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}</div>
       <div class="sc-desc">${esc(describe(d))}</div></button>`;
   }).join('');
+  // Pick Your Kit: 1 of 2 gear pieces, under the skills
+  const gd = run.gearDraft || [], gearOn = gd.includes(ui.draftGear) ? ui.draftGear : null;
+  const kit = gd.length ? `<h3 class="kit-h">[Standard issue: choose 1 piece of gear]</h3>${gd.map(id => { const g = GEAR[id];
+    return `<button class="scard ${gearOn === id ? 'on' : ''} ${mainTag(id)}" data-act="draft-gear" data-id="${id}">
+      <div class="sc-h"><span class="sc-name">${esc(g.name)}</span>${rk(g.rank)}</div>
+      <div class="sc-meta">${tagNames(id)}<span class="tagn">${g.slot[0].toUpperCase() + g.slot.slice(1)}</span></div>
+      <div class="sc-desc">${Object.entries(gearStats(id, 1)).map(([k, v]) => `+${v} ${k}`).join(', ')}. ${esc(gearText(id, 1))}</div></button>`; }).join('')}` : '';
+  const ready = ui.draftSel.length === 3 && (!gd.length || gearOn);
   return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">Step 3 of 3 · Opening draft</div><h2>[Skill selection: choose 3]</h2></div></div>
     <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.</p>
-    <div class="sgrid">${cards}</div>
-    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-ok" ${ui.draftSel.length === 3 ? '' : 'disabled'}>Confirm ${ui.draftSel.length}/3</button></div></main>`;
+    <div class="sgrid">${cards}${kit}</div>
+    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-ok" ${ready ? '' : 'disabled'}>${ready ? 'Confirm' : ui.draftSel.length < 3 ? `Skills ${ui.draftSel.length}/3` : 'Pick 1 gear'}</button></div></main>`;
 }
 
 // ---------- Choose opponent ----------
@@ -1546,8 +1554,9 @@ function onAct(el) {
   const msgs = [];
   switch (a) {
     case 'draft-pick': { const i = ui.draftSel.indexOf(d.id); if (i >= 0) ui.draftSel.splice(i, 1); else if (ui.draftSel.length < 3) ui.draftSel.push(d.id); return render(); }
-    case 'draft-reroll': rerollDraft(run); ui.draftSel = []; saveRun(); return render();
-    case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta); ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
+    case 'draft-gear': ui.draftGear = ui.draftGear === d.id ? null : d.id; return render();
+    case 'draft-reroll': rerollDraft(run); ui.draftSel = []; ui.draftGear = null; saveRun(); return render();
+    case 'draft-ok': confirmDraft(run, ui.draftSel.slice(), run.practice ? META : meta, undefined, ui.draftGear); ui.draftGear = null; ui.pick = null; ui.wagerOn = false; saveRun(); return go('choose');
     case 'pick-opp': { chooseOpponent(run, +d.i, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; ui.distDone = null; saveRun(); return go('district'); }
     case 'wager': ui.wagerOn = !ui.wagerOn; return render();
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
