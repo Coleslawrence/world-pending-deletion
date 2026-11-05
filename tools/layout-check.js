@@ -60,6 +60,11 @@ function states() {
     // Choose screen with the longest traits on every opponent, glitch ones included (Corrupted widened a card at 320)
     const ch = out.find(s => s.label === 'r5-choose');
     if (ch) { const t = JSON.parse(JSON.stringify(ch.run)); t.choices.forEach(c => c.traits = ['corrupted', 'desynced']); out.push({ label: 'r5-choose-traits', stage: 'choose', run: t }); }
+    // Opening draft: 6 skills and the 2-gear Standard issue row, longest names
+    const dr = JSON.parse(JSON.stringify(mid.run)); dr.stage = 'draft';
+    dr.draft = ['snake_eyes', 'double_down', 'thirteenth', 'pass_curse', 'evil_eye', 'loaded_die'];
+    dr.gearDraft = G.rollGearDraft(dr, Math.random); if (dr.gearDraft.length < 2) dr.gearDraft = Object.keys(G.GEAR).slice(0, 2);
+    out.push({ label: 'draft', stage: 'draft', run: dr });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };
