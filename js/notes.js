@@ -5,6 +5,44 @@
 // The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
+    id: '2026-11-05', release: 'wpd-v14', title: "[System Notice: Luck Update]", pages: [
+      { h: "House Rules", sys: "[Two new classes have registered under Luck. The System disapproves of both.]", items: [
+        "[The Gambler rolls a die each turn. Skills scale with the pip. Rerolls are legal.]",
+        "[A six is a jackpot. The House pays it. The House is not pleased about it.]",
+        "[Beat Delphine, win three chances, or pay 20 Echoes to unlock the Gambler.]",
+        "[New: the Marches, the House, the Dealer. Gifts and Titles for the lucky.]"] },
+      { h: "Ill Omens", sys: "[A second Luck class arrived uninvited. It brought a cat.]", items: [
+        "[The Jinx spends Misfortune to jinx the move you see coming. Results vary. Badly.]",
+        "[Omens wait for a move to punish. Curse makes you hit harder. And them. Choose.]",
+        "[Beat Mott, win after three misses, or pay 20 Echoes to unlock the Jinx.]",
+        "[New: the Crooked Fens, the Crow, the Hanged Augur. Do not cross the cat.]"] },
+      { h: "Paths", sys: "[Commitment has been noticed. It will now be rewarded twice.]", items: [
+        "[At 6 pieces of one class, choose what its Path becomes. The choice holds.]",
+        "[Classes are now filed by stat and Discipline. Allies share one or the other.]",
+        "[Six new ally pieces have arrived for the Gambler and the Jinx.]"] },
+      { h: "Kit", sys: "[Your kit has been reviewed. Additions have been approved.]", items: [
+        "[After the skill draft, you now pick one piece of opening gear.]",
+        "[Gear grants stat points by rank and a new line at ★3. B and A pieces exist.]",
+        "[Read skills hit harder when they answer the move your opponent is showing.]",
+        "[Every skill now has a third evolution. Indecision has been made harder.]"] },
+      { h: "Procedure", sys: "[The Awakening has been reordered. Paperwork first.]", items: [
+        "[The Awakening asks for your Patron first. Your Gift Points depend on it.]",
+        "[Skills, then gear, then stats. You place points once you know what they power.]"] },
+      { h: "Receipts", sys: "[The System now keeps receipts. You are welcome.]", items: [
+        "[Every item an event gives now says how you got it. Tap it to inspect.]",
+        "[Notices now state their cause. Important ones wait until you dismiss them.]",
+        "[Every fight now ends in a summary. Each notification is then presented in turn.]",
+        "[Settings > Fast wins restores the old haste, for ordinary wins only.]"] },
+      { h: "Field Tests", sys: "[Experimental equipment is now in circulation. Liability is not.]", items: [
+        "[Field Test now issues prototypes. Their mechanics are not yet approved.]",
+        "[Delay Engine, Mirror Cuirass, Echo Chamber, Countdown Collar, Pain Link.]",
+        "[An Unsigned Patch removes one rule. Its publisher is unknown. Install anyway.]"] },
+      { h: "Corrections", sys: "[Minor faults have been corrected. The System admits nothing.]", items: [
+        "[Short screens no longer hide the Attack button. Long traits stay on their cards.]",
+        "[Crises now air with a clearer signal. Wire gold home, act yourself, or take.]"] },
+    ],
+  },
+  {
     id: '2026-11-04', release: 'wpd-v13', title: "[System Notice: Broadcast Update]", pages: [
       { h: "On Air", sys: "[The tournament is now broadcast in full. Every screen. All the time.]", items: [
         "[The interface has been redesigned for viewers. Entrants were not consulted.]",
