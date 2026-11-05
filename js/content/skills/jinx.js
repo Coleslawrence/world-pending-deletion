@@ -9,7 +9,11 @@ sk('pass_curse', 'Pass the Curse', ['jinx'], 'D', 3, { passCurse: 2 }, [['crosse
 sk('thirteenth', 'Thirteenth Hour', ['jinx'], 'C', 4, { perMisf: 3, perCurse: 3 }, [['witching_hour', 'Witching Hour', { perMisf: 4, perCurse: 4 }], ['last_hour', 'Last Hour', { perMisf: 3, perCurse: 3, killReset: 1 }]]);
 sk('cursed_coin', 'Cursed Coin', ['jinx', 'venom'], 'B', 4, { weaken: 2, misf: 5, coinStun: 1 }, [['bad_penny', 'Bad Penny', { weaken: 2, misf: 5, coinStun: 1, misfT: 2 }], ['heads_win', 'Heads I Win', { weaken: 3, misf: 5, coinStun: 1 }]]);
 sk('calamity', 'Calamity', ['jinx'], 'A', 5, { dmg: 10, calamity: 4 }, [['catastrophe', 'Catastrophe', { dmg: 10, calamity: 5 }], ['aftermath', 'Aftermath', { dmg: 10, calamity: 4, keepHalf: 1 }]]);
+sk('bad_wick', 'Bad Wick', ['jinx', 'pyre'], 'D', 2, { burn: 4, misfPerBurn: 3 }, [['wax_and_ash', 'Wax and Ash', { burn: 4, misfPerBurn: 2 }], ['ember_omen', 'Ember Omen', { burn: 4, misfPerBurn: 3, omenAtk: 8 }]]);
 flav({
+  bad_wick: "Lit at both ends, and pointed at someone else.",
+  wax_and_ash: "The longer it burns, the worse their week gets.",
+  ember_omen: "[Omen logged. Fire hazard noted.]",
   evil_eye: "One look, held a moment too long.",
   stare_down: "You do not blink. Neither does their luck.",
   glare: "The look hurts. The luck hurts later.",
