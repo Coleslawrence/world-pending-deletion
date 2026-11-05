@@ -1182,7 +1182,7 @@ function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
     const E = EVENTS[p.key]; if (!E) { run.pending.shift(); return ''; }
-    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}. Crisis: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. What you say on air happens to the Hearts you carry.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
+    const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. ${esc(run.world.name)} can hear you. Its Hearts are in your hands.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
     const lead = `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
     return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
