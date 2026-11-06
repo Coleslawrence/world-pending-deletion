@@ -8,6 +8,7 @@ sk('malice', 'Malice', ['venom'], 'D', 1, { dmg: 4, malice: 3 }, [['spite', 'Spi
 sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech', 'Blood Leech', { leech: 6 }], ['parasite', 'Parasite', { leech: 3, poison: 3 }], ['symbiote', 'Symbiote', { leech: 3, regen: 2 }]]);
 sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }], ['numbing_needles', 'Numbing Needles', { poison: 4, doublePoison: 1, stunIfWeak: 1 }]]);
 sk('seep', 'Seep', ['venom'], 'D', 2, { poison: 3, read: 'defend', readFx: { poison: 7 } }, [['stagnant_pool', 'Stagnant Pool', { poison: 3, read: 'defend', readFx: { poison: 6, weaken: 2 } }], ['rising_damp', 'Rising Damp', { poison: 4, read: 'defend', readFx: { poison: 6, doublePoison: 1 } }], ['soak', 'Soak', { poison: 3, read: 'defend', readFx: { poison: 5, siphon: 1 } }]]);
+sk('sour_luck', 'Sour Luck', ['venom', 'jinx'], 'C', 3, { dmg: 5, poison: 5, misf: 2 }, [['rotten_luck', 'Rotten Luck', { dmg: 5, poison: 5, misf: 2, misfT: 2 }], ['bitter_draught', 'Bitter Draught', { dmg: 5, poison: 5, misf: 2, lifesteal: 0.3 }], ['blighted_omen', 'Blighted Omen', { dmg: 5, poison: 5, misf: 2, omenAtk: 8 }]]);
 flav({
   venom_blade: "A thin coat of green on a thin blade.",
   viper_fang: "Bitten, not cut. The difference shows later.",
@@ -41,4 +42,8 @@ flav({
   symbiote: "It feeds on them, and it shares.",
   numbing_needles: "A weakened body gives up on standing altogether.",
   soak: "It soaks through the shield and takes it with it.",
+  sour_luck: "Their drink turns. So does their day.",
+  rotten_luck: "Spoiled from the inside, and getting worse.",
+  bitter_draught: "You take a sip of what you gave them. It suits you better.",
+  blighted_omen: "The crows saw this coming. So did you.",
 });
