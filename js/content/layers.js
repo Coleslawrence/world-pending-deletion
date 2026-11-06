@@ -107,7 +107,7 @@ function fateLine(F, type) { return (F.lineBy && F.lineBy[type]) || F.line; }
 const PEOPLES = {
   // roles follow "You were a ...", so each starts with a consonant sound; epithets follow a champion's name
   temple: { name: 'Temple State', line: 'Ruled by priests, who rule by omens.',
-    custom: { name: 'Omens', text: 'Every Favour you gain is 1 more, and gods speak up at 3 Favour.' },
+    custom: { name: 'Omens', text: 'Every Favour you gain is 1 more, and gods speak up at 3 Favour.' }, visit: { at: 2, event: 'temple_omens' },
     roles: ['temple novice', 'candle bearer'], epithets: ['the Devout', 'the Anointed'],
     entries: [
       { k: 'place', tier: 'city', name: 'The High Altar', text: 'Every law is read aloud here first, then argued about forever.' },
@@ -115,7 +115,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Hierarch', text: 'Has ruled for forty years. Claims the omens agree.' },
     ] },
   league: { name: 'Merchant League', line: 'The guilds own everything, including the weather reports.',
-    custom: { name: 'Guild rates', text: 'Shop rerolls cost 1 less gold, and selling pays 1 more.' },
+    custom: { name: 'Guild rates', text: 'Shop rerolls cost 1 less gold, and selling pays 1 more.' }, visit: { at: 4, event: 'league_audit' },
     roles: ['ledger clerk', 'caravan guard'], epithets: ['the Bargainer', 'the Tallied'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Counting House', text: 'Where the guilds meet. Every chair has a price on it.' },
@@ -123,7 +123,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Guildmaster', text: 'Owns a share of everything, including you.' },
     ] },
   clans: { name: 'The Clans', clash: ['steppes'], line: 'Twelve clans, one old feud, and a council that never ends.',
-    custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' },
+    custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' }, visit: { at: 6, event: 'clan_tally' },
     roles: ['clan runner', 'feud keeper'], epithets: ['of the Twelve', 'the Feud-Born'],
     entries: [
       { k: 'place', tier: 'far', name: 'The Moot Stone', text: 'Where the clans swear peace. It has been re-carved many times.' },
@@ -131,7 +131,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Eldest of the Clans', text: 'Remembers why the feud started. Refuses to say.' },
     ] },
   archive: { name: 'The Archive', line: 'Scholars run everything, slowly, with footnotes.',
-    custom: { name: 'Footnotes', text: 'The Enchanter and rune picks show one more prefix.' },
+    custom: { name: 'Footnotes', text: 'The Enchanter and rune picks show one more prefix.' }, visit: { at: 2, event: 'archive_account' },
     roles: ['junior scribe', 'copyist'], epithets: ['the Lettered', 'the Annotated'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Great Index', text: 'Lists every book in the world. Six volumes of it are missing.' },
@@ -148,7 +148,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Speaker', text: 'Chosen by lot. Still trying to give the job back.' },
     ] },
   crown: { name: 'The Old Crown', clash: ['burning', 'iron'], line: 'A dynasty older than the maps, and still in charge.',
-    custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' },
+    custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' }, visit: { at: 6, event: 'crown_summons' },
     roles: ['palace page', 'royal taster'], epithets: ['the Loyal', 'the Crown-Sworn'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Throne Room', text: 'The throne is older than the palace built around it.' },
@@ -156,7 +156,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Old Monarch', text: 'Has reigned so long the coins show them at three ages.' },
     ] },
   exiles: { name: 'Exiles', line: 'Descended from refugees of a world already erased.',
-    custom: { name: 'Salvage Rights', text: 'Beat an Erased champion or a filed record and get a Heart back.' },
+    custom: { name: 'Salvage Rights', text: 'Beat an Erased champion or a filed record and get a Heart back.' }, visit: { at: 4, event: 'exiles_words' },
     roles: ['refugee scout', 'name keeper'], epithets: ['the Displaced', 'of No Shore'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Landing', text: 'Where the first refugees arrived. Their boats are kept as a monument.' },
@@ -164,7 +164,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Last Witness', text: 'Was born in the old world. Never describes it the same way twice.' },
     ] },
   pilgrims: { name: 'Pilgrims', line: 'A people who never stay anywhere longer than a season.',
-    custom: { name: 'The road', text: 'Four districts to pick from each round instead of three.' },
+    custom: { name: 'The road', text: 'Four districts to pick from each round instead of three.' }, visit: { at: 6, event: 'pilgrims_road' },
     roles: ['road cook', 'pathfinder'], epithets: ['the Wanderer', 'of the Road'],
     entries: [
       { k: 'place', tier: 'far', name: 'The Waystones', text: 'Mark the old pilgrim road. Nobody remembers where it ends.' },

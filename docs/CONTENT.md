@@ -414,27 +414,27 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 60 (quests, levels, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 18 (events) |
-| `heart` | 1 | +1 max Heart |  | 13 (quests, levels, events) |
-| `rune` | 1 | a rune |  | 17 (quests, levels, events) |
-| `piece` | "B" | a free B-rank piece |  | 43 (quests, levels, events) |
+| `gold` | 8 | 8 gold |  | 64 (quests, levels, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 22 (events) |
+| `heart` | 1 | +1 max Heart |  | 15 (quests, levels, events) |
+| `rune` | 1 | a rune |  | 19 (quests, levels, events) |
+| `piece` | "B" | a free B-rank piece |  | 46 (quests, levels, events) |
 | `experimental` | 1 | an Experimental item |  | 2 (levels, events) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 31 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 21 (levels, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 33 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 22 (levels, events) |
 | `heal` | 0.5 | 50% of max HP healed |  | 2 (levels) |
 | `max_hp` | -0.1 | −10% max HP |  | 9 (levels, events) |
-| `restore` | 1 | 1 Heart restored |  | 19 (quests, levels, events) |
+| `restore` | 1 | 1 Heart restored |  | 20 (quests, levels, events) |
 | `erase` | 1 | 1 Heart erased |  | 8 (events) |
-| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 10 (levels, events) |
+| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 12 (levels, events) |
 | `respec` | true | your stat points to place again |  | 2 (levels, events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 7 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
-| `ward` | 1 | a ward on your next loss |  | 16 (levels, events) |
+| `ward` | 1 | a ward on your next loss |  | 17 (levels, events) |
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 6 (levels, events) |
 | `fate` | 1 | your world's Fate eased | yes | 99 (quests, levels, events) |
-| `notice` | 1 | the System's notice | yes | 84 (levels, events) |
+| `notice` | 1 | the System's notice | yes | 87 (levels, events) |
 | `chain` | "done" | the story goes on | yes | 70 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 13 (quests, events) |
 

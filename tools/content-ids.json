@@ -787,7 +787,14 @@
   "crisis_sundering_2u",
   "crisis_goldenage_2u",
   "council_vote",
-  "power_struggle"
+  "power_struggle",
+  "temple_omens",
+  "league_audit",
+  "clan_tally",
+  "archive_account",
+  "crown_summons",
+  "exiles_words",
+  "pilgrims_road"
  ],
  "chains": [
   "official",
@@ -899,7 +906,14 @@
   "crisis_sundering_2u": 3,
   "crisis_goldenage_2u": 3,
   "council_vote": 3,
-  "power_struggle": 2
+  "power_struggle": 2,
+  "temple_omens": 3,
+  "league_audit": 3,
+  "clan_tally": 3,
+  "archive_account": 3,
+  "crown_summons": 3,
+  "exiles_words": 3,
+  "pilgrims_road": 3
  },
  "lore": {
   "drowned": {
