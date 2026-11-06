@@ -5,6 +5,26 @@
 // The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
+    id: '2026-11-07', release: 'wpd-v16', title: "[System Notice: Levels Update]", pages: [
+      { h: "Levels", sys: "[Levels are now issued after every battle. Win or lose. Attendance counts.]", items: [
+        "[Each level: +4 Max HP, better shop odds and 1 stat point. Or decline it for a perk.]",
+        "[25 perks: gold, healing, pieces, runes, Hearts. None is offered twice in one world.]",
+        "[Training still sells stat points for gold. It no longer raises your level.]"] },
+      { h: "Inventory", sys: "[The tournament's stock has been expanded. Please do not ask where it came from.]", items: [
+        "[9 new monsters. Each round now has its own.]",
+        "[9 new enemy traits, one per world type. Drowned worlds drown you, etc.]",
+        "[4 new rivals, and two rival duos who tag out mid-fight.]",
+        "[4 new skills and 9 new gear. Every class now has at least 11 skills and 7 gear.]"] },
+      { h: "Itinerary", sys: "[Worlds have been given more to say. Some of it is about you.]", items: [
+        "[16 new quests tied to your world's Fate or People.]",
+        "[5 new short event chains and 10 new world events.]",
+        "[Fate Crises now remember what you did the first time.]",
+        "[Every People now sends a visitor. Each god offers one wager.]"] },
+      { h: "Amendments", sys: "[Further amendments have been filed. Read them or don't.]", items: [
+        "[New world modifiers: Market Day, Long Siege, Strange Times.]",
+        "[26 new prefixes: 8 for effects that had none, one per class, 8 that cost you.]"] }
+    ] },
+  {
     id: '2026-11-06', release: 'wpd-v15', title: "[System Notice: Requests Update]", pages: [
       { h: "Requests", sys: "[Destinations may now be requested. The System will consider it, for a fee.]", items: [
         "[Pay 5 Echoes at the world choice to request a Fate or a People. It will be offered.]",
