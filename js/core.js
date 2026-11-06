@@ -455,8 +455,12 @@ function newRun(world, setup, meta, rng) {
   // Opening stat points: placed after the opening draft, once the skills and gear are known (placeStartStats).
   // floor: the stats before any are placed, Gifts included; rollSeed: where the once-only roll comes from.
   if (setup.startPts) Object.assign(run, { startPts: setup.startPts, statFloor: Object.assign({}, run.stats), rollSeed: setup.seed ? setup.seed + ':roll' : setup.rollSeed || 'roll:' + world.name, rolled: false, rollUsed: false });
-  // System quests: two visible, every hidden one quietly active
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
+  // System quests: two visible, every hidden one quietly active. In a world with a Fate or People that has a quest
+  // (quests.js, fate: / people:), those quests are shown too, on top of one general quest
+  const fair = k => [].concat(QUESTS[k].feat).every(f => featFair(run, f));
+  const local = Object.keys(QUESTS).filter(k => (QUESTS[k].fate && QUESTS[k].fate === world.fate) || (QUESTS[k].people && QUESTS[k].people === world.people)).filter(fair);
+  const taken = local.map(k => [].concat(QUESTS[k].feat).join('+'));
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && !QUESTS[k].fate && !QUESTS[k].people && fair(k) && !taken.includes([].concat(QUESTS[k].feat).join('+'))), rs).slice(0, local.length ? 1 : 2).concat(local);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
@@ -1607,6 +1611,8 @@ function checkPhase(f, B, playerTurn) {
   (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
   if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
   if (ph.script) { B.script = ph.script; B.scriptIdx = 0; }
+  // A duo's partner tags in: a new name, and (clear) none of the Burn, Poison or Bleed that was on the first
+  if (ph.swap) { B.name = ph.swap.name + (B.hard ? ', Veteran' : ''); if (ph.swap.clear) { B.burn = 0; B.poison = 0; B.bleed = 0; } }
   say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
   return true;
 }
