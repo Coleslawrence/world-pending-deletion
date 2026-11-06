@@ -973,13 +973,16 @@ function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; 
 // The feats a god will bet on. Trials never ask one that is unfair for any archetype; wagers and quests skip it for the run that leans on one.
 const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
 const WAGERS = {};
-WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
+const GOD_WAGERS = Object.values(GODS).map(g => g.wager).filter(Boolean);
+WAGER_FEATS.concat(GOD_WAGERS).forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 // The Silence (lore audit, 2 Nov): no Favour and no wagers in a Silence world until its Fate is lifted
 function silent(run) { return !!run && !run.practice && !run.chosenNow && run.world.fate === 'silence' && (run.fateTrack || 0) < FATE_TRACK.max; }
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
   const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
-  return { god, key: pick(keys, rng) };
+  // About half the time a god bets on its own favourite (GODS[x].wager)
+  const own = GODS[god].wager, mine = own && featPossible(run, own) && featFair(run, own) && rnd(rng) < 0.5;
+  return { god, key: mine ? own : pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
 function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); return o; }

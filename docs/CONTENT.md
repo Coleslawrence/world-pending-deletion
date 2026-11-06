@@ -446,6 +446,8 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | --- | --- | --- | --- | --- | --- | --- |
 | `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt, quest w_hunger |
 | `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner, quest w_exiles |
+| `blocked` | fight | Block 25 damage in a single fight | 25 |  |  | wager |
+| `breaker` | fight | Break the opponent's guard | 1 |  |  | wager |
 | `chances` | chance | Win 3 chance rolls in one run | 3 |  |  | Title Lucky Seven |
 | `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
 | `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector, quest w_league |
@@ -460,13 +462,14 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | `merge` | merge | Merge pieces |  |  |  | quest merge4, quest w_goldenage |
 | `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal, quest w_silence |
 | `outranked` | win | Beat an opponent 2 rank letters above your Entrant Rank | 2 |  |  | Title Rank Is Just a Letter, quest w_crown |
-| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | quest h_overkill, quest w_temple |
+| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | wager, quest h_overkill, quest w_temple |
 | `path` | path | Have the System recognise your path by round 5 | 5 |  |  | quest path5, quest w_archive |
 | `quick` | fight | Use 3 Quick skills in a single turn | 3 |  |  | Title Spellweaver |
 | `react` | fight | Trigger 2 reactions | 2 | yes |  | wager, Title Alchemist, quest react6, quest w_pilgrims |
 | `rival` | win | Defeat a rival |  |  |  | quest rival_noheal, quest w_civilwar |
 | `stop` | win | Stun or Interrupt the opponent's big move |  |  |  | wager |
 | `stuns` | fight | Stun or Interrupt one opponent 3 times | 3 |  |  | quest h_stun3 |
-| `untouched` | win | Win without losing any HP |  |  |  | Title Untouched, quest w_plague |
+| `untouched` | win | Win without losing any HP |  |  |  | wager, Title Untouched, quest w_plague |
 | `wagers` | wager | Win 3 wagers in one run | 3 |  |  | Title High Roller |
+| `wounded` | win | Win with half your HP or less |  |  |  | wager |
 <!-- effects:end -->
