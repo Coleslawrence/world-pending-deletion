@@ -5,6 +5,15 @@
 // The newest entry's release must match VERSION in sw.js; the title screen shows it.
 const PATCH_NOTES = [
   {
+    id: '2026-11-06', release: 'wpd-v15', title: "[System Notice: Requests Update]", pages: [
+      { h: "Requests", sys: "[Destinations may now be requested. The System will consider it, for a fee.]", items: [
+        "[Pay 5 Echoes at the world choice to request a Fate or a People. It will be offered.]",
+        "[Requested worlds are tagged as such. You may ask again. The fee does not change.]",
+        "[Pending World does not take requests.]"] },
+      { h: "Corrections", sys: "[A filing error has been corrected. The System regrets nothing.]", items: [
+        "[An empty new device can no longer overwrite your cloud save. Progress stays put.]"] }
+    ] },
+  {
     id: '2026-11-05', release: 'wpd-v14', title: "[System Notice: Luck Update]", pages: [
       { h: "House Rules", sys: "[Two new classes have registered under Luck. The System disapproves of both.]", items: [
         "[The Gambler rolls a die each turn. Skills scale with the pip. Rerolls are legal.]",
