@@ -1178,6 +1178,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
     if (run.rolls) delete run.rolls[key];
   }
   const before = msgs.length, T = B.then || {};
+  if (EVENTS[key].crisis && FATES[run.world.fate] && FATES[run.world.fate].crises[0] === key) run.crisisUsed = (T.fate || 0) < 0;
   const ctx = { run, h, msgs, chain: EVENTS[key].chain, from: EVENTS[key].title };
   applyOutcomes(T, ctx, false);
   if (B.go) B.go(run, h);
@@ -1275,7 +1276,8 @@ function fateEnd(run) {
 function crisisDue(run) {
   const F = FATES[run.world.fate], at = PULSE.stageAt.indexOf(run.round);
   if (!F || !F.crises || at < 0 || run.practice || run.elite) return null;
-  const k = F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
+  // Round 5 branches on round 3: a crisis that was used brings crisisIfUsed instead (run.crisisUsed, set in resolveEvent)
+  const k = at > 0 && F.crisisIfUsed && run.crisisUsed ? F.crisisIfUsed : F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
 }
 // The run is decided: say how the Fate ended. A lifted Fate in a spared world gives a Heart back, and its entry comes back partial
 function closeFate(run, msgs, spared) {

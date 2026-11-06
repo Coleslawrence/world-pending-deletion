@@ -77,7 +77,7 @@ const SCHEMA = {
   archetypes: [C.ARCH, ['name', 'stat', 'disc', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
   gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'guest2', 'mids', 'setting', 'ruler']],
-  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy']],
+  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy', 'crisisIfUsed']],
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit', 'clash']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], ['glitch']],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
@@ -234,11 +234,12 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
 Object.entries(C.FATES).forEach(([k, F]) => {
   const w = 'fates ' + k;
   if (F.crises) { ref(w, Array.isArray(F.crises) && F.crises.length <= C.PULSE.stageAt.length, `crises is a list of up to ${C.PULSE.stageAt.length} event ids, one per stage round`); (F.crises || []).forEach(e => ref(w, C.EVENTS[e] && C.EVENTS[e].crisis && C.EVENTS[e].fate === k, `crisis ${e} must be an event with crisis: true and fate: '${k}'`)); }
+  if (F.crisisIfUsed != null) ref(w, C.EVENTS[F.crisisIfUsed] && C.EVENTS[F.crisisIfUsed].crisis && C.EVENTS[F.crisisIfUsed].fate === k && (F.crises || []).length >= 2, `crisisIfUsed ${F.crisisIfUsed} is not a crisis event of this Fate (and needs two crises)`);
   if (F.ends) ref(w, Object.keys(F.ends).every(e => ['lifted', 'sealed'].includes(e) && typeof F.ends[e] === 'string'), 'ends is { lifted, sealed }: one line each');
 });
 Object.entries(C.EVENTS).forEach(([k, E]) => {
   [['fate', C.FATES], ['people', C.PEOPLES]].forEach(([f, L]) => { if (E[f] != null) ref('event ' + k, [].concat(E[f]).every(x => L[x]), `${f} ${E[f]} is not in ${f === 'fate' ? 'FATES' : 'PEOPLES'} (layers.js)`); });
-  if (E.crisis) ref('event ' + k, !E.chain && E.fate && !Array.isArray(E.fate) && C.FATES[E.fate] && (C.FATES[E.fate].crises || []).includes(k), 'a crisis event names its one fate, which lists it in crises');
+  if (E.crisis) ref('event ' + k, !E.chain && E.fate && !Array.isArray(E.fate) && C.FATES[E.fate] && ((C.FATES[E.fate].crises || []).includes(k) || C.FATES[E.fate].crisisIfUsed === k), 'a crisis event names its one fate, which lists it in crises or crisisIfUsed');
 });
 Object.entries(C.PEOPLES).forEach(([k, P]) => {
   ref('peoples ' + k, P.custom && P.custom.name && P.custom.text, 'needs a custom: { name, text }, the loop rule it changes');
