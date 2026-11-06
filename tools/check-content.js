@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope).
-const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT })');
+const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT, LEVEL_PERKS })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -75,9 +75,9 @@ const SCHEMA = {
   skills: [C.SKILLS, ['id', 'name', 'tags', 'rank', 'cd', 'fx', 'kind', 'flavour'], ['evo', 'base', 'noShop', 'quick', 'basic', 'breaks', 'glitch', 'unstable']],
   gear: [C.GEAR, ['name', 'slot', 'tags', 'rank', 'stats', 'pas', 'text', 'flavour'], ['fix', 'top', 'glitch', 'rolling', 'splice', 'experimental', 'consumable']],
   archetypes: [C.ARCH, ['name', 'stat', 'disc', 'theme', 'path', 'b', 'p', 'line', 'owns', 'words'], []],
-  gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat']],
+  gods: [C.GODS, ['name', 'short', 'arch', 'blessing', 'bless', 'reply'], ['chat', 'wager']],
   worlds: [C.WORLD_TYPES, ['name', 'flavour', 'home', 'gift', 'final', 'names', 'champs'], ['guest', 'guest2', 'mids', 'setting', 'ruler']],
-  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy']],
+  fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy', 'crisisIfUsed']],
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit', 'clash']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], ['glitch']],
   enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
@@ -85,12 +85,12 @@ const SCHEMA = {
   titles: [C.TITLES, ['name', 'cond', 'desc', 'flavour'], ['first', 'p', 'feat', 'n', 'theme']],
   effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
   feats: [C.FEATS, ['at', 'say', 'hit'], ['n', 'measure', 'must', 'unfairFor', 'needs', 'theme']],
-  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme']],
+  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme', 'fate', 'people']],
   outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit', 'glitch']],
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
-  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits', 'glitch']],
+  traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits', 'glitch', 'world']],
 };
 const OPTION = [['label', 'desc'], ['check', 'roll', 'fail', 'pay', 'payHeart', 'can', 'then', 'go', 'reveal', 'glitch']], THEN = Object.keys(C.OUTCOMES);
 Object.entries(SCHEMA).forEach(([kind, [o, need, may]]) => Object.entries(o).forEach(([k, d]) => {
@@ -158,6 +158,7 @@ const outcomeOk = (where, T, what) => {
     if (k === 'favour') Object.keys(v).forEach(g => ref(where, C.GODS[g], `${g} is not a god`));
     if (k === 'next') Object.keys(v).forEach(f => ref(where, nextRead.has(f), `core.js never reads nextFlags.${f}, so it does nothing`));
     if (k === 'foe') Object.entries(v).forEach(([f, n]) => ref(where, ['weaken', 'poison', 'burn', 'hp', 'trait'].includes(f) && typeof n === 'number' && n !== 0, `foe takes weaken, poison, burn, hp (a share) or trait (a count), as numbers; ${f} is not one`));
+    if (k === 'heal') ref(where, typeof v === 'number' && v > 0 && v <= 1, 'heal is a share of max HP, like 0.85');
     if (k === 'max_hp') ref(where, typeof v === 'number' && v !== 0 && Math.abs(v) <= 0.5, 'max_hp is a share of max HP, like -0.1');
     if (k === 'amend') ref(where, C.AMENDMENTS && C.AMENDMENTS[v], `amend ${v} is not in AMENDMENTS (events.js)`);
     if (k === 'respec') ref(where, v === true, 'respec is true');
@@ -173,6 +174,18 @@ const outcomeOk = (where, T, what) => {
 // h.piece(tries, got) in an event's go: the got line says how you got the piece, as an outcome's got does
 fs.readdirSync(path.join(ROOT, 'js/content/events')).filter(f => f.endsWith('.js')).forEach(f => [...read('js/content/events/' + f).matchAll(/h\.piece\(([^)]*)\)/g)].forEach(m => { if (!/^\s*\d+\s*,\s*'\[.*\{item\}.*\]'\s*$/.test(m[1])) err('events/' + f, `h.piece(${m[1]}) needs a got line: h.piece(tries, '[... {item} ...]')`); }));
 Object.entries(C.QUESTS).forEach(([k, q]) => { outcomeOk('quests ' + k, q.reward, 'quest ' + k); if (q.reward && q.reward.chain != null) err('quests ' + k, 'chain is an event outcome'); });
+// Level perks (levels.js): offered in place of a level, so each must give something
+Object.entries(C.LEVEL_PERKS).forEach(([k, L]) => {
+  const w = 'level perk ' + k;
+  ref(w, typeof L.name === 'string' && L.name.length > 0, 'needs a name');
+  ref(w, typeof L.flavour === 'string' && /^\[.*\]$/.test(L.flavour), 'flavour is a System line in [brackets]');
+  ref(w, L.then || L.main || L.patron, 'gives nothing: needs then, main or patron');
+  if (L.then) outcomeOk(w, L.then, w);
+  if (L.main != null) ref(w, Number.isInteger(L.main) && L.main > 0, 'main is a whole number of stat points above 0');
+  if (L.patron != null) ref(w, Number.isInteger(L.patron) && L.patron > 0, 'patron is a whole number of Favour above 0');
+  if (L.say != null) ref(w, typeof L.say === 'string' && /\.$/.test(L.say), 'say is a sentence');
+  if (L.when != null) ref(w, typeof L.when === 'function', 'when is a function of the run');
+});
 Object.keys(C.OUTCOMES).forEach(k => { if (typeof C.OUTCOMES[k].say !== 'function') err('outcomes ' + k, 'say(v) gives the words players read for it'); });
 const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.fate ? !!C.FATES[c.fate] : c.people ? !!C.PEOPLES[c.people] : c.luck === true);
 Object.entries(C.CHAINS).forEach(([c, ch]) => ref('chains ' + c, C.EVENTS[ch.start] && C.EVENTS[ch.start].chain === c, `start ${ch.start} is not an event in this chain`));
@@ -221,11 +234,12 @@ Object.entries(C.WORLD_TYPES).forEach(([k, t]) => {
 Object.entries(C.FATES).forEach(([k, F]) => {
   const w = 'fates ' + k;
   if (F.crises) { ref(w, Array.isArray(F.crises) && F.crises.length <= C.PULSE.stageAt.length, `crises is a list of up to ${C.PULSE.stageAt.length} event ids, one per stage round`); (F.crises || []).forEach(e => ref(w, C.EVENTS[e] && C.EVENTS[e].crisis && C.EVENTS[e].fate === k, `crisis ${e} must be an event with crisis: true and fate: '${k}'`)); }
+  if (F.crisisIfUsed != null) ref(w, C.EVENTS[F.crisisIfUsed] && C.EVENTS[F.crisisIfUsed].crisis && C.EVENTS[F.crisisIfUsed].fate === k && (F.crises || []).length >= 2, `crisisIfUsed ${F.crisisIfUsed} is not a crisis event of this Fate (and needs two crises)`);
   if (F.ends) ref(w, Object.keys(F.ends).every(e => ['lifted', 'sealed'].includes(e) && typeof F.ends[e] === 'string'), 'ends is { lifted, sealed }: one line each');
 });
 Object.entries(C.EVENTS).forEach(([k, E]) => {
   [['fate', C.FATES], ['people', C.PEOPLES]].forEach(([f, L]) => { if (E[f] != null) ref('event ' + k, [].concat(E[f]).every(x => L[x]), `${f} ${E[f]} is not in ${f === 'fate' ? 'FATES' : 'PEOPLES'} (layers.js)`); });
-  if (E.crisis) ref('event ' + k, !E.chain && E.fate && !Array.isArray(E.fate) && C.FATES[E.fate] && (C.FATES[E.fate].crises || []).includes(k), 'a crisis event names its one fate, which lists it in crises');
+  if (E.crisis) ref('event ' + k, !E.chain && E.fate && !Array.isArray(E.fate) && C.FATES[E.fate] && ((C.FATES[E.fate].crises || []).includes(k) || C.FATES[E.fate].crisisIfUsed === k), 'a crisis event names its one fate, which lists it in crises or crisisIfUsed');
 });
 Object.entries(C.PEOPLES).forEach(([k, P]) => {
   ref('peoples ' + k, P.custom && P.custom.name && P.custom.text, 'needs a custom: { name, text }, the loop rule it changes');
@@ -252,6 +266,7 @@ Object.entries(C.TRAIT_POOL).forEach(([k, T]) => {
   traitCheck(w, T.traits || {});
   Object.keys(T.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies`));
   ref(w, T.passives || T.traits, 'needs passives or traits, or it does nothing');
+  if (T.world != null) ref(w, C.WORLD_TYPES[T.world] && !T.glitch && Object.keys(C.TRAIT_POOL).filter(x => C.TRAIT_POOL[x].world === T.world).length === 1, `world ${T.world} is not a world type, or has more than one trait`);
 });
 // Known Issues: each points at real glitched content (or names itself), once each
 const ISSUE_OF = { prefix: G.PREFIXES, gear: C.GEAR, skill: C.SKILLS, event: C.EVENTS, trait: C.TRAIT_POOL, mod: C.MODIFIERS };
@@ -262,14 +277,15 @@ G.KNOWN_ISSUES.forEach((K, i) => {
   ref(w, typeof K.text === 'string' && K.text.length > 0, 'needs text');
   ref(w, G.KNOWN_ISSUES.filter(x => x.of === K.of && x.id === K.id).length === 1, 'listed twice');
 });
-ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).filter(k => !C.TRAIT_POOL[k].glitch).length), 'one whole number per round, no more than the pool holds');
+ref('trait pool TRAIT_COUNT', Array.isArray(C.TRAIT_COUNT) && C.TRAIT_COUNT.every(n => Number.isInteger(n) && n >= 0 && n <= Object.keys(C.TRAIT_POOL).filter(k => !C.TRAIT_POOL[k].glitch && !C.TRAIT_POOL[k].world).length), 'one whole number per round, no more than the pool holds');
 Object.entries(C.ENEMIES).forEach(([k, e]) => {
   const w = 'enemies ' + k;
   traitCheck(w, Object.fromEntries(MECHANICS.filter(t => e[t] != null).map(t => [t, e[t]])));
   Object.keys(e.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies (they can use ${Object.keys(G.ENEMY_PASSIVES).join(', ')})`));
   const ph = e.phase; if (!ph) return;
   const moves = e.skills.concat(ph.add || []);
-  Object.keys(ph).filter(f => !['at', 'say', 'script', 'add', 'set'].includes(f)).forEach(f => err(w + ' phase', `unknown field ${f} (at, say, script, add, set)`));
+  Object.keys(ph).filter(f => !['at', 'say', 'script', 'add', 'set', 'swap'].includes(f)).forEach(f => err(w + ' phase', `unknown field ${f} (at, say, script, add, set, swap)`));
+  if (ph.swap) ref(w + ' phase', typeof ph.swap.name === 'string' && ph.swap.name.length > 0 && Object.keys(ph.swap).every(k => ['name', 'clear'].includes(k)), 'swap is { name, clear? }: the partner who tags in');
   ref(w + ' phase', share(ph.at), 'at is the share of max HP the phase starts at, between 0 and 1');
   ref(w + ' phase', typeof ph.say === 'string' && /^\[.*\]$/.test(ph.say), 'say is the System line announcing it, in [brackets]');
   ref(w + ' phase', Array.isArray(ph.script) && ph.script.length && ph.script.every(i => Number.isInteger(i) && moves[i]), `script must list moves that exist (0 to ${moves.length - 1}; added moves come after the enemy's own)`);
@@ -278,6 +294,8 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
   if (e.revive && ph.at <= e.revive) warn(w + ' phase', `starts at ${ph.at} of max HP, at or below where it rises (${e.revive}), so it may start only after it rises`);
 });
 C.MONSTERS.concat(C.RIVALS).forEach(k => ref('enemies', C.ENEMIES[k], `${k} is listed in MONSTERS or RIVALS but not defined`));
+C.MONSTERS.forEach(k => ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.filter(r => r.includes(k)).length === 1, `${k} must be in exactly one qualifier round`));
+ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.length === 3 && C.MONSTER_ROUNDS.every(r => r.length >= 2 && r.every(k => C.MONSTERS.includes(k))), 'three qualifier rounds of at least 2 monsters each, all from MONSTERS');
 C.RIVALS.forEach(k => ref('enemies ' + k, C.ENEMIES[k] && C.ENEMIES[k].rival, 'is in RIVALS but not marked rival: true'));
 Object.entries(C.RIVAL_LINES).forEach(([k, L]) => { ref('enemies ' + k, C.RIVALS.includes(k), 'has rival lines but is not a rival'); ['below', 'level', 'above', 'grudge'].forEach(f => ref('enemies ' + k, L[f], `rival lines need ${f}`)); });
 Object.entries(C.GIFTS).forEach(([k, g]) => {
@@ -301,9 +319,12 @@ Object.entries(C.FEATS).forEach(([k, F]) => {
   [].concat(F.theme || []).forEach(t => ref(w, isArch(t), `theme ${t} is not an archetype`));
 });
 G.WAGER_FEATS.forEach(k => askFeat('wagers', k, null, null, 'wager'));
+Object.entries(C.GODS).forEach(([g, D]) => { if (D.wager != null) { ref('gods ' + g, C.FEATS[D.wager] && ['win', 'fight'].includes(C.FEATS[D.wager].at), `wager ${D.wager} is not a feat measured in a fight`); askFeat('gods ' + g, D.wager, null, null, 'wager'); } });
 Object.entries(C.TITLES).forEach(([k, t]) => { if (t.feat) askFeat('titles ' + k, t.feat, t.n, t.cond, 'Title ' + t.name); else ref('titles ' + k, t.first, 'needs a feat from feats.js, unless it is a world first'); });
 Object.entries(C.QUESTS).forEach(([k, q]) => {
   const feats = [].concat(q.feat), w = 'quests ' + k;
+  if (q.fate != null) ref(w, C.FATES[q.fate] && !q.people && !q.hidden, `fate ${q.fate} is not a Fate (and a world quest is for one Fate or one People, never hidden)`);
+  if (q.people != null) ref(w, C.PEOPLES[q.people] && !q.hidden, `people ${q.people} is not a People (and a world quest is never hidden)`);
   feats.forEach(f => askFeat(w, f, q.count ? q.goal : q.n, q.text, 'quest ' + k));
   if (q.count) ref(w, feats.length === 1 && C.FEATS[feats[0]] && C.FEATS[feats[0]].measure, 'count: true needs one feat with a measure');
   if (feats.length > 1 && feats.every(f => C.FEATS[f])) ref(w, new Set(feats.map(f => C.FEATS[f].at)).size === 1, 'feats asked together must be measured at the same moment');
@@ -519,7 +540,7 @@ function effectDoc() {
     '', '### Outcomes (`then`, `reward`), from `js/content/outcomes.js`',
     '', 'What an event option, a quest or a wager can give. Applied in this order; one marked late is announced after everything else.',
     '', '| Key | Example | Shown to players as | Late | Used by |', '| --- | --- | --- | --- | --- |',
-    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', experimental: 1, next: { bribe: true }, foe: { weaken: 2 }, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', ward: 1, mod: 'none', always: { foe: { poison: 2 } }, fate: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
+    ...Object.entries(C.OUTCOMES).map(([k, O]) => { const ex = { gold: 8, stats: { VIT: 2 }, heart: 1, rune: 1, piece: 'B', experimental: 1, next: { bribe: true }, foe: { weaken: 2 }, heal: 0.5, max_hp: -0.1, restore: 1, erase: 1, stakes: { win: { gold: 10 } }, respec: true, summon: { who: 'copy' }, amend: 'sudden', ward: 1, mod: 'none', always: { foe: { poison: 2 } }, fate: 1, notice: 1, chain: 'done', favour: { war: 2 } }[k]; return `| \`${k}\` | ${JSON.stringify(ex).replace(/\|/g, '\\|')} | ${O.say(ex)} | ${O.late ? 'yes' : ''} | ${(outcomeUses[k] || []).length} (${[...new Set((outcomeUses[k] || []).map(u => u.split(' ')[0] + 's'))].join(', ')}) |`; }),
     '', '### Feats (`feat`), from `js/content/feats.js`',
     '', 'What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: when it is checked (win: a won fight; fight: any fight). Usual: the amount asked for unless the Title or quest says another (`n`). Unfair for: archetypes it is never asked of.',
     '', '| Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |', '| --- | --- | --- | --- | --- | --- | --- |',

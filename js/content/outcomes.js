@@ -12,6 +12,7 @@
 //   experimental: n    n Experimental gear pieces (gear.js, experimental: true) you don't have yet, at random
 //   next: { bribe: true }   flags for the next fight (the ones core.js reads)
 //   foe: { weaken: 2, poison: 4, burn: 4, hp: -0.1, trait: 1 }   your next opponent starts with these (hp: a share more or less; trait: n extra pool traits)
+//   heal: 0.85         heal that share of max HP now
 //   max_hp: -0.1       a share of max HP, gained or lost for the rest of the run (lost at most half)
 //   restore: n         Hearts back, up to your max; the World Record entries come back partial
 //   erase: n           Hearts lost (never the last one); World Record entries erased as in a defeat
@@ -36,6 +37,7 @@ const OUTCOMES = {
   experimental: { say: n => n === 1 ? 'an Experimental item' : `${n} Experimental items` },
   next: { say: () => 'a mark on your next fight' },
   foe: { say: () => 'a mark on your next opponent' },
+  heal: { say: v => `${Math.round(v * 100)}% of max HP healed` },
   max_hp: { say: v => `${v > 0 ? '+' : '−'}${Math.round(Math.abs(v) * 100)}% max HP` },
   restore: { say: n => `${n} Heart${n === 1 ? '' : 's'} restored` },
   erase: { say: n => `${n} Heart${n === 1 ? '' : 's'} erased` },

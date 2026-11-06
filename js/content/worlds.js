@@ -20,6 +20,10 @@ const MODIFIERS = {
   famine: { name: 'Famine', desc: 'Healing after fights and at the Infirmary is halved.' },
   golden: { name: 'Rich Tithes', desc: '+2 gold every round.' },
   restless: { name: 'Restless Dead', desc: 'Erased champions appear more often.' },
+  // Added 6 Nov (thin content audit): one for the shop, one for fights, one for events
+  market: { name: 'Market Day', desc: 'One free shop reroll every round.' },
+  siege: { name: 'Long Siege', desc: 'Everyone starts each fight with Block worth 15% of their max HP.' },
+  strange: { name: 'Strange Times', desc: 'The Undercity is always open, and chance options in events +10%.' },
   // glitch: never in the normal draw. A world offer is sometimes one, and Pending World runs on one each Glitch Day (core.js)
   corrupted: { name: 'Corrupted Save', desc: 'Glitches turn up twice as often.', glitch: true },
 };

@@ -12,6 +12,7 @@ sk('jackpot', 'Jackpot', ['dicer'], 'A', 5, { dmgAll: 3 }, [['progressive', 'Pro
 sk('thunder_dice', 'Thunder Dice', ['dicer', 'storm'], 'D', 3, { die: 1, dmg: 4, dmgPip: 2, dieStun: 6 }, [['rolling_thunder', 'Rolling Thunder', { die: 1, dmg: 4, dmgPip: 2, dieStun: 5 }], ['storm_front', 'Storm Front', { die: 1, dmg: 4, dmgPip: 2, weaken: 1, dieStun: 6 }], ['thunderhead', 'Thunderhead', { die: 1, dmg: 4, dmgPip: 2, dieStun: 6, brk: 6 }]]);
 sk('crooked_odds', 'Crooked Odds', ['dicer', 'jinx'], 'E', 2, { reroll: 1, misf: 2 }, [['sore_loser', 'Sore Loser', { reroll: 1, misf: 2, jinxDisc: 2 }], ['loaded_luck', 'Loaded Luck', { reroll: 1, block: 6 }], ['fixed_game', 'Fixed Game', { reroll: 1, misf: 2, focus: 0.2 }]], { quick: true });
 sk('call_the_bluff', 'Call the Bluff', ['dicer'], 'D', 2, { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2 } }, [['raise_the_stakes', 'Raise the Stakes', { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2, weaken: 1 } }], ['fold', 'Fold', { die: 1, blockPip: 3, dmgPip: 2, read: 'attack', readFx: { readMult: 2 } }], ['poker_face', 'Poker Face', { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2, evade: 1 } }]]);
+sk('storm_chaser', 'Storm Chaser', ['dicer', 'storm'], 'C', 3, { die: 1, dmg: 5, dmgPip: 2, brk: 6 }, [['charged_roll', 'Charged Roll', { die: 1, dmg: 5, dmgPip: 2, brk: 6, dieStun: 6 }], ['static_bet', 'Static Bet', { die: 1, dmg: 5, dmgPip: 2, brk: 6, weaken: 1 }], ['grounded_bet', 'Grounded Bet', { die: 1, dmg: 5, dmgPip: 2, brk: 6, blockPip: 2 }]]);
 flav({
   thunder_dice: "Two bones carved from a tree the lightning picked twice.",
   rolling_thunder: "The odds are bad. The storm doesn't read them.",
@@ -53,4 +54,8 @@ flav({
   thunderhead: "A rumble in the dice cup. Their guard shakes with it.",
   fixed_game: "The odds were never fair. Now they are in your favour.",
   poker_face: "You let them commit, and they hit nothing.",
+  storm_chaser: "You bet on where the lightning lands. You are usually right.",
+  charged_roll: "The die crackles. Roll a six and so do they.",
+  static_bet: "Hair on end, arms gone numb. Theirs, not yours.",
+  grounded_bet: "Half the stake on the strike, half on the shelter.",
 });

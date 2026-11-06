@@ -306,7 +306,7 @@ function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k
 
 // ---------- Worlds ----------
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
-const MOD_W = [30, 15, 15, 15, 15];
+const MOD_W = [30, 15, 15, 15, 15, 10, 10, 10];
 // The modifiers in the normal draw (MOD_W is theirs, in order). A glitch modifier (Corrupted Save) comes another way
 const modKeys = () => Object.keys(MODIFIERS).filter(k => !MODIFIERS[k].glitch);
 // A world offer is sometimes a Corrupted Save (never in Pending World, which gets it on Glitch Day)
@@ -455,8 +455,12 @@ function newRun(world, setup, meta, rng) {
   // Opening stat points: placed after the opening draft, once the skills and gear are known (placeStartStats).
   // floor: the stats before any are placed, Gifts included; rollSeed: where the once-only roll comes from.
   if (setup.startPts) Object.assign(run, { startPts: setup.startPts, statFloor: Object.assign({}, run.stats), rollSeed: setup.seed ? setup.seed + ':roll' : setup.rollSeed || 'roll:' + world.name, rolled: false, rollUsed: false });
-  // System quests: two visible, every hidden one quietly active
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && [].concat(QUESTS[k].feat).every(f => featFair(run, f))), rs).slice(0, 2);
+  // System quests: two visible, every hidden one quietly active. In a world with a Fate or People that has a quest
+  // (quests.js, fate: / people:), those quests are shown too, on top of one general quest
+  const fair = k => [].concat(QUESTS[k].feat).every(f => featFair(run, f));
+  const local = Object.keys(QUESTS).filter(k => (QUESTS[k].fate && QUESTS[k].fate === world.fate) || (QUESTS[k].people && QUESTS[k].people === world.people)).filter(fair);
+  const taken = local.map(k => [].concat(QUESTS[k].feat).join('+'));
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && !QUESTS[k].fate && !QUESTS[k].people && fair(k) && !taken.includes([].concat(QUESTS[k].feat).join('+'))), rs).slice(0, local.length ? 1 : 2).concat(local);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
@@ -490,20 +494,58 @@ function effStats(run) {
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
 function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0))); }
-// Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
-// points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
+// Levels come from fighting: after every battle (win or lose) the System offers a level, which is +1 level (Max HP +4,
+// better shop odds) and +1 stat point, or a Gift drawn at random in its place. Level stops at LEVEL_MAX.
+// Stat points can also be bought with gold, one at a time, at a rising price (Train). Bought points never raise the level.
 const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
+const LEVEL_MAX = 9;
 function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)]; return hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p; }
-function levelFor(bought) { return Math.min(9, 1 + Math.floor(bought / 2)); }
 function trainStat(run, k, msgs) {
   if (!STATS.includes(k)) return false;
   const pr = pointPrice(run); if (run.gold < pr) return false;
-  const before = maxHp(run), lv = run.level;
+  const before = maxHp(run);
   run.gold -= pr; run.stats[k]++; run.bought = (run.bought || 0) + 1;
-  if (hasGift(run, 'latebloomer') && run.bought % 2 === 0) run.statPts++;
-  run.level = levelFor(run.bought); run.hp += maxHp(run) - before;
-  if (run.level > lv) msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. Shop odds improved.]` });
+  run.hp += maxHp(run) - before;
   if (run.milestones) checkMilestones(run, msgs);
+  return true;
+}
+function midGiftPool(run) {
+  const M = run.seed && META ? levelMeta(META) : META;
+  return Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
+}
+// The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now,
+// never one already offered this run while a fresh one fits
+function levelPerk(run, rng) { const t = run.fateTrack || 0, x = { maxHp: maxHp(run), fateOpen: !!FATES[run.world.fate] && t > FATE_TRACK.min && t < FATE_TRACK.max, noticeRoom: !run.noticeOff && (run.notice || 0) < TUNE.noticeMax }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); const fresh = pool.filter(k => !(run.perksShown || []).includes(k)), k = pick(fresh.length ? fresh : pool, rng); if (k) run.perksShown = (run.perksShown || []).concat(k); return k || null; }
+function levelPerkOutcomes(run, k) {
+  const L = LEVEL_PERKS[k], T = Object.assign({}, L.then);
+  if (L.main) { const st = ARCH[run.arch[0]].stat; T.stats = Object.assign({}, T.stats, { [st]: L.main }); }
+  if (L.patron && GODS[run.patron]) T.favour = { [run.patron]: L.patron };
+  return T;
+}
+function levelPerkText(run, k) { if (LEVEL_PERKS[k].say) return LEVEL_PERKS[k].say; const t = outcomeText(levelPerkOutcomes(run, k)); return t.charAt(0).toUpperCase() + t.slice(1) + '.'; }
+function offerLevel(run, rng) {
+  if (run.elite || run.level >= LEVEL_MAX || run.pending.some(p => p.type === 'levelup')) return;
+  run.pending.push({ type: 'levelup', perk: levelPerk(run, rng) });
+}
+// Take the level (choice 'level') or the Gift shown in its place (choice 'perk')
+function takeLevel(run, choice, msgs) {
+  const i = run.pending.findIndex(p => p.type === 'levelup'); if (i < 0) return false;
+  const p = run.pending[i];
+  if (choice === 'perk' && LEVEL_PERKS[p.perk]) {
+    run.pending.splice(i, 1);
+    msgs = msgs || [];
+    msgs.push({ t: 'class', text: `[Level declined. Perk issued: ${LEVEL_PERKS[p.perk].name}.]` });
+    const before = maxHp(run), T = levelPerkOutcomes(run, p.perk), ctx = { run, h: eventKit(run, META, stream(run, 'loot'), msgs), msgs, label: LEVEL_PERKS[p.perk].name };
+    applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true);
+    if (T.stats) { run.hp += maxHp(run) - before; checkMilestones(run, msgs); }
+    return true;
+  }
+  run.pending.splice(i, 1);
+  const before = maxHp(run);
+  run.level = Math.min(LEVEL_MAX, run.level + 1); run.statPts++;
+  if (hasGift(run, 'latebloomer')) run.statPts++;
+  run.hp += maxHp(run) - before;
+  msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. +1 stat point${hasGift(run, 'latebloomer') ? ', +1 from Late Bloomer' : ''}. Shop odds improved.]` });
   return true;
 }
 
@@ -545,9 +587,13 @@ const GLITCH_SKILL = 0.04;
 // Traits from the pool for an opponent: n normal ones (not in have). Where glitches are on, the last one is sometimes a
 // glitched trait instead. Glitched traits never enter the normal draw, so Pending World draws exactly as before
 const GLITCH_TRAIT = 0.15;
+const WORLD_TRAIT = 0.35;
 function rollTraits(run, n, rng, have) {
   have = have || [];
-  const out = shuffle(Object.keys(TRAIT_POOL).filter(k => !TRAIT_POOL[k].glitch && !have.includes(k)), rng).slice(0, n);
+  const out = shuffle(Object.keys(TRAIT_POOL).filter(k => !TRAIT_POOL[k].glitch && !TRAIT_POOL[k].world && !have.includes(k)), rng).slice(0, n);
+  // The world's own trait (traits.js, world:) sometimes takes the first slot
+  const wt = Object.keys(TRAIT_POOL).find(k => TRAIT_POOL[k].world === run.world.type && !have.includes(k));
+  if (out.length && wt && rnd(rng) < WORLD_TRAIT) out[0] = wt;
   if (out.length && glitchesOn(run) && rnd(rng) < GLITCH_TRAIT * glitchMul(run)) {
     const g = Object.keys(TRAIT_POOL).filter(k => TRAIT_POOL[k].glitch && !have.includes(k));
     if (g.length) out[out.length - 1] = pick(g, rng);
@@ -851,7 +897,7 @@ function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
   if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: finalId(run), round: ROUNDS }, poolOn(run) ? { pool: true } : {}, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
   const early = run.round <= 3;
-  let pool = shuffle((early ? MONSTERS : RIVALS).filter(id => !run.met.includes(id)), rng);
+  let pool = shuffle((early ? (MONSTER_ROUNDS[run.round - 1] || MONSTERS) : RIVALS).filter(id => !run.met.includes(id)), rng);
   // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
   if (!early) { const want = RANKS.indexOf('D') + run.round - 4, gap = id => ENEMIES[id].rank ? Math.abs(RANKS.indexOf(ENEMIES[id].rank) - want) : 0.5; pool = pool.map(id => ({ id, k: gap(id) + rnd(rng) * 1.5 })).sort((x, y) => x.k - y.k).map(x => x.id); }
   const easy = { kind: early ? 'monster' : 'rival', id: pool[0] };
@@ -927,13 +973,16 @@ function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; 
 // The feats a god will bet on. Trials never ask one that is unfair for any archetype; wagers and quests skip it for the run that leans on one.
 const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
 const WAGERS = {};
-WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
+const GOD_WAGERS = Object.values(GODS).map(g => g.wager).filter(Boolean);
+WAGER_FEATS.concat(GOD_WAGERS).forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 // The Silence (lore audit, 2 Nov): no Favour and no wagers in a Silence world until its Fate is lifted
 function silent(run) { return !!run && !run.practice && !run.chosenNow && run.world.fate === 'silence' && (run.fateTrack || 0) < FATE_TRACK.max; }
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
   const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
-  return { god, key: pick(keys, rng) };
+  // About half the time a god bets on its own favourite (GODS[x].wager)
+  const own = GODS[god].wager, mine = own && featPossible(run, own) && featFair(run, own) && rnd(rng) < 0.5;
+  return { god, key: mine ? own : pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
 function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); return o; }
@@ -984,6 +1033,7 @@ function rollDistricts(run, rng) {
   const want = customOf(run, 'pilgrims') ? 4 : 3; // Pilgrims: the road, one more district to pick from
   const out = []; let g = 0; while (out.length < want && g++ < 50) { const k = wpick(keys, keys.map(x => w[x]), rng); if (!out.includes(k)) out.push(k); }
   if (run.hp < maxHp(run) * 0.45 && !out.includes('infirmary')) out[2] = 'infirmary';
+  if (run.world.mod === 'strange' && !out.includes('undercity')) out[out[2] === 'infirmary' ? 1 : 2] = 'undercity'; // Strange Times: the Undercity is always open
   return out;
 }
 function infirmary(run) { const f = (run.world.mod === 'famine' ? 0.25 : 0.5) + (districtUp(run, 'infirmary') ? 0.15 : 0); const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
@@ -1086,7 +1136,7 @@ const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, 
 function rollChance(run, r) {
   const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
   const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
-  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0)); // The House, Loaded Dice
+  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0) + (run.world.mod === 'strange' ? 10 : 0)); // The House, Loaded Dice, Strange Times
   return floor && run.chanceFloorAt !== run.round ? Math.max(c2, floor) : c2;
 }
 // A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
@@ -1132,6 +1182,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
     if (run.rolls) delete run.rolls[key];
   }
   const before = msgs.length, T = B.then || {};
+  if (EVENTS[key].crisis && FATES[run.world.fate] && FATES[run.world.fate].crises[0] === key) run.crisisUsed = (T.fate || 0) < 0;
   const ctx = { run, h, msgs, chain: EVENTS[key].chain, from: EVENTS[key].title };
   applyOutcomes(T, ctx, false);
   if (B.go) B.go(run, h);
@@ -1160,6 +1211,7 @@ const OUTCOME_APPLY = {
     if (v.trait) { const have = F.foeTraits || [], add = rollTraits(c.run, v.trait, stream(c.run, 'opps'), have); F.foeTraits = have.concat(add); }
     addMark(c, 'foe', markFoe(v));
   },
+  heal: (v, c) => { const m = maxHp(c.run), b = c.run.hp; c.run.hp = Math.min(m, c.run.hp + Math.round(m * v)); if (c.run.hp > b) c.msgs.push({ t: 'loot', text: `[+${Math.round(c.run.hp - b)} HP.]` }); },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
   stakes: (v, c) => { addMark(c, 'stakes', ['win', 'lose'].filter(w => v[w]).map(w => `${w === 'win' ? 'Win' : 'Lose'}: ${outcomeText(v[w])}`));  const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
@@ -1228,7 +1280,8 @@ function fateEnd(run) {
 function crisisDue(run) {
   const F = FATES[run.world.fate], at = PULSE.stageAt.indexOf(run.round);
   if (!F || !F.crises || at < 0 || run.practice || run.elite) return null;
-  const k = F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
+  // Round 5 branches on round 3: a crisis that was used brings crisisIfUsed instead (run.crisisUsed, set in resolveEvent)
+  const k = at > 0 && F.crisisIfUsed && run.crisisUsed ? F.crisisIfUsed : F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
 }
 // The run is decided: say how the Fate ended. A lifted Fate in a spared world gives a Heart back, and its entry comes back partial
 function closeFate(run, msgs, spared) {
@@ -1351,9 +1404,7 @@ function completeQuest(run, q, msgs) {
 function extraGiftOffers(run, rng) {
   const c = runCounts(run);
   const top = Object.keys(c).filter(k => run.arch.includes(k)).sort((a, b) => c[b] - c[a])[0] || run.arch[0];
-  const M = run.seed && META ? levelMeta(META) : META;
-  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
-  return ['aff_' + top].concat(shuffle(pool, rng).slice(0, 2));
+  return ['aff_' + top].concat(shuffle(midGiftPool(run), rng).slice(0, 2));
 }
 function applyGift(run, k, msgs) {
   if (!GIFTS[k] || hasGift(run, k)) return false;
@@ -1434,7 +1485,7 @@ function enterChoose(run, meta, rng, msgs) {
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
   if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
-  run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
+  run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0) + (run.world.mod === 'market' ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
@@ -1566,6 +1617,8 @@ function checkPhase(f, B, playerTurn) {
   (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
   if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
   if (ph.script) { B.script = ph.script; B.scriptIdx = 0; }
+  // A duo's partner tags in: a new name, and (clear) none of the Burn, Poison or Bleed that was on the first
+  if (ph.swap) { B.name = ph.swap.name + (B.hard ? ', Veteran' : ''); if (ph.swap.clear) { B.burn = 0; B.poison = 0; B.bleed = 0; } }
   say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
   return true;
 }
@@ -1714,7 +1767,7 @@ function newFight(run, rng) {
   };
   [A, B].forEach(X => {
     const P = X.P;
-    X.block += (P.startBlock || 0) + Math.round((P.startBlockPct || 0) * X.maxHp);
+    X.block += (P.startBlock || 0) + Math.round(((P.startBlockPct || 0) + (run.world.mod === 'siege' && !run.elite ? 0.15 : 0)) * X.maxHp);
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
@@ -2621,7 +2674,7 @@ function resolveFight(run, f, meta, rng) {
   // A shared champion that beats you earns its owner's champion RP (see champWin)
   if (!won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
-  if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
+  if (!res.death && !res.spared && !res.eliteOver) { offerLevel(run, stream(run, 'level', rng)); enterChoose(run, meta, rng, msgs); }
   return res;
 }
 function startElite(run, meta, rng) {
@@ -2894,11 +2947,11 @@ function choosePerk(run, meta, k, msgs) {
 if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
