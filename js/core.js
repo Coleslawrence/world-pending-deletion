@@ -306,7 +306,7 @@ function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k
 
 // ---------- Worlds ----------
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
-const MOD_W = [30, 15, 15, 15, 15];
+const MOD_W = [30, 15, 15, 15, 15, 10, 10, 10];
 // The modifiers in the normal draw (MOD_W is theirs, in order). A glitch modifier (Corrupted Save) comes another way
 const modKeys = () => Object.keys(MODIFIERS).filter(k => !MODIFIERS[k].glitch);
 // A world offer is sometimes a Corrupted Save (never in Pending World, which gets it on Glitch Day)
@@ -1033,6 +1033,7 @@ function rollDistricts(run, rng) {
   const want = customOf(run, 'pilgrims') ? 4 : 3; // Pilgrims: the road, one more district to pick from
   const out = []; let g = 0; while (out.length < want && g++ < 50) { const k = wpick(keys, keys.map(x => w[x]), rng); if (!out.includes(k)) out.push(k); }
   if (run.hp < maxHp(run) * 0.45 && !out.includes('infirmary')) out[2] = 'infirmary';
+  if (run.world.mod === 'strange' && !out.includes('undercity')) out[out[2] === 'infirmary' ? 1 : 2] = 'undercity'; // Strange Times: the Undercity is always open
   return out;
 }
 function infirmary(run) { const f = (run.world.mod === 'famine' ? 0.25 : 0.5) + (districtUp(run, 'infirmary') ? 0.15 : 0); const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
@@ -1135,7 +1136,7 @@ const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, 
 function rollChance(run, r) {
   const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
   const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
-  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0)); // The House, Loaded Dice
+  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0) + (run.world.mod === 'strange' ? 10 : 0)); // The House, Loaded Dice, Strange Times
   return floor && run.chanceFloorAt !== run.round ? Math.max(c2, floor) : c2;
 }
 // A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
@@ -1484,7 +1485,7 @@ function enterChoose(run, meta, rng, msgs) {
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
   if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
-  run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
+  run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0) + (run.world.mod === 'market' ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
@@ -1766,7 +1767,7 @@ function newFight(run, rng) {
   };
   [A, B].forEach(X => {
     const P = X.P;
-    X.block += (P.startBlock || 0) + Math.round((P.startBlockPct || 0) * X.maxHp);
+    X.block += (P.startBlock || 0) + Math.round(((P.startBlockPct || 0) + (run.world.mod === 'siege' && !run.elite ? 0.15 : 0)) * X.maxHp);
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
