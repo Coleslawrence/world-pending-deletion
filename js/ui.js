@@ -1191,10 +1191,10 @@ function pendingSheet() {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
   if (p.type === 'levelup') {
-    const g = p.perk && GIFTS[p.perk] && !hasGift(run, p.perk) ? GIFTS[p.perk] : null, nx = run.level + 1, lb = hasGift(run, 'latebloomer');
+    const L = p.perk && LEVEL_PERKS[p.perk], nx = run.level + 1, lb = hasGift(run, 'latebloomer');
     const lvBtn = `<button class="choice" data-act="take-level" data-k="level"><div class="sr-h"><span class="sr-name">Level up</span><span class="tagn">Lv ${nx}</span></div><div class="sr-desc">+4 Max HP, rarer pieces in the shop and ${lb ? '2 stat points' : '1 stat point'} to place.</div></button>`;
-    const gBtn = g ? `<button class="choice" data-act="take-level" data-k="perk"><div class="sr-h"><span class="sr-name">Take ${esc(g.name)}</span><span class="tagn">${g.arch ? 'Affinity' : GIFT_CATS[g.cat]}</span></div><div class="sr-desc">${esc(g.desc)}${flavHTML(g.flavour)}</div></button>` : '';
-    return sheetWrap('[Level available]', `<p class="sh-p">[Battle logged. Level ${nx} is ready. Take it, or skip it for a Gift.]</p>` + lvBtn + gBtn, false, 'sys');
+    const pBtn = L ? `<button class="choice" data-act="take-level" data-k="perk"><div class="sr-h"><span class="sr-name">Take ${esc(L.name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(levelPerkText(run, p.perk))}${flavHTML(L.flavour)}</div></button>` : '';
+    return sheetWrap('[Level available]', `<p class="sh-p">[Battle logged. Level ${nx} is ready. Take it, or skip it for the perk on offer.]</p>` + lvBtn + pBtn, false, 'sys');
   }
   if (p.type === 'perk') {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
@@ -1414,7 +1414,7 @@ function howtoSheet() {
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
     <li><b>Gold:</b> 5 a round, +interest of 1 per 4 gold you hold (up to 5, so a 20-gold bank doubles your income). Reroll for 2.</li>
-    <li><b>Levels:</b> after every battle, win or lose, take a level (+4 Max HP, rarer pieces in the shop, +1 stat point) or skip it for the Gift shown.</li>
+    <li><b>Levels:</b> after every battle, win or lose, take a level (+4 Max HP, rarer pieces in the shop, +1 stat point) or skip it for the perk on offer (gold, a piece, runes, Hearts and more).</li>
     <li><b>Training:</b> in the shop, buy extra stat points with gold. Each costs a little more than the last. Training never raises your level.</li>
     <li><b>Reactions:</b> Burn + Poison, Burn + Bleed, Bleed + Mark, Stun + Weaken and more trigger bonus effects.</li>
     <li><b>Wagers:</b> a god bets on your next fight. Stake 5 gold for 10 and their Favour.</li>
@@ -1657,7 +1657,7 @@ function onAct(el) {
       return render();
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
-    case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Gift instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
+    case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Perk instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
     case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }

@@ -505,12 +505,19 @@ function trainStat(run, k, msgs) {
   if (run.milestones) checkMilestones(run, msgs);
   return true;
 }
-// The Gift offered in place of a level: any Gift the mid-run Gift offer could hold, not owned yet
 function midGiftPool(run) {
   const M = run.seed && META ? levelMeta(META) : META;
   return Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
 }
-function levelPerk(run, rng) { const pool = midGiftPool(run); return pool.length ? pick(pool, rng) : null; }
+// The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now
+function levelPerk(run, rng) { const x = { maxHp: maxHp(run) }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); return pool.length ? pick(pool, rng) : null; }
+function levelPerkOutcomes(run, k) {
+  const L = LEVEL_PERKS[k], T = Object.assign({}, L.then);
+  if (L.main) { const st = ARCH[run.arch[0]].stat; T.stats = Object.assign({}, T.stats, { [st]: L.main }); }
+  if (L.patron && GODS[run.patron]) T.favour = { [run.patron]: L.patron };
+  return T;
+}
+function levelPerkText(run, k) { if (LEVEL_PERKS[k].say) return LEVEL_PERKS[k].say; const t = outcomeText(levelPerkOutcomes(run, k)); return t.charAt(0).toUpperCase() + t.slice(1) + '.'; }
 function offerLevel(run, rng) {
   if (run.elite || run.level >= LEVEL_MAX || run.pending.some(p => p.type === 'levelup')) return;
   run.pending.push({ type: 'levelup', perk: levelPerk(run, rng) });
@@ -519,10 +526,13 @@ function offerLevel(run, rng) {
 function takeLevel(run, choice, msgs) {
   const i = run.pending.findIndex(p => p.type === 'levelup'); if (i < 0) return false;
   const p = run.pending[i];
-  if (choice === 'perk' && p.perk && !hasGift(run, p.perk)) {
+  if (choice === 'perk' && LEVEL_PERKS[p.perk]) {
     run.pending.splice(i, 1);
-    applyGift(run, p.perk, null);
-    msgs && msgs.push({ t: 'class', text: `[Level declined. Gift granted: ${GIFTS[p.perk].name}.]` });
+    msgs = msgs || [];
+    msgs.push({ t: 'class', text: `[Level declined. Perk issued: ${LEVEL_PERKS[p.perk].name}.]` });
+    const before = maxHp(run), T = levelPerkOutcomes(run, p.perk), ctx = { run, h: eventKit(run, META, stream(run, 'loot'), msgs), msgs, label: LEVEL_PERKS[p.perk].name };
+    applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true);
+    if (T.stats) { run.hp += maxHp(run) - before; checkMilestones(run, msgs); }
     return true;
   }
   run.pending.splice(i, 1);
@@ -1187,6 +1197,7 @@ const OUTCOME_APPLY = {
     if (v.trait) { const have = F.foeTraits || [], add = rollTraits(c.run, v.trait, stream(c.run, 'opps'), have); F.foeTraits = have.concat(add); }
     addMark(c, 'foe', markFoe(v));
   },
+  heal: (v, c) => { const m = maxHp(c.run), b = c.run.hp; c.run.hp = Math.min(m, c.run.hp + Math.round(m * v)); if (c.run.hp > b) c.msgs.push({ t: 'loot', text: `[+${Math.round(c.run.hp - b)} HP.]` }); },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
   stakes: (v, c) => { addMark(c, 'stakes', ['win', 'lose'].filter(w => v[w]).map(w => `${w === 'win' ? 'Win' : 'Lose'}: ${outcomeText(v[w])}`));  const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
@@ -2923,7 +2934,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, levelPerk, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
