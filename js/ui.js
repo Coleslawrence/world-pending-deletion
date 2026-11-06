@@ -1367,6 +1367,7 @@ function settingsSheet() {
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
+    + backupsHTML()
     + '<p class="sh-p fine">On a keyboard: number keys pick choices and skills, Enter presses the main button, Escape closes, S opens Stats and L the System log.</p>';
   return sheetWrap('Settings', body, '<button class="btn primary" data-act="close">Done</button>', 'settings');
 }
@@ -1505,7 +1506,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1570,6 +1571,8 @@ function onAct(el) {
     }
     case 'news': openNews(); return render();
     case 'news-page': ui.sheet = { type: 'news', p: Math.max(0, +d.p) }; return render();
+    case 'save-pick': pickSave(d.k); return;
+    case 'restore-save': restoreBackup(+d.i); return render();
     case 'close': ui.sheet = null; ui.confirmAbandon = false; ui.enchantSel = null; return render();
     case 'rec-snap': ui.recOpen = null; ui.sheet = { type: 'record', at: d.at, back: ui.sheet && ui.sheet.type }; return render();
     case 'rec-open': ui.recOpen = +d.p; return render();
@@ -1753,6 +1756,7 @@ function endPractice(done) {
   if (done && first) { meta.echoes += 5; toast('[Practice complete. +5 Echoes.]', 'level'); }
   saveMeta(); run = null;
   go('title');
+  if (cloud.on && !cloud.pulled && !cloud.syncOff) pullProgress(); // the practice run held back the account's save
 }
 function coachStep() { return ui.coach && COACH[ui.coach.i]; }
 function coachAdvance() { if (!ui.coach) return; ui.coach.i++; if (ui.coach.i >= COACH.length) ui.coach.done = true; }
@@ -1886,32 +1890,99 @@ function cloudFail(kind, where, e) {
   cloud.failShown[kind] = true; toast(`[${CLOUD_FAIL_TEXT[kind]} (${code})]`, 'loss');
 }
 function progressDoc() { return cloud.db.doc('data/users/' + cloud.uid + '/progress'); }
+// Which account this device last synced with. A device that has never synced with the signed-in account
+// (a new phone, cleared data, another account) never pushes before it has seen that account's save.
+const SYNC_KEY = 'wpd-sync', BACKUP_KEY = 'wpd-save-backups';
+// Real progress: anything a player would miss. A new device has none, even after it marks the patch notes seen.
+function hasProgress(m) { return !!m && ((m.runs || 0) > 0 || (m.echoes || 0) > 0 || (m.champions || []).length > 0 || (m.erased || []).length > 0 || Object.keys(m.unlocks || {}).length > 0); }
+// The last 3 saves this device replaced, so a wrong pick (or a sync bug) can be undone from Settings
+function backupSave(m, r, why) {
+  if (!hasProgress(m)) return;
+  const list = (lsGet(BACKUP_KEY) || []).filter(b => b && b.meta && b.meta.savedAt !== m.savedAt);
+  list.unshift({ at: Date.now(), why, meta: jsonSafe(m), run: r || null });
+  lsSet(BACKUP_KEY, list.slice(0, 3));
+}
+const markSynced = () => { if (cloud.uid) lsSet(SYNC_KEY, { uid: cloud.uid, at: Date.now() }); };
+function useCloudSave(r) {
+  backupSave(meta, lsGet(RUN_KEY), 'Replaced by your account save');
+  meta = migrateMeta(jsonSafe(r.meta)); bindMeta(meta); lsSet(META_KEY, meta);
+  if (ui.screen === 'title') { if (r.run && r.run.v === VERSION && !r.run.ended) lsSet(RUN_KEY, r.run); else lsDel(RUN_KEY); }
+}
 async function pullProgress() {
+  cloud.pulled = false;
   let snap;
   try { snap = await progressDoc().get(); } catch (e) { cloud.syncOff = true; cloud.status = 'local'; cloudFail('sync', 'load progress', e); return; }
+  if (realMeta) return; // in the practice run: endPractice pulls again, and nothing pushes meanwhile
   const r = snap.exists ? snap.data() : null;
-  let changed = false;
-  if (r && r.meta && (r.meta.savedAt || 0) > (meta.savedAt || 0) && !realMeta) {
-    meta = migrateMeta(jsonSafe(r.meta)); bindMeta(meta); lsSet(META_KEY, meta); changed = true;
+  const cloudHas = !!(r && r.meta && hasProgress(r.meta)), localHas = hasProgress(meta);
+  // Known: this device synced with this account before, or both hold the same progress (a device from before this check)
+  const same = (a, b) => ['runs', 'wins', 'echoes'].every(k => (a[k] || 0) === (b[k] || 0)) && (a.champions || []).length === (b.champions || []).length && (a.erased || []).length === (b.erased || []).length;
+  const known = (lsGet(SYNC_KEY) || {}).uid === cloud.uid || !!(r && r.meta && same(r.meta, meta));
+  // First sync on this device with both saves holding progress: the player picks, nothing pushes until then
+  if (!known && cloudHas && localHas) { ui.sheet = { type: 'savepick', r }; render(); return; }
+  let changed = false, push = false;
+  if (!known && cloudHas && !localHas) { useCloudSave(r); changed = true; } // a new device: take the account's save, however new its own looks
+  else if (!known && localHas && !cloudHas) push = true; // the account's save is empty: this device's is the real one
+  else {
+    if (r && r.meta && (r.meta.savedAt || 0) > (meta.savedAt || 0)) {
+      backupSave(meta, null, 'Replaced by a newer account save');
+      meta = migrateMeta(jsonSafe(r.meta)); bindMeta(meta); lsSet(META_KEY, meta); changed = true;
+    }
+    const localRun = lsGet(RUN_KEY);
+    if (r && r.run && r.run.v === VERSION && !r.run.ended && (!localRun || (r.run.savedAt || 0) > (localRun.savedAt || 0)) && ui.screen === 'title') {
+      lsSet(RUN_KEY, r.run); changed = true;
+    }
   }
+  cloud.pulled = true; markSynced();
+  if (changed) { toast('[Progress synced from your account.]', 'sys'); render(); }
   const localRun = lsGet(RUN_KEY);
-  if (r && r.run && r.run.v === VERSION && !r.run.ended && (!localRun || (r.run.savedAt || 0) > (localRun.savedAt || 0)) && ui.screen === 'title') {
-    lsSet(RUN_KEY, r.run); changed = true;
+  if (push || !r || (meta.savedAt || 0) > ((r.meta && r.meta.savedAt) || 0) || (localRun && (localRun.savedAt || 0) > ((r.run && r.run.savedAt) || 0))) schedulePush();
+}
+function saveSummary(m) {
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`, sp = (m.champions || []).length, d = m.savedAt ? new Date(m.savedAt) : null;
+  return `${n(m.runs || 0, 'run', 'runs')}, ${n(sp, 'world', 'worlds')} spared, ${m.echoes || 0} Echoes${d ? `. Last played ${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}`;
+}
+function savePickSheet() {
+  const r = ui.sheet.r;
+  return sheetWrap('[Two saves found]', `<p class="sh-p">This device and your account both have progress. Pick the one to keep.</p><p class="sh-p"><b>Account save:</b> ${esc(saveSummary(r.meta))}.</p><p class="sh-p"><b>This device:</b> ${esc(saveSummary(meta))}.</p><p class="sh-p fine">The other one stays on this device as a backup. You can bring it back from Settings.</p>`,
+    `<button class="btn ghost" data-act="save-pick" data-k="local">Keep this device's</button><button class="btn primary" data-act="save-pick" data-k="cloud">Use account save</button>`, 'sys', true);
+}
+function pickSave(k) {
+  const S = ui.sheet; if (!S || S.type !== 'savepick') return;
+  ui.sheet = null;
+  if (k === 'cloud') { useCloudSave(S.r); toast('[Account save loaded. The other one is kept as a backup.]', 'sys'); }
+  else {
+    backupSave(migrateMeta(jsonSafe(S.r.meta)), S.r.run || null, 'Account save, replaced by this device');
+    meta.savedAt = Date.now(); lsSet(META_KEY, meta); toast('[This device\'s save kept. The account save is kept as a backup.]', 'sys');
   }
-  if (changed) toast('[Progress synced from your account.]', 'sys');
-  if (!r || (meta.savedAt || 0) > ((r.meta && r.meta.savedAt) || 0) || (localRun && (localRun.savedAt || 0) > ((r.run && r.run.savedAt) || 0))) schedulePush();
+  cloud.pulled = true; markSynced();
+  schedulePush(); render();
+}
+function restoreBackup(i) {
+  const b = (lsGet(BACKUP_KEY) || [])[i]; if (!b || !b.meta) return;
+  backupSave(meta, lsGet(RUN_KEY), 'Replaced by a restored backup');
+  meta = migrateMeta(b.meta); bindMeta(meta);
+  if (b.run && b.run.v === VERSION && !b.run.ended) lsSet(RUN_KEY, b.run);
+  saveMeta(); toast('[Backup restored.]', 'sys');
+}
+function backupsHTML() {
+  const list = (lsGet(BACKUP_KEY) || []).filter(b => b && b.meta);
+  if (!list.length) return '';
+  if (run && !run.ended) return '<h4>Save backups</h4><p class="sh-p fine">This device has a backup save. Finish or leave your run to restore it.</p>';
+  return `<h4>Save backups</h4><p class="sh-p fine">Saves this device replaced. Restoring one swaps it with your current save, which becomes a backup.</p>${list.map((b, i) => `<div class="setrow"><div><b>${esc(saveSummary(b.meta))}</b><small>${esc(b.why || '')}</small></div><button class="btn small ghost" data-act="restore-save" data-i="${i}">Restore</button></div>`).join('')}`;
 }
 function schedulePush() {
-  if (!cloud.on || cloud.syncOff || realMeta) return;
+  if (!cloud.on || cloud.syncOff || realMeta || !cloud.pulled) return;
   clearTimeout(cloud.timer); cloud.timer = setTimeout(pushProgress, FIREBASE ? 5000 : 2000);
 }
 async function pushProgress() {
+  if (!cloud.on || !cloud.pulled || realMeta) return;
   if (cloud.pushing) { cloud.again = true; return; }
   cloud.pushing = true;
   try {
     const r = lsGet(RUN_KEY);
     await progressDoc().set(jsonSafe({ meta, run: r && !r.ended && !r.practice ? r : null, savedAt: Date.now() }));
-    cloud.status = 'synced';
+    cloud.status = 'synced'; markSynced();
   } catch (e) {
     if (e && (e.code === 'invalid_argument' || e.code === 'revoked' || e.code === 'not_granted')) { cloud.syncOff = true; cloud.status = 'local'; }
     else if (e && e.code === 'unavailable') setTimeout(schedulePush, 4000 + Math.random() * 3000);
@@ -2115,7 +2186,7 @@ function logToast(text) { toast(text, 'broadcast'); }
 // Web version: Firebase sign-in state
 window.addEventListener('wpd-auth', e => {
   if (e.detail && e.detail.signedIn) { if (!cloud.on) cloudInit(); }
-  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, syncOff: false, shareOff: false, tester: null, shared: [], status: 'local' }); ui.board = null; setShared([], []); render(); }
+  else { clearTimeout(cloud.timer); Object.assign(cloud, { db: null, user: null, uid: null, on: false, pulled: false, syncOff: false, shareOff: false, tester: null, shared: [], status: 'local' }); ui.board = null; setShared([], []); render(); }
 });
 function cloudSignInHTML(compact) {
   const provs = (window.FIREBASE_PROVIDERS || ['google', 'github']).filter(k => k === 'google' || k === 'github');
@@ -2137,7 +2208,7 @@ function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
-  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
+  if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note', 'savepick'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
   if (typing) return;
   const sheet = app.querySelector('.sheet');
   if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }
