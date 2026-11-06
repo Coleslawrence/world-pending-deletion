@@ -47,6 +47,8 @@ jobs:
         run: node tools/read-test.js
       - name: Path evolution test
         run: node tools/advance-test.js
+      - name: Prefix test
+        run: node tools/prefix-test.js
 
   balance:
     name: Balance gate

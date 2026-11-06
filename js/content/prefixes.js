@@ -39,6 +39,35 @@ const PREFIXES = {
   redacted: { name: '[REDACTED]', desc: 'A glitched prefix. Which one is withheld until its first use.', w: 0.5, glitch: true, apply: () => {} },
   // Only the Enchanter's Corrupt gives this
   overclocked: { name: 'Overcl̷ocked', desc: '+30% power.', w: 0, corrupt: true, apply: d => { d.powerMult *= 1.3; } },
+  // Gap prefixes: one for each effect that had none
+  guarded: { name: 'Guarded', desc: 'Also gain 5 Block.', w: 2, ok: d => !d.fx.block, apply: d => { d.fx.block = 5; } },
+  crippling: { name: 'Crippling', desc: 'Weaken the opponent for 1 turn.', w: 2, ok: d => !isDmg(d) && !d.fx.weaken, apply: d => { d.fx.weaken = 1; } },
+  marking: { name: 'Marking', desc: 'Mark the opponent for 2 turns.', w: 2, ok: d => !d.fx.mark, apply: d => { d.fx.mark = 2; } },
+  shattering: { name: 'Shattering', desc: 'Also Break 6.', w: 2, ok: isDmg, apply: d => { d.fx.brk = (d.fx.brk || 0) + 6; } },
+  mending: { name: 'Mending', desc: 'Heal 2 at the start of your next 3 turns.', w: 2, ok: d => !d.fx.regen, apply: d => { d.fx.regen = 2; } },
+  hexing: { name: 'Hexing', desc: 'Also apply 2 Misfortune.', w: 2, apply: d => { d.fx.misf = (d.fx.misf || 0) + 2; } },
+  purifying: { name: 'Purifying', desc: 'Remove your Burn, Poison, Bleed and Weaken.', w: 2, ok: d => !d.fx.cleanse, apply: d => { d.fx.cleanse = 1; } },
+  evasive: { name: 'Evasive', desc: 'Dodge the next hit.', w: 2, ok: d => !d.fx.evade, apply: d => { d.fx.evade = 1; } },
+  // Class prefixes: only skills of that class can take them
+  kindled: { name: 'Kindled', desc: '50% more Burn.', w: 2, ok: d => (d.tags || []).includes('pyre') && !!d.fx.burn, apply: d => { d.fx.burn = Math.round(d.fx.burn * 1.5); } },
+  virulent: { name: 'Virulent', desc: '50% more Poison.', w: 2, ok: d => (d.tags || []).includes('venom') && !!d.fx.poison, apply: d => { d.fx.poison = Math.round(d.fx.poison * 1.5); } },
+  keen: { name: 'Keen', desc: '+15% critical chance.', w: 2, ok: d => (d.tags || []).includes('blade') && !!d.fx.dmg, apply: d => { d.fx.critBonus = (d.fx.critBonus || 0) + 0.15; } },
+  stalwart: { name: 'Stalwart', desc: '50% more Block.', w: 2, ok: d => (d.tags || []).includes('bastion') && !!d.fx.block, apply: d => { d.fx.block = Math.round(d.fx.block * 1.5); } },
+  blessed: { name: 'Blessed', desc: '50% more healing.', w: 2, ok: d => (d.tags || []).includes('zealot') && !!(d.fx.heal || d.fx.regen), apply: d => { if (d.fx.heal) d.fx.heal = Math.round(d.fx.heal * 1.5); if (d.fx.regen) d.fx.regen = Math.round(d.fx.regen * 1.5); } },
+  focused: { name: 'Focused', desc: 'Your next damaging skill deals 25% more.', w: 2, ok: d => (d.tags || []).includes('arcanist') && !d.fx.focus, apply: d => { d.fx.focus = 0.25; } },
+  reaping: { name: 'Reaping', desc: '50% more damage to an opponent below 30% HP.', w: 2, ok: d => (d.tags || []).includes('reaper') && !!d.fx.dmg && !d.fx.execute, apply: d => { d.fx.execute = 0.3; d.fx.execMult = 1.5; } },
+  jolting: { name: 'Jolting', desc: 'If the opponent is Weakened, Stun them.', w: 2, ok: d => (d.tags || []).includes('storm') && isDmg(d) && !d.fx.stunIfWeak, apply: d => { d.fx.stunIfWeak = 1; } },
+  loaded: { name: 'Loaded', desc: 'Its die never rolls below 3.', w: 2, ok: d => (d.tags || []).includes('dicer') && !!d.fx.die && !d.fx.dieMin, apply: d => { d.fx.dieMin = 3; } },
+  ominous: { name: 'Ominous', desc: 'Also leave an Omen: 8 damage when they next attack.', w: 2, ok: d => (d.tags || []).includes('jinx') && !d.fx.omenAtk, apply: d => { d.fx.omenAtk = 8; } },
+  // Trade-off prefixes: stronger, with a cost
+  reckless: { name: 'Reckless', desc: '+50% power. Costs 4 HP.', w: 1.5, ok: isDmg, apply: d => { d.powerMult *= 1.5; d.fx.selfDmg = (d.fx.selfDmg || 0) + 4; } },
+  hasty: { name: 'Hasty', desc: '2 turns shorter cooldown, 30% less power.', w: 1.5, ok: d => d.cd >= 3, apply: d => { d.cd = Math.max(1, d.cd - 2); d.powerMult *= 0.7; } },
+  ponderous: { name: 'Ponderous', desc: '+80% power, 2 turns longer cooldown.', w: 1.5, ok: d => !d.quick, apply: d => { d.powerMult *= 1.8; d.cd += 2; } },
+  wild: { name: 'Wild', desc: '50% chance to cast twice, 2 turns longer cooldown.', w: 1.5, ok: d => !d.quick, apply: d => { d.fx.echo = Math.max(d.fx.echo || 0, 0.5); d.cd += 2; } },
+  thirsting: { name: 'Thirsting', desc: 'Heal 50% of the damage dealt, 25% less power.', w: 1.5, ok: isDmg, apply: d => { d.fx.lifesteal = (d.fx.lifesteal || 0) + 0.5; d.powerMult *= 0.75; } },
+  bloodbound: { name: 'Bloodbound', desc: 'Ignores Block. Costs 6 HP.', w: 1.5, ok: d => isDmg(d) && !d.fx.pierce, apply: d => { d.fx.pierce = 1; d.fx.selfDmg = (d.fx.selfDmg || 0) + 6; } },
+  hollow: { name: 'Hollow', desc: "Doesn't end your turn, 40% less power.", w: 1.5, ok: d => !d.quick && !d.basic, apply: d => { d.quick = true; d.powerMult *= 0.6; } },
+  weighty: { name: 'Weighty', desc: 'Also Break 12, 1 turn longer cooldown.', w: 1.5, ok: isDmg, apply: d => { d.fx.brk = (d.fx.brk || 0) + 12; d.cd += 1; } },
 };
 // The [REDACTED] stand-ins: r_<glitch> works as that glitch and reads as [REDACTED] until it is disclosed
 Object.keys(PREFIXES).filter(k => PREFIXES[k].glitch && k !== 'redacted').forEach(k => {
