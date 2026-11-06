@@ -414,17 +414,17 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 42 (quests, levels, events) |
+| `gold` | 8 | 8 gold |  | 45 (quests, levels, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 7 (events) |
-| `heart` | 1 | +1 max Heart |  | 10 (quests, levels, events) |
-| `rune` | 1 | a rune |  | 9 (quests, levels, events) |
-| `piece` | "B" | a free B-rank piece |  | 25 (quests, levels, events) |
+| `heart` | 1 | +1 max Heart |  | 11 (quests, levels, events) |
+| `rune` | 1 | a rune |  | 12 (quests, levels, events) |
+| `piece` | "B" | a free B-rank piece |  | 27 (quests, levels, events) |
 | `experimental` | 1 | an Experimental item |  | 2 (levels, events) |
 | `next` | {"bribe":true} | a mark on your next fight |  | 20 (events) |
 | `foe` | {"weaken":2} | a mark on your next opponent |  | 15 (levels, events) |
 | `heal` | 0.5 | 50% of max HP healed |  | 2 (levels) |
 | `max_hp` | -0.1 | −10% max HP |  | 7 (levels, events) |
-| `restore` | 1 | 1 Heart restored |  | 9 (levels, events) |
+| `restore` | 1 | 1 Heart restored |  | 10 (quests, levels, events) |
 | `erase` | 1 | 1 Heart erased |  | 6 (events) |
 | `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 8 (levels, events) |
 | `respec` | true | your stat points to place again |  | 2 (levels, events) |
@@ -433,7 +433,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `ward` | 1 | a ward on your next loss |  | 12 (levels, events) |
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 5 (levels, events) |
-| `fate` | 1 | your world's Fate eased | yes | 57 (levels, events) |
+| `fate` | 1 | your world's Fate eased | yes | 65 (quests, levels, events) |
 | `notice` | 1 | the System's notice | yes | 57 (levels, events) |
 | `chain` | "done" | the story goes on | yes | 33 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 10 (quests, events) |
@@ -444,29 +444,29 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 
 | Key | Measured | Shown to players as | Usual | Counts up | Unfair for | Asked by |
 | --- | --- | --- | --- | --- | --- | --- |
-| `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt |
-| `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner |
+| `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt, quest w_hunger |
+| `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner, quest w_exiles |
 | `chances` | chance | Win 3 chance rolls in one run | 3 |  |  | Title Lucky Seven |
 | `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
-| `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector |
-| `fast` | win | Win within 6 turns | 6 |  |  | wager, Title First Blood, quest fast3 |
+| `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector, quest w_league |
+| `fast` | win | Win within 6 turns | 6 |  |  | wager, Title First Blood, quest fast3, quest w_longnight, quest w_sundering |
 | `fatelifted` | win | Beat the Final Champion with your world's Fate lifted |  |  |  | Title Fatebreaker |
 | `giant` | win | Beat an opponent with at least twice your max HP |  |  |  | Title Giant Slayer |
-| `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2 |
-| `healed` | fight | Heal 60 HP in a single fight | 60 |  |  | Title Bloodthirsty |
-| `healthy` | win | Win with more than half your HP |  |  |  | wager |
+| `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2, quest w_clans |
+| `healed` | fight | Heal 60 HP in a single fight | 60 |  |  | Title Bloodthirsty, quest w_council |
+| `healthy` | win | Win with more than half your HP |  |  |  | wager, quest w_lastgen |
 | `jinxes` | fight | Jinx 3 moves in a single fight | 3 |  |  | Title Black Cat |
 | `masked` | win | Defeat the Masked Entrant |  |  |  | Title Mirror Breaker |
-| `merge` | merge | Merge pieces |  |  |  | quest merge4 |
-| `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal |
-| `outranked` | win | Beat an opponent 2 rank letters above your Entrant Rank | 2 |  |  | Title Rank Is Just a Letter |
-| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | quest h_overkill |
-| `path` | path | Have the System recognise your path by round 5 | 5 |  |  | quest path5 |
+| `merge` | merge | Merge pieces |  |  |  | quest merge4, quest w_goldenage |
+| `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal, quest w_silence |
+| `outranked` | win | Beat an opponent 2 rank letters above your Entrant Rank | 2 |  |  | Title Rank Is Just a Letter, quest w_crown |
+| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | quest h_overkill, quest w_temple |
+| `path` | path | Have the System recognise your path by round 5 | 5 |  |  | quest path5, quest w_archive |
 | `quick` | fight | Use 3 Quick skills in a single turn | 3 |  |  | Title Spellweaver |
-| `react` | fight | Trigger 2 reactions | 2 | yes |  | wager, Title Alchemist, quest react6 |
-| `rival` | win | Defeat a rival |  |  |  | quest rival_noheal |
+| `react` | fight | Trigger 2 reactions | 2 | yes |  | wager, Title Alchemist, quest react6, quest w_pilgrims |
+| `rival` | win | Defeat a rival |  |  |  | quest rival_noheal, quest w_civilwar |
 | `stop` | win | Stun or Interrupt the opponent's big move |  |  |  | wager |
 | `stuns` | fight | Stun or Interrupt one opponent 3 times | 3 |  |  | quest h_stun3 |
-| `untouched` | win | Win without losing any HP |  |  |  | Title Untouched |
+| `untouched` | win | Win without losing any HP |  |  |  | Title Untouched, quest w_plague |
 | `wagers` | wager | Win 3 wagers in one run | 3 |  |  | Title High Roller |
 <!-- effects:end -->

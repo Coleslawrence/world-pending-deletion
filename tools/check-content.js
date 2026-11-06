@@ -85,7 +85,7 @@ const SCHEMA = {
   titles: [C.TITLES, ['name', 'cond', 'desc', 'flavour'], ['first', 'p', 'feat', 'n', 'theme']],
   effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
   feats: [C.FEATS, ['at', 'say', 'hit'], ['n', 'measure', 'must', 'unfairFor', 'needs', 'theme']],
-  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme']],
+  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme', 'fate', 'people']],
   outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
   events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit', 'glitch']],
@@ -321,6 +321,8 @@ G.WAGER_FEATS.forEach(k => askFeat('wagers', k, null, null, 'wager'));
 Object.entries(C.TITLES).forEach(([k, t]) => { if (t.feat) askFeat('titles ' + k, t.feat, t.n, t.cond, 'Title ' + t.name); else ref('titles ' + k, t.first, 'needs a feat from feats.js, unless it is a world first'); });
 Object.entries(C.QUESTS).forEach(([k, q]) => {
   const feats = [].concat(q.feat), w = 'quests ' + k;
+  if (q.fate != null) ref(w, C.FATES[q.fate] && !q.people && !q.hidden, `fate ${q.fate} is not a Fate (and a world quest is for one Fate or one People, never hidden)`);
+  if (q.people != null) ref(w, C.PEOPLES[q.people] && !q.hidden, `people ${q.people} is not a People (and a world quest is never hidden)`);
   feats.forEach(f => askFeat(w, f, q.count ? q.goal : q.n, q.text, 'quest ' + k));
   if (q.count) ref(w, feats.length === 1 && C.FEATS[feats[0]] && C.FEATS[feats[0]].measure, 'count: true needs one feat with a measure');
   if (feats.length > 1 && feats.every(f => C.FEATS[f])) ref(w, new Set(feats.map(f => C.FEATS[f].at)).size === 1, 'feats asked together must be measured at the same moment');
