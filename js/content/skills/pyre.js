@@ -9,6 +9,7 @@ sk('inferno', 'Inferno', ['pyre'], 'B', 4, { dmg: 10, burn: 11 }, [['hellfire', 
 sk('sacred_flame', 'Sacred Flame', ['zealot', 'pyre'], 'B', 3, { dmg: 9, burn: 4, heal: 8 }, [['purging_flame', 'Purging Flame', { dmg: 12, burn: 6, heal: 10 }], ['sunfire', 'Sunfire', { dmg: 9, burn: 4, heal: 8, cleanse: 1 }], ['holy_brand', 'Holy Brand', { dmg: 9, burn: 4, heal: 8, mark: 2 }]]);
 sk('pandemic', 'Pandemic', ['venom', 'pyre'], 'A', 4, { burn: 8, poison: 6 }, [['apocalypse', 'Apocalypse', { burn: 12, poison: 10 }], ['black_death', 'Black Death', { burn: 8, poison: 6, weaken: 2 }], ['fever_dream', 'Fever Dream', { burn: 8, poison: 6, misf: 3 }]]);
 sk('backdraft', 'Backdraft', ['pyre'], 'D', 3, { burn: 4, read: 'attack', readFx: { burn: 4, detonate: 1 } }, [['blowback', 'Blowback', { burn: 4, read: 'attack', readFx: { burn: 4, detonate: 1, keep: 1 } }], ['smoke_screen', 'Smoke Screen', { burn: 4, read: 'attack', readFx: { burn: 4, evade: 1 } }], ['flash_fire', 'Flash Fire', { burn: 4, read: 'attack', readFx: { burn: 4, detonate: 1, block: 8 } }]]);
+sk('hex_brand', 'Hex Brand', ['pyre', 'jinx'], 'C', 3, { burn: 6, misf: 3 }, [['cursed_brand', 'Cursed Brand', { burn: 6, misf: 3, mark: 2 }], ['ashen_hex', 'Ashen Hex', { burn: 6, misf: 3, weaken: 1 }], ['warding_brand', 'Warding Brand', { burn: 6, misf: 3, block: 6 }]]);
 flav({
   firebolt: "Fire, thrown. The oldest argument in the Burning Empire.",
   fireball: "It gets bigger on the way.",
@@ -46,4 +47,8 @@ flav({
   holy_brand: "A brand that marks them for judgement.",
   fever_dream: "Hot, sick, and suddenly very unlucky.",
   flash_fire: "The flare that catches them also hides you.",
+  hex_brand: "A sigil pressed into them, still hot. It is bad luck to be marked twice.",
+  cursed_brand: "The brand glows brighter wherever you strike next.",
+  ashen_hex: "Ash in the joints. Their swing comes slow and late.",
+  warding_brand: "You keep the hot iron between you and them.",
 });
