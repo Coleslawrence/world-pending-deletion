@@ -583,9 +583,13 @@ const GLITCH_SKILL = 0.04;
 // Traits from the pool for an opponent: n normal ones (not in have). Where glitches are on, the last one is sometimes a
 // glitched trait instead. Glitched traits never enter the normal draw, so Pending World draws exactly as before
 const GLITCH_TRAIT = 0.15;
+const WORLD_TRAIT = 0.35;
 function rollTraits(run, n, rng, have) {
   have = have || [];
-  const out = shuffle(Object.keys(TRAIT_POOL).filter(k => !TRAIT_POOL[k].glitch && !have.includes(k)), rng).slice(0, n);
+  const out = shuffle(Object.keys(TRAIT_POOL).filter(k => !TRAIT_POOL[k].glitch && !TRAIT_POOL[k].world && !have.includes(k)), rng).slice(0, n);
+  // The world's own trait (traits.js, world:) sometimes takes the first slot
+  const wt = Object.keys(TRAIT_POOL).find(k => TRAIT_POOL[k].world === run.world.type && !have.includes(k));
+  if (out.length && wt && rnd(rng) < WORLD_TRAIT) out[0] = wt;
   if (out.length && glitchesOn(run) && rnd(rng) < GLITCH_TRAIT * glitchMul(run)) {
     const g = Object.keys(TRAIT_POOL).filter(k => TRAIT_POOL[k].glitch && !have.includes(k));
     if (g.length) out[out.length - 1] = pick(g, rng);

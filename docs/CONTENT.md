@@ -246,7 +246,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `critMult` | 2 | Swordmaster (2), Executioner (1.75) | Critical hits deal ×2 instead of ×1.5. | set |  |  |  |
 | `curseBlock` | 1 | mirror_shard_mail (4) | Each Curse you take gives you 4 Block. | add |  |  | Jinx |
 | `dieMin` | 2 | Gambler 2 (2), Card Counter (3) | Your dice never roll below 2. | set |  |  | Gambler |
-| `dmgPct` | 7 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
+| `dmgPct` | 8 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
 | `dodge` | 4 | shadow_leathers (0.06), Elf-touched (0.1), Skyfall (0.05), … | +6% dodge. | add |  |  |  |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
@@ -319,7 +319,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `reactMult` | 2 | Catalyst (1.5), Alchemist (1.2) | Reactions are 50% stronger. | mul |  |  |  |
 | `reapBlood` | 3 | Reaper 2 (0.15), Headsman (0.15), executioner_axe (0.1) | The first time you hit an opponent below half HP, heal 15% of your max HP. | set |  |  | Reaper |
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
-| `regen` | 8 | Zealot 4 (2), Undying (3), pilgrim_mace (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
+| `regen` | 9 | Zealot 4 (2), Undying (3), pilgrim_mace (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
 | `rerolls` | 6 | Gambler 4 (2), Card Counter (1), croupiers_rake (1), … | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
 | `savingGrace` | 1 | Saving Grace (1) | Healing from a die skill showing 6 is doubled. | set |  |  | Gambler, Zealot |
 | `sixGold` | 2 | weighted_dice (1), gilded_coin (1) | +1 gold after each win where you rolled a 6. | add |  |  | Gambler |
@@ -341,10 +341,10 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `suspend` | 1 | delay_engine (3) | Your hits are stored and all strike at once every 3rd turn, +50%. | set |  |  |  |
 | `swapHp` | 1 | mirror_cuirass (0.3) | Once per fight below 30% HP, your HP and your opponent's trade places. | set |  |  |  |
 | `swordSaint` | 1 | Sword Saint (1) | Your basic Attack becomes S-rank: far stronger, and it ignores Block. | set |  |  |  |
-| `thornBurn` | 2 | Cinder Warden (4), Ember Wall (2) | Thorns also apply 4 Burn. | add |  | flat, scales with power | Bastion, Pyre |
+| `thornBurn` | 3 | Cinder Warden (4), Ember Wall (2), trait Cinderskin (2) | Thorns also apply 4 Burn. | add |  | flat, scales with power | Bastion, Pyre |
 | `thornMult` | 2 | Thornguard (2), Duelist (1.5) | Thorns and Riposte deal 100% more. | add |  | rate | Bastion, Bladedancer |
 | `thornPoison` | 1 | Thornbark (2) | Thorns also apply 2 Poison. | add |  | flat, scales with power | Bastion, Venom |
-| `thornsAlways` | 5 | Bastion 4 (4), chain_mail (2), crown_of_thorns (3), … | Always have 4 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
+| `thornsAlways` | 6 | Bastion 4 (4), chain_mail (2), crown_of_thorns (3), … | Always have 4 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
 | `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |
 | `vsDisabled` | 2 | verdict_hammer (0.2), Warlord (0.25) | +20% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
 | `vsHalf` | 1 | Reaper 2 (0.35) | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
@@ -356,19 +356,19 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 
 | Key | Used | Examples (value) |
 | --- | --- | --- |
-| `adapt` | 1 | Kaito Ren (0.6) |
+| `adapt` | 2 | Kaito Ren (0.6), trait Tell-Reader (0.75) |
 | `aura` | 2 | Emperor Kharros the Ashen (0.7), trait Smouldering (1.5) |
 | `briar` | 2 | The Thorn Mother (1), trait Barbed (1) |
-| `dodge` | 3 | Lyss of the Thorn (0.05), trait Elusive (0.12), trait Cl̷ipping (0.25) |
-| `enrage` | 3 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5), trait Frenzied (0.5) |
-| `enrageMult` | 3 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4) |
-| `flood` | 1 | The Leviathan Queen (3) |
-| `forge` | 1 | The Forge King (3) |
+| `dodge` | 4 | Lyss of the Thorn (0.05), trait Elusive (0.12), trait Wildgrown (0.08), … |
+| `enrage` | 4 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5), trait Frenzied (0.5), … |
+| `enrageMult` | 4 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4), … |
+| `flood` | 2 | The Leviathan Queen (3), trait Tidal (4) |
+| `forge` | 2 | The Forge King (3), trait Ironclad (2) |
 | `hexer` | 1 | Mott the Unlucky (1) |
-| `jinxTax` | 1 | The Hanged Augur (2) |
-| `revive` | 2 | The Bone Saint (0.3), trait Repl̷icated (0.3) |
-| `showNext` | 1 | The Hanged Augur (1) |
-| `twincast` | 2 | The Archmage Who Fell Upward (3), trait Desy̷nced (3) |
+| `jinxTax` | 2 | The Hanged Augur (2), trait Omen-Read (2) |
+| `revive` | 3 | The Bone Saint (0.3), trait Unquiet (0.15), trait Repl̷icated (0.3) |
+| `showNext` | 2 | The Hanged Augur (1), trait Omen-Read (1) |
+| `twincast` | 3 | The Archmage Who Fell Upward (3), trait Spellbound (4), trait Desy̷nced (3) |
 
 ### The grid, from `js/content/archetypes.js`
 
