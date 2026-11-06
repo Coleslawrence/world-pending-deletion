@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope).
-const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT, LEVEL_PERKS })');
+const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT, LEVEL_PERKS })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -292,6 +292,8 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
   if (e.revive && ph.at <= e.revive) warn(w + ' phase', `starts at ${ph.at} of max HP, at or below where it rises (${e.revive}), so it may start only after it rises`);
 });
 C.MONSTERS.concat(C.RIVALS).forEach(k => ref('enemies', C.ENEMIES[k], `${k} is listed in MONSTERS or RIVALS but not defined`));
+C.MONSTERS.forEach(k => ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.filter(r => r.includes(k)).length === 1, `${k} must be in exactly one qualifier round`));
+ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.length === 3 && C.MONSTER_ROUNDS.every(r => r.length >= 2 && r.every(k => C.MONSTERS.includes(k))), 'three qualifier rounds of at least 2 monsters each, all from MONSTERS');
 C.RIVALS.forEach(k => ref('enemies ' + k, C.ENEMIES[k] && C.ENEMIES[k].rival, 'is in RIVALS but not marked rival: true'));
 Object.entries(C.RIVAL_LINES).forEach(([k, L]) => { ref('enemies ' + k, C.RIVALS.includes(k), 'has rival lines but is not a rival'); ['below', 'level', 'above', 'grudge'].forEach(f => ref('enemies ' + k, L[f], `rival lines need ${f}`)); });
 Object.entries(C.GIFTS).forEach(([k, g]) => {

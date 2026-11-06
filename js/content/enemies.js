@@ -9,6 +9,16 @@ const ENEMIES = {
   ghoul: { name: 'Feral Ghoul', style: 'Bleeds you, feeds', tier: 1, theme: ['venom', 'blade'], rank: 'E', hp: 42, skills: [{ n: 'Claw', fx: { dmg: 4, hits: 2, bleed: 1, perHit: 1 } }, { n: 'Feast', fx: { dmg: 4, lifesteal: 1 } }], script: [0, 0, 1] },
   imp: { name: 'Ember Imp', style: 'Burns and hides', tier: 1, theme: 'pyre', rank: 'E', hp: 38, skills: [{ n: 'Fire Spit', fx: { dmg: 5, burn: 3 } }, { n: 'Cackle', fx: { block: 6 } }], script: [0, 0, 1] },
   brute: { name: 'Pit Brute', style: 'Slow, one huge swing', tier: 1, theme: ['bastion'], rank: 'E', hp: 56, skills: [{ n: 'Wind Up', fx: { block: 5 }, label: 'Winding up' }, { n: 'Crushing Swing', fx: { dmg: 22 } }, { n: 'Shove', fx: { dmg: 5 } }], script: [2, 0, 1] },
+  // Qualifier monsters added 6 Nov (thin content audit): three for each qualifier round, see MONSTER_ROUNDS
+  wisp: { name: 'Spark Wisp', style: 'Quick jolts that sap your strength', tier: 1, theme: 'storm', rank: 'E', hp: 36, skills: [{ n: 'Zap', fx: { dmg: 7 } }, { n: 'Static Pop', fx: { dmg: 3, weaken: 1 } }], script: [0, 1] },
+  lucky_rat: { name: 'Lucky Rat', style: 'Bites for whatever the die says', tier: 1, theme: 'dicer', rank: 'E', hp: 40, skills: [{ n: 'Gnaw', fx: { die: 1, dmg: 2, dmgPip: 1 } }, { n: 'Hoard', fx: { block: 6 } }], script: [0, 0, 1] },
+  hex_toad: { name: 'Hex Toad', style: 'Croaks bad luck at you, then lunges', tier: 1, theme: 'jinx', rank: 'E', hp: 42, skills: [{ n: 'Croak', fx: { dmg: 3, weaken: 1 } }, { n: 'Tongue Lash', fx: { dmg: 9 } }], script: [0, 1, 1] },
+  acolyte: { name: 'Pit Acolyte', style: 'Hits, then patches itself up', tier: 1, theme: 'zealot', rank: 'E', hp: 46, skills: [{ n: 'Censer Swing', fx: { dmg: 8 } }, { n: 'Field Prayer', fx: { heal: 7 } }], script: [0, 0, 1] },
+  glyph_moth: { name: 'Glyph Moth', style: 'A flurry of little cuts and blinding dust', tier: 1, theme: 'arcanist', rank: 'E', hp: 44, skills: [{ n: 'Flutter', fx: { dmg: 3, hits: 3 } }, { n: 'Glyph Dust', fx: { dmg: 2, weaken: 2 } }], script: [0, 1, 0] },
+  briar_cub: { name: 'Briar Cub', style: 'Pounces to make you bleed, then scampers off', tier: 1, theme: 'blade', rank: 'E', hp: 48, skills: [{ n: 'Pounce', fx: { dmg: 5, bleed: 2 } }, { n: 'Scamper', fx: { block: 7 } }], script: [0, 1, 0] },
+  grave_hound: { name: 'Grave Hound', style: 'Feeds on every bite, then goes for the throat', tier: 1, theme: 'reaper', rank: 'E', hp: 54, skills: [{ n: 'Bite', fx: { dmg: 7 } }, { n: 'Feed', fx: { dmg: 5, lifesteal: 1 } }, { n: 'Go for the Throat', fx: { dmg: 18 } }], script: [0, 1, 2] },
+  thunder_ram: { name: 'Thunder Ram', style: 'Paws the ground, then charges', tier: 1, theme: 'storm', rank: 'E', hp: 58, skills: [{ n: 'Paw the Ground', fx: { block: 8 }, label: 'Lowering its head' }, { n: 'Thunder Charge', fx: { dmg: 21 } }, { n: 'Headbutt', fx: { dmg: 7 } }], script: [2, 0, 1] },
+  sunken_knight: { name: 'Sunken Knight', style: 'Shells up, then drags you under', tier: 1, theme: ['zealot', 'bastion'], rank: 'E', hp: 56, skills: [{ n: 'Rusted Blade', fx: { dmg: 10 } }, { n: 'Barnacle Guard', fx: { block: 9 } }, { n: 'Drag Under', fx: { dmg: 5, blockDmg: 0.5 } }], script: [1, 0, 2, 0] },
   seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, theme: ['zealot', 'bastion'], rank: 'B', rival: true, hp: 80, passives: { regen: 2 }, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 19, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
   grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, theme: 'reaper', rank: 'D', rival: true, hp: 62, enrage: 0.5, enrageMult: 1.5, skills: [{ n: 'Axe Swing', fx: { dmg: 9 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 6, hits: 3 } }], script: [0, 1, 0, 2] },
   lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, theme: 'venom', rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 5, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
@@ -31,7 +41,15 @@ const ENEMIES = {
   legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
   undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
 };
-const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute'];
+const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute', 'wisp', 'lucky_rat', 'hex_toad', 'acolyte', 'glyph_moth', 'briar_cub', 'grave_hound', 'thunder_ram', 'sunken_knight'];
+// The qualifier ladder: each qualifier round draws its two monsters from its own list, so each round has its own feel.
+// Round 1 the light ones, round 2 the ones that put a status on you, round 3 the heavy hitters. Every monster in MONSTERS
+// is in exactly one round.
+const MONSTER_ROUNDS = [
+  ['goblin', 'imp', 'wisp', 'lucky_rat', 'hex_toad'],
+  ['drake', 'ghoul', 'acolyte', 'glyph_moth', 'briar_cub'],
+  ['golem', 'brute', 'grave_hound', 'thunder_ram', 'sunken_knight'],
+];
 const RIVALS = ['seraphine', 'grukk', 'lyss', 'masked', 'kaito', 'calder', 'delphine', 'mott'];
 // below: you're below them; level; above: you outrank them; grudge: you've beaten them before
 // Lines for named opponents (lore audit, 2 Nov; draft lore/drafts/champions-and-rivals-v2.md). All optional:
