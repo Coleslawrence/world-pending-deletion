@@ -1,13 +1,15 @@
 // ===== [World Pending Deletion] — content: level perks =====
 'use strict';
 // After every battle the System offers a level (+1 level, +1 stat point). The player can skip it for one perk from
-// this list, drawn at random and shown before they choose. Each perk is a one-off lump, sized like a day choice in
+// this list, drawn at random and shown before they choose. A perk is offered at most once a run (run.perksShown) until
+// every perk that fits has been offered. Each perk is a one-off lump, sized like a day choice in
 // Oaken Tower (Healing Touch: +85% max HP and +10 gold): worth about as much as the level it replaces, in another shape.
 //   then: outcomes (outcomes.js), applied when the perk is taken
 //   main: n      n stat points in your main archetype's stat (worked out when taken)
 //   patron: n    n Favour with your patron (worked out when taken)
 //   say:         the words shown, when the outcomes' own words are too vague
-//   when(run, x): only offered while this is true (x.maxHp: your max HP now), so a perk never shows when it would do nothing
+//   when(run, x): only offered while this is true (x.maxHp: your max HP now; x.fateOpen: your world's Fate can still
+//                move; x.noticeRoom: the System's notice can still rise), so a perk never shows when it would do nothing
 const LEVEL_PERKS = {
   severance: { name: 'Severance Pay', then: { gold: 12 }, flavour: '[Your unused training budget, refunded in cash.]' },
   field_medic: { name: 'Field Medic', then: { heal: 0.85, gold: 6 }, say: 'Heal 85% of your max HP and take 6 gold.', when: (run, x) => run.hp < x.maxHp * 0.7, flavour: '[A medic is assigned to you for one evening. Please do not ask their name.]' },
@@ -24,4 +26,15 @@ const LEVEL_PERKS = {
   scouting: { name: 'Scouting Report', then: { foe: { weaken: 3, hp: -0.15 } }, say: 'Your next opponent starts with Weaken 3 and 15% less HP.', flavour: '[Your next opponent has been leaked. The System calls it an accident.]' },
   stipend: { name: 'Stipend', then: { gold: 6, rune: 1 }, flavour: '[A small allowance, and something from the lost and found.]' },
   bounty: { name: 'Open Bounty', then: { stakes: { win: { gold: 18 } } }, say: 'Win your next fight for 18 extra gold.', flavour: '[A price has been put on your next opponent. Collect it.]' },
+  // Added 6 Nov (thin content audit): ten more, so a run of about ten battles never needs a repeat
+  relief: { name: 'Relief Shipment', then: { fate: 1 }, say: "Your world's Fate eases one step.", when: (run, x) => x.fateOpen, flavour: '[Aid has been sent to your world. It was addressed to a different one. Nobody checked.]' },
+  reassessment: { name: 'Reassessment', then: { respec: true }, say: 'Every stat goes back to 1, and you place all the points again.', when: run => run.round >= 2, flavour: '[Your file has been re-graded from the beginning. Please place your points again.]' },
+  warranty: { name: 'Extended Warranty', then: { max_hp: 0.1 }, flavour: '[Coverage extended. Terms apply. The terms are not available.]' },
+  split_grant: { name: 'Split Grant', main: 1, then: { gold: 6 }, flavour: '[Half the grant in training, half in cash. The form allowed both.]' },
+  hazard_pay: { name: 'Hazard Pay', then: { stakes: { win: { gold: 6, piece: 'B', got: '[Hazard pay issued: 6 gold and {item}.]' } } }, say: 'Win your next fight for 6 gold and a free B-rank piece.', flavour: '[Your next fight has been classed as hazardous. The pay reflects it.]' },
+  sabotage: { name: 'Equipment Fault', then: { foe: { hp: -0.25 } }, say: 'Your next opponent starts with 25% less HP.', flavour: "[Your next opponent's healing allotment was misplaced. The System regrets the error.]" },
+  sick_note: { name: 'Sick Note', then: { heal: 0.4, ward: 1 }, say: 'Heal 40% of your max HP, and your next loss costs no Heart.', when: (run, x) => run.hp < x.maxHp * 0.9, flavour: '[Medical exemption filed. Your next defeat will be excused.]' },
+  bulk_payment: { name: 'Bulk Payment', then: { gold: 20, notice: 1 }, say: "Take 20 gold. The System's notice on you rises by 1 step.", when: (run, x) => x.noticeRoom, flavour: '[A large payment. It has been flagged for review.]' },
+  standing_complaint: { name: 'Standing Complaint', then: { always: { foe: { weaken: 1 } } }, say: 'Every opponent from now on starts with Weaken 1.', when: run => run.round >= 4, flavour: '[Your complaint about the other Entrants has been upheld. All of them.]' },
+  lost_and_found: { name: 'Lost and Found', then: { piece: 'C', rune: 1 }, flavour: '[Unclaimed items, released to you. Their owners are not expected back.]' },
 };
