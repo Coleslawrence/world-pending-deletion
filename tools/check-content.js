@@ -283,7 +283,8 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
   Object.keys(e.passives || {}).forEach(p => ref(w, G.ENEMY_PASSIVES[p], `passive ${p} doesn't work on enemies (they can use ${Object.keys(G.ENEMY_PASSIVES).join(', ')})`));
   const ph = e.phase; if (!ph) return;
   const moves = e.skills.concat(ph.add || []);
-  Object.keys(ph).filter(f => !['at', 'say', 'script', 'add', 'set'].includes(f)).forEach(f => err(w + ' phase', `unknown field ${f} (at, say, script, add, set)`));
+  Object.keys(ph).filter(f => !['at', 'say', 'script', 'add', 'set', 'swap'].includes(f)).forEach(f => err(w + ' phase', `unknown field ${f} (at, say, script, add, set, swap)`));
+  if (ph.swap) ref(w + ' phase', typeof ph.swap.name === 'string' && ph.swap.name.length > 0 && Object.keys(ph.swap).every(k => ['name', 'clear'].includes(k)), 'swap is { name, clear? }: the partner who tags in');
   ref(w + ' phase', share(ph.at), 'at is the share of max HP the phase starts at, between 0 and 1');
   ref(w + ' phase', typeof ph.say === 'string' && /^\[.*\]$/.test(ph.say), 'say is the System line announcing it, in [brackets]');
   ref(w + ' phase', Array.isArray(ph.script) && ph.script.length && ph.script.every(i => Number.isInteger(i) && moves[i]), `script must list moves that exist (0 to ${moves.length - 1}; added moves come after the enemy's own)`);

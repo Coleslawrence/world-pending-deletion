@@ -1607,6 +1607,8 @@ function checkPhase(f, B, playerTurn) {
   (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
   if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
   if (ph.script) { B.script = ph.script; B.scriptIdx = 0; }
+  // A duo's partner tags in: a new name, and (clear) none of the Burn, Poison or Bleed that was on the first
+  if (ph.swap) { B.name = ph.swap.name + (B.hard ? ', Veteran' : ''); if (ph.swap.clear) { B.burn = 0; B.poison = 0; B.bleed = 0; } }
   say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
   return true;
 }

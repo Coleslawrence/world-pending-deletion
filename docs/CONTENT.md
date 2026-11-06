@@ -117,6 +117,8 @@ phase: { at: 0.5, say: '[The Forge King\'s anvil cracks.]', add: [{ n: 'Slag Bur
 
 At or below `at` of max HP, the System says `say`, the moves in `add` join its moves (numbered after its own, so the first added move is `skills.length`), and it switches to `script` from the start, with any traits in `set`. Intent stays honest: the move already shown still happens as shown, and the new traits start after it. The scout report says the enemy has a second phase, not what it is.
 
+A **duo** (two Entrants on one entry) is a phase with `swap: { name, clear }`: at the line, the partner tags in under its own name, and with `clear` none of the Burn, Poison or Bleed on the first one carries over. Example: `vey_twins`.
+
 ## The effect menu
 
 Written from the content itself by the checker, so it is always current. "Bot scores it: no" means the balance sims undervalue skills that lean on that effect.
@@ -128,13 +130,13 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | --- | --- | --- | --- | --- |
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
-| `bleed` | 16 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
-| `block` | 76 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `bleed` | 17 | Lacerate (5), Thousand Cuts (1), Scorching Cut (2), … | Apply 5 Bleed. | yes |
+| `block` | 82 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 10 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 6 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
 | `brk` | 31 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
-| `burn` | 41 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
+| `burn` | 43 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `bust` | 4 | Double Down (6), All In (8), Press Your Luck (6), … | (works with other keys on the same skill) | yes |
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
 | `calamity` | 4 | Calamity (4), Catastrophe (5), Aftermath (4), … | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
@@ -150,7 +152,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 28 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 2 | Two-Headed Coin (4), Hedged Bet (3) | (works with other keys on the same skill) | yes |
 | `dieStun` | 4 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 239 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 255 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgPip` | 20 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 5 | Doom (26), Swift Doom (22), Inevitable Doom (40), … | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
@@ -166,14 +168,14 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `heal` | 30 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 8 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 2 | Lucky Coin (1), Insurance (1) | (works with other keys on the same skill) | yes |
-| `hits` | 44 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
+| `hits` | 45 | Flame Wave (2), Quick Slash (2), Fan of Knives (4), … | (works with other keys on the same skill) | yes |
 | `interrupt` | 4 | Counterspell (1), Nullify (1), Spell Theft (1), … | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
 | `jinxDisc` | 5 | Knock on Wood (2), Sore Loser (2), Touch Wood (2), … | Your next jinx this turn costs 2 less. | yes |
 | `keep` | 1 | Wildfire (1) | (works with other keys on the same skill) | no |
 | `keepHalf` | 1 | Aftermath (1) | (works with other keys on the same skill) | no |
 | `killReset` | 3 | Silent Kill (1), Mercy Kill (1), Last Hour (1) | No cooldown if it kills. | no |
 | `leech` | 4 | Leech (3), Blood Leech (6), Parasite (3), … | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
-| `lifesteal` | 15 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
+| `lifesteal` | 16 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
 | `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
 | `mark` | 15 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | no |
@@ -189,7 +191,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perHit` | 14 | Flame Wave (1), Thousand Cuts (1), Fire Rain (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
 | `pierce` | 11 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
-| `poison` | 33 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `poison` | 34 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `read` | 32 | Backdraft ("attack"), Seep ("defend"), Sidestep ("attack"), … | (works with other keys on the same skill) | yes |
@@ -209,7 +211,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `stunIfWeak` | 6 | Overload (1), Numbing Needles (1), Jolt (1), … | If the opponent is Weakened, Stun them. | yes |
 | `thorns` | 9 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
-| `weaken` | 52 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 54 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -347,7 +349,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `thornsAlways` | 6 | Bastion 4 (4), chain_mail (2), crown_of_thorns (3), … | Always have 4 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
 | `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |
 | `vsDisabled` | 2 | verdict_hammer (0.2), Warlord (0.25) | +20% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
-| `vsHalf` | 1 | Reaper 2 (0.35) | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
+| `vsHalf` | 2 | Reaper 2 (0.35), Mother Sable (0.35) | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
 | `vsHard` | 1 | Underdog (0.1) | +10% damage to hard opponents. | add |  |  |  |
 | `vsHigherRank` | 1 | Rank Is Just a Letter (0.1) | +10% damage to opponents of a higher rank than you. | add |  |  |  |
 | `weakPoison` | 1 | Hexblade (3) | Weaken you apply also applies 3 Poison. | add |  |  | Stormcaller, Venom |
@@ -359,7 +361,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `adapt` | 2 | Kaito Ren (0.6), trait Tell-Reader (0.75) |
 | `aura` | 2 | Emperor Kharros the Ashen (0.7), trait Smouldering (1.5) |
 | `briar` | 2 | The Thorn Mother (1), trait Barbed (1) |
-| `dodge` | 4 | Lyss of the Thorn (0.05), trait Elusive (0.12), trait Wildgrown (0.08), … |
+| `dodge` | 5 | Lyss of the Thorn (0.05), Wren Halloway (0.08), trait Elusive (0.12), … |
 | `enrage` | 4 | Grukk the Unbroken (0.5), Emperor Kharros the Ashen (0.5), trait Frenzied (0.5), … |
 | `enrageMult` | 4 | Grukk the Unbroken (1.5), Emperor Kharros the Ashen (1.25), trait Frenzied (1.4), … |
 | `flood` | 2 | The Leviathan Queen (3), trait Tidal (4) |
@@ -400,11 +402,11 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 36 moves |
-| big | a big hit, the one to Block or Stun | 15 moves |
-| guard | Block and nothing else | 22 moves |
-| setup | a status, buff or trick with little damage | 24 moves |
-| sustain | healing or draining | 7 moves |
+| strike | a plain hit | 42 moves |
+| big | a big hit, the one to Block or Stun | 18 moves |
+| guard | Block and nothing else | 28 moves |
+| setup | a status, buff or trick with little damage | 30 moves |
+| sustain | healing or draining | 8 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
 
