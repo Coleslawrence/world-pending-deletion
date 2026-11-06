@@ -1190,6 +1190,12 @@ function pendingSheet() {
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
+  if (p.type === 'levelup') {
+    const L = p.perk && LEVEL_PERKS[p.perk], nx = run.level + 1, lb = hasGift(run, 'latebloomer');
+    const lvBtn = `<button class="choice" data-act="take-level" data-k="level"><div class="sr-h"><span class="sr-name">Level up</span><span class="tagn">Lv ${nx}</span></div><div class="sr-desc">+4 Max HP, rarer pieces in the shop and ${lb ? '2 stat points' : '1 stat point'} to place.</div></button>`;
+    const pBtn = L ? `<button class="choice" data-act="take-level" data-k="perk"><div class="sr-h"><span class="sr-name">Take ${esc(L.name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(levelPerkText(run, p.perk))}${flavHTML(L.flavour)}</div></button>` : '';
+    return sheetWrap('[Level available]', `<p class="sh-p">[Battle logged. Level ${nx} is ready. Take it, or skip it for the perk on offer.]</p>` + lvBtn + pBtn, false, 'sys');
+  }
   if (p.type === 'perk') {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
   }
@@ -1277,15 +1283,15 @@ function resultSheet() {
 }
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
-// Progress to the next level: every 2 points bought is a level
-function lvFill() { return run.level >= 9 ? 100 : (run.bought || 0) % 2 * 50; }
+// Progress through the levels: one is offered after every battle, up to LEVEL_MAX
+function lvFill() { return Math.round((run.level - 1) / (LEVEL_MAX - 1) * 100); }
 // A collapsed section of a sheet: the heading is the tap target
 function sec(title, html, open) { return `<details class="ssec"${open ? ' open' : ''}><summary>${title}</summary><div class="ssec-b">${html}</div></details>`; }
 function statsSheet() {
   const s = effStats(run), p = buildPlayer(run), train = ui.screen === 'shop', pr = pointPrice(run);
   const rows = STATS.map(k => `<div class="strow s4"><span class="st-k">${k}</span><details class="st-n"><summary>${STAT_INFO[k].name}</summary><small>${STAT_INFO[k].short}</small><small class="face">${faceTag(k, s[k])}</small></details><span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.statPts ? `<button class="btn small add" data-act="stat" data-k="${k}" aria-label="Add a point to ${STAT_INFO[k].name}">+</button>` : train ? `<button class="btn small add" data-act="train" data-k="${k}" ${run.gold < pr ? 'disabled' : ''} aria-label="Train ${STAT_INFO[k].name} for ${pr} gold">+${pr}g</button>` : '<span></span>'}</div>`).join('');
   const gods = Object.entries(GODS).map(([g, G]) => `<div class="god"><div class="gd-h"><b>${esc(G.name)}${run.patron === g ? ' · Patron' : ''}</b><span>${run.favour[g] || 0} Favour</span></div><div class="gbar"><i style="width:${Math.min(100, (run.favour[g] || 0) / 8 * 100)}%"></i><em style="left:50%"></em></div><small>Gift at 4, blessing at 8: ${esc(G.blessing)}</small></div>`).join('');
-  const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : train ? `<p class="sh-p">Train a stat: ${pr} gold a point, you have ${run.gold}. Every 2 points is a level: +4 Max HP and rarer pieces in the shop.</p>` : `<p class="sh-p fine">Train stats with gold in the shop.</p>`}${rows}
+  const body = `${run.statPts ? `<p class="sh-p pts">${run.statPts} stat point${run.statPts > 1 ? 's' : ''} to spend.</p>` : train ? `<p class="sh-p">Train a stat: ${pr} gold a point, you have ${run.gold}. Levels come from battles, not training.</p>` : `<p class="sh-p fine">Train stats with gold in the shop.</p>`}${rows}
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
     ${sec('Stat milestones', `<ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>`)}${sec('Title', titleList())}${sec('System quests', questList(), true)}
     ${run.hiddenPath ? sec(`Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}`, `<p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>`) : ''}
@@ -1331,7 +1337,7 @@ function menuSheet() {
 // Never in the practice run (the tutorial covers it there). Seen hints are kept in meta.hints.
 const HINTS = [
   { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
-  { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into stat points. Every 2 points is a level: more HP and rarer pieces.]' },
+  { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into extra stat points, on top of the one each level gives.]' },
   { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. Damage past Block fills it. Full, they are Broken: a lost turn and 50% more damage.]" },
   { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
 ];
@@ -1408,7 +1414,8 @@ function howtoSheet() {
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
     <li><b>Gold:</b> 5 a round, +interest of 1 per 4 gold you hold (up to 5, so a 20-gold bank doubles your income). Reroll for 2.</li>
-    <li><b>Training:</b> in the shop, buy stat points with gold. Each costs a little more than the last. Every 2 points is a level: +4 Max HP and rarer pieces.</li>
+    <li><b>Levels:</b> after every battle, win or lose, take a level (+4 Max HP, rarer pieces in the shop, +1 stat point) or skip it for the perk on offer (gold, a piece, runes, Hearts and more).</li>
+    <li><b>Training:</b> in the shop, buy extra stat points with gold. Each costs a little more than the last. Training never raises your level.</li>
     <li><b>Reactions:</b> Burn + Poison, Burn + Bleed, Bleed + Mark, Stun + Weaken and more trigger bonus effects.</li>
     <li><b>Wagers:</b> a god bets on your next fight. Stake 5 gold for 10 and their Favour.</li>
     <li><b>Titles</b> come from feats and world firsts. Equip one for a small bonus; many unlock new Gifts.</li>
@@ -1650,6 +1657,7 @@ function onAct(el) {
       return render();
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
+    case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Perk instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
     case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
@@ -1723,7 +1731,7 @@ const COACH = [
   { scr: 'shop', pos: 'bottom', hl: '.tile.merge, .tile.owned', text: 'Glowing tiles are copies of pieces you own; the dots show how many you have. Three copies merge into ★2 with +50% power. Copies get a Buy button of their own. Buy both Firebolts.', until: () => ownsStar('firebolt', 2) },
   { scr: 'shop', pos: 'bottom', hl: '[data-act="shop-tab"][data-k="gear"]', text: 'Merged! Now open the Gear shop. Gear gives stats and one passive, and counts toward archetypes too.', wait: 'shop-tab' },
   { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
-  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on stat points, and every 2 points is a level that finds rarer pieces. Gold you keep earns interest: +1 for every 4, up to 5.', wait: 'next' },
+  { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on extra stat points. Levels come from battles. Gold you keep earns interest: +1 for every 4, up to 5.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'Damage past their Block fills the gold break bar, and big hits fill it twice as fast. Full, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },

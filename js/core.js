@@ -490,20 +490,57 @@ function effStats(run) {
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
 function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0))); }
-// Stat points are bought with gold, one at a time, at a rising price (the old XP curve, a point at a time). Every 2
-// points bought is a level: Max HP +4 and better shop odds. Level stops at 9; points stay on sale at the top price.
+// Levels come from fighting: after every battle (win or lose) the System offers a level, which is +1 level (Max HP +4,
+// better shop odds) and +1 stat point, or a Gift drawn at random in its place. Level stops at LEVEL_MAX.
+// Stat points can also be bought with gold, one at a time, at a rising price (Train). Bought points never raise the level.
 const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
+const LEVEL_MAX = 9;
 function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)]; return hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p; }
-function levelFor(bought) { return Math.min(9, 1 + Math.floor(bought / 2)); }
 function trainStat(run, k, msgs) {
   if (!STATS.includes(k)) return false;
   const pr = pointPrice(run); if (run.gold < pr) return false;
-  const before = maxHp(run), lv = run.level;
+  const before = maxHp(run);
   run.gold -= pr; run.stats[k]++; run.bought = (run.bought || 0) + 1;
-  if (hasGift(run, 'latebloomer') && run.bought % 2 === 0) run.statPts++;
-  run.level = levelFor(run.bought); run.hp += maxHp(run) - before;
-  if (run.level > lv) msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. Shop odds improved.]` });
+  run.hp += maxHp(run) - before;
   if (run.milestones) checkMilestones(run, msgs);
+  return true;
+}
+function midGiftPool(run) {
+  const M = run.seed && META ? levelMeta(META) : META;
+  return Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
+}
+// The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now
+function levelPerk(run, rng) { const x = { maxHp: maxHp(run) }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); return pool.length ? pick(pool, rng) : null; }
+function levelPerkOutcomes(run, k) {
+  const L = LEVEL_PERKS[k], T = Object.assign({}, L.then);
+  if (L.main) { const st = ARCH[run.arch[0]].stat; T.stats = Object.assign({}, T.stats, { [st]: L.main }); }
+  if (L.patron && GODS[run.patron]) T.favour = { [run.patron]: L.patron };
+  return T;
+}
+function levelPerkText(run, k) { if (LEVEL_PERKS[k].say) return LEVEL_PERKS[k].say; const t = outcomeText(levelPerkOutcomes(run, k)); return t.charAt(0).toUpperCase() + t.slice(1) + '.'; }
+function offerLevel(run, rng) {
+  if (run.elite || run.level >= LEVEL_MAX || run.pending.some(p => p.type === 'levelup')) return;
+  run.pending.push({ type: 'levelup', perk: levelPerk(run, rng) });
+}
+// Take the level (choice 'level') or the Gift shown in its place (choice 'perk')
+function takeLevel(run, choice, msgs) {
+  const i = run.pending.findIndex(p => p.type === 'levelup'); if (i < 0) return false;
+  const p = run.pending[i];
+  if (choice === 'perk' && LEVEL_PERKS[p.perk]) {
+    run.pending.splice(i, 1);
+    msgs = msgs || [];
+    msgs.push({ t: 'class', text: `[Level declined. Perk issued: ${LEVEL_PERKS[p.perk].name}.]` });
+    const before = maxHp(run), T = levelPerkOutcomes(run, p.perk), ctx = { run, h: eventKit(run, META, stream(run, 'loot'), msgs), msgs, label: LEVEL_PERKS[p.perk].name };
+    applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true);
+    if (T.stats) { run.hp += maxHp(run) - before; checkMilestones(run, msgs); }
+    return true;
+  }
+  run.pending.splice(i, 1);
+  const before = maxHp(run);
+  run.level = Math.min(LEVEL_MAX, run.level + 1); run.statPts++;
+  if (hasGift(run, 'latebloomer')) run.statPts++;
+  run.hp += maxHp(run) - before;
+  msgs && msgs.push({ t: 'level', text: `[Level ${run.level}. +1 stat point${hasGift(run, 'latebloomer') ? ', +1 from Late Bloomer' : ''}. Shop odds improved.]` });
   return true;
 }
 
@@ -1160,6 +1197,7 @@ const OUTCOME_APPLY = {
     if (v.trait) { const have = F.foeTraits || [], add = rollTraits(c.run, v.trait, stream(c.run, 'opps'), have); F.foeTraits = have.concat(add); }
     addMark(c, 'foe', markFoe(v));
   },
+  heal: (v, c) => { const m = maxHp(c.run), b = c.run.hp; c.run.hp = Math.min(m, c.run.hp + Math.round(m * v)); if (c.run.hp > b) c.msgs.push({ t: 'loot', text: `[+${Math.round(c.run.hp - b)} HP.]` }); },
   max_hp: (v, c) => { const b = maxHp(c.run); c.run.hpCut = Math.min(0.5, Math.max(0, (c.run.hpCut || 0) - v)); c.run.hp = Math.min(c.run.hp, maxHp(c.run)); c.msgs.push({ t: v < 0 ? 'loss' : 'loot', text: `[Max HP ${v < 0 ? '−' : '+'}${Math.abs(maxHp(c.run) - b)} for the rest of the run.]` }); },
   erase: (v, c) => { const b = c.run.hearts; c.run.hearts = Math.max(1, c.run.hearts - v); const k = b - c.run.hearts; if (k) { c.msgs.push({ t: 'loss', text: `[−${k} Heart${k > 1 ? 's' : ''}, ${c.run.hearts} left.]` }); eraseRecord(c.run, k, c.msgs); } },
   stakes: (v, c) => { addMark(c, 'stakes', ['win', 'lose'].filter(w => v[w]).map(w => `${w === 'win' ? 'Win' : 'Lose'}: ${outcomeText(v[w])}`));  const S = c.run.nextFlags.stakes = c.run.nextFlags.stakes || {}; ['win', 'lose'].forEach(w => { if (v[w]) S[w] = Object.assign({}, S[w], v[w]); }); },
@@ -1351,9 +1389,7 @@ function completeQuest(run, q, msgs) {
 function extraGiftOffers(run, rng) {
   const c = runCounts(run);
   const top = Object.keys(c).filter(k => run.arch.includes(k)).sort((a, b) => c[b] - c[a])[0] || run.arch[0];
-  const M = run.seed && META ? levelMeta(META) : META;
-  const pool = Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
-  return ['aff_' + top].concat(shuffle(pool, rng).slice(0, 2));
+  return ['aff_' + top].concat(shuffle(midGiftPool(run), rng).slice(0, 2));
 }
 function applyGift(run, k, msgs) {
   if (!GIFTS[k] || hasGift(run, k)) return false;
@@ -2621,7 +2657,7 @@ function resolveFight(run, f, meta, rng) {
   // A shared champion that beats you earns its owner's champion RP (see champWin)
   if (!won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
-  if (!res.death && !res.spared && !res.eliteOver) enterChoose(run, meta, rng, msgs);
+  if (!res.death && !res.spared && !res.eliteOver) { offerLevel(run, stream(run, 'level', rng)); enterChoose(run, meta, rng, msgs); }
   return res;
 }
 function startElite(run, meta, rng) {
@@ -2898,7 +2934,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, levelFor, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
