@@ -509,8 +509,9 @@ function midGiftPool(run) {
   const M = run.seed && META ? levelMeta(META) : META;
   return Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
 }
-// The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now
-function levelPerk(run, rng) { const x = { maxHp: maxHp(run) }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); return pool.length ? pick(pool, rng) : null; }
+// The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now,
+// never one already offered this run while a fresh one fits
+function levelPerk(run, rng) { const t = run.fateTrack || 0, x = { maxHp: maxHp(run), fateOpen: !!FATES[run.world.fate] && t > FATE_TRACK.min && t < FATE_TRACK.max, noticeRoom: !run.noticeOff && (run.notice || 0) < TUNE.noticeMax }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); const fresh = pool.filter(k => !(run.perksShown || []).includes(k)), k = pick(fresh.length ? fresh : pool, rng); if (k) run.perksShown = (run.perksShown || []).concat(k); return k || null; }
 function levelPerkOutcomes(run, k) {
   const L = LEVEL_PERKS[k], T = Object.assign({}, L.then);
   if (L.main) { const st = ARCH[run.arch[0]].stat; T.stats = Object.assign({}, T.stats, { [st]: L.main }); }
