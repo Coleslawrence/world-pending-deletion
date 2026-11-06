@@ -1,6 +1,6 @@
 // [World Pending Deletion] service worker: offline play.
 // Bump VERSION whenever the game files change so players get the update.
-const VERSION = 'wpd-v15';
+const VERSION = 'wpd-v16';
 const CORE = [
   './', 'index.html', 'css/fonts.css', 'css/style.css',
   'fonts/anton-400-latin-ext.woff2', 'fonts/anton-400-latin.woff2', 'fonts/alegreya-sans-400-latin-ext.woff2', 'fonts/alegreya-sans-400-latin.woff2', 'fonts/alegreya-sans-500-latin-ext.woff2', 'fonts/alegreya-sans-500-latin.woff2', 'fonts/alegreya-sans-700-latin-ext.woff2', 'fonts/alegreya-sans-700-latin.woff2', 'fonts/ibm-plex-mono-400-latin-ext.woff2', 'fonts/ibm-plex-mono-400-latin.woff2', 'fonts/ibm-plex-mono-500-latin-ext.woff2', 'fonts/ibm-plex-mono-500-latin.woff2', 'fonts/marcellus-400-latin-ext.woff2', 'fonts/marcellus-400-latin.woff2', 'js/firebase-config.js', 'js/preview.js',
