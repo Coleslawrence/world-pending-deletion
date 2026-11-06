@@ -29,7 +29,7 @@ if (args[0] === '--sample') {
 // When each release went live (UTC). A run with no ver is put in the last release shipped before it finished; a phone
 // still running a cached older build can land one release late, so newer summaries carry their own ver instead.
 const SHIPS = [['wpd-v5', '2026-10-27T16:35Z'], ['wpd-v6', '2026-10-28T13:23Z'], ['wpd-v7', '2026-10-29T12:34Z'], ['wpd-v8', '2026-10-29T15:31Z'],
-  ['wpd-v9', '2026-10-29T23:26Z'], ['wpd-v10', '2026-10-31T09:19Z'], ['wpd-v11', '2026-11-01T02:54Z'], ['wpd-v12', '2026-11-01T23:10Z'], ['wpd-v13', '2026-11-04T11:48Z']].map(([v, t]) => [v, Date.parse(t)]);
+  ['wpd-v9', '2026-10-29T23:26Z'], ['wpd-v10', '2026-10-31T09:19Z'], ['wpd-v11', '2026-11-01T02:54Z'], ['wpd-v12', '2026-11-01T23:10Z'], ['wpd-v13', '2026-11-04T11:48Z'], ['wpd-v14', '2026-11-05T14:35Z']].map(([v, t]) => [v, Date.parse(t)]);
 const verAt = at => { let v = 'wpd-v4'; SHIPS.forEach(([n, t]) => { if (at >= t) v = n; }); return v; };
 const verNum = v => +(String(v).match(/(\d+)$/) || [0, 0])[1];
 const vi = args.indexOf('--ver'), only = vi >= 0 ? args.splice(vi, 2)[1].split(',') : null;
