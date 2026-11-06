@@ -10,6 +10,7 @@
 //   roles, promises   extra bio roles ("You were a {role} of ...") and promises ("You promised ... you would {promise}.")
 //   stages            (Fates) World Pulse lines for rounds 3 and 5, as the trouble grows (they follow "Velmora: ")
 //   crises            (Fates) the Fate Crisis events for rounds 3 and 5 (events/crises.js): answer the trouble or use it
+//   crisisIfUsed      (Fates) the round 5 crisis instead, when the round 3 one was used (its Fate worsened)
 //   ends              (Fates) { lifted, sealed }: the closing line when the run ends with the Fate lifted or sealed (they follow "Velmora: ")
 //   mods              (Fates) modifier weights, e.g. { bloodmoon: 3, none: 1 }; without it the usual weights apply
 //   epithets          (Peoples) what the System may call a champion of this people; the first is earned when the custom first pays out
@@ -23,8 +24,8 @@
 // the Fate's from 100, the People's from 200, a Confluence type's from 300.
 const FATES = {
   // mods: each Fate brings the modifiers that fit it; across all Fates each modifier is about as common as before layers
-  longnight: { name: 'The Long Night', line: 'The sun has not risen in eleven years.', crises: ['crisis_longnight_1', 'crisis_longnight_2'],
-    ends: { lifted: 'the sun rose this morning. Nobody knows what to do with it.', sealed: 'the Lamp Ward is dark. Nobody remembers what a sunrise looked like.' }, mods: { none: 6, restless: 6 },
+  longnight: { name: 'The Long Night', line: 'The sun has not risen in eleven years.', crises: ['crisis_longnight_1', 'crisis_longnight_2'], crisisIfUsed: 'crisis_longnight_2u',
+    ends: { lifted: 'the sun rose this morning. Nobody knows what to do with it.', sealed: 'the Lamp Ward is dark. Nobody remembers what a sunrise looked like.' }, mods: { none: 6, restless: 6, siege: 2 },
     stages: ['the Long Night enters its twelfth year. Candles are rationed.', 'the last lamp oil has been shared out. The dark holds.'],
     promises: ['bring back the sun', 'see one more dawn'],
     entries: [
@@ -32,8 +33,8 @@ const FATES = {
       { k: 'custom', tier: 'far', name: 'The Last Sunrise', text: 'Painted on every ceiling, so nobody forgets what it looked like.' },
       { k: 'person', tier: 'city', name: 'The Dawn Watcher', text: 'Has faced east every morning for eleven years. Still hopeful.' },
     ] },
-  plague: { name: 'The Grey Plague', line: 'A grey sickness spreads, and no cure has worked.', crises: ['crisis_plague_1', 'crisis_plague_2'],
-    ends: { lifted: 'the Quarantine Wall is coming down. Nobody has been marked in a week.', sealed: 'every door carries the grey mark now. There is no one left to chalk them.' }, mods: { restless: 6, famine: 3, none: 3 },
+  plague: { name: 'The Grey Plague', line: 'A grey sickness spreads, and no cure has worked.', crises: ['crisis_plague_1', 'crisis_plague_2'], crisisIfUsed: 'crisis_plague_2u',
+    ends: { lifted: 'the Quarantine Wall is coming down. Nobody has been marked in a week.', sealed: 'every door carries the grey mark now. There is no one left to chalk them.' }, mods: { restless: 6, famine: 3, none: 3, strange: 3 },
     stages: ['the Grey Plague has reached the capital.', 'half the doors now carry the grey mark.'],
     promises: ['find a cure', 'outlive the plague'],
     entries: [
@@ -41,8 +42,8 @@ const FATES = {
       { k: 'custom', tier: 'city', name: 'The Grey Mark', text: 'Chalk on the door of a sick house. Most doors have one now.' },
       { k: 'person', tier: 'far', name: 'The Plague Doctor', text: 'Has tried every cure in the old books. Is writing a new book.' },
     ] },
-  hunger: { name: 'The Hungry Years', line: 'The harvests have failed four years running.', crises: ['crisis_hunger_1', 'crisis_hunger_2'],
-    ends: { lifted: 'the first harvest in five years came in. The Ration Bell has been retired.', sealed: 'the Empty Granary is a museum now. Admission is one loaf.' }, mods: { famine: 9, none: 3 },
+  hunger: { name: 'The Hungry Years', line: 'The harvests have failed four years running.', crises: ['crisis_hunger_1', 'crisis_hunger_2'], crisisIfUsed: 'crisis_hunger_2u',
+    ends: { lifted: 'the first harvest in five years came in. The Ration Bell has been retired.', sealed: 'the Empty Granary is a museum now. Admission is one loaf.' }, mods: { famine: 9, none: 3, market: 2 },
     stages: ['the seed stores are open. They were meant to stay shut.', 'bread is now something people say quietly.'],
     promises: ['fill the granaries again', 'bring home bread'],
     entries: [
@@ -50,8 +51,8 @@ const FATES = {
       { k: 'custom', tier: 'city', name: 'The Ration Bell', text: 'Rings once a day. Everyone knows exactly how long until it rings.' },
       { k: 'person', tier: 'city', name: 'The Seed Keeper', text: 'Guards the last sack of good seed. Has not slept well in years.' },
     ] },
-  civilwar: { name: 'Civil War', line: 'Two factions claim the same world, and neither will yield.', crises: ['crisis_civilwar_1', 'crisis_civilwar_2'],
-    ends: { lifted: 'both sides ate together, and nobody went back to war in the morning.', sealed: 'one side won. The other is not mentioned any more.' }, mods: { bloodmoon: 9, none: 3 },
+  civilwar: { name: 'Civil War', line: 'Two factions claim the same world, and neither will yield.', crises: ['crisis_civilwar_1', 'crisis_civilwar_2'], crisisIfUsed: 'crisis_civilwar_2u',
+    ends: { lifted: 'both sides ate together, and nobody went back to war in the morning.', sealed: 'one side won. The other is not mentioned any more.' }, mods: { bloodmoon: 9, none: 3, siege: 3 },
     stages: ['both sides claim your wins as their own.', 'the ceasefire is holding, barely, while you fight.'],
     promises: ['end the war', 'bring both sides to one table'],
     entries: [
@@ -59,8 +60,8 @@ const FATES = {
       { k: 'custom', tier: 'city', name: 'The Ceasefire Feast', text: 'One night a year, both sides eat together. Then the war resumes.' },
       { k: 'person', tier: 'city', name: 'The Turncoat Captain', text: 'Has switched sides three times. Both sides still want them back.' },
     ] },
-  silence: { name: 'The Silence', line: 'The gods stopped answering a year before the sky opened.', crises: ['crisis_silence_1', 'crisis_silence_2'],
-    ends: { lifted: 'the gods answered. They said they were sorry. Nobody believed them.', sealed: 'the temples are empty. The gods were never coming back.' }, mods: { none: 4, restless: 4, golden: 4 },
+  silence: { name: 'The Silence', line: 'The gods stopped answering a year before the sky opened.', crises: ['crisis_silence_1', 'crisis_silence_2'], crisisIfUsed: 'crisis_silence_2u',
+    ends: { lifted: 'the gods answered. They said they were sorry. Nobody believed them.', sealed: 'the temples are empty. The gods were never coming back.' }, mods: { none: 4, restless: 4, golden: 4, strange: 4 },
     stages: ['still no answer from the gods. The prayers get louder.', 'the temples have started praying to you instead.'],
     promises: ['make the gods answer', 'learn why the gods went quiet'],
     entries: [
@@ -68,8 +69,8 @@ const FATES = {
       { k: 'custom', tier: 'far', name: 'The Listening Hour', text: 'At noon the whole world stops talking, in case the gods do.' },
       { k: 'person', tier: 'city', name: 'The Last Oracle', text: 'Hears nothing now. Charges the same price.' },
     ] },
-  lastgen: { name: 'The Last Generation', line: 'No child has been born here in ten years.', crises: ['crisis_lastgen_1', 'crisis_lastgen_2'],
-    ends: { lifted: 'a child was born this morning. The whole world came to see.', sealed: 'the Naming Stone is full. Nobody will add another name.' }, mods: { none: 5, golden: 3, famine: 4 },
+  lastgen: { name: 'The Last Generation', line: 'No child has been born here in ten years.', crises: ['crisis_lastgen_1', 'crisis_lastgen_2'], crisisIfUsed: 'crisis_lastgen_2u',
+    ends: { lifted: 'a child was born this morning. The whole world came to see.', sealed: 'the Naming Stone is full. Nobody will add another name.' }, mods: { none: 5, golden: 3, famine: 4, strange: 2 },
     stages: ['the youngest has stopped asking when the others are coming.', 'they have started naming the empty cradles after you.'],
     promises: ['hear a child laugh again', 'make sure someone comes after us'],
     entries: [
@@ -77,8 +78,8 @@ const FATES = {
       { k: 'custom', tier: 'city', name: 'The Naming Stone', text: 'Lists every child ever born here. The last name is ten years old.' },
       { k: 'person', tier: 'city', name: 'The Youngest', text: 'Ten years old, and the whole world knows their name.' },
     ] },
-  sundering: { name: 'The Sundering', line: 'The land is cracking apart, a little more each year.', crises: ['crisis_sundering_1', 'crisis_sundering_2'],
-    ends: { lifted: 'the Great Rift has closed. The two halves are arguing about who saved whom.', sealed: 'there are two worlds now, and neither one will speak to the other.' }, mods: { bloodmoon: 7, none: 5 },
+  sundering: { name: 'The Sundering', line: 'The land is cracking apart, a little more each year.', crises: ['crisis_sundering_1', 'crisis_sundering_2'], crisisIfUsed: 'crisis_sundering_2u',
+    ends: { lifted: 'the Great Rift has closed. The two halves are arguing about who saved whom.', sealed: 'there are two worlds now, and neither one will speak to the other.' }, mods: { bloodmoon: 7, none: 5, siege: 3 },
     stages: ['a new crack opened overnight. Nobody fell in this time.', 'the rift splits the world in two. Both halves are watching.'],
     promises: ['hold the world together', 'mend the great crack'],
     entries: [
@@ -91,8 +92,8 @@ const FATES = {
     lineBy: { drowned: 'The isles stopped sinking for a whole year. It was entered anyway.', burning: 'The war paused for a harvest festival. It was entered anyway.',
       hollow: 'The dead have rested for a whole season. It was entered anyway.', verdant: 'The forest has not eaten anyone in years. It was entered anyway.',
       sky: 'No city has fallen from the sky in a generation. It was entered anyway.', iron: 'The siege lifted last spring. It was entered anyway.',
-      steppes: 'The storm has been almost gentle lately. It was entered anyway.' }, crises: ['crisis_goldenage_1', 'crisis_goldenage_2'],
-    ends: { lifted: 'still nothing wrong. The System has stopped checking.', sealed: 'the festival square is ash. Something is finally wrong.' }, mods: { golden: 9, none: 3 },
+      steppes: 'The storm has been almost gentle lately. It was entered anyway.' }, crises: ['crisis_goldenage_1', 'crisis_goldenage_2'], crisisIfUsed: 'crisis_goldenage_2u',
+    ends: { lifted: 'still nothing wrong. The System has stopped checking.', sealed: 'the festival square is ash. Something is finally wrong.' }, mods: { golden: 9, none: 3, market: 4 },
     stages: ['the festival has a new song. It is about you.', 'still nothing wrong. The System is checking again.'],
     promises: ['keep things exactly as they are', 'come home in time for the festival'],
     entries: [
@@ -106,7 +107,7 @@ function fateLine(F, type) { return (F.lineBy && F.lineBy[type]) || F.line; }
 const PEOPLES = {
   // roles follow "You were a ...", so each starts with a consonant sound; epithets follow a champion's name
   temple: { name: 'Temple State', line: 'Ruled by priests, who rule by omens.',
-    custom: { name: 'Omens', text: 'Every Favour you gain is 1 more, and gods speak up at 3 Favour.' },
+    custom: { name: 'Omens', text: 'Every Favour you gain is 1 more, and gods speak up at 3 Favour.' }, visit: { at: 2, event: 'temple_omens' },
     roles: ['temple novice', 'candle bearer'], epithets: ['the Devout', 'the Anointed'],
     entries: [
       { k: 'place', tier: 'city', name: 'The High Altar', text: 'Every law is read aloud here first, then argued about forever.' },
@@ -114,7 +115,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Hierarch', text: 'Has ruled for forty years. Claims the omens agree.' },
     ] },
   league: { name: 'Merchant League', line: 'The guilds own everything, including the weather reports.',
-    custom: { name: 'Guild rates', text: 'Shop rerolls cost 1 less gold, and selling pays 1 more.' },
+    custom: { name: 'Guild rates', text: 'Shop rerolls cost 1 less gold, and selling pays 1 more.' }, visit: { at: 4, event: 'league_audit' },
     roles: ['ledger clerk', 'caravan guard'], epithets: ['the Bargainer', 'the Tallied'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Counting House', text: 'Where the guilds meet. Every chair has a price on it.' },
@@ -122,7 +123,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Guildmaster', text: 'Owns a share of everything, including you.' },
     ] },
   clans: { name: 'The Clans', clash: ['steppes'], line: 'Twelve clans, one old feud, and a council that never ends.',
-    custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' },
+    custom: { name: 'The Blood Tally', text: 'Whoever beats you comes back next round, with a bounty on them.' }, visit: { at: 6, event: 'clan_tally' },
     roles: ['clan runner', 'feud keeper'], epithets: ['of the Twelve', 'the Feud-Born'],
     entries: [
       { k: 'place', tier: 'far', name: 'The Moot Stone', text: 'Where the clans swear peace. It has been re-carved many times.' },
@@ -130,7 +131,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Eldest of the Clans', text: 'Remembers why the feud started. Refuses to say.' },
     ] },
   archive: { name: 'The Archive', line: 'Scholars run everything, slowly, with footnotes.',
-    custom: { name: 'Footnotes', text: 'The Enchanter and rune picks show one more prefix.' },
+    custom: { name: 'Footnotes', text: 'The Enchanter and rune picks show one more prefix.' }, visit: { at: 2, event: 'archive_account' },
     roles: ['junior scribe', 'copyist'], epithets: ['the Lettered', 'the Annotated'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Great Index', text: 'Lists every book in the world. Six volumes of it are missing.' },
@@ -147,7 +148,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Speaker', text: 'Chosen by lot. Still trying to give the job back.' },
     ] },
   crown: { name: 'The Old Crown', clash: ['burning', 'iron'], line: 'A dynasty older than the maps, and still in charge.',
-    custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' },
+    custom: { name: 'Royal bounty', text: 'Gatekeepers pay a free B-rank piece when you beat them.' }, visit: { at: 6, event: 'crown_summons' },
     roles: ['palace page', 'royal taster'], epithets: ['the Loyal', 'the Crown-Sworn'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Throne Room', text: 'The throne is older than the palace built around it.' },
@@ -155,7 +156,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Old Monarch', text: 'Has reigned so long the coins show them at three ages.' },
     ] },
   exiles: { name: 'Exiles', line: 'Descended from refugees of a world already erased.',
-    custom: { name: 'Salvage Rights', text: 'Beat an Erased champion or a filed record and get a Heart back.' },
+    custom: { name: 'Salvage Rights', text: 'Beat an Erased champion or a filed record and get a Heart back.' }, visit: { at: 4, event: 'exiles_words' },
     roles: ['refugee scout', 'name keeper'], epithets: ['the Displaced', 'of No Shore'],
     entries: [
       { k: 'place', tier: 'city', name: 'The Landing', text: 'Where the first refugees arrived. Their boats are kept as a monument.' },
@@ -163,7 +164,7 @@ const PEOPLES = {
       { k: 'person', tier: 'city', name: 'The Last Witness', text: 'Was born in the old world. Never describes it the same way twice.' },
     ] },
   pilgrims: { name: 'Pilgrims', line: 'A people who never stay anywhere longer than a season.',
-    custom: { name: 'The road', text: 'Four districts to pick from each round instead of three.' },
+    custom: { name: 'The road', text: 'Four districts to pick from each round instead of three.' }, visit: { at: 6, event: 'pilgrims_road' },
     roles: ['road cook', 'pathfinder'], epithets: ['the Wanderer', 'of the Road'],
     entries: [
       { k: 'place', tier: 'far', name: 'The Waystones', text: 'Mark the old pilgrim road. Nobody remembers where it ends.' },

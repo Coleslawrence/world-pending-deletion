@@ -414,27 +414,27 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 57 (quests, levels, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 18 (events) |
-| `heart` | 1 | +1 max Heart |  | 12 (quests, levels, events) |
-| `rune` | 1 | a rune |  | 16 (quests, levels, events) |
-| `piece` | "B" | a free B-rank piece |  | 39 (quests, levels, events) |
+| `gold` | 8 | 8 gold |  | 64 (quests, levels, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 22 (events) |
+| `heart` | 1 | +1 max Heart |  | 15 (quests, levels, events) |
+| `rune` | 1 | a rune |  | 19 (quests, levels, events) |
+| `piece` | "B" | a free B-rank piece |  | 46 (quests, levels, events) |
 | `experimental` | 1 | an Experimental item |  | 2 (levels, events) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 28 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 19 (levels, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 33 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 22 (levels, events) |
 | `heal` | 0.5 | 50% of max HP healed |  | 2 (levels) |
-| `max_hp` | -0.1 | −10% max HP |  | 8 (levels, events) |
-| `restore` | 1 | 1 Heart restored |  | 13 (quests, levels, events) |
-| `erase` | 1 | 1 Heart erased |  | 6 (events) |
-| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 10 (levels, events) |
+| `max_hp` | -0.1 | −10% max HP |  | 9 (levels, events) |
+| `restore` | 1 | 1 Heart restored |  | 20 (quests, levels, events) |
+| `erase` | 1 | 1 Heart erased |  | 8 (events) |
+| `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 12 (levels, events) |
 | `respec` | true | your stat points to place again |  | 2 (levels, events) |
-| `summon` | {"who":"copy"} | a visitor in your bracket |  | 6 (events) |
+| `summon` | {"who":"copy"} | a visitor in your bracket |  | 7 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
-| `ward` | 1 | a ward on your next loss |  | 14 (levels, events) |
+| `ward` | 1 | a ward on your next loss |  | 17 (levels, events) |
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
-| `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 5 (levels, events) |
-| `fate` | 1 | your world's Fate eased | yes | 75 (quests, levels, events) |
-| `notice` | 1 | the System's notice | yes | 73 (levels, events) |
+| `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 6 (levels, events) |
+| `fate` | 1 | your world's Fate eased | yes | 99 (quests, levels, events) |
+| `notice` | 1 | the System's notice | yes | 87 (levels, events) |
 | `chain` | "done" | the story goes on | yes | 70 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 13 (quests, events) |
 
@@ -446,6 +446,8 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | --- | --- | --- | --- | --- | --- | --- |
 | `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt, quest w_hunger |
 | `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner, quest w_exiles |
+| `blocked` | fight | Block 25 damage in a single fight | 25 |  |  | wager |
+| `breaker` | fight | Break the opponent's guard | 1 |  |  | wager |
 | `chances` | chance | Win 3 chance rolls in one run | 3 |  |  | Title Lucky Seven |
 | `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
 | `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector, quest w_league |
@@ -460,13 +462,14 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | `merge` | merge | Merge pieces |  |  |  | quest merge4, quest w_goldenage |
 | `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal, quest w_silence |
 | `outranked` | win | Beat an opponent 2 rank letters above your Entrant Rank | 2 |  |  | Title Rank Is Just a Letter, quest w_crown |
-| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | quest h_overkill, quest w_temple |
+| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | wager, quest h_overkill, quest w_temple |
 | `path` | path | Have the System recognise your path by round 5 | 5 |  |  | quest path5, quest w_archive |
 | `quick` | fight | Use 3 Quick skills in a single turn | 3 |  |  | Title Spellweaver |
 | `react` | fight | Trigger 2 reactions | 2 | yes |  | wager, Title Alchemist, quest react6, quest w_pilgrims |
 | `rival` | win | Defeat a rival |  |  |  | quest rival_noheal, quest w_civilwar |
 | `stop` | win | Stun or Interrupt the opponent's big move |  |  |  | wager |
 | `stuns` | fight | Stun or Interrupt one opponent 3 times | 3 |  |  | quest h_stun3 |
-| `untouched` | win | Win without losing any HP |  |  |  | Title Untouched, quest w_plague |
+| `untouched` | win | Win without losing any HP |  |  |  | wager, Title Untouched, quest w_plague |
 | `wagers` | wager | Win 3 wagers in one run | 3 |  |  | Title High Roller |
+| `wounded` | win | Win with half your HP or less |  |  |  | wager |
 <!-- effects:end -->

@@ -3,7 +3,6 @@
 // turns up WORLD_LEAN times as often in a world with either, and each has a line only that Fate or People can take.
 // A Fate's line eases the Fate, at a price.
 'use strict';
-const patronOr = (run, h) => (GODS[run.patron] ? run.patron : h.pick(Object.keys(GODS)));
 
 EVENTS.lamp_seller = { fate: 'longnight', people: 'league', title: 'The Lamp Seller', text: 'A seller has lamps that burn without oil. She swears they came from a world where the sun never set.', opts: [
   { label: 'Pay 5 gold', desc: 'For a lamp that never goes out.', pay: 5, then: { ward: 1 }, reveal: '[The lamp burns all night. Your next loss costs no Heart.]' },
@@ -33,11 +32,11 @@ EVENTS.two_banners = { fate: 'civilwar', people: 'crown', title: 'Two Banners', 
   { check: { people: 'crown' }, label: "Fly the Crown's colours", desc: 'Above both.', then: { piece: 'B', got: "[The Crown rewards loyalty in the old way: {item}.]" } }] };
 
 EVENTS.silent_bell = { fate: 'silence', people: 'temple', title: 'The Silent Bell', text: 'A temple bell hangs in the tunnel with its clapper removed. Pilgrims ring it anyway.', opts: [
-  { label: 'Ring it', desc: 'Someone might be listening.', then: {}, go: (run, h) => { h.say('[No sound. Someone hears it anyway.]'); h.favour(patronOr(run, h), 1); } },
+  { label: 'Ring it', desc: 'Someone might be listening.', then: {}, go: (run, h) => { h.say('[No sound. Someone hears it anyway.]'); h.favour(patronOf(run, h), 1); } },
   { roll: { stat: 'STR' }, label: 'Put the clapper back', desc: 'It is lying right there.', then: { piece: 'C', got: '[The bell rings for the first time in years. The pilgrims give you what they brought: {item}.]' },
     fail: { then: { next: { weaken: 2 } }, reveal: '[The bell is heavier than it looks. You start your next fight Weakened for 2 turns.]' } },
   { check: { fate: 'silence' }, label: 'Listen for an answer', desc: 'As long as it takes.', then: { fate: 1 }, go: (run, h) => h.lose(0.05, 'You kneel until your knees give out.') },
-  { check: { people: 'temple' }, label: 'Lead the prayer', desc: 'The priests taught you the words.', then: { notice: -1 }, go: (run, h) => h.favour(patronOr(run, h), 2) }] };
+  { check: { people: 'temple' }, label: 'Lead the prayer', desc: 'The priests taught you the words.', then: { notice: -1 }, go: (run, h) => h.favour(patronOf(run, h), 2) }] };
 
 EVENTS.toy_stall = { fate: 'lastgen', people: 'exiles', title: 'The Toy Stall', text: 'A stall sells toys. Nobody has bought one in years. The seller dusts them every morning.', opts: [
   { label: 'Pay 3 gold', desc: 'For a wooden horse.', pay: 3, then: { stats: { LUK: 2 } }, reveal: '[You keep it in your pocket. It feels lucky. +2 LUK.]' },

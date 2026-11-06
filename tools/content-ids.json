@@ -424,6 +424,9 @@
   "famine",
   "golden",
   "restless",
+  "market",
+  "siege",
+  "strange",
   "corrupted"
  ],
  "fates": [
@@ -638,6 +641,9 @@
   "bankrupt",
   "chances",
   "jinxes",
+  "breaker",
+  "wounded",
+  "blocked",
   "wagers"
  ],
  "outcomes": [
@@ -778,8 +784,23 @@
   "crisis_sundering_2",
   "crisis_goldenage_1",
   "crisis_goldenage_2",
+  "crisis_longnight_2u",
+  "crisis_plague_2u",
+  "crisis_hunger_2u",
+  "crisis_civilwar_2u",
+  "crisis_silence_2u",
+  "crisis_lastgen_2u",
+  "crisis_sundering_2u",
+  "crisis_goldenage_2u",
   "council_vote",
-  "power_struggle"
+  "power_struggle",
+  "temple_omens",
+  "league_audit",
+  "clan_tally",
+  "archive_account",
+  "crown_summons",
+  "exiles_words",
+  "pilgrims_road"
  ],
  "chains": [
   "official",
@@ -882,8 +903,23 @@
   "crisis_sundering_2": 3,
   "crisis_goldenage_1": 3,
   "crisis_goldenage_2": 3,
+  "crisis_longnight_2u": 3,
+  "crisis_plague_2u": 3,
+  "crisis_hunger_2u": 3,
+  "crisis_civilwar_2u": 3,
+  "crisis_silence_2u": 3,
+  "crisis_lastgen_2u": 3,
+  "crisis_sundering_2u": 3,
+  "crisis_goldenage_2u": 3,
   "council_vote": 3,
-  "power_struggle": 2
+  "power_struggle": 2,
+  "temple_omens": 3,
+  "league_audit": 3,
+  "clan_tally": 3,
+  "archive_account": 3,
+  "crown_summons": 3,
+  "exiles_words": 3,
+  "pilgrims_road": 3
  },
  "lore": {
   "drowned": {

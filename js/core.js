@@ -306,7 +306,7 @@ function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k
 
 // ---------- Worlds ----------
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
-const MOD_W = [30, 15, 15, 15, 15];
+const MOD_W = [30, 15, 15, 15, 15, 10, 10, 10];
 // The modifiers in the normal draw (MOD_W is theirs, in order). A glitch modifier (Corrupted Save) comes another way
 const modKeys = () => Object.keys(MODIFIERS).filter(k => !MODIFIERS[k].glitch);
 // A world offer is sometimes a Corrupted Save (never in Pending World, which gets it on Glitch Day)
@@ -973,13 +973,16 @@ function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; 
 // The feats a god will bet on. Trials never ask one that is unfair for any archetype; wagers and quests skip it for the run that leans on one.
 const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
 const WAGERS = {};
-WAGER_FEATS.forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
+const GOD_WAGERS = Object.values(GODS).map(g => g.wager).filter(Boolean);
+WAGER_FEATS.concat(GOD_WAGERS).forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 // The Silence (lore audit, 2 Nov): no Favour and no wagers in a Silence world until its Fate is lifted
 function silent(run) { return !!run && !run.practice && !run.chosenNow && run.world.fate === 'silence' && (run.fateTrack || 0) < FATE_TRACK.max; }
 function makeWager(run, rng) {
   const god = run.patron !== 'none' && rnd(rng) < 0.6 ? run.patron : pick(Object.keys(GODS), rng);
   const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
-  return { god, key: pick(keys, rng) };
+  // About half the time a god bets on its own favourite (GODS[x].wager)
+  const own = GODS[god].wager, mine = own && featPossible(run, own) && featFair(run, own) && rnd(rng) < 0.5;
+  return { god, key: mine ? own : pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
 function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); return o; }
@@ -1030,6 +1033,7 @@ function rollDistricts(run, rng) {
   const want = customOf(run, 'pilgrims') ? 4 : 3; // Pilgrims: the road, one more district to pick from
   const out = []; let g = 0; while (out.length < want && g++ < 50) { const k = wpick(keys, keys.map(x => w[x]), rng); if (!out.includes(k)) out.push(k); }
   if (run.hp < maxHp(run) * 0.45 && !out.includes('infirmary')) out[2] = 'infirmary';
+  if (run.world.mod === 'strange' && !out.includes('undercity')) out[out[2] === 'infirmary' ? 1 : 2] = 'undercity'; // Strange Times: the Undercity is always open
   return out;
 }
 function infirmary(run) { const f = (run.world.mod === 'famine' ? 0.25 : 0.5) + (districtUp(run, 'infirmary') ? 0.15 : 0); const m = maxHp(run), b = run.hp; run.hp = Math.min(m, run.hp + Math.round(m * f)); return run.hp - b; }
@@ -1132,7 +1136,7 @@ const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, 
 function rollChance(run, r) {
   const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
   const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
-  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0)); // The House, Loaded Dice
+  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0) + (run.world.mod === 'strange' ? 10 : 0)); // The House, Loaded Dice, Strange Times
   return floor && run.chanceFloorAt !== run.round ? Math.max(c2, floor) : c2;
 }
 // A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
@@ -1178,6 +1182,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
     if (run.rolls) delete run.rolls[key];
   }
   const before = msgs.length, T = B.then || {};
+  if (EVENTS[key].crisis && FATES[run.world.fate] && FATES[run.world.fate].crises[0] === key) run.crisisUsed = (T.fate || 0) < 0;
   const ctx = { run, h, msgs, chain: EVENTS[key].chain, from: EVENTS[key].title };
   applyOutcomes(T, ctx, false);
   if (B.go) B.go(run, h);
@@ -1275,7 +1280,8 @@ function fateEnd(run) {
 function crisisDue(run) {
   const F = FATES[run.world.fate], at = PULSE.stageAt.indexOf(run.round);
   if (!F || !F.crises || at < 0 || run.practice || run.elite) return null;
-  const k = F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
+  // Round 5 branches on round 3: a crisis that was used brings crisisIfUsed instead (run.crisisUsed, set in resolveEvent)
+  const k = at > 0 && F.crisisIfUsed && run.crisisUsed ? F.crisisIfUsed : F.crises[at]; return EVENTS[k] && !(run.seen || []).includes(k) ? k : null;
 }
 // The run is decided: say how the Fate ended. A lifted Fate in a spared world gives a Heart back, and its entry comes back partial
 function closeFate(run, msgs, spared) {
@@ -1479,7 +1485,7 @@ function enterChoose(run, meta, rng, msgs) {
   run.visit = (run.visit || 0) + 1;
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
   if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
-  run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0);
+  run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0) + (run.world.mod === 'market' ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
@@ -1761,7 +1767,7 @@ function newFight(run, rng) {
   };
   [A, B].forEach(X => {
     const P = X.P;
-    X.block += (P.startBlock || 0) + Math.round((P.startBlockPct || 0) * X.maxHp);
+    X.block += (P.startBlock || 0) + Math.round(((P.startBlockPct || 0) + (run.world.mod === 'siege' && !run.elite ? 0.15 : 0)) * X.maxHp);
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
