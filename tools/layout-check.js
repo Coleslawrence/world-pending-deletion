@@ -72,6 +72,7 @@ function states() {
     out.push({ label: 'kit-stats', stage: 'kitstats', run: ks });
     // Path evolution card: the two advanced classes for an archetype at 6 pieces
     out.push({ label: 'path-evolution', stage: 'shop', run: mid.run, pending: [{ type: 'adv', arch: 'reaper' }] });
+    out.push({ label: 'level-up', stage: 'choose', run: mid.run, pending: [{ type: 'levelup', perk: 'field_medic' }] });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };

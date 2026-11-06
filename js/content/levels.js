@@ -10,7 +10,7 @@
 //   when(run, x): only offered while this is true (x.maxHp: your max HP now), so a perk never shows when it would do nothing
 const LEVEL_PERKS = {
   severance: { name: 'Severance Pay', then: { gold: 12 }, flavour: '[Your unused training budget, refunded in cash.]' },
-  field_medic: { name: 'Field Medic', then: { heal: 0.85, gold: 6 }, when: (run, x) => run.hp < x.maxHp * 0.7, flavour: '[A medic is assigned to you for one evening. Please do not ask their name.]' },
+  field_medic: { name: 'Field Medic', then: { heal: 0.85, gold: 6 }, say: 'Heal 85% of your max HP and take 6 gold.', when: (run, x) => run.hp < x.maxHp * 0.7, flavour: '[A medic is assigned to you for one evening. Please do not ask their name.]' },
   requisition: { name: 'Requisition', then: { piece: 'B' }, flavour: '[Form 7-B approved. One item, issued from stores.]' },
   priority: { name: 'Priority Requisition', then: { piece: 'A' }, when: run => run.round >= 4, flavour: '[Form 7-A approved. Someone senior signed it without reading.]' },
   allotment: { name: 'Rune Allotment', then: { rune: 2 }, flavour: '[Two runes released from the archive. Sign here. And here.]' },
