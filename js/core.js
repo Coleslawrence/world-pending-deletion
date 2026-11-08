@@ -193,7 +193,7 @@ function sanitizeRec(r, type) {
 // ---------- Gifts ----------
 const SIGILS = ['✦', '☾', '♜', '⚔', '❖', '✠'];
 const SIGIL_COLS = ['#d6a04f', '#72d0ff', '#e15b52', '#9fd86a', '#c27ce6', '#efe6d8'];
-function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank]; }
+function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank] + (world.bounty === 'gift' ? BOUNTIES.gift.points : 0); }
 function giftUnlocked(k, meta) { const g = GIFTS[k]; if (!g.lock) return true; if (!meta) return false; if (g.lock === 'echo') return !!meta.unlocks['gift_' + k]; if (g.lock === 'chain') return !!(meta.found && meta.found[k]); return !!meta.titles[g.lock]; }
 function giftLockText(k) { const g = GIFTS[k]; if (g.lock === 'echo') return 'Unlock with Echoes'; if (g.lock === 'chain') return 'Found at the end of an event chain'; return 'Earn the Title: ' + TITLES[g.lock].name; }
 function giftsAllowed(world) { const wg = WORLD_TYPES[world.type].gift; return Object.keys(GIFTS).filter(k => GIFTS[k].cat !== 'extra' && (GIFTS[k].cat !== 'world' || k === wg)); }
@@ -375,6 +375,19 @@ function offerWorlds(meta, rng) {
   }
   return out;
 }
+// World bounties: one world in each offer carries a bounty, shown on its card. Never in Pending World (the daily world
+// doesn't come from an offer) and never on a world asked for with Steer.
+const BOUNTIES = {
+  echoes: { name: 'Echo bounty', desc: 'Echoes from this world are doubled.', mul: 2 },
+  rank: { name: 'Rank bounty', desc: 'Rank Points from this world +50%.', mul: 1.5 },
+  gift: { name: 'Gift bounty', desc: '+2 Gift Points at the Awakening.', points: 2 },
+};
+function worldBounty(worlds, rng) {
+  const open = worlds.filter(w => !w.steered); if (!open.length) return worlds;
+  pick(open, rng).bounty = pick(Object.keys(BOUNTIES), rng);
+  return worlds;
+}
+function bountyOf(run, k) { return !!(run && run.world && run.world.bounty === k && !run.seed && !run.practice); }
 // Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built
 // around the layer you name: a world type, a Fate or a People. Everything else about it is drawn as usual. Only layers
 // that can come up for you are listed (a type whose home class is still locked can't). Pending World ignores it.
@@ -2751,7 +2764,7 @@ function echoesFor(run, outcome) {
   let e = 3 * run.wins;
   if (outcome === 'spared' || outcome === 'elite') e += 10 + (5 - run.world.rank) * 3;
   e += 8 * run.eliteWins;
-  return e;
+  return bountyOf(run, 'echoes') ? e * BOUNTIES.echoes.mul : e;
 }
 function endRun(run, meta, outcome) {
   if (outcome === 'erased') { run.hearts = 0; eraseRecord(run, REC_MAX); } // an abandoned world goes all at once
@@ -2873,7 +2886,7 @@ function sanitizeRank(r, m) {
 // RP for a finished run: 10 a win, 1 a Heart left, 20 for a spared world, times the world's rank (E ×1 up to S ×2)
 function rpFor(run, outcome) {
   const spared = outcome !== 'erased';
-  return Math.round((10 * (run.wins || 0) + Math.max(0, run.hearts) + (spared ? 20 : 0)) * (1 + 0.2 * run.world.rank));
+  return Math.round((10 * (run.wins || 0) + Math.max(0, run.hearts) + (spared ? 20 : 0)) * (1 + 0.2 * run.world.rank) * (bountyOf(run, 'rank') ? BOUNTIES.rank.mul : 1));
 }
 function awardRank(run, meta, outcome) {
   if (run.practice || !meta.rank) return { rp: 0, trial: null };
@@ -2916,7 +2929,7 @@ function runProgress(meta, gain) {
 // Elite wins come after the spared world is filed, so they pay their RP when the run closes
 function eliteRank(run, meta) {
   if (run.practice || !meta.rank || !run.eliteWins) return { rp: 0, trial: null };
-  const rp = Math.round(10 * run.eliteWins * (1 + 0.2 * run.world.rank)); meta.rank.rp += rp;
+  const rp = Math.round(10 * run.eliteWins * (1 + 0.2 * run.world.rank) * (bountyOf(run, 'rank') ? BOUNTIES.rank.mul : 1)); meta.rank.rp += rp;
   run.rpEarned = (run.rpEarned || 0) + rp; run.trialOpened = run.trialOpened || openTrial(meta.rank);
   return { rp, trial: run.trialOpened };
 }
@@ -3036,7 +3049,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

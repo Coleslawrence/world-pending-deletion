@@ -53,6 +53,8 @@ jobs:
         run: node tools/progress-test.js
       - name: Spoils test
         run: node tools/spoils-test.js
+      - name: World bounty test
+        run: node tools/bounty-test.js
 
   balance:
     name: Balance gate

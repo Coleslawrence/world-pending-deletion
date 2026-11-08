@@ -50,6 +50,7 @@ p { margin: 0; }
 .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .tag { font-size: var(--fs-1); text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border: 1px solid var(--line2); border-radius: var(--r-s); color: var(--muted); white-space: nowrap; }
 .tag.uniq { border-color: var(--bronze); color: var(--bronze); }
+.tag.bounty { border-color: var(--gold-hi); color: var(--gold-hi); }
 .eyebrow { font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .14em; text-transform: uppercase; color: var(--sys); }
 .hint { font-size: var(--fs-2); color: var(--muted); }
 

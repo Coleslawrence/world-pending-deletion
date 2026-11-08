@@ -538,7 +538,7 @@ function worldsHTML() {
     const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod], F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix];
     const classes = w.v >= 2 ? worldArch(w, meta.unlocks) : [T.home];
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
-      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${rankChip(w.rank)}</div>
+      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${rankChip(w.rank)}</div>${w.bounty && BOUNTIES[w.bounty] ? `<div class="pk-row"><span class="tag bounty">${esc(BOUNTIES[w.bounty].name)}</span><span class="pk-mut">${esc(BOUNTIES[w.bounty].desc)}</span></div>` : ''}
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
       <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
@@ -1553,7 +1553,7 @@ function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); if (meta.steer) ui.worlds.push(meta.steer); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
+    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = worldBounty(offerWorlds(meta)); if (meta.steer) ui.worlds.push(meta.steer); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
@@ -1708,7 +1708,7 @@ function onAct(el) {
       saveRun(); return go(stageScreen());
     }
     case 'enter-elite': startElite(run, meta); ui.end = null; ui.sheet = null; ui.fight = null; saveRun(); return go(stageScreen());
-    case 'end-run': { const extra = run.eliteWins * 8; meta.echoes += extra; eliteRank(run, meta); saveMeta(); const snap = meta.champions[0]; ui.end = { kind: 'spared', snap, totalEchoes: echoesFor(run, 'spared') + extra, rp: run.rpEarned || 0, opened: run.trialOpened, observed: finishDaily(true) }; run.ended = true; lsDel(RUN_KEY); ui.fight = null; return go('end'); }
+    case 'end-run': { const extra = run.eliteWins * 8 * (bountyOf(run, 'echoes') ? BOUNTIES.echoes.mul : 1); meta.echoes += extra; eliteRank(run, meta); saveMeta(); const snap = meta.champions[0]; ui.end = { kind: 'spared', snap, totalEchoes: echoesFor(run, 'spared') + extra, rp: run.rpEarned || 0, opened: run.trialOpened, observed: finishDaily(true) }; run.ended = true; lsDel(RUN_KEY); ui.fight = null; return go('end'); }
   }
 }
 // ---------- Practice run (tutorial) ----------
