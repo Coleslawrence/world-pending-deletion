@@ -51,6 +51,8 @@ jobs:
         run: node tools/prefix-test.js
       - name: End screen progress test
         run: node tools/progress-test.js
+      - name: Spoils test
+        run: node tools/spoils-test.js
 
   balance:
     name: Balance gate

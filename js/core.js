@@ -946,12 +946,65 @@ function specStyle(spec) {
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
-  if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
+  const sp = spec.spoils && SPOILS[spec.spoils] ? `. Spoils: ${SPOILS[spec.spoils].short}` : '';
+  if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 5 gold, a rune and a rare shop slot' : ' and 5 gold') + sp;
   if (spec.kind === 'final') return 'Spares your world. Theirs is not';
-  if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
-  if (spec.gate) return '3 gold, a stat point, a rune and a rare shop slot';
-  if (spec.hard) return '3 gold, a rune and a rare shop slot';
-  return '3 gold';
+  if (spec.kind === 'erased') return '5 gold, a rune, a rare shop slot and one of their pieces' + sp;
+  if (spec.gate) return '5 gold, a stat point, a rune and a rare shop slot' + sp;
+  if (spec.hard) return '5 gold, a rune and a rare shop slot' + sp;
+  return '5 gold' + sp;
+}
+// ---------- Spoils ----------
+// Every opponent but the Final Champion carries Spoils, named on their card: after the win, pick 1 of 3 of that kind,
+// or leave them for SPOILS_SKIP gold. Hard opponents carry pieces; the easy one carries pieces, training or supplies.
+// Drawn from their own 'spoils' stream, so seeded runs (Pending World) get the same Spoils for everyone and nothing else shifts.
+const SPOILS = {
+  skill: { name: 'Skill', short: '1 of 3 skills', say: 'Choose a skill.' },
+  gear: { name: 'Gear', short: '1 of 3 gear', say: 'Choose a piece of gear.' },
+  stat: { name: 'Training', short: '+1 to a stat', say: 'Choose a stat to raise by 1.' },
+  supplies: { name: 'Supplies', short: '1 of 3 supplies', say: 'Choose your supplies.' },
+};
+const SPOILS_SKIP = 2, SPOILS_GOLD = 6, SPOILS_HEAL = 0.4, SPOILS_REROLLS = 2;
+function assignSpoils(run, rng) {
+  if (run.script || !run.choices) return;
+  run.choices.forEach(c => { if (c.kind !== 'final') c.spoils = pick(c.hard ? ['gear', 'skill'] : ['skill', 'stat', 'supplies'], rng); });
+}
+// The 3 offers for a kind, all of them takeable right now (no full-Heart Heart, no full-HP heal)
+function spoilsOffers(run, kind, rng) {
+  if (kind === 'skill' || kind === 'gear') {
+    const out = []; let g = 0;
+    while (out.length < 3 && g++ < 30) { const p = rollPiece(run, rng, { kind }); if (p && !out.some(x => x.id === p.id)) out.push(p); }
+    return out.map(p => ({ k: 'piece', id: p.id, mods: p.mods || [] }));
+  }
+  if (kind === 'stat') return shuffle(STATS, rng).slice(0, 3).map(k => ({ k: 'stat', stat: k }));
+  const sup = [{ k: 'gold', n: SPOILS_GOLD }];
+  if (run.hearts < run.maxHearts) sup.push({ k: 'heart', n: 1 });
+  if (run.hp < maxHp(run)) sup.push({ k: 'heal', n: SPOILS_HEAL });
+  sup.push({ k: 'rerolls', n: SPOILS_REROLLS });
+  return sup.slice(0, 3);
+}
+function spoilsText(o) {
+  if (o.k === 'piece') return pieceDef(o.id).name;
+  if (o.k === 'stat') return `+1 ${o.stat}`;
+  if (o.k === 'gold') return `+${o.n} gold`;
+  if (o.k === 'heart') return 'Restore 1 Heart';
+  if (o.k === 'heal') return `Heal ${Math.round(o.n * 100)}% HP`;
+  return `${o.n} free shop rerolls this round`;
+}
+// i: the offer taken, or 'skip' for SPOILS_SKIP gold
+function takeSpoils(run, i, msgs) {
+  const at = run.pending.findIndex(p => p.type === 'spoils'); if (at < 0) return false;
+  const P = run.pending[at], o = i === 'skip' ? null : P.offers[+i];
+  if (i !== 'skip' && !o) return false;
+  run.pending.splice(at, 1);
+  if (!o) { run.gold += SPOILS_SKIP; msgs && msgs.push({ t: 'loot', text: `[Spoils left on the floor. The cleaners pay ${SPOILS_SKIP} gold for the trouble.]` }); return true; }
+  if (o.k === 'piece') { const p = addPiece(run, o.id, o.mods, msgs); p.got = `[Spoils: ${pieceDef(o.id).name}.]`; msgs && msgs.push({ t: 'loot', text: p.got, item: o.id, u: p.u }); }
+  else if (o.k === 'stat') { run.stats[o.stat]++; msgs && msgs.push({ t: 'level', text: `[Spoils: +1 ${o.stat}.]` }); checkMilestones(run, msgs); }
+  else if (o.k === 'gold') { run.gold += o.n; msgs && msgs.push({ t: 'loot', text: `[Spoils: +${o.n} gold.]` }); }
+  else if (o.k === 'heart') OUTCOME_APPLY.restore(o.n, { run, msgs: msgs || [] });
+  else if (o.k === 'heal') { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * o.n)); msgs && msgs.push({ t: 'loot', text: `[Spoils: +${Math.round(run.hp - b)} HP.]` }); }
+  else if (o.k === 'rerolls') { run.freeRerolls = (run.freeRerolls || 0) + o.n; msgs && msgs.push({ t: 'loot', text: `[Spoils: ${o.n} free rerolls in this round's shop.]` }); }
+  return true;
 }
 function chooseOpponent(run, i, wagerOn) {
   run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
@@ -1497,6 +1550,7 @@ function enterChoose(run, meta, rng, msgs) {
   [crisisDue(run), visitDue(run), clashDue(run)].forEach(k => { if (k && !run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
+  assignSpoils(run, stream(run, 'spoils', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
   const sm = run.choices.find(c => c.summoned && c.say); if (sm) msgs && msgs.push({ t: 'class', text: sm.say });
   run.wager = makeWager(run, stream(run, 'opps', rng));
@@ -2625,6 +2679,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
     if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
+    if (spec.spoils && SPOILS[spec.spoils] && !run.elite && spec.kind !== 'final') run.pending.push({ type: 'spoils', kind: spec.spoils, offers: spoilsOffers(run, spec.spoils, stream(run, 'spoils', rng)) });
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
       const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
@@ -2983,7 +3038,7 @@ if (typeof module !== 'undefined') module.exports = {
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
-  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
+  makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,

@@ -1190,6 +1190,12 @@ function pendingSheet() {
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
+  if (p.type === 'spoils') {
+    const K = SPOILS[p.kind] || SPOILS.supplies;
+    const body = p.offers.map((o, i) => o.k === 'piece' && pieceDef(o.id) ? `<button class="choice ${mainTag(o.id)}" data-act="take-spoils" data-i="${i}">${pieceBody(o.id, 1, o.mods)}</button>`
+      : `<button class="choice" data-act="take-spoils" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(spoilsText(o))}</span><span class="tagn">${esc(K.name)}</span></div></button>`).join('');
+    return sheetWrap(`[Spoils · ${K.name}]`, `<p class="sh-p">[Victory logged. ${esc(K.say)} Or leave it for ${SPOILS_SKIP} gold.]</p>` + body, `<button class="btn ghost" data-act="take-spoils" data-i="skip">Leave it · +${SPOILS_SKIP} gold</button>`, 'sys', true);
+  }
   if (p.type === 'levelup') {
     const L = p.perk && LEVEL_PERKS[p.perk], nx = run.level + 1, lb = hasGift(run, 'latebloomer');
     const lvBtn = `<button class="choice" data-act="take-level" data-k="level"><div class="sr-h"><span class="sr-name">Level up</span><span class="tagn">Lv ${nx}</span></div><div class="sr-desc">+4 Max HP, rarer pieces in the shop and ${lb ? '2 stat points' : '1 stat point'} to place.</div></button>`;
@@ -1666,6 +1672,7 @@ function onAct(el) {
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
     case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Perk instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
+    case 'take-spoils': { const P = run.pending.find(x => x.type === 'spoils'), o = P && d.i !== 'skip' && P.offers[+d.i]; if (!takeSpoils(run, d.i, msgs)) return render(); pushMsgs(msgs, false, o ? `Spoils: ${spoilsText(o)}` : 'Spoils left'); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
     case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
