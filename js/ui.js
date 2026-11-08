@@ -1479,6 +1479,14 @@ function shareBlock(s, erased) {
   if (meta.shared && meta.shared[s.at]) return `<p class="sh-p fine center">[${esc(s.champ)} is shared with other entrants.]</p>`;
   return `<button class="btn" data-act="share" data-k="${erased ? 'erased' : 'spared'}">Share ${esc(s.name || s.champ)} with other entrants</button>`;
 }
+// End screen: what this run moved. Round and wins, then a bar each for Entrant Rank, Echoes and Titles, and the nearest goal.
+function progressHTML(e, s) {
+  const titles = run && run.titles0 != null ? Math.max(0, Object.keys(meta.titles).length - run.titles0) : null;
+  const P = runProgress(meta, { rp: e.rp || 0, echoes: e.totalEchoes != null ? e.totalEchoes : e.echoes, titles });
+  const unit = { rank: ' RP', echoes: '', titles: '' };
+  const rows = P.bars.map(b => `<div class="pg-row pg-${b.k}" title="${esc(b.text)}"><span class="pg-l">${esc(b.label)}</span><span class="pg-bar" role="progressbar" aria-label="${esc(b.label + ': ' + b.text)}" aria-valuemin="0" aria-valuemax="${b.max}" aria-valuenow="${b.now}"><i style="width:${Math.round(100 * Math.min(1, b.now / (b.max || 1)))}%"></i></span><span class="pg-g">${b.gain ? `+${b.gain}${unit[b.k]}` : ''}</span></div>`).join('');
+  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
+}
 function endHTML() {
   const e = ui.end, s = e.snap;
   const erased = e.kind === 'erased';
@@ -1486,7 +1494,7 @@ function endHTML() {
   return `<main class="screen title end ${erased ? 'erased' : 'spared'}">${broadcastTicker(erased ? `++ BREAKING +++ [Entrant eliminated. ${s.worldName} is erased.] +++` : `++ LIVE +++ [${s.worldName} is spared.] +++`)}<div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
     ${runCard(s, { erased, big: true })}</div>
-    <div class="t-stats"><div><b>${s.round}</b><span>round</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div><div><b>+${e.rp || 0}</b><span>RP</span></div></div>
+    ${progressHTML(e, s)}
     ${shareBlock(s, erased)}
     <div class="stack">${e.observed ? `<div class="row2 even"><button class="btn" data-act="daily-board">Today's outcomes</button><button class="btn primary" data-act="new">New world</button></div>` : '<button class="btn primary" data-act="new">Choose a new world</button>'}<div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div></div></main>`;
 }

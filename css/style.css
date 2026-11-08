@@ -86,6 +86,17 @@ p { margin: 0; }
 .logo .brk { -webkit-text-fill-color: var(--sys); color: var(--sys); text-shadow: 0 0 18px rgba(114,208,255,.35); }
 .title h1 { font-size: clamp(44px, 13vw, 64px); line-height: .95; letter-spacing: .03em; text-transform: uppercase; background: linear-gradient(180deg, #fff3dc 20%, var(--bronze) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .lede { color: var(--muted); font-size: var(--fs-3); }
+/* End screen progress: what the run moved */
+.progress { border: 1px solid var(--line); border-radius: var(--r-l); background: var(--panel); padding: 7px 10px; display: grid; gap: 4px; }
+.progress .pg-head { margin: 0; font-size: var(--fs-1); color: var(--muted); }
+.progress .pg-head b { color: var(--bronze); font-weight: 500; }
+.pg-rows { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center; font-size: var(--fs-1); }
+.pg-row { display: contents; }
+.pg-l { color: var(--text); }
+.pg-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.pg-bar i { display: block; height: 100%; background: var(--bronze); }
+.pg-g { color: var(--bronze); font-variant-numeric: tabular-nums; text-align: right; min-width: 3.5em; }
+.pg-next { margin: 0; font-size: var(--fs-1); }
 .t-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .t-stats button { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .t-stats > * { border: 1px solid var(--line); border-radius: var(--r-l); padding: 10px; display: grid; gap: 2px; background: var(--panel); }
@@ -474,6 +485,8 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 @container app (max-height: 860px) { .end { padding-block: 14px 12px; gap: 10px; } .end h1 { font-size: var(--fs-5); } .end .sysbox p + p { display: none; } .end .t-stats > * { padding: 6px 8px; } .end .t-stats b { font-size: var(--fs-4); } .end .rc-l:nth-of-type(n+5) { display: none; } }
 @container app (max-height: 700px) { .end .rc-bio { display: none; } }
 @container app (max-height: 660px) { .end .runcard { gap: 4px; padding: 8px 10px; } .end .t-top { gap: 8px; } }
+/* The progress panel needs the room on short screens: the run card keeps its name, round strip and record; skills and gear stay in the Halls */
+@container app (max-height: 760px) { .end .runcard .rc-l:not(.rc-rec) { display: none; } .end .progress { padding: 6px 10px; gap: 3px; } }
 .toast.t-broadcast { color: var(--ink); background: linear-gradient(180deg, var(--gold-hi), var(--bronze)); border-color: var(--gold-hi); font-weight: 500; box-shadow: 0 0 24px rgba(214,160,79,.5); }
 .msgs li.t-broadcast { color: var(--bronze); font-family: var(--f-m); font-size: var(--fs-2); }
 .log p.t-broadcast { color: var(--bronze); }

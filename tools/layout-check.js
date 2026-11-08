@@ -73,6 +73,8 @@ function states() {
     // Path evolution card: the two advanced classes for an archetype at 6 pieces
     out.push({ label: 'path-evolution', stage: 'shop', run: mid.run, pending: [{ type: 'adv', arch: 'reaper' }] });
     out.push({ label: 'level-up', stage: 'choose', run: mid.run, pending: [{ type: 'levelup', perk: 'field_medic' }] });
+    // End screens: an erased world and a spared one, with the progress bars and next goal
+    out.push({ label: 'end-erased', stage: 'end-erased', run: mid.run }, { label: 'end-spared', stage: 'end-spared', run: mid.run });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
     return { meta, list: out };
@@ -156,6 +158,7 @@ function inspect() {
         ui.sheet = null; run.pending = pending || [];
         if (stage === 'fight') startFightUI();
         else if (stage === 'worlds') onAct({ dataset: { act: 'new' } });
+        else if (stage.startsWith('end-')) { const kind = stage.slice(4), out = endRun(run, meta, kind); ui.end = { kind, echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial }; run.ended = true; ui.screen = 'end'; render(); }
         else { ui.screen = stage; ui.sheet = sheet || null; render(); }
       }, [st.stage, st.sheet, st.pending]);
       await page.evaluate(() => document.fonts.ready);

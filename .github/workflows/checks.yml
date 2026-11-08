@@ -49,6 +49,8 @@ jobs:
         run: node tools/advance-test.js
       - name: Prefix test
         run: node tools/prefix-test.js
+      - name: End screen progress test
+        run: node tools/progress-test.js
 
   balance:
     name: Balance gate

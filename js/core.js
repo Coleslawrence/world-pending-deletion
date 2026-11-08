@@ -434,6 +434,7 @@ function newRun(world, setup, meta, rng) {
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer, setup.sysBonus);
   const G = setup.gifts;
   const run = {
+    titles0: Object.keys((meta && meta.titles) || {}).length, // Titles held when the run began, for the end screen's progress bars
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
     stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0, notice: 0,
     gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
@@ -2828,6 +2829,35 @@ function awardRank(run, meta, outcome) {
   return { rp, trial: openTrial(R) };
 }
 function openTrial(R) { const nx = nextRank(R.letter); if (R.trial || !nx || R.rp < RANK_RP[nx]) return null; R.trial = nx; return nx; }
+
+// ---------- End screen progress ----------
+// The bars a finished run moved (Entrant Rank, Echoes, Titles) and one line naming the nearest goal, so even an erased world
+// shows progress. gain: { rp, echoes, titles } earned this run (null parts show no "+"). Pending World runs pass meta as it is.
+function runProgress(meta, gain) {
+  gain = gain || {}; const bars = [], goals = [];
+  const R = meta.rank;
+  if (R) {
+    const nx = nextRank(R.letter);
+    if (R.trial) { bars.push({ k: 'rank', label: `Rank ${R.letter}`, now: 1, max: 1, gain: gain.rp, text: `${R.trial}-rank trial ready` }); goals.push({ w: 0, text: `Next: your ${R.trial}-rank Rank Trial waits in your next world.` }); }
+    else if (nx) {
+      const lo = RANK_RP[R.letter] || 0, hi = RANK_RP[nx], need = Math.max(0, hi - R.rp);
+      bars.push({ k: 'rank', label: `Rank ${R.letter}`, now: Math.max(0, R.rp - lo), max: hi - lo, gain: gain.rp, text: `${need} RP to ${nx}` });
+      goals.push({ w: need / 60, text: `Next: ${need} RP to your ${nx}-rank trial.` });
+    }
+  }
+  const left = Object.keys(UNLOCKS).filter(k => !meta.unlocks[k]).sort((a, b) => UNLOCKS[a].cost - UNLOCKS[b].cost);
+  if (left.length) {
+    const U = UNLOCKS[left[0]], need = Math.max(0, U.cost - meta.echoes);
+    bars.push({ k: 'echoes', label: 'Echoes', now: Math.min(meta.echoes, U.cost), max: U.cost, gain: gain.echoes, text: need ? `${need} to ${U.name}` : 'Unlock ready' });
+    goals.push({ w: need ? need / 35 : -1, text: need ? `Next: ${need} Echoes to ${U.name}.` : `Next: you can buy ${U.name} in the Echoes sheet.` });
+  } else bars.push({ k: 'echoes', label: 'Echoes', now: 1, max: 1, gain: gain.echoes, text: `${meta.echoes} banked` });
+  const ids = Object.keys(TITLES), have = ids.filter(k => meta.titles[k]).length;
+  bars.push({ k: 'titles', label: 'Titles', now: have, max: ids.length, gain: gain.titles, text: `${have} of ${ids.length}` });
+  const open = ids.find(k => !meta.titles[k]);
+  if (open) goals.push({ w: 1.5, text: `Next: earn ${TITLES[open].name}. ${TITLES[open].cond}` });
+  goals.sort((a, b) => a.w - b.w);
+  return { bars, next: goals.length ? goals[0].text : null };
+}
 // Elite wins come after the spared world is filed, so they pay their RP when the run closes
 function eliteRank(run, meta) {
   if (run.practice || !meta.rank || !run.eliteWins) return { rp: 0, trial: null };
@@ -2948,7 +2978,7 @@ if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
-  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
+  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
