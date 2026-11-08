@@ -73,6 +73,9 @@ function states() {
     // Path evolution card: the two advanced classes for an archetype at 6 pieces
     out.push({ label: 'path-evolution', stage: 'shop', run: mid.run, pending: [{ type: 'adv', arch: 'reaper' }] });
     out.push({ label: 'level-up', stage: 'choose', run: mid.run, pending: [{ type: 'levelup', perk: 'field_medic' }] });
+    // Spoils after a win: three gear cards, and the supplies list
+    out.push({ label: 'spoils-gear', stage: 'choose', run: mid.run, pending: [{ type: 'spoils', kind: 'gear', offers: G.spoilsOffers(mid.run, 'gear', Math.random) }] });
+    out.push({ label: 'spoils-supplies', stage: 'choose', run: mid.run, pending: [{ type: 'spoils', kind: 'supplies', offers: [{ k: 'gold', n: 6 }, { k: 'heart', n: 1 }, { k: 'heal', n: 0.4 }] }] });
     // End screens: an erased world and a spared one, with the progress bars and next goal
     out.push({ label: 'end-erased', stage: 'end-erased', run: mid.run }, { label: 'end-spared', stage: 'end-spared', run: mid.run });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));

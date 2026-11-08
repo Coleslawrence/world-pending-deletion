@@ -388,6 +388,27 @@ function worldBounty(worlds, rng) {
   return worlds;
 }
 function bountyOf(run, k) { return !!(run && run.world && run.world.bounty === k && !run.seed && !run.practice); }
+// Back yourself (an Echo sink): before a run, stake Echoes on how far it gets. Paid at the goal's odds when the run ends,
+// lost otherwise. Kept in meta.backing until a normal run starts (never Pending World or practice), then on run.backing.
+const BACK_STAKES = [5, 10, 25];
+const BACK_GOALS = {
+  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 2 },
+  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 3 },
+  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 4 },
+};
+function placeBacking(meta, goal, stake) {
+  if (meta.backing || !BACK_GOALS[goal] || !BACK_STAKES.includes(stake) || meta.echoes < stake) return false;
+  meta.echoes -= stake; meta.backing = { goal, stake }; return true;
+}
+function withdrawBacking(meta) { if (!meta.backing) return false; meta.echoes += meta.backing.stake; delete meta.backing; return true; }
+function claimBacking(run, meta) { if (run.seed || run.practice || !meta.backing) return false; run.backing = Object.assign({}, meta.backing); delete meta.backing; return true; }
+function settleBacking(run, meta, outcome) {
+  const B = run.backing; if (!B || B.settled) return null;
+  const G = BACK_GOALS[B.goal]; B.settled = true;
+  B.met = G ? (B.goal === 'spared' ? outcome !== 'erased' : run.round >= G.round) : false;
+  B.paid = B.met ? B.stake * G.mul : 0; meta.echoes += B.paid;
+  return B;
+}
 // Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built
 // around the layer you name: a world type, a Fate or a People. Everything else about it is drawn as usual. Only layers
 // that can come up for you are listed (a type whose home class is still locked can't). Pending World ignores it.
@@ -2774,6 +2795,7 @@ function endRun(run, meta, outcome) {
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
+  settleBacking(run, meta, outcome);
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
   return { echoes: e, snap, rp: rk.rp, trial: rk.trial };
@@ -3049,7 +3071,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

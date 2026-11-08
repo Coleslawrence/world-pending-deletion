@@ -55,6 +55,8 @@ jobs:
         run: node tools/spoils-test.js
       - name: World bounty test
         run: node tools/bounty-test.js
+      - name: Back yourself test
+        run: node tools/backing-test.js
 
   balance:
     name: Balance gate
