@@ -190,7 +190,7 @@ function stripProg() {
   let h = '';
   for (let i = 1; i <= ROUNDS; i++) h += `<i class="${run.elite || i < run.round ? 'done' : i === run.round ? 'now' : ''}${i === ROUNDS ? ' fin' : ''}"></i>`;
   if (run.elite) run.eliteBracket.forEach((_, i) => { h += `<i class="elite ${i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : ''}"></i>`; });
-  return `<div class="st-prog"><b>${esc(roundLabel())}</b>${h}</div>`;
+  return `<button class="st-prog" data-act="sheet" data-s="bracket" aria-label="${esc(roundLabel())}. Open the tournament bracket"><b>${esc(roundLabel())} ›</b>${h}</button>`;
 }
 function strip() {
   const mh = maxHp(run);
@@ -1514,6 +1514,23 @@ function deskSheet() {
   const body = top + (rows.length ? `<h4>In force this run</h4>${rows.join('')}` : top ? '' : '<p class="sh-p">[Nothing on the desk. No rules changed.]</p>');
   return sheetWrap('[The desk]', body, `<button class="btn primary" data-act="close">Close</button>`);
 }
+// The tournament bracket: every round from the qualifiers down to the Final, each row narrower than the last as the
+// field halves. Fought rounds show the result, this round its opponents, rounds ahead what the rules have scheduled.
+function bracketSheet() {
+  const B = bracketMap(run), n = B.rows.length;
+  const row = (R, i) => {
+    const w = Math.round(100 - i * (40 / (n - 1)));
+    const head = `<div class="bk-bar" style="width:${w}%"><b>${R.stage === 'final' ? 'Final' : 'R' + R.round}</b><span>${R.stage === 'final' ? esc(R.foes || 'Final Champion') : R.label}</span><em>${R.field} left</em></div>`;
+    const fights = R.fights.map(f => `<div class="bk-l ${f.won ? 'won' : 'lost'}">${f.won ? 'Won' : 'Lost'} · ${esc(f.name)}${f.hearts ? ` · −${f.hearts}♥` : ''}</div>`).join('');
+    const opps = R.opponents.map(o => `<div class="bk-l bko${o.chosen ? ' on' : ''}">${o.chosen ? 'Facing' : o.gate ? 'Gatekeeper' : o.hard ? 'Hard' : 'Open'} · ${esc(o.name)}${o.spoils ? ` · Spoils: ${esc(o.spoils)}` : ''}</div>`).join('');
+    const ahead = R.state === 'ahead' && R.stage !== 'final' ? `<div class="bk-l dim">${esc(R.foes)} · a loss costs ${R.heart}♥${R.stage === 'main' ? ', the hard one 1 more' : ''}</div>` : '';
+    const marks = R.marks.map(m => `<div class="bk-l mk-${m.k}">${esc(m.text)}</div>`).join('');
+    return `<div class="bk-row ${R.state} ${R.stage}${R.gate ? ' gate' : ''}">${head}${fights}${opps}${ahead}${marks}</div>`;
+  };
+  const elite = B.elite.length ? `<h4>Elite bracket</h4>` + B.elite.map((e, i) => `<div class="bk-row elite ${e.state}"><div class="bk-bar" style="width:${60 - i * 6}%"><b>E${i + 1}</b><span>${esc(e.name)}</span></div></div>`).join('') : '';
+  const lead = run.elite ? '[Your world is spared. What is left is pride.]' : `[${BRACKET_FIELD[0]} Entrants. One world walks out. You are ${run.round >= ROUNDS ? 'in the Final' : `in round ${run.round}, among the last ${BRACKET_FIELD[run.round - 1]}`}.]`;
+  return sheetWrap('[Tournament bracket]', `<p class="sh-p">${lead}</p><div class="bk">${B.rows.map(row).join('')}</div>${elite}<p class="sh-p fine">Each round: choose an opponent, visit a district, shop, fight. Opponents are drawn when the round begins.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
 function backingSheet() {
   const B = meta.backing;
   if (B && BACK_GOALS[B.goal]) {
@@ -1590,7 +1607,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }

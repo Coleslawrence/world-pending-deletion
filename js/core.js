@@ -1116,6 +1116,43 @@ function tickCurse(run, meta, msgs, rng) {
   msgs.push({ t: 'loot', text: `[${(CURSES[C.id] || {}).name || 'The curse'} lifts. The door pays what it promised.]` });
   shapeApply(C.pay, shapeCtx(run, msgs, 'Cursed door', rng));
 }
+// ---------- The bracket map ----------
+// The whole tournament on one page: 3 qualifiers, 4 main bracket rounds and the Final, the field halving each round.
+// Each round says what is known about it by the tournament's own rules: fights already fought, the opponents on the
+// card now, and what is scheduled ahead (a Gatekeeper, a rules review, a crisis, a Rank Trial...). It draws nothing,
+// so it never shifts a seeded run. Unlisted doors are on no map, this one included.
+const BRACKET_FIELD = [256, 128, 64, 32, 16, 8, 4, 2];
+const BRACKET_STAGES = { qualifier: 'Qualifier', main: 'Main bracket', final: 'Final' };
+function bracketStage(r) { return r >= ROUNDS ? 'final' : r <= 3 ? 'qualifier' : 'main'; }
+function bracketMap(run) {
+  const F = FATES[run.world.fate], P = PEOPLES[run.world.people], V = P && P.visit, done = run.shapeDone || {}, live = shaped(run) && !run.ended;
+  const rows = [];
+  for (let r = 1; r <= ROUNDS; r++) {
+    const stage = bracketStage(r), state = run.elite || r < run.round || (run.ended && r <= run.round) ? 'done' : r === run.round ? 'now' : 'ahead';
+    const fights = (run.history || []).filter(h => h.round === r && (h.kind === 'final') === (r >= ROUNDS) && !['champion', 'legend'].includes(h.kind)).map(h => ({ name: h.name, won: !!h.won, hearts: h.hl || 0, hard: !!h.hard }));
+    const row = { round: r, stage, label: BRACKET_STAGES[stage], field: BRACKET_FIELD[r - 1], state, gate: GATES.includes(r) && !run.practice, fights, marks: [], opponents: [] };
+    if (stage === 'final') row.foes = ENEMIES[finalId(run)].name;
+    if (state !== 'done') {
+      const at = Object.assign({}, run, { round: r });
+      row.heart = heartCost(at, null);
+      row.foes = stage === 'final' ? ENEMIES[finalId(run)].name : stage === 'qualifier' ? 'Monsters of this world' : 'Rival Entrants';
+      const M = (k, text) => row.marks.push({ k, text });
+      if (row.gate) M('gate', 'Gatekeeper: the hard opponent guards the way on. Beat them for a stat point.');
+      if (run.trial && !run.trial.done && run.trial.round === r) M('trial', `Rank Trial: the ${run.trial.to}-rank Proctor takes the hard slot.`);
+      if (live && AUGMENT_ROUNDS.includes(r) && !done['a' + r]) M('rules', 'Rules review: pass 1 of 3 Amendments, or none.');
+      if (live && r === 5 && !run.extraGiven) M('gift', 'Milestone: one more Gift.');
+      if (live && F && F.crises && PULSE.stageAt.includes(r) && (r > run.round || crisisDue(run))) M('crisis', `Crisis: ${F.name} comes to a head.`);
+      if (live && V && V.at === r && !run.customOff && (r > run.round || visitDue(run))) M('visit', `${P.name}: a visit is due.`);
+      if (live && (run.summons || []).some(x => x.round === r && r > run.round)) M('summon', 'Someone you sent for takes the hard slot.');
+      if (live && hasGift(run, 'f_debt') && (r === 3 || r === 6) && run.debtPaid !== r) M('debt', 'The Trickster collects their debt: up to 10 gold.');
+      if (stage === 'final') M('final', 'Win to spare your world. Lose and you fight again, while Hearts last.');
+    }
+    if (state === 'now' && run.choices && !run.elite) row.opponents = run.choices.map(c => ({ name: specName(c), hard: !!c.hard, gate: !!c.gate, spoils: c.spoils && SPOILS[c.spoils] ? SPOILS[c.spoils].short : null, chosen: run.chosen === c }));
+    rows.push(row);
+  }
+  const elite = run.elite && run.eliteBracket ? run.eliteBracket.map((c, i) => ({ name: specName(c), state: i < run.eliteIdx ? 'done' : i === run.eliteIdx ? 'now' : 'ahead' })) : [];
+  return { rows, elite };
+}
 function chooseOpponent(run, i, wagerOn) {
   run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
   if (run.wagerOn) { run.gold -= 5; notePick(run, 'w:' + run.wager.god); }
@@ -3163,7 +3200,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

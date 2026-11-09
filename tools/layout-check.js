@@ -84,6 +84,9 @@ function states() {
       rs.stage = 'shop'; rs.gold = 30; const rc = JSON.parse(JSON.stringify(rs)); rc.stage = 'choose';
       out.push({ label: 'shop-desk', stage: 'shop', run: rs }, { label: 'sheet-desk', stage: 'shop', sheet: 'desk', run: rs }, { label: 'choose-rules', stage: 'choose', run: rc });
       const rd = JSON.parse(JSON.stringify(rs)); rd.districts = ['infirmary', 'sanctum', 'undercity', 'scout', 'enchanter']; rd.stage = 'district'; out.push({ label: 'district-5', stage: 'district', run: rd }); }
+    // Tournament bracket: mid-run, at the start, and in the Elite bracket
+    out.push({ label: 'sheet-bracket', stage: 'choose', sheet: 'bracket', run: mid.run });
+    { const r1 = out.find(s => s.label === 'r1-choose'), el = out.find(s => s.label.startsWith('elite')); if (r1) out.push({ label: 'sheet-bracket-r1', stage: 'choose', sheet: 'bracket', run: r1.run }); if (el) out.push({ label: 'sheet-bracket-elite', stage: 'choose', sheet: 'bracket', run: el.run }); }
     // End screens: an erased world and a spared one, with the progress bars and next goal
     out.push({ label: 'end-erased', stage: 'end-erased', run: mid.run }, { label: 'end-spared', stage: 'end-spared', run: mid.run });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
