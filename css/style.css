@@ -1005,3 +1005,16 @@ details.st-n small { display: block; }
 .link.dk.hot { color: var(--stun); }
 .choice.flat { cursor: default; }
 .shopctl .dk { margin-left: auto; }
+
+/* Tournament bracket (Phase 3): a funnel of rounds, each bar narrower as the field halves */
+button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: pointer; text-align: left; }
+.bk { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.bk-row { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.bk-bar { display: flex; align-items: baseline; gap: 8px; min-width: 190px; padding: 5px 10px; border: 1px solid var(--line2); background: var(--panel); font-size: var(--fs-1); }
+.bk-bar b { font-family: var(--f-m); color: var(--muted); } .bk-bar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .bk-bar em { font-style: normal; font-family: var(--f-m); color: var(--muted); white-space: nowrap; }
+.bk-row.done .bk-bar { border-color: var(--bronze); opacity: .75; }
+.bk-row.now .bk-bar { border-color: var(--sys); box-shadow: 0 0 8px -2px var(--sys); } .bk-row.now .bk-bar b { color: var(--sys); }
+.bk-row.gate.ahead .bk-bar, .bk-row.final.ahead .bk-bar { border-color: var(--bad); }
+.bk-l { font-size: var(--fs-1); color: var(--muted); text-align: center; max-width: 100%; }
+.bk-l.won { color: var(--good, var(--sys)); } .bk-l.lost, .bk-l.mk-gate, .bk-l.mk-crisis, .bk-l.mk-debt { color: var(--bad); } .bk-l.bko { color: var(--text, inherit); } .bk-l.bko.on { color: var(--sys); } .bk-l.dim { opacity: .7; }
+.bk-l.mk-rules, .bk-l.mk-gift, .bk-l.mk-trial, .bk-l.mk-visit, .bk-l.mk-summon, .bk-l.mk-final { color: var(--stun); }
