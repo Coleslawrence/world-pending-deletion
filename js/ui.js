@@ -670,7 +670,7 @@ function chooseHTML() {
   const fin = run.choices.length === 1;
   const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
   const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
-  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${amendOf(run).name ? `<span title="${esc(AMENDMENTS[run.amend].say)}">${esc(AMENDMENTS[run.amend].name)}</span>` : ''}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
+  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${deskBtn()}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
    ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
@@ -735,7 +735,7 @@ function shopHTML() {
     <div class="col col-a">${archChips(counts)}
     <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
     <div class="shopgrid">${items}</div>
-    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}<span class="interest">Interest +${interestOf(run)}g</span></div>
+    <div class="shopctl"><span class="fine">${odds}</span>${bonusHere ? `<button class="btn small" data-act="sheet" data-s="stats">Train · ${pointPrice(run)}g</button>` : ''}${deskBtn()}<span class="interest">Interest +${interestOf(run)}g</span></div>
     </div><div class="col col-b"><div class="sec-h"><span>Skill bar</span><span class="fine">Gear</span></div>
     <div class="build"><div class="barrow c${run.slots}">${bar}</div><div class="gearrow">${gear}</div></div>${run.phantom ? `<div class="sec-h"><span class="bad">Phantom: ${esc(pieceDef(run.phantom.id).name)}${run.phantom.star > 1 ? ' ' + '★'.repeat(run.phantom.star) : ''}</span><span class="fine">Hotfix in ${run.phantom.left} fight${run.phantom.left > 1 ? 's' : ''}</span></div>` : ''}
     <div class="sec-h"><span${over ? ' class="bad"' : ''}>Bench ${run.bench.length}/8</span><span class="fine">Tap to equip, swap or sell</span></div>
@@ -1188,7 +1188,19 @@ function pendingSheet() {
     return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
   }
   if (p.type === 'gift') {
-    return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
+    return sheetWrap('[Additional Gift]', `<p class="sh-p">${p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
+  }
+  if (p.type === 'intake') {
+    const body = p.offers.map((k, i) => { const D = INTAKE[k]; return D ? `<button class="choice ${D.cost ? 'chk' : ''}" data-act="take-intake" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(D.name)}</span><span class="tagn">${D.cost ? 'At a price' : 'Plain'}</span></div><div class="sr-desc">${esc(D.say)}${flavHTML(D.flavour)}</div></button>` : ''; }).join('');
+    return sheetWrap('[Intake Interview]', `<p class="sh-p">[Before your first match, the System offers every Entrant one deal. Two are plain. Two give more and take something. Choose 1.]</p>` + body, false, 'sys', true);
+  }
+  if (p.type === 'augment') {
+    const body = p.offers.map((k, i) => `<button class="choice" data-act="take-augment" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(AMENDMENTS[k].name)}</span><span class="tagn">Amendment</span></div><div class="sr-desc">${esc(AMENDMENTS[k].say)}</div></button>`).join('');
+    return sheetWrap('[Rules review]', `<p class="sh-p">[The tournament's rules are open for review. The System will pass one Amendment of your choosing. It lasts the rest of the run.]</p>` + body, `<button class="btn ghost" data-act="take-augment" data-i="skip">Pass none</button>`, 'sys', true);
+  }
+  if (p.type === 'door') {
+    const C = CURSES[p.curse] || {};
+    return sheetWrap('[Unlisted door]', `<p class="sh-p big">[There is a door here that is on no map of the arena. The System declines to comment.]</p><p class="sh-p">Behind it: <b>${esc(C.name)}</b>, ${esc(C.say)} for your next ${CURSE_FIGHTS} fights. When it lifts, the door pays: <b>${esc(outcomeText(p.pay))}</b>.</p><button class="choice chk" data-act="take-door" data-i="open"><div class="sr-h"><span class="sr-name">Open the door</span><span class="tagn">Cursed</span></div><div class="sr-desc">Take the curse now and the payoff after ${CURSE_FIGHTS} fights, won or lost.</div></button>`, `<button class="btn ghost" data-act="take-door" data-i="pass">Walk past</button>`, 'sys', true);
   }
   if (p.type === 'spoils') {
     const K = SPOILS[p.kind] || SPOILS.supplies;
@@ -1478,6 +1490,30 @@ function backingBtn() {
   if (B && BACK_GOALS[B.goal]) return `<button class="btn ghost small" data-act="sheet" data-s="backing">Backed · ${B.stake} Echoes</button>`;
   return meta.echoes >= BACK_STAKES[0] ? `<button class="btn ghost small" data-act="sheet" data-s="backing">Back yourself</button>` : '';
 }
+// The desk: everything changing this run's rules (Licences, Amendments, a door's curse, a token in use), the Licence
+// in stock, and the token this shop gives for spending nothing
+function deskCount() { return run ? amendIds(run).length + (run.curse && !run.elite ? 1 : 0) + (run.vouchers || []).length + (run.tokenOn ? 1 : 0) : 0; }
+function deskBtn() {
+  const n = deskCount(), shop = run.stage === 'shop';
+  if (shop && run.voucher) return `<button class="link dk hot" data-act="sheet" data-s="desk">Licence ${VOUCHER_PRICE}g ›</button>`;
+  if (shop && tokenReady(run)) return `<button class="link dk" data-act="sheet" data-s="desk">Desk${n ? ' ' + n : ''} ›</button>`;
+  return n ? `<button class="link dk" data-act="sheet" data-s="desk">Rules ${n} ›</button>` : '';
+}
+function deskSheet() {
+  const shop = run.stage === 'shop', V = VOUCHERS[run.voucher], row = (name, tag, text) => `<div class="choice flat"><div class="sr-h"><span class="sr-name">${esc(name)}</span><span class="tagn">${tag}</span></div><div class="sr-desc">${esc(text)}</div></div>`;
+  let top = '';
+  if (V && shop && run.gold >= VOUCHER_PRICE) top += `<button class="choice" data-act="buy-voucher"><div class="sr-h"><span class="sr-name">${esc(V.name)}</span><span class="price">${VOUCHER_PRICE}g</span></div><div class="sr-desc">${esc(V.say)} Lasts the whole run.${flavHTML(V.flavour)}</div></button>`;
+  else if (V) top += `<p class="sh-p">[Licence in stock: <b>${esc(V.name)}</b>, ${VOUCHER_PRICE} gold. ${esc(V.say)} It stays here until you buy it${shop ? `; you have ${run.gold} gold` : ', in the shop'}.]</p>`;
+  if (shop && tokenReady(run)) top += `<p class="sh-p">[Spend no gold in this shop and you leave with a ${esc(TOKENS[run.tokenOffer].name)}: ${esc(TOKENS[run.tokenOffer].say)}.]</p>`;
+  else if (shop && run.tokenOffer) top += `<p class="sh-p fine">[Gold spent this round. No token from this shop.]</p>`;
+  const rows = [].concat(
+    run.tokenOn ? [row(TOKENS[run.tokenOn].name, 'This round', TOKENS[run.tokenOn].say.replace('your next shop', 'this shop').replace('next round', 'this round') + '.')] : [],
+    run.curse && CURSES[run.curse.id] && !run.elite ? [row(CURSES[run.curse.id].name, `Curse · ${run.curse.left} fight${run.curse.left > 1 ? 's' : ''}`, `${CURSES[run.curse.id].say}. When it lifts: ${outcomeText(run.curse.pay)}.`)] : [],
+    amendIds(run).map(k => row(AMENDMENTS[k].name, 'Amendment', AMENDMENTS[k].say)),
+    (run.vouchers || []).filter(k => VOUCHERS[k]).map(k => row(VOUCHERS[k].name, 'Licence', VOUCHERS[k].say)));
+  const body = top + (rows.length ? `<h4>In force this run</h4>${rows.join('')}` : top ? '' : '<p class="sh-p">[Nothing on the desk. No rules changed.]</p>');
+  return sheetWrap('[The desk]', body, `<button class="btn primary" data-act="close">Close</button>`);
+}
 function backingSheet() {
   const B = meta.backing;
   if (B && BACK_GOALS[B.goal]) {
@@ -1554,7 +1590,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1703,6 +1739,10 @@ function onAct(el) {
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
     case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Perk instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
+    case 'take-intake': { const P = run.pending.find(x => x.type === 'intake'), D = P && INTAKE[P.offers[+d.i]]; if (!takeIntake(run, d.i, msgs)) return render(); pushMsgs(msgs, false, `Intake: ${D.name}`); saveRun(); return render(); }
+    case 'take-augment': { if (!takeAugment(run, d.i, msgs)) return render(); pushMsgs(msgs, false, 'Rules review'); saveRun(); return render(); }
+    case 'take-door': { if (!takeDoor(run, d.i === 'open', msgs)) return render(); pushMsgs(msgs, false, d.i === 'open' ? 'Opened the door' : 'Walked past the door'); saveRun(); return render(); }
+    case 'buy-voucher': { const k = run.voucher; if (!buyVoucher(run, msgs)) return render(); sfx('buy'); toast(`[Licence issued: ${VOUCHERS[k].name}]`, 'loot'); pushMsgs(msgs, false, `Licence: ${VOUCHERS[k].name}`); ui.sheet = null; saveRun(); return render(); }
     case 'take-spoils': { const P = run.pending.find(x => x.type === 'spoils'), o = P && d.i !== 'skip' && P.offers[+d.i]; if (!takeSpoils(run, d.i, msgs)) return render(); pushMsgs(msgs, false, o ? `Spoils: ${spoilsText(o)}` : 'Spoils left'); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();

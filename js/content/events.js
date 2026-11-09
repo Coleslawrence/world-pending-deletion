@@ -36,4 +36,10 @@ const CHAINS = {};
 const AMENDMENTS = {
   sudden: { name: 'Sudden Death', say: 'Opponents have 30% less HP and deal 30% more damage.', foeHp: 0.7, foeDmg: 1.3 },
   extended: { name: 'Extended Bouts', say: 'Opponents have 20% more HP. Every win pays 4 gold.', foeHp: 1.2, winGold: 4 },
+  // Added for augment rounds (rounds 2 and 6: choose 1 of 3, or none). income: gold a round; heartCut: Hearts off a loss
+  // (never below 1; negative costs more); trainCut: gold off training a stat
+  levy: { name: 'Broadcast Levy', say: 'Income +3 gold a round. Opponents deal 10% more damage.', income: 3, foeDmg: 1.1 },
+  clemency: { name: 'Clemency Clause', say: 'A lost fight costs 1 Heart less (never less than 1). Opponents have 15% more HP.', heartCut: 1, foeHp: 1.15 },
+  drills: { name: 'Open Drills', say: 'Training a stat costs 1 gold less. Opponents have 10% more HP.', trainCut: 1, foeHp: 1.1 },
+  purse: { name: 'Prize Purse', say: 'Every win pays 3 more gold. A lost fight costs 1 more Heart.', winGold: 3, heartCut: -1 },
 };

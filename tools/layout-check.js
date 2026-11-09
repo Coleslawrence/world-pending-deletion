@@ -76,6 +76,14 @@ function states() {
     // Spoils after a win: three gear cards, and the supplies list
     out.push({ label: 'spoils-gear', stage: 'choose', run: mid.run, pending: [{ type: 'spoils', kind: 'gear', offers: G.spoilsOffers(mid.run, 'gear', Math.random) }] });
     out.push({ label: 'spoils-supplies', stage: 'choose', run: mid.run, pending: [{ type: 'spoils', kind: 'supplies', offers: [{ k: 'gold', n: 6 }, { k: 'heart', n: 1 }, { k: 'heal', n: 0.4 }] }] });
+    // Run shape: the Intake Interview, a rules review, a cursed door, and a shop with a Licence, rules in force and 5 districts
+    out.push({ label: 'intake', stage: 'choose', run: mid.run, pending: [{ type: 'intake', offers: ['briefing', 'signing', 'second_gift', 'advance'] }] });
+    out.push({ label: 'augment', stage: 'choose', run: mid.run, pending: [{ type: 'augment', offers: ['clemency', 'purse', 'extended'] }] });
+    out.push({ label: 'door', stage: 'choose', run: mid.run, pending: [{ type: 'door', curse: 'markup', pay: { experimental: 1 } }] });
+    { const rs = JSON.parse(JSON.stringify(mid.run)); Object.assign(rs, { voucher: 'interest', vouchers: ['district', 'spoils'], augments: ['clemency', 'levy'], curse: { id: 'garnished', left: 2, pay: { piece: 'A' } }, tokenOn: 'discount', tokenOffer: 'district', shopSpent: false });
+      rs.stage = 'shop'; rs.gold = 30; const rc = JSON.parse(JSON.stringify(rs)); rc.stage = 'choose';
+      out.push({ label: 'shop-desk', stage: 'shop', run: rs }, { label: 'sheet-desk', stage: 'shop', sheet: 'desk', run: rs }, { label: 'choose-rules', stage: 'choose', run: rc });
+      const rd = JSON.parse(JSON.stringify(rs)); rd.districts = ['infirmary', 'sanctum', 'undercity', 'scout', 'enchanter']; rd.stage = 'district'; out.push({ label: 'district-5', stage: 'district', run: rd }); }
     // End screens: an erased world and a spared one, with the progress bars and next goal
     out.push({ label: 'end-erased', stage: 'end-erased', run: mid.run }, { label: 'end-spared', stage: 'end-spared', run: mid.run });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));

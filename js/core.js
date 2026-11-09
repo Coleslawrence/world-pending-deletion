@@ -528,18 +528,18 @@ function effStats(run) {
   return s;
 }
 function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0))); }
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0)) * (1 - amendOf(run).hpCut)); }
 // Levels come from fighting: after every battle (win or lose) the System offers a level, which is +1 level (Max HP +4,
 // better shop odds) and +1 stat point, or a Gift drawn at random in its place. Level stops at LEVEL_MAX.
 // Stat points can also be bought with gold, one at a time, at a rising price (Train). Bought points never raise the level.
 const POINT_PRICE = [1, 1, 2, 2, 3, 3, 5, 5, 7, 7, 10, 10, 13, 13, 16];
 const LEVEL_MAX = 9;
-function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)]; return hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p; }
+function pointPrice(run) { const p = POINT_PRICE[Math.min(run.bought || 0, POINT_PRICE.length - 1)], cut = amendOf(run).trainCut + (hasVoucher(run, 'training') ? 1 : 0); return Math.max(1, (hasGift(run, 'fastlearner') ? Math.max(1, Math.ceil(p * 0.67)) : p) - cut); }
 function trainStat(run, k, msgs) {
   if (!STATS.includes(k)) return false;
   const pr = pointPrice(run); if (run.gold < pr) return false;
   const before = maxHp(run);
-  run.gold -= pr; run.stats[k]++; run.bought = (run.bought || 0) + 1;
+  run.gold -= pr; run.shopSpent = true; run.stats[k]++; run.bought = (run.bought || 0) + 1;
   run.hp += maxHp(run) - before;
   if (run.milestones) checkMilestones(run, msgs);
   return true;
@@ -652,6 +652,8 @@ function rollMissing(p, rng) { p.roll = pick(Object.keys(GEAR).filter(k => !GEAR
 function price(run, item) {
   let v = PRICE[pieceDef(item.id).rank] + (item.mods ? item.mods.length : 0) + (hasGift(run, 'f_cursed') ? 1 : 0);
   if (hasGift(run, 'affinity') && pieceDef(item.id).tags.includes(run.arch[0])) v = Math.max(1, v - 1);
+  v += amendOf(run).priceUp;
+  if (run.tokenOn === 'discount') v = Math.max(0, v - 1);
   if (run.haggle) v = Math.max(0, v - 1);
   return v;
 }
@@ -672,16 +674,17 @@ function refreshShop(run, rng, kind) {
     }
   });
 }
-function rerollCost(run) { return run.freeRerolls > 0 ? 0 : (hasGift(run, 'f_unlucky') ? 3 : 2) - (customOf(run, 'league') ? 1 : 0); }
-function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else run.gold -= c; refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
+function rerollBase(run) { return (hasGift(run, 'f_unlucky') ? 3 : 2) - (customOf(run, 'league') ? 1 : 0); }
+function rerollCost(run) { return run.freeRerolls > 0 ? 0 : Math.max(1, rerollBase(run) - (hasVoucher(run, 'rerolls') ? 1 : 0)); }
+function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else { run.gold -= c; run.shopSpent = true; } refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
 // Income: INCOME.base a round, plus interest of 1 for every INCOME.per gold held, up to the cap. Saving is a real choice:
 // a full bank (20 gold) earns as much as the base income again.
 const INCOME = { base: 5, per: 4, cap: 5, golden: 8 };
-function interestCap(run) { return (hasGift(run, 'golden') ? INCOME.golden : INCOME.cap) + (hasPerk(run, 'ledger') ? 1 : 0); }
+function interestCap(run) { return (hasGift(run, 'golden') ? INCOME.golden : INCOME.cap) + (hasPerk(run, 'ledger') ? 1 : 0) + (hasVoucher(run, 'interest') ? 2 : 0); }
 function interestOf(run) { return Math.min(interestCap(run), Math.floor(run.gold / INCOME.per)); }
-function income(run) { return INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0); }
+function income(run) { return Math.max(0, INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0) + (hasVoucher(run, 'income') ? 2 : 0) + amendOf(run).income); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
   let i = run.bar.findIndex(p => p && p.u === u); if (i >= 0) return { p: run.bar[i], at: 'bar', i };
@@ -706,7 +709,7 @@ function addPiece(run, id, mods, msgs, star) {
 function buy(run, kind, i, msgs) {
   const item = shopItem(run, kind, i);
   if (!canBuy(run, item)) return false;
-  run.gold -= price(run, item); run.haggle = false;
+  run.gold -= price(run, item); run.haggle = false; run.shopSpent = true;
   if (kind === 'bonus') run.bonusSlot = null; else { run.shop[kind][i] = null; run.locks[kind][i] = false; }
   addPiece(run, item.id, item.mods, msgs);
   if (pieceDef(item.id).glitch) { msgs && msgs.push({ t: 'skill', text: `[Glitched item acquired: ${pieceDef(item.id).name}. ${pieceDef(item.id).flavour}]` }); OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] }); }
@@ -927,7 +930,7 @@ function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
 const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
-function heartCost(run, spec) { if (run.elite) return 0; const c = HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
+function heartCost(run, spec) { if (run.elite) return 0; const c = Math.max(1, HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0) - amendOf(run).heartCut); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
   if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: finalId(run), round: ROUNDS }, poolOn(run) ? { pool: true } : {}, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
@@ -1005,17 +1008,18 @@ function assignSpoils(run, rng) {
 }
 // The 3 offers for a kind, all of them takeable right now (no full-Heart Heart, no full-HP heal)
 function spoilsOffers(run, kind, rng) {
+  const n = hasVoucher(run, 'spoils') ? 4 : 3;
   if (kind === 'skill' || kind === 'gear') {
     const out = []; let g = 0;
-    while (out.length < 3 && g++ < 30) { const p = rollPiece(run, rng, { kind }); if (p && !out.some(x => x.id === p.id)) out.push(p); }
+    while (out.length < n && g++ < 30) { const p = rollPiece(run, rng, { kind }); if (p && !out.some(x => x.id === p.id)) out.push(p); }
     return out.map(p => ({ k: 'piece', id: p.id, mods: p.mods || [] }));
   }
-  if (kind === 'stat') return shuffle(STATS, rng).slice(0, 3).map(k => ({ k: 'stat', stat: k }));
+  if (kind === 'stat') return shuffle(STATS, rng).slice(0, n).map(k => ({ k: 'stat', stat: k }));
   const sup = [{ k: 'gold', n: SPOILS_GOLD }];
   if (run.hearts < run.maxHearts) sup.push({ k: 'heart', n: 1 });
   if (run.hp < maxHp(run)) sup.push({ k: 'heal', n: SPOILS_HEAL });
   sup.push({ k: 'rerolls', n: SPOILS_REROLLS });
-  return sup.slice(0, 3);
+  return sup.slice(0, n);
 }
 function spoilsText(o) {
   if (o.k === 'piece') return pieceDef(o.id).name;
@@ -1039,6 +1043,78 @@ function takeSpoils(run, i, msgs) {
   else if (o.k === 'heal') { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * o.n)); msgs && msgs.push({ t: 'loot', text: `[Spoils: +${Math.round(run.hp - b)} HP.]` }); }
   else if (o.k === 'rerolls') { run.freeRerolls = (run.freeRerolls || 0) + o.n; msgs && msgs.push({ t: 'loot', text: `[Spoils: ${o.n} free rerolls in this round's shop.]` }); }
   return true;
+}
+// ---------- Run shape: Intake Interview, saver's tokens, Licences, augment rounds, cursed doors (content in runshape.js) ----------
+// Each draws from its own stream, so a Pending World's draft, shops and opponents never shift. Practice runs have none.
+const VOUCHER_PRICE = 10, VOUCHER_CHANCE = 0.4, AUGMENT_ROUNDS = [2, 6], DOOR_ROUNDS = [3, 5], CURSE_FIGHTS = 2;
+function shaped(run) { return !run.practice && !run.script; }
+function hasVoucher(run, k) { return !!(run.vouchers && run.vouchers.includes(k)); }
+function hasRank(run, r) { return poolIds(run).some(x => pieceDef(x).rank === r); }
+function shapeCtx(run, msgs, label, rng) { return { run, h: eventKit(run, META, stream(run, 'loot', rng), msgs), msgs, label, from: label }; }
+function shapeApply(T, ctx) { if (T) { applyOutcomes(T, ctx, false); applyOutcomes(T, ctx, true); } }
+// The Intake Interview: 2 plain deals, then 2 with a price
+function intakeOffers(run, rng) {
+  const keys = Object.keys(INTAKE).filter(k => !(INTAKE[k].then && INTAKE[k].then.piece && !hasRank(run, INTAKE[k].then.piece)));
+  return shuffle(keys.filter(k => !INTAKE[k].cost), rng).slice(0, 2).concat(shuffle(keys.filter(k => INTAKE[k].cost), rng).slice(0, 2));
+}
+function takeIntake(run, i, msgs, rng) {
+  const at = run.pending.findIndex(p => p.type === 'intake'); if (at < 0) return false;
+  const k = run.pending[at].offers[+i], D = INTAKE[k]; if (!D) return false;
+  run.pending.splice(at, 1); msgs = msgs || [];
+  msgs.push({ t: 'class', text: `[Intake Interview closed. Deal on file: ${D.name}.]` });
+  const ctx = shapeCtx(run, msgs, D.name, rng);
+  shapeApply(D.then, ctx); shapeApply(D.cost, ctx);
+  for (let n = 0; n < (D.gift || 0); n++) run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)), why: D.name });
+  run.hp = Math.min(run.hp, maxHp(run)); checkMilestones(run, msgs); notePick(run, 'i:' + k);
+  return true;
+}
+// Saver's tokens: the one earned last round is used now; this round's shop shows the next one
+function tokenStart(run, rng, msgs) {
+  run.tokenOn = run.token && TOKENS[run.token] ? run.token : null; run.token = null; run.shopSpent = false;
+  if (run.tokenOn === 'rerolls') run.freeRerolls += 2;
+  if (run.tokenOn) msgs && msgs.push({ t: 'loot', text: `[${TOKENS[run.tokenOn].name} redeemed: ${TOKENS[run.tokenOn].say.replace('your next shop', 'this shop').replace('next round', 'this round')}.]` });
+  const k = pick(Object.keys(TOKENS), rng); run.tokenOffer = shaped(run) ? k : null;
+}
+function tokenReady(run) { return !!(run.tokenOffer && TOKENS[run.tokenOffer] && !run.shopSpent && shaped(run)); }
+// Licences: from the second shop on, an empty desk has a VOUCHER_CHANCE each round of stocking one you don't hold
+function voucherPool(run) { return Object.keys(VOUCHERS).filter(k => !hasVoucher(run, k) && !(k === 'rerolls' && rerollBase(run) <= 1)); }
+function stockVoucher(run, rng, msgs) {
+  const roll = rnd(rng), pool = voucherPool(run), k = pool.length ? pick(pool, rng) : null;
+  if (!shaped(run) || run.voucher || run.visit < 2 || roll >= VOUCHER_CHANCE || !k) return;
+  run.voucher = k; msgs && msgs.push({ t: 'sys', text: `[The shop's desk has a Licence in stock: ${VOUCHERS[k].name}, ${VOUCHER_PRICE} gold.]` });
+}
+function buyVoucher(run, msgs) {
+  const k = run.voucher; if (!k || !VOUCHERS[k] || run.gold < VOUCHER_PRICE || run.stage !== 'shop') return false;
+  run.gold -= VOUCHER_PRICE; run.shopSpent = true; (run.vouchers = run.vouchers || []).push(k); run.voucher = null;
+  msgs && msgs.push({ t: 'loot', text: `[Licence issued: ${VOUCHERS[k].name}. ${VOUCHERS[k].say}]` }); notePick(run, 'v:' + k);
+  return true;
+}
+// Augment rounds: 3 Amendments not already in force. i: the offer taken, or 'skip' for none
+function augmentOffers(run, rng) { return shuffle(Object.keys(AMENDMENTS).filter(k => k !== run.amend && !(run.augments || []).includes(k)), rng).slice(0, 3); }
+function takeAugment(run, i, msgs) {
+  const at = run.pending.findIndex(p => p.type === 'augment'); if (at < 0) return false;
+  const k = i === 'skip' ? null : run.pending[at].offers[+i]; if (i !== 'skip' && !AMENDMENTS[k]) return false;
+  run.pending.splice(at, 1);
+  if (!k) { msgs && msgs.push({ t: 'sys', text: '[No Amendment passed. The rules stand.]' }); return true; }
+  (run.augments = run.augments || []).push(k); notePick(run, 'a:' + k);
+  msgs && msgs.push({ t: 'class', text: `[Amendment passed: ${AMENDMENTS[k].name}. ${AMENDMENTS[k].say}]` });
+  return true;
+}
+// Cursed doors: a curse for the next CURSE_FIGHTS fights, won or lost, and a payoff when it lifts
+function doorOffer(run, rng) { return { type: 'door', curse: pick(Object.keys(CURSES), rng), pay: pick(DOOR_PAYS.filter(T => !(T.piece && !hasRank(run, T.piece))), rng) }; }
+function takeDoor(run, open, msgs) {
+  const at = run.pending.findIndex(p => p.type === 'door'); if (at < 0) return false;
+  const P = run.pending.splice(at, 1)[0], C = CURSES[P.curse];
+  if (!open || !C) { msgs && msgs.push({ t: 'sys', text: '[Door left closed. It is no longer on any map.]' }); return true; }
+  run.curse = { id: P.curse, left: CURSE_FIGHTS, pay: P.pay }; run.hp = Math.max(1, Math.min(run.hp, maxHp(run))); notePick(run, 'c:' + P.curse);
+  msgs && msgs.push({ t: 'loss', text: `[Door opened. ${C.name}: ${C.say} for your next ${CURSE_FIGHTS} fights. When it lifts: ${outcomeText(P.pay)}.]` });
+  return true;
+}
+function tickCurse(run, meta, msgs, rng) {
+  const C = run.curse; if (!C || run.elite || run.practice || --C.left > 0) return;
+  delete run.curse;
+  msgs.push({ t: 'loot', text: `[${(CURSES[C.id] || {}).name || 'The curse'} lifts. The door pays what it promised.]` });
+  shapeApply(C.pay, shapeCtx(run, msgs, 'Cursed door', rng));
 }
 function chooseOpponent(run, i, wagerOn) {
   run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
@@ -1118,7 +1194,7 @@ function rollDistricts(run, rng) {
   if (run.script && run.script.districts && run.script.districts[run.round - 1]) return run.script.districts[run.round - 1].slice();
   let keys = Object.keys(DISTRICTS).filter(k => !(k === 'sanctum' && run.hearts >= run.maxHearts) && !(k === 'infirmary' && run.hp >= maxHp(run)) && !(k === 'scout' && hasGift(run, 'appraisal')));
   const w = { infirmary: 3, sanctum: 2, undercity: 3, scout: 2, enchanter: 3 };
-  const want = customOf(run, 'pilgrims') ? 4 : 3; // Pilgrims: the road, one more district to pick from
+  const want = (customOf(run, 'pilgrims') ? 4 : 3) + (hasVoucher(run, 'district') ? 1 : 0) + (run.tokenOn === 'district' ? 1 : 0); // Pilgrims: the road, one more district to pick from
   const out = []; let g = 0; while (out.length < want && g++ < 50) { const k = wpick(keys, keys.map(x => w[x]), rng); if (!out.includes(k)) out.push(k); }
   if (run.hp < maxHp(run) * 0.45 && !out.includes('infirmary')) out[2] = 'infirmary';
   if (run.world.mod === 'strange' && !out.includes('undercity')) out[out[2] === 'infirmary' ? 1 : 2] = 'undercity'; // Strange Times: the Undercity is always open
@@ -1285,6 +1361,7 @@ function resolveEvent(run, key, idx, meta, rng, msgs) {
 const OUTCOME_APPLY = {
   gold: (v, c) => { c.run.gold += v; },
   stats: (v, c) => Object.entries(v).forEach(([k, n]) => c.run.stats[k] += n),
+  points: (v, c) => { c.run.statPts = (c.run.statPts || 0) + v; c.msgs.push({ t: 'level', text: `[+${v} stat point${v === 1 ? '' : 's'} to place.]` }); },
   heart: (v, c) => { for (let i = 0; i < v; i++) { c.run.maxHearts++; c.run.hearts++; amendRecord(c.run, c.msgs, stream(c.run, 'record')); } },
   rune: (v, c) => { for (let i = 0; i < v; i++) c.run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(c.run), stream(c.run, 'loot'), null, c.run), got: c.gotRune || (c.label ? `[${c.label}: a rune.]` : null) }); },
   piece: (v, c) => { const pool = poolIds(c.run).filter(x => pieceDef(x).rank === v); const id = pick(pool, stream(c.run, 'loot')); if (id) givePiece(c.run, id, c.msgs, c.got || `[${c.label || 'Reward'}: {item}]`); },
@@ -1566,6 +1643,7 @@ function confirmDraft(run, ids, meta, rng, gear) {
   run.gearDraft = [];
   run.draft = [];
   run.shop = null; run.locks = null; refreshShop(run, stream(run, 'shop', rng));
+  if (shaped(run)) run.pending.push({ type: 'intake', offers: intakeOffers(run, stream(run, 'intake', rng)) });
   enterChoose(run, meta, rng);
 }
 function enterChoose(run, meta, rng, msgs) {
@@ -1575,11 +1653,17 @@ function enterChoose(run, meta, rng, msgs) {
   if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
   run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0) + (run.world.mod === 'market' ? 1 : 0);
   run.haggle = hasGift(run, 'haggler');
+  tokenStart(run, stream(run, 'token', rng), msgs); stockVoucher(run, stream(run, 'voucher', rng), msgs);
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
   if (run.pulsed !== run.round) { run.pulsed = run.round; const pulse = worldPulse(run, stream(run, 'pulse', rng)); if (pulse) { run.log.push({ t: 'sys', text: pulse }); msgs && msgs.push({ t: 'sys', text: pulse }); } }
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
+  if (shaped(run) && !run.elite) {
+    const done = run.shapeDone = run.shapeDone || {};
+    if (AUGMENT_ROUNDS.includes(run.round) && !done['a' + run.round]) { done['a' + run.round] = true; run.pending.push({ type: 'augment', offers: augmentOffers(run, stream(run, 'augment', rng)) }); msgs && msgs.push({ t: 'class', text: '[Rules review. The System will pass one Amendment of your choosing.]' }); }
+    if (DOOR_ROUNDS.includes(run.round) && !done['d' + run.round] && !run.curse) { done['d' + run.round] = true; run.pending.push(doorOffer(run, stream(run, 'door', rng))); }
+  }
   dueChainEvents(run).forEach(k => { if (!run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   [crisisDue(run), visitDue(run), clashDue(run)].forEach(k => { if (k && !run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
@@ -1593,7 +1677,7 @@ function enterChoose(run, meta, rng, msgs) {
 }
 // Each round: choose an opponent, visit a district, shop, fight. The district comes first, so the shop's exit is the fight.
 function toDistrict(run, rng) { run.stage = 'district'; run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
-function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); run.stage = 'ready'; }
+function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); if (tokenReady(run)) { run.token = run.tokenOffer; msgs && msgs.push({ t: 'loot', text: `[Nothing spent. Issued: ${TOKENS[run.token].name}, ${TOKENS[run.token].say}.]` }); } run.tokenOffer = null; run.stage = 'ready'; }
 function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; if (run.districts.length > 3 && customOf(run, 'pilgrims')) customPaid(run, run.log); if (k === 'enchanter' && customOf(run, 'archive')) customPaid(run, run.log); run.districts = []; run.stage = 'shop'; notePick(run, 'd:' + k); if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
 // District upgrades from stats: the stat that improves each district, at STAT_EASY
 const DISTRICT_STAT = { infirmary: 'VIT', scout: 'AGI', enchanter: 'INT' };
@@ -1636,7 +1720,15 @@ function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.
 function noticeOf(run) { return run.elite || run.practice || run.noticeOff ? 0 : Math.min(TUNE.noticeMax, run.notice || 0); }
 function noticeMul(run) { return 1 + TUNE.notice * noticeOf(run); }
 function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); }
-function amendOf(run) { return run.amend && !run.elite && !run.practice ? AMENDMENTS[run.amend] || {} : {}; }
+// Every rule change in force, as one set: an event's Amendment, the augment rounds' Amendments and a cursed door's curse
+function amendIds(run) { return run.elite || run.practice ? [] : [run.amend].concat(run.augments || []).filter(k => AMENDMENTS[k]); }
+function amendOf(run) {
+  const o = { foeHp: 1, foeDmg: 1, winGold: 0, income: 0, heartCut: 0, trainCut: 0, priceUp: 0, hpCut: 0 };
+  const add = A => { o.foeHp *= A.foeHp || 1; o.foeDmg *= A.foeDmg || 1; ['winGold', 'income', 'heartCut', 'trainCut', 'priceUp', 'hpCut'].forEach(k => o[k] += A[k] || 0); };
+  amendIds(run).forEach(k => add(AMENDMENTS[k]));
+  if (run.curse && CURSES[run.curse.id] && !run.elite && !run.practice) add(CURSES[run.curse.id]);
+  return o;
+}
 function enemyPower(run) { return roundPower(curRound(run)) * curveOf(run, 'dmg') * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1); }
 function enemyHpMul(run) { return roundHp(curRound(run)) * curveOf(run, 'hp') * rankMul(run) * (amendOf(run).foeHp || 1); }
 function buildEnemy(run, spec) {
@@ -2712,7 +2804,7 @@ function resolveFight(run, f, meta, rng) {
     if (META && !META.unlocks.arch_jinx && !run.practice && (spec.id === 'mott' || (f.tally.missed || 0) >= 3)) { META.unlocks.arch_jinx = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Jinx. Please stand well back.]' }); } // beat Mott, or win a fight where 3 attacks missed you
     if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
     if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
-    if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
+    if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${amendIds(run).filter(k => AMENDMENTS[k].winGold).map(k => AMENDMENTS[k].name).join(', ')}: +${amendOf(run).winGold} gold.]` }); }
     if (spec.spoils && SPOILS[spec.spoils] && !run.elite && spec.kind !== 'final') run.pending.push({ type: 'spoils', kind: spec.spoils, offers: spoilsOffers(run, spec.spoils, stream(run, 'spoils', rng)) });
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
@@ -2764,7 +2856,7 @@ function resolveFight(run, f, meta, rng) {
   // A shared champion that beats you earns its owner's champion RP (see champWin)
   if (!won && spec.snap && spec.snap.owner && spec.kind !== 'entrant') res.fell = { owner: spec.snap.owner, champ: spec.snap.champ, at: spec.snap.at };
   if (run.practice && !res.death && (run.round > (run.practiceRounds || 3))) { res.practiceDone = true; return res; }
-  if (!res.death && !res.spared && !res.eliteOver) { offerLevel(run, stream(run, 'level', rng)); enterChoose(run, meta, rng, msgs); }
+  if (!res.death && !res.spared && !res.eliteOver) { tickCurse(run, meta, msgs, lr); offerLevel(run, stream(run, 'level', rng)); enterChoose(run, meta, rng, msgs); }
   return res;
 }
 function startElite(run, meta, rng) {
@@ -3071,7 +3163,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
