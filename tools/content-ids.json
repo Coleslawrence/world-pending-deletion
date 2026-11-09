@@ -674,6 +674,7 @@
  "outcomes": [
   "gold",
   "stats",
+  "points",
   "heart",
   "rune",
   "piece",

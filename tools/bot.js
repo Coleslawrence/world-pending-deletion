@@ -132,6 +132,9 @@ function pending(run, meta) {
     if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
     if (p.type === 'spoils') { run.pending.unshift(p); G.takeSpoils(run, 0, []); }
+    if (p.type === 'intake') { run.pending.unshift(p); G.takeIntake(run, Math.floor(Math.random() * p.offers.length), []); }
+    if (p.type === 'augment') { run.pending.unshift(p); G.takeAugment(run, Math.random() < 0.5 && p.offers.length ? 0 : 'skip', []); }
+    if (p.type === 'door') { run.pending.unshift(p); G.takeDoor(run, Math.random() < 0.5 && run.hearts > 4, []); }
     if (p.type === 'levelup') { run.pending.unshift(p); G.takeLevel(run, p.perk && Math.random() < (+process.env.BOT_PERK || 0) ? 'perk' : 'level', []); }
     if (p.type === 'perk') { run.pending.unshift(p); G.choosePerk(run, meta, p.offers[0]); }
     if (p.type === 'adv') { run.pending.unshift(p); G.advance(run, p.arch, Math.random() < 0.5 ? 0 : 1); }
@@ -179,6 +182,7 @@ function playRun(meta, verbose, opts = {}) {
     if (k === 'infirmary') G.infirmary(run);
     if (k === 'sanctum') G.sanctum(run);
     if (k === 'enchanter') { const ms = G.rollPrefixes(G.districtUp(run, 'enchanter') ? 4 : 3, null, null, run); for (const m of glitchLast(ms)) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
+    if (run.voucher && run.gold >= G.VOUCHER_PRICE + 6) G.buyVoucher(run, []);
     shop(run, meta, { reroll: true, xp: true, picky: opts.picky });
     pending(run, meta); arrange(run);
     if (opts.snap) opts.snap('shop', run);

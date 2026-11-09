@@ -6,6 +6,7 @@
 // so an event's reveal line comes before its Favour line.
 //   gold: n            gain that much gold
 //   stats: { VIT: 2 }  stat points, permanent for the run
+//   points: n          stat points to place where you like
 //   heart: n           max Hearts (and Hearts) +n; the World Record grows with it
 //   rune: n            n rune choices to make (three offered each time)
 //   piece: 'B'         a free piece of that rank from your archetypes' pool
@@ -31,6 +32,7 @@
 const OUTCOMES = {
   gold: { say: n => `${n} gold` },
   stats: { say: o => Object.entries(o).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(', ') },
+  points: { say: n => `${n} stat point${n === 1 ? '' : 's'} to place` },
   heart: { say: n => `+${n} max Heart${n === 1 ? '' : 's'}` },
   rune: { say: n => n === 1 ? 'a rune' : `${n} runes` },
   piece: { say: r => `a free ${r}-rank piece` },

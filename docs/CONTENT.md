@@ -416,6 +416,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | --- | --- | --- | --- | --- |
 | `gold` | 8 | 8 gold |  | 64 (quests, levels, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 22 (events) |
+| `points` | 2 | 2 stat points to place |  | 0 () |
 | `heart` | 1 | +1 max Heart |  | 15 (quests, levels, events) |
 | `rune` | 1 | a rune |  | 19 (quests, levels, events) |
 | `piece` | "B" | a free B-rank piece |  | 46 (quests, levels, events) |

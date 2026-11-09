@@ -57,6 +57,8 @@ jobs:
         run: node tools/bounty-test.js
       - name: Back yourself test
         run: node tools/backing-test.js
+      - name: Run shape test
+        run: node tools/runshape-test.js
 
   balance:
     name: Balance gate
