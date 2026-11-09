@@ -193,7 +193,7 @@ function sanitizeRec(r, type) {
 // ---------- Gifts ----------
 const SIGILS = ['✦', '☾', '♜', '⚔', '❖', '✠'];
 const SIGIL_COLS = ['#d6a04f', '#72d0ff', '#e15b52', '#9fd86a', '#c27ce6', '#efe6d8'];
-function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank]; }
+function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank] + (world.bounty === 'gift' ? BOUNTIES.gift.points : 0); }
 function giftUnlocked(k, meta) { const g = GIFTS[k]; if (!g.lock) return true; if (!meta) return false; if (g.lock === 'echo') return !!meta.unlocks['gift_' + k]; if (g.lock === 'chain') return !!(meta.found && meta.found[k]); return !!meta.titles[g.lock]; }
 function giftLockText(k) { const g = GIFTS[k]; if (g.lock === 'echo') return 'Unlock with Echoes'; if (g.lock === 'chain') return 'Found at the end of an event chain'; return 'Earn the Title: ' + TITLES[g.lock].name; }
 function giftsAllowed(world) { const wg = WORLD_TYPES[world.type].gift; return Object.keys(GIFTS).filter(k => GIFTS[k].cat !== 'extra' && (GIFTS[k].cat !== 'world' || k === wg)); }
@@ -375,6 +375,40 @@ function offerWorlds(meta, rng) {
   }
   return out;
 }
+// World bounties: one world in each offer carries a bounty, shown on its card. Never in Pending World (the daily world
+// doesn't come from an offer) and never on a world asked for with Steer.
+const BOUNTIES = {
+  echoes: { name: 'Echo bounty', desc: 'Echoes from this world are doubled.', mul: 2 },
+  rank: { name: 'Rank bounty', desc: 'Rank Points from this world +50%.', mul: 1.5 },
+  gift: { name: 'Gift bounty', desc: '+2 Gift Points at the Awakening.', points: 2 },
+};
+function worldBounty(worlds, rng) {
+  const open = worlds.filter(w => !w.steered); if (!open.length) return worlds;
+  pick(open, rng).bounty = pick(Object.keys(BOUNTIES), rng);
+  return worlds;
+}
+function bountyOf(run, k) { return !!(run && run.world && run.world.bounty === k && !run.seed && !run.practice); }
+// Back yourself (an Echo sink): before a run, stake Echoes on how far it gets. Paid at the goal's odds when the run ends,
+// lost otherwise. Kept in meta.backing until a normal run starts (never Pending World or practice), then on run.backing.
+const BACK_STAKES = [5, 10, 25];
+const BACK_GOALS = {
+  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 2 },
+  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 3 },
+  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 4 },
+};
+function placeBacking(meta, goal, stake) {
+  if (meta.backing || !BACK_GOALS[goal] || !BACK_STAKES.includes(stake) || meta.echoes < stake) return false;
+  meta.echoes -= stake; meta.backing = { goal, stake }; return true;
+}
+function withdrawBacking(meta) { if (!meta.backing) return false; meta.echoes += meta.backing.stake; delete meta.backing; return true; }
+function claimBacking(run, meta) { if (run.seed || run.practice || !meta.backing) return false; run.backing = Object.assign({}, meta.backing); delete meta.backing; return true; }
+function settleBacking(run, meta, outcome) {
+  const B = run.backing; if (!B || B.settled) return null;
+  const G = BACK_GOALS[B.goal]; B.settled = true;
+  B.met = G ? (B.goal === 'spared' ? outcome !== 'erased' : run.round >= G.round) : false;
+  B.paid = B.met ? B.stake * G.mul : 0; meta.echoes += B.paid;
+  return B;
+}
 // Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built
 // around the layer you name: a world type, a Fate or a People. Everything else about it is drawn as usual. Only layers
 // that can come up for you are listed (a type whose home class is still locked can't). Pending World ignores it.
@@ -434,6 +468,7 @@ function newRun(world, setup, meta, rng) {
   const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer, setup.sysBonus);
   const G = setup.gifts;
   const run = {
+    titles0: Object.keys((meta && meta.titles) || {}).length, // Titles held when the run began, for the end screen's progress bars
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
     stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0, notice: 0,
     gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
@@ -945,12 +980,65 @@ function specStyle(spec) {
   return ENEMIES[spec.id].style;
 }
 function specReward(spec) {
-  if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 3 gold, a rune and a rare shop slot' : ' and 3 gold');
+  const sp = spec.spoils && SPOILS[spec.spoils] ? `. Spoils: ${SPOILS[spec.spoils].short}` : '';
+  if (spec.kind === 'trial') return `Promotion to ${spec.to}-rank` + (spec.hard ? ', 5 gold, a rune and a rare shop slot' : ' and 5 gold') + sp;
   if (spec.kind === 'final') return 'Spares your world. Theirs is not';
-  if (spec.kind === 'erased') return '3 gold, a rune, a rare shop slot and one of their pieces';
-  if (spec.gate) return '3 gold, a stat point, a rune and a rare shop slot';
-  if (spec.hard) return '3 gold, a rune and a rare shop slot';
-  return '3 gold';
+  if (spec.kind === 'erased') return '5 gold, a rune, a rare shop slot and one of their pieces' + sp;
+  if (spec.gate) return '5 gold, a stat point, a rune and a rare shop slot' + sp;
+  if (spec.hard) return '5 gold, a rune and a rare shop slot' + sp;
+  return '5 gold' + sp;
+}
+// ---------- Spoils ----------
+// Every opponent but the Final Champion carries Spoils, named on their card: after the win, pick 1 of 3 of that kind,
+// or leave them for SPOILS_SKIP gold. Hard opponents carry pieces; the easy one carries pieces, training or supplies.
+// Drawn from their own 'spoils' stream, so seeded runs (Pending World) get the same Spoils for everyone and nothing else shifts.
+const SPOILS = {
+  skill: { name: 'Skill', short: '1 of 3 skills', say: 'Choose a skill.' },
+  gear: { name: 'Gear', short: '1 of 3 gear', say: 'Choose a piece of gear.' },
+  stat: { name: 'Training', short: '+1 to a stat', say: 'Choose a stat to raise by 1.' },
+  supplies: { name: 'Supplies', short: '1 of 3 supplies', say: 'Choose your supplies.' },
+};
+const SPOILS_SKIP = 2, SPOILS_GOLD = 6, SPOILS_HEAL = 0.4, SPOILS_REROLLS = 2;
+function assignSpoils(run, rng) {
+  if (run.script || !run.choices) return;
+  run.choices.forEach(c => { if (c.kind !== 'final') c.spoils = pick(c.hard ? ['gear', 'skill'] : ['skill', 'stat', 'supplies'], rng); });
+}
+// The 3 offers for a kind, all of them takeable right now (no full-Heart Heart, no full-HP heal)
+function spoilsOffers(run, kind, rng) {
+  if (kind === 'skill' || kind === 'gear') {
+    const out = []; let g = 0;
+    while (out.length < 3 && g++ < 30) { const p = rollPiece(run, rng, { kind }); if (p && !out.some(x => x.id === p.id)) out.push(p); }
+    return out.map(p => ({ k: 'piece', id: p.id, mods: p.mods || [] }));
+  }
+  if (kind === 'stat') return shuffle(STATS, rng).slice(0, 3).map(k => ({ k: 'stat', stat: k }));
+  const sup = [{ k: 'gold', n: SPOILS_GOLD }];
+  if (run.hearts < run.maxHearts) sup.push({ k: 'heart', n: 1 });
+  if (run.hp < maxHp(run)) sup.push({ k: 'heal', n: SPOILS_HEAL });
+  sup.push({ k: 'rerolls', n: SPOILS_REROLLS });
+  return sup.slice(0, 3);
+}
+function spoilsText(o) {
+  if (o.k === 'piece') return pieceDef(o.id).name;
+  if (o.k === 'stat') return `+1 ${o.stat}`;
+  if (o.k === 'gold') return `+${o.n} gold`;
+  if (o.k === 'heart') return 'Restore 1 Heart';
+  if (o.k === 'heal') return `Heal ${Math.round(o.n * 100)}% HP`;
+  return `${o.n} free shop rerolls this round`;
+}
+// i: the offer taken, or 'skip' for SPOILS_SKIP gold
+function takeSpoils(run, i, msgs) {
+  const at = run.pending.findIndex(p => p.type === 'spoils'); if (at < 0) return false;
+  const P = run.pending[at], o = i === 'skip' ? null : P.offers[+i];
+  if (i !== 'skip' && !o) return false;
+  run.pending.splice(at, 1);
+  if (!o) { run.gold += SPOILS_SKIP; msgs && msgs.push({ t: 'loot', text: `[Spoils left on the floor. The cleaners pay ${SPOILS_SKIP} gold for the trouble.]` }); return true; }
+  if (o.k === 'piece') { const p = addPiece(run, o.id, o.mods, msgs); p.got = `[Spoils: ${pieceDef(o.id).name}.]`; msgs && msgs.push({ t: 'loot', text: p.got, item: o.id, u: p.u }); }
+  else if (o.k === 'stat') { run.stats[o.stat]++; msgs && msgs.push({ t: 'level', text: `[Spoils: +1 ${o.stat}.]` }); checkMilestones(run, msgs); }
+  else if (o.k === 'gold') { run.gold += o.n; msgs && msgs.push({ t: 'loot', text: `[Spoils: +${o.n} gold.]` }); }
+  else if (o.k === 'heart') OUTCOME_APPLY.restore(o.n, { run, msgs: msgs || [] });
+  else if (o.k === 'heal') { const b = run.hp; run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * o.n)); msgs && msgs.push({ t: 'loot', text: `[Spoils: +${Math.round(run.hp - b)} HP.]` }); }
+  else if (o.k === 'rerolls') { run.freeRerolls = (run.freeRerolls || 0) + o.n; msgs && msgs.push({ t: 'loot', text: `[Spoils: ${o.n} free rerolls in this round's shop.]` }); }
+  return true;
 }
 function chooseOpponent(run, i, wagerOn) {
   run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
@@ -1496,6 +1584,7 @@ function enterChoose(run, meta, rng, msgs) {
   [crisisDue(run), visitDue(run), clashDue(run)].forEach(k => { if (k && !run.pending.some(p => p.type === 'event' && p.key === k)) pushEvent(run, k, rng); });
   if (run.elite) { run.wager = null; toDistrict(run, rng); return; }
   run.choices = makeChoices(run, meta, stream(run, 'opps', rng));
+  assignSpoils(run, stream(run, 'spoils', rng));
   const tr = run.choices.find(c => c.kind === 'trial'); if (tr) msgs && msgs.push({ t: 'class', text: trialLine(tr.to, 0, tr.cond) });
   const sm = run.choices.find(c => c.summoned && c.say); if (sm) msgs && msgs.push({ t: 'class', text: sm.say });
   run.wager = makeWager(run, stream(run, 'opps', rng));
@@ -2624,6 +2713,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
     if (runP(run).sixGold && f.A.rolledSix) { run.gold += runP(run).sixGold; msgs.push({ t: 'loot', text: `[Gilded Coin: you rolled a 6. +${runP(run).sixGold} gold.]` }); }
     if (amendOf(run).winGold) { run.gold += amendOf(run).winGold; msgs.push({ t: 'loot', text: `[${AMENDMENTS[run.amend].name}: +${amendOf(run).winGold} gold.]` }); }
+    if (spec.spoils && SPOILS[spec.spoils] && !run.elite && spec.kind !== 'final') run.pending.push({ type: 'spoils', kind: spec.spoils, offers: spoilsOffers(run, spec.spoils, stream(run, 'spoils', rng)) });
     if (spec.bounty) { const ctx = { run, h: eventKit(run, meta, lr, msgs), msgs, label: 'Bounty' }; applyOutcomes(spec.bounty, ctx, false); applyOutcomes(spec.bounty, ctx, true); }
     if (!run.elite && !run.practice && spec.kind !== 'final') {
       const was = noticeOf(run); run.notice = (run.notice || 0) + 1;
@@ -2695,7 +2785,7 @@ function echoesFor(run, outcome) {
   let e = 3 * run.wins;
   if (outcome === 'spared' || outcome === 'elite') e += 10 + (5 - run.world.rank) * 3;
   e += 8 * run.eliteWins;
-  return e;
+  return bountyOf(run, 'echoes') ? e * BOUNTIES.echoes.mul : e;
 }
 function endRun(run, meta, outcome) {
   if (outcome === 'erased') { run.hearts = 0; eraseRecord(run, REC_MAX); } // an abandoned world goes all at once
@@ -2705,6 +2795,7 @@ function endRun(run, meta, outcome) {
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
+  settleBacking(run, meta, outcome);
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
   return { echoes: e, snap, rp: rk.rp, trial: rk.trial };
@@ -2817,7 +2908,7 @@ function sanitizeRank(r, m) {
 // RP for a finished run: 10 a win, 1 a Heart left, 20 for a spared world, times the world's rank (E ×1 up to S ×2)
 function rpFor(run, outcome) {
   const spared = outcome !== 'erased';
-  return Math.round((10 * (run.wins || 0) + Math.max(0, run.hearts) + (spared ? 20 : 0)) * (1 + 0.2 * run.world.rank));
+  return Math.round((10 * (run.wins || 0) + Math.max(0, run.hearts) + (spared ? 20 : 0)) * (1 + 0.2 * run.world.rank) * (bountyOf(run, 'rank') ? BOUNTIES.rank.mul : 1));
 }
 function awardRank(run, meta, outcome) {
   if (run.practice || !meta.rank) return { rp: 0, trial: null };
@@ -2828,10 +2919,39 @@ function awardRank(run, meta, outcome) {
   return { rp, trial: openTrial(R) };
 }
 function openTrial(R) { const nx = nextRank(R.letter); if (R.trial || !nx || R.rp < RANK_RP[nx]) return null; R.trial = nx; return nx; }
+
+// ---------- End screen progress ----------
+// The bars a finished run moved (Entrant Rank, Echoes, Titles) and one line naming the nearest goal, so even an erased world
+// shows progress. gain: { rp, echoes, titles } earned this run (null parts show no "+"). Pending World runs pass meta as it is.
+function runProgress(meta, gain) {
+  gain = gain || {}; const bars = [], goals = [];
+  const R = meta.rank;
+  if (R) {
+    const nx = nextRank(R.letter);
+    if (R.trial) { bars.push({ k: 'rank', label: `Rank ${R.letter}`, now: 1, max: 1, gain: gain.rp, text: `${R.trial}-rank trial ready` }); goals.push({ w: 0, text: `Next: your ${R.trial}-rank Rank Trial waits in your next world.` }); }
+    else if (nx) {
+      const lo = RANK_RP[R.letter] || 0, hi = RANK_RP[nx], need = Math.max(0, hi - R.rp);
+      bars.push({ k: 'rank', label: `Rank ${R.letter}`, now: Math.max(0, R.rp - lo), max: hi - lo, gain: gain.rp, text: `${need} RP to ${nx}` });
+      goals.push({ w: need / 60, text: `Next: ${need} RP to your ${nx}-rank trial.` });
+    }
+  }
+  const left = Object.keys(UNLOCKS).filter(k => !meta.unlocks[k]).sort((a, b) => UNLOCKS[a].cost - UNLOCKS[b].cost);
+  if (left.length) {
+    const U = UNLOCKS[left[0]], need = Math.max(0, U.cost - meta.echoes);
+    bars.push({ k: 'echoes', label: 'Echoes', now: Math.min(meta.echoes, U.cost), max: U.cost, gain: gain.echoes, text: need ? `${need} to ${U.name}` : 'Unlock ready' });
+    goals.push({ w: need ? need / 35 : -1, text: need ? `Next: ${need} Echoes to ${U.name}.` : `Next: you can buy ${U.name} in the Echoes sheet.` });
+  } else bars.push({ k: 'echoes', label: 'Echoes', now: 1, max: 1, gain: gain.echoes, text: `${meta.echoes} banked` });
+  const ids = Object.keys(TITLES), have = ids.filter(k => meta.titles[k]).length;
+  bars.push({ k: 'titles', label: 'Titles', now: have, max: ids.length, gain: gain.titles, text: `${have} of ${ids.length}` });
+  const open = ids.find(k => !meta.titles[k]);
+  if (open) goals.push({ w: 1.5, text: `Next: earn ${TITLES[open].name}. ${TITLES[open].cond}` });
+  goals.sort((a, b) => a.w - b.w);
+  return { bars, next: goals.length ? goals[0].text : null };
+}
 // Elite wins come after the spared world is filed, so they pay their RP when the run closes
 function eliteRank(run, meta) {
   if (run.practice || !meta.rank || !run.eliteWins) return { rp: 0, trial: null };
-  const rp = Math.round(10 * run.eliteWins * (1 + 0.2 * run.world.rank)); meta.rank.rp += rp;
+  const rp = Math.round(10 * run.eliteWins * (1 + 0.2 * run.world.rank) * (bountyOf(run, 'rank') ? BOUNTIES.rank.mul : 1)); meta.rank.rp += rp;
   run.rpEarned = (run.rpEarned || 0) + rp; run.trialOpened = run.trialOpened || openTrial(meta.rank);
   return { rp, trial: run.trialOpened };
 }
@@ -2948,12 +3068,12 @@ if (typeof module !== 'undefined') module.exports = {
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
-  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
+  RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
-  makeChoices, specName, specRank, specStyle, specReward, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
+  makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,

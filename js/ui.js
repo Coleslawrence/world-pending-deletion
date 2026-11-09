@@ -538,7 +538,7 @@ function worldsHTML() {
     const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod], F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix];
     const classes = w.v >= 2 ? worldArch(w, meta.unlocks) : [T.home];
     return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
-      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${rankChip(w.rank)}</div>
+      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${rankChip(w.rank)}</div>${w.bounty && BOUNTIES[w.bounty] ? `<div class="pk-row"><span class="tag bounty">${esc(BOUNTIES[w.bounty].name)}</span><span class="pk-mut">${esc(BOUNTIES[w.bounty].desc)}</span></div>` : ''}
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
       <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
@@ -549,7 +549,7 @@ function worldsHTML() {
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
     <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.</p>
-    <div class="picks">${cards}</div>${canSteer() ? `<button class="btn ghost small" data-act="sheet" data-s="steer">${ui.worlds.some(x => x.steered) ? 'Ask for a different world' : 'Ask the System for a world'} (${STEER_COST} Echoes)</button>` : ''}
+    <div class="picks">${cards}</div>${worldExtras()}
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
 }
 
@@ -1190,6 +1190,12 @@ function pendingSheet() {
   if (p.type === 'gift') {
     return sheetWrap('[Additional Gift]', `<p class="sh-p">[Milestone reached. The System grants one more Gift. Choose 1.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
   }
+  if (p.type === 'spoils') {
+    const K = SPOILS[p.kind] || SPOILS.supplies;
+    const body = p.offers.map((o, i) => o.k === 'piece' && pieceDef(o.id) ? `<button class="choice ${mainTag(o.id)}" data-act="take-spoils" data-i="${i}">${pieceBody(o.id, 1, o.mods)}</button>`
+      : `<button class="choice" data-act="take-spoils" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(spoilsText(o))}</span><span class="tagn">${esc(K.name)}</span></div></button>`).join('');
+    return sheetWrap(`[Spoils · ${K.name}]`, `<p class="sh-p">[Victory logged. ${esc(K.say)} Or leave it for ${SPOILS_SKIP} gold.]</p>` + body, `<button class="btn ghost" data-act="take-spoils" data-i="skip">Leave it · +${SPOILS_SKIP} gold</button>`, 'sys', true);
+  }
   if (p.type === 'levelup') {
     const L = p.perk && LEVEL_PERKS[p.perk], nx = run.level + 1, lb = hasGift(run, 'latebloomer');
     const lvBtn = `<button class="choice" data-act="take-level" data-k="level"><div class="sr-h"><span class="sr-name">Level up</span><span class="tagn">Lv ${nx}</span></div><div class="sr-desc">+4 Max HP, rarer pieces in the shop and ${lb ? '2 stat points' : '1 stat point'} to place.</div></button>`;
@@ -1460,6 +1466,29 @@ function hallsSheet() {
   return sheetWrap('The Halls', `${rankHTML()}${cloud.on && cloud.tester === false ? `<p class="sh-p fine">${PENDING} Sharing champions opens once you are approved.</p>` : ''}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div><h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Steer the next world: one requested world joins the offer (asking again replaces it). Only shown when you can pay.
+// Below the world offer: Back yourself and Steer, side by side when both are open
+function worldExtras() {
+  const b = backingBtn(), st = canSteer() ? `<button class="btn ghost small" data-act="sheet" data-s="steer">${b ? `${ui.worlds.some(x => x.steered) ? 'New request' : 'Request a world'} · ${STEER_COST}` : `${ui.worlds.some(x => x.steered) ? 'Ask for a different world' : 'Ask the System for a world'} (${STEER_COST} Echoes)`}</button>` : '';
+  return b && st ? `<div class="row2 even">${b}${st}</div>` : b + st;
+}
+// Back yourself: the world screen shows your stake, or a button to place one when you can afford the smallest
+function backingBtn() {
+  if (ui.daily) return '';
+  const B = meta.backing;
+  if (B && BACK_GOALS[B.goal]) return `<button class="btn ghost small" data-act="sheet" data-s="backing">Backed · ${B.stake} Echoes</button>`;
+  return meta.echoes >= BACK_STAKES[0] ? `<button class="btn ghost small" data-act="sheet" data-s="backing">Back yourself</button>` : '';
+}
+function backingSheet() {
+  const B = meta.backing;
+  if (B && BACK_GOALS[B.goal]) {
+    const G = BACK_GOALS[B.goal];
+    return sheetWrap('[Backing placed]', `<p class="sh-p">[You have backed yourself: ${esc(G.name)}. Stake ${B.stake} Echoes. Pays ${B.stake * G.mul} if you make it.]</p><p class="sh-p fine">It rides on your next world. Pending World and practice don't count.</p>`, `<div class="row2 even"><button class="btn" data-act="back-withdraw">Withdraw (${B.stake} back)</button><button class="btn primary" data-act="close">Keep it</button></div>`);
+  }
+  const stakes = BACK_STAKES.filter(n => n <= meta.echoes), st = stakes.includes(ui.backStake) ? ui.backStake : stakes[stakes.length > 1 ? 1 : 0];
+  const head = `<div class="row3">${stakes.map(n => `<button class="btn small ${n === st ? 'primary' : 'ghost'}" data-act="back-stake" data-n="${n}">${n} Echoes</button>`).join('')}</div>`;
+  const list = Object.entries(BACK_GOALS).map(([k, G]) => `<button class="choice" data-act="back-place" data-k="${k}" data-n="${st}"><div class="sr-h"><span class="sr-name">${esc(G.name)}</span><span class="price">Pays ${st * G.mul}</span></div><div class="sr-desc">${esc(G.desc)} Odds ×${G.mul}.</div></button>`).join('');
+  return sheetWrap('[Back yourself]', `<p class="sh-p">[The House takes bets on Entrants. Including from the Entrant. Stake Echoes on how far your next world gets.] You have <b>${meta.echoes}</b> Echoes.</p>${head}${list}`, `<button class="btn primary" data-act="close">Close</button>`);
+}
 function canSteer() { return !ui.daily && meta.echoes >= STEER_COST && ui.worlds && ui.worlds.length > 0; }
 function steerSheet() {
   const O = steerOptions(meta), name = { type: k => WORLD_TYPES[k].name, fate: k => FATES[k].name, people: k => PEOPLES[k].name }, line = { type: k => WORLD_TYPES[k].flavour, fate: k => FATES[k].line, people: k => PEOPLES[k].line };
@@ -1479,6 +1508,18 @@ function shareBlock(s, erased) {
   if (meta.shared && meta.shared[s.at]) return `<p class="sh-p fine center">[${esc(s.champ)} is shared with other entrants.]</p>`;
   return `<button class="btn" data-act="share" data-k="${erased ? 'erased' : 'spared'}">Share ${esc(s.name || s.champ)} with other entrants</button>`;
 }
+// End screen: what this run moved. Round and wins, then a bar each for Entrant Rank, Echoes and Titles, and the nearest goal.
+function progressHTML(e, s) {
+  const titles = run && run.titles0 != null ? Math.max(0, Object.keys(meta.titles).length - run.titles0) : null;
+  const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.backing && run.backing.paid || 0), titles });
+  const unit = { rank: ' RP', echoes: '', titles: '' };
+  const rows = P.bars.map(b => `<div class="pg-row pg-${b.k}" title="${esc(b.text)}"><span class="pg-l">${esc(b.label)}</span><span class="pg-bar" role="progressbar" aria-label="${esc(b.label + ': ' + b.text)}" aria-valuemin="0" aria-valuemax="${b.max}" aria-valuenow="${b.now}"><i style="width:${Math.round(100 * Math.min(1, b.now / (b.max || 1)))}%"></i></span><span class="pg-g">${b.gain ? `+${b.gain}${unit[b.k]}` : ''}</span></div>`).join('');
+  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
+}
+function backLine() {
+  const B = run && run.backing && run.backing.settled && BACK_GOALS[run.backing.goal] ? run.backing : null; if (!B) return '';
+  return `<p class="pg-next ${B.met ? 'good' : 'bad'}">${B.met ? `[Backing paid: ${esc(BACK_GOALS[B.goal].name)}. +${B.paid} Echoes.]` : `[Backing lost: ${B.stake} Echoes. The House thanks you.]`}</p>`;
+}
 function endHTML() {
   const e = ui.end, s = e.snap;
   const erased = e.kind === 'erased';
@@ -1486,7 +1527,7 @@ function endHTML() {
   return `<main class="screen title end ${erased ? 'erased' : 'spared'}">${broadcastTicker(erased ? `++ BREAKING +++ [Entrant eliminated. ${s.worldName} is erased.] +++` : `++ LIVE +++ [${s.worldName} is spared.] +++`)}<div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>
     ${runCard(s, { erased, big: true })}</div>
-    <div class="t-stats"><div><b>${s.round}</b><span>round</span></div><div><b>${run ? run.wins : '–'}</b><span>wins</span></div><div><b>+${e.totalEchoes != null ? e.totalEchoes : e.echoes}</b><span>Echoes</span></div><div><b>+${e.rp || 0}</b><span>RP</span></div></div>
+    ${progressHTML(e, s)}
     ${shareBlock(s, erased)}
     <div class="stack">${e.observed ? `<div class="row2 even"><button class="btn" data-act="daily-board">Today's outcomes</button><button class="btn primary" data-act="new">New world</button></div>` : '<button class="btn primary" data-act="new">Choose a new world</button>'}<div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div></div></main>`;
 }
@@ -1513,7 +1554,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1539,7 +1580,7 @@ function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
-    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = offerWorlds(meta); if (meta.steer) ui.worlds.push(meta.steer); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
+    case 'new': if (run && !run.ended) recordRunStats('abandoned'); lsDel(RUN_KEY); run = null; ui.daily = null; ui.worlds = worldBounty(offerWorlds(meta)); if (meta.steer) ui.worlds.push(meta.steer); ui.seed = Math.random().toString(36).slice(2); ui.world = null; ui.end = null; return go('worlds');
     case 'daily': { const date = dailyDate(), w = dailyWorld(date); if (lsGet(RUN_KEY) && !lsGet(RUN_KEY).ended) return render(); run = null; ui.end = null; ui.sheet = null; ui.daily = { date, ranked: !dailyPlayed(date) }; countObservers(ui.daily); ui.worlds = [w]; ui.world = 0; ui.aw = newAw(w, date); return go('awaken'); }
     case 'daily-board': ui.sheet = { type: 'daily' }; loadBoard(); postDaily(); if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
     case 'board-week': ui.sheet = { type: 'dailyweek' }; if (!ui.season || Date.now() - ui.season.t > 3600e3) loadSeason(); return render();
@@ -1548,6 +1589,9 @@ function onAct(el) {
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
     case 'pick-world': ui.world = +d.i; return render();
+    case 'back-stake': ui.backStake = +d.n; return render();
+    case 'back-place': { if (placeBacking(meta, d.k, +d.n)) { saveMeta(); ui.sheet = null; toast(`[Backing placed: ${BACK_GOALS[d.k].name}. The House has noted your confidence.]`, 'class'); } return render(); }
+    case 'back-withdraw': { if (withdrawBacking(meta)) { saveMeta(); ui.sheet = null; toast('[Backing withdrawn. Stake returned. The House is disappointed.]', 'class'); } return render(); }
     case 'steer-tab': ui.steerTab = d.k; return render();
     case 'steer': {
       if (!canSteer()) return render();
@@ -1573,6 +1617,7 @@ function onAct(el) {
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       if (!run.daily && !run.practice && meta.steer) { delete meta.steer; saveMeta(); } // a requested world is spent once a run starts
+      if (claimBacking(run, meta)) { saveMeta(); run.log.push({ t: 'class', text: `[Backing on file: ${BACK_GOALS[run.backing.goal].name}. ${run.backing.stake} Echoes riding on it.]` }); }
       pushMsgs(run.log.slice(), true);
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
     }
@@ -1658,6 +1703,7 @@ function onAct(el) {
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
     case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Perk instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
+    case 'take-spoils': { const P = run.pending.find(x => x.type === 'spoils'), o = P && d.i !== 'skip' && P.offers[+d.i]; if (!takeSpoils(run, d.i, msgs)) return render(); pushMsgs(msgs, false, o ? `Spoils: ${spoilsText(o)}` : 'Spoils left'); saveRun(); return render(); }
     case 'take-gift': { run.pending.shift(); applyGift(run, d.k, msgs); pushMsgs(msgs, false, `Gift: ${GIFTS[d.k].name}`); saveRun(); return render(); }
     case 'ench-mod': ui.enchantSel = d.i === 'corrupt' ? 'corrupt' : +d.i; return render();
     case 'corrupt-pick': { run.corrupting = corruptOptions(run, +d.u); ui.enchantSel = null; saveRun(); return render(); }
@@ -1693,7 +1739,7 @@ function onAct(el) {
       saveRun(); return go(stageScreen());
     }
     case 'enter-elite': startElite(run, meta); ui.end = null; ui.sheet = null; ui.fight = null; saveRun(); return go(stageScreen());
-    case 'end-run': { const extra = run.eliteWins * 8; meta.echoes += extra; eliteRank(run, meta); saveMeta(); const snap = meta.champions[0]; ui.end = { kind: 'spared', snap, totalEchoes: echoesFor(run, 'spared') + extra, rp: run.rpEarned || 0, opened: run.trialOpened, observed: finishDaily(true) }; run.ended = true; lsDel(RUN_KEY); ui.fight = null; return go('end'); }
+    case 'end-run': { const extra = run.eliteWins * 8 * (bountyOf(run, 'echoes') ? BOUNTIES.echoes.mul : 1); meta.echoes += extra; eliteRank(run, meta); saveMeta(); const snap = meta.champions[0]; ui.end = { kind: 'spared', snap, totalEchoes: echoesFor(run, 'spared') + extra, rp: run.rpEarned || 0, opened: run.trialOpened, observed: finishDaily(true) }; run.ended = true; lsDel(RUN_KEY); ui.fight = null; return go('end'); }
   }
 }
 // ---------- Practice run (tutorial) ----------
