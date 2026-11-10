@@ -81,6 +81,12 @@ jobs:
         run: node tools/goals-test.js
       - name: Rival grudges test
         run: node tools/grudges-test.js
+      - name: Patron bonds test
+        run: node tools/bonds-test.js
+      - name: Settle the Erased test
+        run: node tools/settle-test.js
+      - name: Story drip test
+        run: node tools/story-test.js
 
   balance:
     name: Balance gate

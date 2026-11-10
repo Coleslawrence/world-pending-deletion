@@ -709,7 +709,12 @@
   "aff_reaper",
   "aff_storm",
   "aff_dicer",
-  "aff_jinx"
+  "aff_jinx",
+  "bond_war",
+  "bond_trick",
+  "bond_ruin",
+  "bond_house",
+  "bond_crow"
  ],
  "titles": [
   "first_blood",

@@ -194,8 +194,8 @@ function sanitizeRec(r, type) {
 const SIGILS = ['✦', '☾', '♜', '⚔', '❖', '✠'];
 const SIGIL_COLS = ['#d6a04f', '#72d0ff', '#e15b52', '#9fd86a', '#c27ce6', '#efe6d8'];
 function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank] + (world.bounty === 'gift' ? BOUNTIES.gift.points : 0); }
-function giftUnlocked(k, meta) { const g = GIFTS[k]; if (!g.lock) return true; if (!meta) return false; if (g.lock === 'echo') return !!meta.unlocks['gift_' + k]; if (g.lock === 'chain') return !!(meta.found && meta.found[k]); return !!meta.titles[g.lock]; }
-function giftLockText(k) { const g = GIFTS[k]; if (g.lock === 'echo') return 'Unlock with Echoes'; if (g.lock === 'chain') return 'Found at the end of an event chain'; return 'Earn the Title: ' + TITLES[g.lock].name; }
+function giftUnlocked(k, meta) { const g = GIFTS[k]; if (!g.lock) return true; if (!meta) return false; if (g.lock === 'bond') return bondLevel(meta, g.bond) >= BOND_AT.length; if (g.lock === 'echo') return !!meta.unlocks['gift_' + k]; if (g.lock === 'chain') return !!(meta.found && meta.found[k]); return !!meta.titles[g.lock]; }
+function giftLockText(k) { const g = GIFTS[k]; if (g.lock === 'bond') return `Reach Bond ${BOND_AT.length} with ${GODS[g.bond].name}`; if (g.lock === 'echo') return 'Unlock with Echoes'; if (g.lock === 'chain') return 'Found at the end of an event chain'; return 'Earn the Title: ' + TITLES[g.lock].name; }
 function giftsAllowed(world) { const wg = WORLD_TYPES[world.type].gift; return Object.keys(GIFTS).filter(k => GIFTS[k].cat !== 'extra' && (GIFTS[k].cat !== 'world' || k === wg)); }
 // System Offer: 3 random Gifts cost 1 less, one random cheat costs 2 less.
 function makeOffer(world, meta, rng) {
@@ -288,7 +288,7 @@ function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'), w =
 // w: the day's world (or just its type, for a world without layers)
 function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w); }
 // Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
-function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {} }); }
+function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {}, bonds: {} }); }
 // Leaderboard score: round reached, then Hearts left, then fewest turns, in one sortable number
 function dailyScore(run) {
   const turns = (run.history || []).reduce((a, h) => a + (h.turns || 0), 0);
@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' }, contracts: { week: null, done: {}, weeks: 0 }, grudges: {} }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' }, contracts: { week: null, done: {}, weeks: 0 }, grudges: {}, bonds: {}, settled: [], story: { open: {}, since: 0 } }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; n.grudges = sanitizeGrudges(m.grudges); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; n.grudges = sanitizeGrudges(m.grudges); n.bonds = sanitizeBonds(m.bonds); n.settled = sanitizeSettled(m.settled); n.story = sanitizeStory(m.story); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -516,6 +516,7 @@ function newRun(world, setup, meta, rng) {
   masteryStart(run, meta, !!setup.seed);
   run.designs = designsOn(run) ? Object.keys(sanitizeDesigns(meta.designs).filed) : [];
   clauseStart(run, meta);
+  bondStart(run, meta);
   run.draft = rollDraft(run, stream(run, 'draft', rng));
   run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
@@ -1249,6 +1250,63 @@ function settleMastery(run, meta, outcome) {
   });
 }
 
+// ---------- Story drip (Phase 7; pages in story.js) ----------
+// meta.story: { open: { page id: 1 }, since: runs since the last drip page }. Pages open at the end of a run (not practice):
+// milestones when their moment has come, and the next drip page every STORY_EVERY runs and for each new Priority level.
+function storyDrips() { return Object.keys(STORY_PAGES).filter(k => !STORY_PAGES[k].at); }
+function sanitizeStory(S) { const open = {}; Object.keys(STORY_PAGES).forEach(k => { if (S && S.open && S.open[k]) open[k] = 1; }); return { open, since: Math.max(0, Math.min(99, Math.floor((S && S.since) || 0))) }; }
+function nextDrip(meta) { const S = sanitizeStory(meta.story); return storyDrips().find(k => !S.open[k]) || null; }
+function storyMoment(at, meta, outcome) {
+  if (at === 'erased') return (meta.erased || []).length > 0 || outcome === 'erased';
+  if (at === 'spared') return (meta.wins || 0) > 0;
+  if (at === 'settled') return (meta.settled || []).length > 0;
+  if (at.startsWith('rank:')) return !!meta.rank && rankIdx(meta.rank.letter) >= rankIdx(at.slice(5));
+  return false;
+}
+function openPage(run, meta, k) { if (!k || meta.story.open[k]) return false; meta.story.open[k] = 1; if (run) (run.pagesOpened = run.pagesOpened || []).push(k); return true; }
+function settleStory(run, meta, outcome) {
+  if (!meta || (run && (run.practice || run.script))) return [];
+  meta.story = sanitizeStory(meta.story); const before = run && run.pagesOpened ? run.pagesOpened.length : 0;
+  Object.keys(STORY_PAGES).filter(k => STORY_PAGES[k].at && storyMoment(STORY_PAGES[k].at, meta, outcome)).forEach(k => openPage(run, meta, k));
+  if (run) { meta.story.since++; let n = (run.ladder && run.ladder.opened ? 1 : 0); if (meta.story.since >= STORY_EVERY) { n++; meta.story.since = 0; } for (; n > 0; n--) openPage(run, meta, nextDrip(meta)); }
+  return run && run.pagesOpened ? run.pagesOpened.slice(before) : [];
+}
+// Buying the next drip page early (an Echo sink)
+function buyPage(meta) { const k = nextDrip(meta); if (!k || meta.echoes < STORY_PRICE) return null; meta.story = sanitizeStory(meta.story); meta.echoes -= STORY_PRICE; meta.story.open[k] = 1; return k; }
+
+// ---------- Settle the Erased (Phase 7; lines in settled.js) ----------
+// Beat one of your own Erased champions and you may settle them: they move from meta.erased to meta.settled with a
+// closing line, and stop returning. Other players' Erased champions can't be settled from here; practice settles nothing.
+function canSettle(run, meta, spec) { return !!(spec && spec.kind === 'erased' && spec.snap && meta && !run.practice && !run.script && (meta.erased || []).some(s => s.at === spec.snap.at)); }
+function settleLine(snap) { let h = 0; String(snap.at).split('').forEach(c => h = (h * 31 + c.charCodeAt(0)) >>> 0); return SETTLE_LINES[h % SETTLE_LINES.length].replace(/\{champ\}/g, snap.champ || snap.name || 'The champion').replace(/\{world\}/g, snap.worldName || 'their world'); }
+function settleErased(meta, at, now) {
+  const i = (meta.erased || []).findIndex(s => s.at === at); if (i < 0) return null;
+  const snap = meta.erased.splice(i, 1)[0], entry = { at: snap.at, champ: String(snap.champ || snap.name || '').slice(0, 80), worldName: String(snap.worldName || '').slice(0, 40), line: settleLine(snap), when: Math.round(now == null ? Date.now() : now) };
+  meta.settled = [entry].concat(meta.settled || []).slice(0, SETTLED_MAX);
+  return entry;
+}
+function sanitizeSettled(L) { return (Array.isArray(L) ? L : []).filter(x => x && x.at != null && x.line).slice(0, SETTLED_MAX).map(x => ({ at: x.at, champ: String(x.champ || '').slice(0, 80), worldName: String(x.worldName || '').slice(0, 40), line: String(x.line).slice(0, 300), when: Math.floor(+x.when) || 0 })); }
+
+// ---------- Patron bonds (Phase 7; content in bonds.js) ----------
+// meta.bonds: { god: Favour kept across runs }. A run adds the Favour it ends holding with each god (not practice). A normal
+// run carries the Bond levels it began with (run.bonds); Pending World and practice carry none, so their wagers stay level.
+function bondLevel(meta, g) { const n = (meta && meta.bonds && meta.bonds[g]) || 0; return BOND_AT.filter(v => n >= v).length; }
+function bondNext(meta, g) { const n = (meta && meta.bonds && meta.bonds[g]) || 0, L = bondLevel(meta, g); return L >= BOND_AT.length ? null : { level: L + 1, need: BOND_AT[L] - n }; }
+function sanitizeBonds(B) { const out = {}; Object.keys(GODS).forEach(g => { const v = Math.max(0, Math.min(9999, Math.floor(+(B && B[g]) || 0))); if (v) out[g] = v; }); return out; }
+function bondText(g, L) { const B = BONDS[g]; return L === 1 ? 'A line from your Patron.' : L === 2 ? `${GODS[g].short} also bets on: ${FEATS[B.wager].say(FEATS[B.wager].n)}.` : L === 3 ? 'Another line from your Patron.' : `Gift opened: ${GIFTS[B.gift].name}.`; }
+function bondStart(run, meta) {
+  if (run.seed || run.practice || run.script || !meta) return;
+  run.bonds = {}; Object.keys(BONDS).forEach(g => { const L = bondLevel(meta, g); if (L) run.bonds[g] = L; });
+  const L = run.bonds[run.patron]; if (!L) return;
+  run.log.push({ t: 'favour', text: `[Bond ${L} with ${GODS[run.patron].name}.]` }, { t: 'favour', text: `${GODS[run.patron].short}: "${BONDS[run.patron].lines[L >= 3 ? 1 : 0]}"` });
+}
+function settleBonds(run, meta) {
+  if (run.practice || run.script || !meta) return [];
+  meta.bonds = sanitizeBonds(meta.bonds); const up = [];
+  Object.keys(BONDS).forEach(g => { const v = Math.max(0, Math.floor(run.favour[g] || 0)); if (!v) return; const b = bondLevel(meta, g); meta.bonds[g] = (meta.bonds[g] || 0) + v; const a = bondLevel(meta, g); for (let l = b + 1; l <= a; l++) up.push({ g, level: l, text: bondText(g, l) }); });
+  run.bondUp = up; return up;
+}
+
 // ---------- Rival grudges (Phase 7; lines in grudges.js) ----------
 // meta.grudges: { rival id: { w: your wins, l: their wins, last: 'w' | 'l', retired: 1 } }. Every run but practice keeps
 // the record; only normal runs change a fight for it (grudgeOn), so Pending World stays the same for everyone.
@@ -1468,7 +1526,7 @@ function featFair(run, k) { const F = FEATS[k], lead = run.path || run.arch[0]; 
 const WAGER_FEATS = ['fast', 'noheal', 'react', 'stop', 'healthy'];
 const WAGERS = {};
 const GOD_WAGERS = Object.values(GODS).map(g => g.wager).filter(Boolean);
-WAGER_FEATS.concat(GOD_WAGERS).forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
+WAGER_FEATS.concat(GOD_WAGERS, Object.values(BONDS).map(b => b.wager)).forEach(k => WAGERS[k] = { text: FEATS[k].say(FEATS[k].n), check: f => featOk(k, featCtx(null, f, true)) });
 // The Silence (lore audit, 2 Nov): no Favour and no wagers in a Silence world until its Fate is lifted
 function silent(run) { return !!run && !run.practice && !run.chosenNow && run.world.fate === 'silence' && (run.fateTrack || 0) < FATE_TRACK.max; }
 function makeWager(run, rng) {
@@ -1476,6 +1534,9 @@ function makeWager(run, rng) {
   const keys = WAGER_FEATS.filter(k => featPossible(run, k) && featFair(run, k));
   // About half the time a god bets on its own favourite (GODS[x].wager)
   const own = GODS[god].wager, mine = own && featPossible(run, own) && featFair(run, own) && rnd(rng) < 0.5;
+  // Bond 2 or more (Phase 7): the god's own bet is sometimes the new one it offers you
+  const extra = run.bonds && run.bonds[god] >= 2 && BONDS[god] ? BONDS[god].wager : null;
+  if (mine && extra && featPossible(run, extra) && featFair(run, extra) && rnd(rng) < 0.5) return { god, key: extra };
   return { god, key: mine ? own : pick(keys, rng) };
 }
 // A god added after a run started has no Favour entry in that save yet, hence the || 0
@@ -3251,6 +3312,7 @@ function resolveFight(run, f, meta, rng) {
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
   const res = { won, gold: 0, msgs, tally: f.tally, dealt: f.dealt, turns: f.turn, enemy: f.B.name, death: false, spared: false, eliteOver: false, wager: null, rewind: false };
+  if (won && canSettle(run, meta, spec)) res.settle = spec.snap.at; // Settle the Erased (Phase 7): offered on the result
   // What they say at the end (FOE_LINES in enemies.js): beaten when you win, wins when they do. Finalists and snapshots never speak these
   { const L = !spec.snap && spec.id && FOE_LINES[spec.id], t = L && (won ? L.beaten : L.wins); if (t) res.foeLine = foeLine(t, run); }
   if (!won && !run.elite && hasGift(run, 'rewind') && !run.usedRewind) {
@@ -3394,11 +3456,13 @@ function endRun(run, meta, outcome) {
   const e = echoesFor(run, outcome); meta.echoes += e;
   settleBacking(run, meta, outcome);
   settleGoals(run, meta, outcome);
+  settleBonds(run, meta);
   const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
   run.masteryGain = settleMastery(run, meta, outcome);
   openClauses(run, meta, 'end', outcome, null);
   settleDesigns(run, meta);
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
+  settleStory(run, meta, outcome);
   run.ended = true;
   return { echoes: e + ladder.echoes, snap, rp: rk.rp, trial: rk.trial, ladder, mastery: run.masteryGain };
 }
@@ -3677,7 +3741,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
