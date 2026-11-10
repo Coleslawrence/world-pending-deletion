@@ -189,7 +189,7 @@ service cloud.firestore {
         && d.world is string && d.world.size() <= 16
         && runInt(d.round, 0, 20) && runInt(d.wins, 0, 20) && runInt(d.hearts, 0, 20)
         && (!('mode' in d) || d.mode in ['world', 'daily', 'replay'])
-        && (!('patron' in d) || d.patron in ['war', 'trick', 'ruin', 'none'])
+        && (!('patron' in d) || d.patron in ['war', 'trick', 'ruin', 'house', 'crow', 'none'])
         && (!('wrank' in d) || runKey(d.wrank, 1)) && (!('rank' in d) || runKey(d.rank, 3))
         && (!('path' in d) || runKey(d.path, 16)) && (!('hidden' in d) || runKey(d.hidden, 24)) && (!('title' in d) || runKey(d.title, 24))
         && (!('maxHearts' in d) || runInt(d.maxHearts, 0, 20)) && (!('level' in d) || runInt(d.level, 1, 9))

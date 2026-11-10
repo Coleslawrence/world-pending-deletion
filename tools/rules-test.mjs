@@ -98,6 +98,8 @@ await check('a round of 21 is refused', assertFails(postRun(alice, 'alice', 1700
 await check('61 picks are refused', assertFails(postRun(alice, 'alice', 1700000000006, { picks: Array(61).fill('d:scout') })));
 await check('a 41-character foe is refused', assertFails(postRun(alice, 'alice', 1700000000007, { foe: 'x'.repeat(41) })));
 await check('an unknown mode is refused', assertFails(postRun(alice, 'alice', 1700000000008, { mode: 'cheat' })));
+await check('a House patron run is fine', assertSucceeds(postRun(alice, 'alice', 1700000000041, { patron: 'house' })));
+await check('a Crow patron run is fine', assertSucceeds(postRun(alice, 'alice', 1700000000042, { patron: 'crow' })));
 await check('an unknown patron is refused', assertFails(postRun(alice, 'alice', 1700000000009, { patron: 'Wren' })));
 await check('a level of 10 is refused', assertFails(postRun(alice, 'alice', 1700000000010, { level: 10 })));
 await check('fractional turns are refused', assertFails(postRun(alice, 'alice', 1700000000011, { turns: 40.5 })));
