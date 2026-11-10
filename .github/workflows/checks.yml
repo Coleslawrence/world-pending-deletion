@@ -77,6 +77,8 @@ jobs:
         run: node tools/clauses-test.js
       - name: Goals test
         run: node tools/goals-test.js
+      - name: Rival grudges test
+        run: node tools/grudges-test.js
 
   balance:
     name: Balance gate
