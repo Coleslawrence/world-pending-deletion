@@ -71,6 +71,8 @@ jobs:
         run: node tools/mastery-test.js
       - name: Designs test
         run: node tools/designs-test.js
+      - name: Clauses test
+        run: node tools/clauses-test.js
 
   balance:
     name: Balance gate

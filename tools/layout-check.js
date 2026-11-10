@@ -95,8 +95,10 @@ function states() {
     out.push({ label: 'sheet-mastery', stage: 'shop', sheet: 'mastery', run: mid.run });
     meta.designs = { found: { miasma: 1, vow_of_iron: 1, smelters_apron: 1, stormglass: 1 }, filed: { miasma: 1 }, dry: 2 }; meta.echoes = Math.max(meta.echoes, 20);
     out.push({ label: 'sheet-designs', stage: 'shop', sheet: 'designs', run: mid.run });
+    meta.clauses = { open: { standard: 1, pauper: 1, collector: 1, barehands: 1 }, set: 'collector' }; meta.marks = Object.assign({ arch: {}, world: {}, challenge: {}, clause: {}, depth: 0 }, meta.marks, { clause: { pauper: 3 } });
+    out.push({ label: 'sheet-clauses', stage: 'worlds', sheet: 'clauses', run: mid.run }, { label: 'worlds-clause', stage: 'worlds', sheet: 'none', run: mid.run });
     { const d3 = JSON.parse(JSON.stringify(dg)); d3.gearDraft = ['apothecarys_case', 'stormbreak_plate', 'flail_of_penance']; out.push({ label: 'draft-gear-3', stage: 'draft', run: d3 }); }
-    const me = JSON.parse(JSON.stringify(mid.run)); me.masteryGain = [{ k: 'stormcaller' in G.ARCH ? 'stormcaller' : 'storm', gain: 5, from: 1, level: 2, xp: 27, lo: 25, hi: 45, need: 18, opened: [{ level: 2, text: G.masteryReward('storm', 2), piece: G.masteryPiece('storm', 2) }] }, { k: 'blade', gain: 3, from: 10, level: 10, xp: 338, lo: 330, hi: null, need: 0, opened: [] }, { k: 'arcanist', gain: 1, from: 0, level: 0, xp: 1, lo: 0, hi: 10, need: 9, opened: [] }]; me.designFound = ['blood_price'];
+    const me = JSON.parse(JSON.stringify(mid.run)); me.masteryGain = [{ k: 'stormcaller' in G.ARCH ? 'stormcaller' : 'storm', gain: 5, from: 1, level: 2, xp: 27, lo: 25, hi: 45, need: 18, opened: [{ level: 2, text: G.masteryReward('storm', 2), piece: G.masteryPiece('storm', 2) }] }, { k: 'blade', gain: 3, from: 10, level: 10, xp: 338, lo: 330, hi: null, need: 0, opened: [] }, { k: 'arcanist', gain: 1, from: 0, level: 0, xp: 1, lo: 0, hi: 10, need: 9, opened: [] }]; me.designFound = ['blood_price']; me.clauseOpened = ['hermit'];
     out.push({ label: 'end-erased', stage: 'end-erased', run: me }, { label: 'end-spared', stage: 'end-spared', run: me });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
