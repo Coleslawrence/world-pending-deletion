@@ -57,6 +57,26 @@ Object.entries(G.REFLEXES).forEach(([id, R]) => {
   const h = fightWith(id, skill.id); G.skipPlayer(h); G.enemyTurn(h);
   ok(!h.B.reflexNow, `${id}: a lost turn does not set it off`);
 });
+// Second rules (rivals and Final Champions): each fires on its own trigger; hurt fires once, below half HP
+const TRIG2 = { block: 'block', flurry: 'flurry', status: 'status', heal: 'heal', passive: 'passive' };
+Object.entries(G.REFLEXES).filter(([, R]) => R.also).forEach(([id, R0]) => {
+  const R = R0.also, name = R.move ? R.move.n : G.ENEMIES[id].skills[R.use].n;
+  ok(G.reflexText(id, 1) === `${G.REFLEX_ON[R.on].if}: ${name}.`, `${id}: the second rule's card text`);
+  const skill = R.on === 'hurt' ? null : pick(TRIG2[R.on]);
+  const f = fightWith(id, skill ? skill.id : pick('block').id);
+  ok(f.B.reflexes && f.B.reflexes.length === 2, `${id}: carries both rules`);
+  f.B.reflexes = [f.B.reflexes[1]];
+  if (R.on === 'hurt') {
+    use(f, 'attack'); ok(!f.B.reflexNow, `${id}: hurt waits until it is below half`);
+    f.B.hp = Math.floor(f.B.maxHp * 0.45); use(f, 'attack'); use(f, 'attack');
+    ok(f.tally.reflexes === 1 && f.log.some(l => l.text === R.say), `${id}: hurt fires below half and says its line`);
+    use(f, 'attack'); use(f, 'attack'); use(f, 'attack');
+    ok(f.tally.reflexes === 1, `${id}: hurt fires only once`);
+  } else {
+    use(f, skill.id);
+    ok(f.B.reflexNow && f.B.intent.def.name === name, `${id}: second rule ${R.on} sets off ${name}`);
+  }
+});
 // Practice fights and other players' builds have none
 {
   const meta = G.newMeta(); G.bindMeta(meta);

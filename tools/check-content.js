@@ -295,16 +295,17 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
 });
 C.MONSTERS.concat(C.RIVALS).forEach(k => ref('enemies', C.ENEMIES[k], `${k} is listed in MONSTERS or RIVALS but not defined`));
 // Reflexes: a known trigger, one move (its own or one of the enemy's skills), a System line, and one for every monster, rival and Final Champion
-Object.entries(C.REFLEXES).forEach(([k, R]) => {
-  const w = 'reflexes ' + k, e = C.ENEMIES[k];
+Object.entries(C.REFLEXES).forEach(([k, R0]) => [R0].concat(R0.also ? [R0.also] : []).forEach((R, n) => {
+  const w = 'reflexes ' + k + (n ? ' also' : ''), e = C.ENEMIES[k];
   if (!e) return err(w, 'is not an enemy in ENEMIES');
-  Object.keys(R).filter(f => !['on', 'move', 'use', 'say'].includes(f)).forEach(f => err(w, `unknown field ${f} (on, move, use, say)`));
+  Object.keys(R).filter(f => !['on', 'move', 'use', 'say'].concat(n ? [] : ['also']).includes(f)).forEach(f => err(w, `unknown field ${f} (on, move, use, say${n ? '' : ', also'})`));
+  if (n) ref(w, R.on !== R0.on, 'the second rule needs a different trigger from the first');
   ref(w, C.REFLEX_ON[R.on], `on must be one of ${Object.keys(C.REFLEX_ON).join(', ')}`);
   ref(w, (R.move != null) !== (R.use != null), 'needs move or use, not both');
   if (R.move) ref(w, R.move.n && R.move.fx && Object.keys(R.move.fx).length, 'move needs a name n and effects fx');
   if (R.use != null) ref(w, Number.isInteger(R.use) && e.skills[R.use], `use ${R.use} is not one of its skills`);
   ref(w, typeof R.say === 'string' && /^\[.*\]$/.test(R.say), 'say must be a [System line]');
-});
+}));
 C.MONSTERS.concat(C.RIVALS, Object.keys(C.ENEMIES).filter(k => C.ENEMIES[k].final)).forEach(k => ref('reflexes', C.REFLEXES[k], `${k} has no Reflex`));
 C.MONSTERS.forEach(k => ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.filter(r => r.includes(k)).length === 1, `${k} must be in exactly one qualifier round`));
 ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.length === 3 && C.MONSTER_ROUNDS.every(r => r.length >= 2 && r.every(k => C.MONSTERS.includes(k))), 'three qualifier rounds of at least 2 monsters each, all from MONSTERS');
@@ -362,7 +363,7 @@ Object.values(C.TITLES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) 
 Object.values(G.PERKS).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('perk', k, t.name, v)));
 Object.values(G.MILESTONES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('milestone', k, t.name, v)));
 Object.values(C.GODS).forEach(g => Object.entries(g.bless).forEach(([k, v]) => use('god', k, g.name, v)));
-Object.entries(C.REFLEXES).forEach(([k, R]) => R.move && Object.entries(R.move.fx).forEach(([x, v]) => use('skill', x, `${C.ENEMIES[k].name}: ${R.move.n} (Reflex)`, v)));
+Object.entries(C.REFLEXES).forEach(([k, R0]) => [R0].concat(R0.also ? [R0.also] : []).forEach(R => R.move && Object.entries(R.move.fx).forEach(([x, v]) => use('skill', x, `${C.ENEMIES[k].name}: ${R.move.n} (Reflex)`, v))));
 Object.values(C.ENEMIES).forEach(e => MECHANICS.filter(k => e[k] != null).forEach(k => use('enemy', k, e.name, e[k])));
 Object.values(C.ENEMIES).forEach(e => e.phase && Object.entries(e.phase.set || {}).forEach(([k, v]) => use('enemy', k, e.name + ' (phase)', v)));
 Object.values(C.ENEMIES).forEach(e => Object.entries(e.passives || {}).forEach(([k, v]) => use('passive', k, e.name, v)));

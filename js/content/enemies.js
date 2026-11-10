@@ -54,6 +54,7 @@ const ENEMIES = {
 // Reflexes: each opponent's one if-then rule, shown on its card. on is what you did on your turn (REFLEX_ON); when it
 // fires, the opponent's next move is the Reflex's instead of the next in its script: move (a move of its own, written
 // like any other) or use (the index of one of its skills). say is the System's line when it fires, so the player sees why.
+// also: a second rule, written the same way (rivals and Final Champions). hurt fires once, the first time it is below half HP.
 // It never fires two turns running, and the move is shown as the intent before the player acts (planReflex in core.js).
 // Rank Trial examiners, legends, the Undefeated and other players' builds have none.
 const REFLEX_ON = {
@@ -62,6 +63,7 @@ const REFLEX_ON = {
   status: { chip: 'afflictions', if: 'If you Burn, Poison or Bleed it', why: 'you afflicted it' },
   heal: { chip: 'healing', if: 'If you heal', why: 'you healed' },
   passive: { chip: 'no attack', if: 'If you do not attack', why: 'you held back' },
+  hurt: { chip: 'below half', if: 'Once it drops below half HP', why: 'it is hurt' },
 };
 const REFLEXES = {
   goblin: { on: 'block', move: { n: 'Ankle Stab', fx: { dmg: 5, pierce: 1 } }, say: '[The Goblin sees your guard go up. It goes low.]' },
@@ -79,29 +81,29 @@ const REFLEXES = {
   grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes for the throat early.]' },
   thunder_ram: { on: 'passive', use: 1, say: '[You stood still. The Ram takes that as a target.]' },
   sunken_knight: { on: 'block', use: 2, say: '[The Knight sees you shell up. It knows that trick.]' },
-  seraphine: { on: 'status', move: { n: 'Lay on Hands', fx: { cleanse: 1, heal: 8 } }, say: '[Seraphine notices the stain. She prays it off.]' },
-  grukk: { on: 'flurry', use: 1, say: '[Grukk felt every one of those. Grukk is delighted.]' },
-  lyss: { on: 'block', use: 1, say: '[Lyss notes your guard. Poison does not mind it.]' },
-  masked: { on: 'heal', move: { n: 'Mirror Mend', fx: { heal: 12 } }, say: '[The Masked Entrant copies that as well.]' },
-  kaito: { on: 'status', use: 1, say: '[Kaito has seen that before. He seals it away.]' },
-  delphine: { on: 'passive', use: 2, say: '[You hesitated. Delphine raises.]' },
-  mott: { on: 'block', move: { n: 'Trip', fx: { dmg: 6, pierce: 1 } }, say: '[Mott trips and goes under your guard. He is sorry.]' },
-  calder: { on: 'passive', use: 0, say: '[You did not attack. Ser Calder considers that an invitation.]' },
-  ossian: { on: 'block', move: { n: 'Smoke Out', fx: { burn: 6 } }, say: '[Ossian cannot reach you in there. The smoke can.]' },
-  wren: { on: 'flurry', move: { n: 'Slip Away', fx: { evade: 1 } }, say: '[Wren has counted your hits. She will not be there for the next.]' },
-  bram: { on: 'heal', use: 2, say: '[Bram stops counting. The thunder comes early.]' },
-  sable: { on: 'heal', move: { n: 'Reopen', fx: { dmg: 8, bleed: 3 } }, say: '[Mother Sable watches you mend. She undoes it.]' },
-  vey_twins: { on: 'status', move: { n: 'Trade Looks', fx: { cleanse: 1, block: 6 } }, say: '[The Veys trade a look. What you left on them is gone.]' },
-  brook_pair: { on: 'flurry', use: 1, say: '[The Brooks have seen fast hands before. They brace.]' },
-  leviathan: { on: 'block', move: { n: 'Undertow', fx: { dmg: 8, pierce: 1, weaken: 1 } }, say: '[The Queen sees your wall. The tide goes under it.]' },
-  kharros: { on: 'heal', move: { n: 'Imperial Decree', fx: { burn: 6 } }, say: '[The Emperor does not permit recovery. It is decreed.]' },
-  bone_saint: { on: 'status', move: { n: 'Absolution', fx: { cleanse: 1, heal: 6 } }, say: '[The Bone Saint absolves itself. It has had practice.]' },
-  thorn_mother: { on: 'flurry', move: { n: 'Bramble Wall', fx: { block: 12 } }, say: '[The Thorn Mother pulls the forest in close.]' },
-  archmage: { on: 'passive', use: 2, say: '[The Archmage notices nobody is attacking him. He fills the silence.]' },
-  forge_king: { on: 'status', move: { n: 'Burn It Off', fx: { cleanse: 1, dmg: 6 } }, say: '[The Forge King puts it to the fire. It does not survive.]' },
-  dealer: { on: 'block', move: { n: 'Marked Card', fx: { dmg: 7, pierce: 1 } }, say: '[The Dealer saw that hand coming. It plays around it.]' },
-  augur: { on: 'heal', move: { n: 'Foreseen', fx: { dmg: 9, weaken: 1 } }, say: '[The Augur read that you would mend. It had an answer ready.]' },
-  herald: { on: 'passive', use: 1, say: '[You gave the Storm Herald time. It used it.]' },
+  seraphine: { on: 'status', move: { n: 'Lay on Hands', fx: { cleanse: 1, heal: 8 } }, say: '[Seraphine notices the stain. She prays it off.]' , also: { on: 'hurt', use: 2, say: '[Seraphine kneels. A prayer, mid-fight.]' } },
+  grukk: { on: 'flurry', use: 1, say: '[Grukk felt every one of those. Grukk is delighted.]' , also: { on: 'hurt', use: 2, say: '[Grukk is bleeding. Grukk is happy.]' } },
+  lyss: { on: 'block', use: 1, say: '[Lyss notes your guard. Poison does not mind it.]' , also: { on: 'hurt', use: 2, say: '[Lyss stops playing. She slips out of reach.]' } },
+  masked: { on: 'heal', move: { n: 'Mirror Mend', fx: { heal: 12 } }, say: '[The Masked Entrant copies that as well.]' , also: { on: 'hurt', move: { n: 'Borrowed Face', fx: { block: 10, cleanse: 1 } }, say: '[The mask cracks. Something underneath steadies it.]' } },
+  kaito: { on: 'status', use: 1, say: '[Kaito has seen that before. He seals it away.]' , also: { on: 'hurt', use: 2, say: '[Kaito sheathes his blade. That is not a good sign.]' } },
+  delphine: { on: 'passive', use: 2, say: '[You hesitated. Delphine raises.]' , also: { on: 'hurt', use: 2, say: '[Delphine pushes her whole stack in.]' } },
+  mott: { on: 'block', move: { n: 'Trip', fx: { dmg: 6, pierce: 1 } }, say: '[Mott trips and goes under your guard. He is sorry.]' , also: { on: 'hurt', move: { n: 'Lucky Break', fx: { heal: 10 } }, say: '[Mott finds a plaster in his pocket. He is sorry it was not sooner.]' } },
+  calder: { on: 'passive', use: 0, say: '[You did not attack. Ser Calder considers that an invitation.]' , also: { on: 'hurt', use: 1, say: '[Ser Calder falls back on the book: shield first.]' } },
+  ossian: { on: 'block', move: { n: 'Smoke Out', fx: { burn: 6 } }, say: '[Ossian cannot reach you in there. The smoke can.]' , also: { on: 'hurt', move: { n: 'Let It Spread', fx: { burn: 8 } }, say: '[Ossian stops tending the fire and lets it spread.]' } },
+  wren: { on: 'flurry', move: { n: 'Slip Away', fx: { evade: 1 } }, say: '[Wren has counted your hits. She will not be there for the next.]' , also: { on: 'hurt', use: 2, say: '[Wren is cut. She returns the favour.]' } },
+  bram: { on: 'heal', use: 2, say: '[Bram stops counting. The thunder comes early.]' , also: { on: 'hurt', use: 2, say: '[Bram stops counting.]' } },
+  sable: { on: 'heal', move: { n: 'Reopen', fx: { dmg: 8, bleed: 3 } }, say: '[Mother Sable watches you mend. She undoes it.]' , also: { on: 'hurt', use: 2, say: '[Mother Sable is hurt. She decides it is your turn.]' } },
+  vey_twins: { on: 'status', move: { n: 'Trade Looks', fx: { cleanse: 1, block: 6 } }, say: '[The Veys trade a look. What you left on them is gone.]' , also: { on: 'block', move: { n: 'Crossfire', fx: { dmg: 4, pierce: 1, burn: 2 } }, say: '[The Veys aim around your guard together.]' } },
+  brook_pair: { on: 'flurry', use: 1, say: '[The Brooks have seen fast hands before. They brace.]' , also: { on: 'heal', use: 0, say: '[The Brooks see you mending. They do not wait.]' } },
+  leviathan: { on: 'block', move: { n: 'Undertow', fx: { dmg: 8, pierce: 1, weaken: 1 } }, say: '[The Queen sees your wall. The tide goes under it.]' , also: { on: 'flurry', move: { n: 'Coral Shell', fx: { block: 14 } }, say: '[The Queen draws her coral close.]' } },
+  kharros: { on: 'heal', move: { n: 'Imperial Decree', fx: { burn: 6 } }, say: '[The Emperor does not permit recovery. It is decreed.]' , also: { on: 'passive', use: 0, say: '[The Emperor takes your hesitation as tribute.]' } },
+  bone_saint: { on: 'status', move: { n: 'Absolution', fx: { cleanse: 1, heal: 6 } }, say: '[The Bone Saint absolves itself. It has had practice.]' , also: { on: 'heal', move: { n: 'Deny Rest', fx: { poison: 5 } }, say: '[The Bone Saint does not let anyone rest. Including you.]' } },
+  thorn_mother: { on: 'flurry', move: { n: 'Bramble Wall', fx: { block: 12 } }, say: '[The Thorn Mother pulls the forest in close.]' , also: { on: 'block', move: { n: 'Root Through', fx: { dmg: 6, pierce: 1, bleed: 1 } }, say: '[The roots go under your guard.]' } },
+  archmage: { on: 'passive', use: 2, say: '[The Archmage notices nobody is attacking him. He fills the silence.]' , also: { on: 'status', move: { n: 'Upward Cleanse', fx: { cleanse: 1, block: 8 } }, say: '[The Archmage lets it fall off him. Upward.]' } },
+  forge_king: { on: 'status', move: { n: 'Burn It Off', fx: { cleanse: 1, dmg: 6 } }, say: '[The Forge King puts it to the fire. It does not survive.]' , also: { on: 'flurry', use: 1, say: '[The Forge King raises the anvil.]' } },
+  dealer: { on: 'block', move: { n: 'Marked Card', fx: { dmg: 7, pierce: 1 } }, say: '[The Dealer saw that hand coming. It plays around it.]' , also: { on: 'heal', use: 2, say: '[The Dealer sees you buying time. It goes all in.]' } },
+  augur: { on: 'heal', move: { n: 'Foreseen', fx: { dmg: 9, weaken: 1 } }, say: '[The Augur read that you would mend. It had an answer ready.]' , also: { on: 'passive', use: 2, say: '[The Augur read this pause. It was ready.]' } },
+  herald: { on: 'passive', use: 1, say: '[You gave the Storm Herald time. It used it.]' , also: { on: 'block', move: { n: 'Lightning Seeks', fx: { dmg: 7, pierce: 1 } }, say: '[Lightning does not care about your shield.]' } },
 };
 const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute', 'wisp', 'lucky_rat', 'hex_toad', 'acolyte', 'glyph_moth', 'briar_cub', 'grave_hound', 'thunder_ram', 'sunken_knight'];
 // The qualifier ladder: each qualifier round draws its two monsters from its own list, so each round has its own feel.

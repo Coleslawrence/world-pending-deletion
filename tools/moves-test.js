@@ -14,7 +14,7 @@ function fight(id) {
   G.confirmDraft(run, run.draft.slice(0, 3), meta);
   G.chooseOpponent(run, 0, false);
   const spec = G.currentSpec(run); Object.keys(spec).forEach(k => delete spec[k]); Object.assign(spec, { kind: G.ENEMIES[id].final ? 'final' : G.ENEMIES[id].rival ? 'rival' : 'monster', id, traits: [] });
-  const f = G.newFight(run); f.rng = rng; f.B.reflex = null; f.B.phase = null; f.A.hp = f.A.maxHp = 9999; f.B.hp = f.B.maxHp = 99999;
+  const f = G.newFight(run); f.rng = rng; f.B.reflex = null; f.B.reflexes = []; f.B.phase = null; f.A.hp = f.A.maxHp = 9999; f.B.hp = f.B.maxHp = 99999;
   return f;
 }
 // Play the opponent for many turns without the player acting, recording each move it uses

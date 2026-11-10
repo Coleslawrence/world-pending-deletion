@@ -2065,7 +2065,7 @@ function buildEnemy(run, spec) {
   // Undefeated keep their fixed order. Rivals and Final Champions also read the fight (tactics).
   E.fixed = !!run.practice || !REFLEXES[spec.id]; E.tactics = !E.fixed && !!(t.rival || t.final); E.hist = []; E.next = null;
   const R = !run.practice && REFLEXES[spec.id];
-  if (R) E.reflex = { on: R.on, say: R.say, use: R.use, s: R.move ? Object.assign(enemyMove(R.move, 0, mp), { key: 'r0' }) : null };
+  if (R) { E.reflexes = [R].concat(R.also ? [R.also] : []).map((x, k) => ({ on: x.on, say: x.say, use: x.use, s: x.move ? Object.assign(enemyMove(x.move, 0, mp), { key: 'r' + k }) : null })); E.reflex = E.reflexes[0]; }
   return E;
 }
 // A finalist: another player's round-8 build at its own strength, with its world's Final Champion's mechanic on top
@@ -2893,15 +2893,19 @@ function noteReflex(f, fx) {
   if (fx.heal || fx.healMissing || fx.quench) t.heal = true;
   if (fx.dmg || fx.dmgPip || fx.dmgHigh || fx.fester || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity) t.hits += fx.hits || 1;
 }
-const REFLEX_TEST = { block: t => t.block, status: t => t.status, heal: t => t.heal, flurry: t => t.hits >= 2, passive: t => t.hits === 0 };
-function reflexMove(B) { const R = B.reflex; return R ? R.s || B.skills[R.use] : null; }
+const REFLEX_TEST = { block: t => t.block, status: t => t.status, heal: t => t.heal, flurry: t => t.hits >= 2, passive: t => t.hits === 0, hurt: (t, B) => B.hp <= B.maxHp / 2 };
+function reflexMove(B, R) { R = R || B.reflex; return R ? R.s || B.skills[R.use] : null; }
 // The rule as the player reads it: "If you Block: Ankle Stab."
-function reflexText(id) { const R = REFLEXES[id], t = R && ENEMIES[id]; return R ? `${REFLEX_ON[R.on].if}: ${R.move ? R.move.n : t.skills[R.use].n}.` : ''; }
+function reflexRules(id) { const R = REFLEXES[id]; return R ? [R].concat(R.also ? [R.also] : []) : []; }
+function reflexText(id, k) { const R = reflexRules(id)[k || 0], t = ENEMIES[id]; return R ? `${REFLEX_ON[R.on].if}: ${R.move ? R.move.n : t.skills[R.use].n}.` : ''; }
 function planReflex(f, B) {
-  const R = B.reflex, t = f.pt, s = reflexMove(B);
-  if (R && R.s && R.s.cd > 0) R.s.cd--;
-  if (!R || !s || !t || !t.acted || B.stun > 0 || s.cd > 0 || (B.reflexAt != null && B.turns - B.reflexAt < 2) || !REFLEX_TEST[R.on](t)) return false;
-  B.reflexAt = B.turns; B.reflexNow = true; B.intent = s; B.interrupted = null;
+  const rules = B.reflexes || (B.reflex ? [B.reflex] : []), t = f.pt;
+  rules.forEach(R => { if (R.s && R.s.cd > 0) R.s.cd--; });
+  if (!t || !t.acted || B.stun > 0 || B.hp <= 0 || (B.reflexAt != null && B.turns - B.reflexAt < 2)) return false;
+  const R = rules.find(x => { const s = reflexMove(B, x); return s && s.cd <= 0 && !(x.on === 'hurt' && B.hurtDone) && REFLEX_TEST[x.on](t, B); });
+  if (!R) return false;
+  const s = reflexMove(B, R); if (R.on === 'hurt') B.hurtDone = true;
+  B.reflexAt = B.turns; B.reflexNow = R; B.intent = s; B.interrupted = null;
   f.tally.reflexes = (f.tally.reflexes || 0) + 1;
   say(f, R.say, 'loss'); ev(f, { k: 'reflex', side: B.side, name: s.def.name });
   return true;
@@ -3034,7 +3038,7 @@ function intentInfo(f) {
   const r = intentText(f, s, B);
   if (B.twincast && (B.turns + 1) % B.twincast === 0) r.text += ' · twice';
   if (B.flood && (B.turns + 1) % B.flood === 0) r.text += ' · flood';
-  if (B.reflexNow && B.reflex) r.reflex = REFLEX_ON[B.reflex.on].why;
+  if (B.reflexNow) r.reflex = REFLEX_ON[(B.reflexNow.on ? B.reflexNow : B.reflex).on].why;
   if (B.windup) r.windup = Math.max(1, Math.ceil(B.windup.need - B.windup.got));
   if (f.foresight || B.showNext) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; } // the Hanged Augur shows two moves
   return r;
@@ -3639,5 +3643,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, WINDUP, planIntentForTest: planIntent, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, reflexRules, WINDUP, planIntentForTest: planIntent, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

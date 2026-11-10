@@ -2,6 +2,34 @@ const G = require('../js/core.js');
 // Glitched prefixes cost the System's notice, so the bot only takes one when no normal prefix fits
 const glitchLast = ms => ms.filter(m => !G.PREFIXES[m].glitch).concat(ms.filter(m => G.PREFIXES[m].glitch));
 const RV = { E: 1, D: 2, C: 3, B: 4, A: 5, S: 6 };
+const NAIVE = !!process.env.BOT_NAIVE;
+// What a skill would set off: the triggers in REFLEX_ON, read from its effects as noteReflex in core.js does
+function wouldTrigger(on, fx, B) {
+  const hits = (fx.dmg || fx.dmgPip || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity) ? fx.hits || 1 : 0;
+  return on === 'block' ? !!(fx.block || fx.blockPip) : on === 'status' ? !!(fx.burn || fx.poison || fx.bleed) : on === 'heal' ? !!(fx.heal || fx.healMissing)
+    : on === 'flurry' ? hits >= 2 : on === 'passive' ? hits === 0 : on === 'hurt' ? false : false;
+}
+// A skill that sets off a Reflex costs what the Reflex move would do to you (or undo for them)
+function reflexCost(f, fx, p) {
+  const B = f.B, A = f.A; if (!B.reflexes || (B.reflexAt != null && B.turns + 1 - B.reflexAt < 2)) return 0;
+  // The Reflex move replaces the move it would have used next, so only the difference counts
+  const harm = (s, extra) => { if (!s) return 0; const m = s.def.fx, q = s.power; return ((m.dmg || 0) * (m.hits || 1) * (m.pierce ? 1.3 : 1) + (m.burn || 0) * 1.6 + (m.poison || 0) * 2.5 + (m.bleed || 0) * 1.5 + (m.weaken ? 4 : 0) + ((m.heal || 0) + (m.block || 0) * 0.5) * 0.5) * q + (m.cleanse ? extra : 0); };
+  const undo = (B.poison + B.burn + B.bleed) * 1.2 + ((fx.poison || 0) * 2.5 + (fx.burn || 0) * 1.6 + (fx.bleed || 0) * 1.5) * p;
+  const normal = harm(B.next != null ? B.skills[B.next] : null, undo);
+  let c = 0;
+  B.reflexes.forEach(R => {
+    const s = R.s || B.skills[R.use]; if (!s || s.cd > 1 || !wouldTrigger(R.on, fx, B)) return;
+    c = Math.min(c, normal - harm(s, undo));
+  });
+  return c * W_REFLEX;
+}
+const W_REFLEX = +(process.env.BOT_WR || 0.5), W_WIND = +(process.env.BOT_WW || 10);
+// Breaking a wind-up: worth a lot when this skill's damage is enough
+function windupGain(f, fx, p) {
+  const B = f.B, W = B.windup; if (!W) return 0;
+  const d = ((fx.dmg || 0) * (fx.hits || 1) + (fx.blockDmg ? f.A.block * fx.blockDmg : 0)) * p * G.dmgMult(f, f.A, B) - (fx.pierce ? 0 : B.block);
+  return d >= W.need - W.got ? W_WIND : 0;
+}
 function choosePlayer(f) {
   const A = f.A, B = f.B, ready = A.skills.map((s, i) => ({ s, i })).filter(x => G.canUse(x.s));
   const intent = G.intentInfo(f);
@@ -53,6 +81,8 @@ function choosePlayer(f) {
     if (fx.coinStun) sc += 4;
     if (fx.jinxDisc && !G.canJinx(f)) sc -= 6;
     if (fx.rollTwice) sc += 10;
+    // Reflexes and wind-ups (BOT_NAIVE=1 turns this off, to measure what reading them is worth)
+    if (!NAIVE) sc += reflexCost(f, fx, p) + windupGain(f, fx, p);
     if (s.def.quick) sc += 1000;
     if (sc > bs) { bs = sc; best = { s, i }; }
   });
