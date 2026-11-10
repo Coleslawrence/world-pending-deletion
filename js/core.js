@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {} }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 } }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -514,6 +514,7 @@ function newRun(world, setup, meta, rng) {
   }
   ladderStart(run);
   masteryStart(run, meta, !!setup.seed);
+  run.designs = designsOn(run) ? Object.keys(sanitizeDesigns(meta.designs).filed) : [];
   run.draft = rollDraft(run, stream(run, 'draft', rng));
   run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
@@ -1194,7 +1195,7 @@ function masteryPieces(k) {
 function masteryPiece(k, level) { return masteryPieces(k).find(id => pieceDef(id).mastery === level) || null; }
 function masteryLevels(meta) { const o = {}; ARCH_KEYS.forEach(k => { const l = masteryOf(meta, k).level; if (l) o[k] = l; }); return o; }
 // Can this run find this piece: anything that isn't a Mastery piece, and Mastery pieces the run began with
-function masteryOpen(run, id) { const d = pieceDef(id), m = d && d.mastery; if (!m) return true; const M = run && run.mastery; return M === 'all' || !!(M && M[d.tags[0]] >= m); }
+function masteryOpen(run, id) { const d = pieceDef(id), m = d && d.mastery; if (d && d.design) return designOpen(run, id); if (!m) return true; const M = run && run.mastery; return M === 'all' || !!(M && M[d.tags[0]] >= m); }
 function masteryStart(run, meta, seeded) {
   if (run.practice) return;
   run.mastery = seeded ? 'all' : masteryLevels(meta);
@@ -1236,6 +1237,38 @@ function settleMastery(run, meta, outcome) {
     for (let l = before.level + 1; l <= after.level; l++) opened.push({ level: l, text: masteryReward(k, l), piece: MASTERY_LEVELS[l - 1].kind === 'piece' ? masteryPiece(k, l) : null });
     return { k, gain, from: before.level, level: after.level, xp: after.xp, lo: after.lo, hi: after.hi, need: after.need, opened };
   });
+}
+
+// ---------- Unfiled designs (Phase 5; content in designs.js) ----------
+// meta.designs: { found: { id: 1 }, filed: { id: 1 }, dry: runs in a row without a design found }. A run carries the
+// designs filed when it began (run.designs); Pending World and practice carry none.
+function designIds() { return SHOP_SKILLS.filter(id => SKILLS[id].design).concat(Object.keys(GEAR).filter(id => GEAR[id].design)); }
+function sanitizeDesigns(D) {
+  const ids = designIds(), clean = o => { const r = {}; ids.forEach(id => { if (o && o[id]) r[id] = 1; }); return r; };
+  const found = clean(D && D.found), filed = clean(D && D.filed); Object.keys(filed).forEach(id => found[id] = 1);
+  return { found, filed, dry: clamp(Math.floor(Number(D && D.dry) || 0), 0, 99) };
+}
+function designCost(id) { return DESIGN_COST[pieceDef(id).rank] || 15; }
+function designOpen(run, id) { return !!(run && Array.isArray(run.designs) && run.designs.includes(id)); }
+function designsOn(run) { return !!run && !run.seed && !run.practice && !run.script; }
+// Beating a Gatekeeper: maybe a design, certainly once DESIGN_DRY runs have passed without one
+function dropDesign(run, meta, msgs, rng) {
+  if (!designsOn(run) || !meta) return null;
+  meta.designs = sanitizeDesigns(meta.designs);
+  const left = designIds().filter(id => !meta.designs.found[id]); if (!left.length) return null;
+  const roll = rnd(stream(run, 'design', rng));
+  if (meta.designs.dry < DESIGN_DRY && roll >= DESIGN_CHANCE) return null;
+  const id = pick(left, stream(run, 'design', rng));
+  meta.designs.found[id] = 1; meta.designs.dry = 0; (run.designFound = run.designFound || []).push(id);
+  msgs.push({ t: 'class', text: `[Unfiled design recovered: ${pieceDef(id).name}. File it in the Archive for ${designCost(id)} Echoes.]` });
+  return id;
+}
+// The end of a run: a run that found nothing adds to the dry count
+function settleDesigns(run, meta) { if (!designsOn(run)) return; meta.designs = sanitizeDesigns(meta.designs); if (!(run.designFound || []).length) meta.designs.dry++; }
+function fileDesign(meta, id) {
+  meta.designs = sanitizeDesigns(meta.designs);
+  if (!meta.designs.found[id] || meta.designs.filed[id] || meta.echoes < designCost(id)) return false;
+  meta.echoes -= designCost(id); meta.designs.filed[id] = 1; return true;
 }
 
 const BRACKET_FIELD = [256, 128, 64, 32, 16, 8, 4, 2];
@@ -2154,6 +2187,7 @@ function dmgMult(f, X, Y) {
     if (P.vsHigherRank && Y.rankUp > 0) m *= 1 + P.vsHigherRank;
     if (P.vsDisabled && (Y.stun > 0 || Y.weaken > 0)) m *= 1 + P.vsDisabled;
     if (P.burnExec && Y.burn > 0 && half(Y)) m *= 1 + P.burnExec;
+    if (P.vsBleed && Y.bleed > 0) m *= 1 + P.vsBleed; // Bloodletter
   }
   if (P.blockDmgPct) m *= 1 + Math.min(0.4, X.block / 200);
   if (P.winDmg) m *= 1 + Math.min(0.12, P.winDmg * (X.won || 0)); // Tally Bone
@@ -2177,6 +2211,7 @@ function hit(f, X, Y, raw, o = {}) {
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   const rest = d - absorbed;
   if (absorbed > 0 && rest === 0 && Y.P.blockMisf && !o.isThorns) addMisfortune(f, X, Y.P.blockMisf); // Bad Landing
+  if (absorbed > 0 && rest === 0 && Y.P.blockWeaken && !o.isThorns && X.hp > 0) X.weaken = Math.max(X.weaken, Y.P.blockWeaken); // Grounding Mail
   // Pain Link (experimental): every hit is split evenly between both fighters
   if ((X.P.painLink || Y.P.painLink) && rest > 1) { const share = Math.floor(rest / 2); Y.hp -= rest - share; X.hp -= share; ev(f, { k: 'hit', side: X.side, amt: share, blocked: 0, thorns: true }); }
   else Y.hp -= rest;
@@ -2257,7 +2292,7 @@ function react(f, X, Y, kind) {
 }
 function applyStatus(f, X, Y, fx, p) {
   if (fx.burn) addStatus(f, X, Y, 'burn', Math.round(fx.burn * p));
-  if (fx.poison) { const had = Y.poison > 0; addStatus(f, X, Y, 'poison', Math.round(fx.poison * p)); if (fx.doublePoison && had) Y.poison = Math.round(Y.poison * 1.5); }
+  if (fx.poison) { const had = Y.poison > 0; addStatus(f, X, Y, 'poison', Math.round(fx.poison * p) * (fx.grim && half(Y) ? 2 : 1)); /* Blood Price: doubled below half HP */ if (fx.doublePoison && had) Y.poison = Math.round(Y.poison * 1.5); }
   if (fx.bleed) addStatus(f, X, Y, 'bleed', Math.round(fx.bleed * p) * (fx.deepen && Y.bleed > 0 ? 2 : 1)); // Open Vein: doubled on a bleeding target
   if (fx.weaken) { Y.weaken = Math.max(Y.weaken, fx.weaken + (X.P.weakenPlus || 0)); if (X.P.weakPoison) addStatus(f, X, Y, 'poison', X.P.weakPoison); react(f, X, Y); }
   if (fx.stun) stunTarget(f, X, Y);
@@ -2323,6 +2358,7 @@ function rollPip(f, X, s) {
   if (v === 1 && X.sleeve) { X.sleeve = false; v = 6; if (X.isPlayer) say(f, "[Cardsharp's Sleeve: a 1 becomes a 6.]", 'skill'); }
   if (v === 6) X.rolledSix = true;
   if (v === 1 && X.P.oneMisf) addMisfortune(f, X === f.A ? f.B : f.A, X.P.oneMisf); // Unlucky Number
+  if (v === 6 && X.P.sixMisf) addMisfortune(f, X === f.A ? f.B : f.A, X.P.sixMisf); // Hexed Dice
   return v;
 }
 function rollDice(f, X, only) {
@@ -2546,6 +2582,8 @@ function useSkill(f, X, s, opt) {
   if (fx.flash && Y.burn > 0 && Y.hp > 0) { const v = Math.min(Y.burn, Math.round(fx.flash * p)); Y.burn += v; if (X.isPlayer) f.tally.burn += v; say(f, `[${def.name}: +${v} Burn.]`, 'skill'); react(f, X, Y, 'burn'); }
   if (fx.fuse) { X.fuseT = 2; X.fuseV = Math.round(fx.fuse * p); } // Slow Fuse: more Burn at the start of your next 2 turns
   if (fx.reapHeal && half(Y)) heal(f, X, fx.reapHeal * p); // Reap
+  if (fx.quench && Y.burn > 0) { const v = Math.min(Y.burn, Math.round(fx.quench * p)); Y.burn = 0; heal(f, X, v); say(f, `[${def.name}: their Burn becomes your healing, ${v}.]`, 'skill'); } // Searing Mercy
+  if (fx.vowHeal) X.vowHeal = fx.vowHeal; // Vow of Iron: heal from the Block still held next turn
   if (damaging && dealt > 0 && X.P.nailMisf) { X.nailN = (X.nailN || 0) + 1; if (X.nailN % 3 === 0) { addMisfortune(f, Y, X.P.nailMisf); say(f, `[Thirteenth Nail: +${X.P.nailMisf} Misfortune.]`, 'class'); } }
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
   if (damaging && X.P.poisonOnHit && dealt > 0) addStatus(f, X, Y, 'poison', X.P.poisonOnHit);
@@ -2631,6 +2669,7 @@ function startTurn(f, X, first) {
   if (X.isPlayer) X.skills.forEach(s => { if (!s.unstable) return; s.unstableId = s.unstableId || s.def.id; const ids = SKILLS[s.unstableId].unstable, e = ids[(f.turn + 1) % 2]; s.def = Object.assign(moddedDef(e, s.mods), { name: `${s.unstable.name}: ${SKILLS[e].name}`, cd: s.unstable.cd, id: s.unstableId }); });
   if (X.isPlayer) rollDice(f, X);
   if (!first) {
+    if (X.vowHeal) { if (X.block > 0) heal(f, X, X.block * X.vowHeal); X.vowHeal = 0; }
     if (X.forge || X.holdBlock) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
     X.holdBlock = false;
   }
@@ -2654,6 +2693,7 @@ function startTurn(f, X, first) {
     if (Y.isPlayer) f.dealt['Burn'] = (f.dealt['Burn'] || 0) + v; else f.tally.hurtBy['Burn'] = (f.tally.hurtBy['Burn'] || 0) + v;
     if (Y.P.burnHeal) heal(f, Y, v * Y.P.burnHeal);
     if (Y.P.burnMisf) addMisfortune(f, X, Y.P.burnMisf); // Black Candle
+    if (Y.P.burnBlock && v > 0) gainBlock(f, Y, Y.P.burnBlock); // Smelter's Apron
     const fade = X.burnFade != null ? X.burnFade : 0.3; X.burn = Math.max(0, X.burn - Math.ceil(X.burn * fade));
   }
   if (X.poison > 0) {
@@ -2724,7 +2764,7 @@ function noteReflex(f, fx) {
   t.acted = true;
   if (fx.block || fx.blockPip) t.block = true;
   if (fx.burn || fx.poison || fx.bleed || fx.fuse || fx.flash) t.status = true;
-  if (fx.heal || fx.healMissing) t.heal = true;
+  if (fx.heal || fx.healMissing || fx.quench) t.heal = true;
   if (fx.dmg || fx.dmgPip || fx.dmgHigh || fx.fester || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity) t.hits += fx.hits || 1;
 }
 const REFLEX_TEST = { block: t => t.block, status: t => t.status, heal: t => t.heal, flurry: t => t.hits >= 2, passive: t => t.hits === 0 };
@@ -2882,7 +2922,7 @@ function describe(def, p = 1) {
   if (fx.detonate) r.push(`Deal ${fx.detonate}× the opponent's Burn as damage${fx.keep ? '' : ', then remove it'}. Ignores Block.`);
   const per = fx.perHit ? ' with each hit' : '';
   if (fx.burn) r.push(`Apply ${n(fx.burn)} Burn${per}.`);
-  if (fx.poison) r.push(`Apply ${n(fx.poison)} Poison${per}${fx.doublePoison ? ', then raise their Poison by half if they already had some' : ''}.`);
+  if (fx.poison) r.push(`Apply ${n(fx.poison)} Poison${per}${fx.doublePoison ? ', then raise their Poison by half if they already had some' : ''}${fx.grim ? ', doubled if they are below half HP' : ''}.`);
   if (fx.bleed) r.push(`Apply ${n(fx.bleed)} Bleed${per}${fx.deepen ? ', doubled if they are already bleeding' : ''}.`);
   if (fx.fester) r.push(`Deal ${fx.fester === 1 ? '' : fx.fester + '× '}the opponent's Poison as damage. The Poison stays.`);
   if (fx.flash) r.push(`Double the opponent's Burn, adding up to ${n(fx.flash)}.`);
@@ -2893,6 +2933,8 @@ function describe(def, p = 1) {
   if (fx.stunIfWeak) r.push('If the opponent is Weakened, Stun them.');
   if (fx.block) r.push(`Gain ${n(fx.block)} Block.`);
   if (fx.heal) r.push(fx.fullBlock ? `Heal ${n(fx.heal)}, or gain ${n(fx.fullBlock)} Block if you are at full HP.` : `Heal ${n(fx.heal)}.`);
+  if (fx.quench) r.push(`Remove the opponent's Burn and heal that much, up to ${n(fx.quench)}.`);
+  if (fx.vowHeal) r.push(`At the start of your next turn, heal ${Math.round(fx.vowHeal * 100)}% of the Block you still hold.`);
   if (fx.reapHeal) r.push(`Heal ${n(fx.reapHeal)} if the opponent is below half HP.`);
   if (fx.hold) r.push('Your Block does not fade at the start of your next turn.');
   if (fx.thornsFight) r.push(`For the rest of the fight, hit back for ${n(fx.thornsFight)} when struck.`);
@@ -3041,7 +3083,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
-    if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
+    if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); dropDesign(run, meta, msgs, rng); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
     if (runP(run).goldPerWin) { run.gold += runP(run).goldPerWin; msgs.push({ t: 'loot', text: `[The House pays out: +${runP(run).goldPerWin} gold.]` }); }
     if (META && !META.unlocks.arch_jinx && !run.practice && (spec.id === 'mott' || (f.tally.missed || 0) >= 3)) { META.unlocks.arch_jinx = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Jinx. Please stand well back.]' }); } // beat Mott, or win a fight where 3 attacks missed you
     if (spec.id === 'delphine' && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); } // the rival route
@@ -3134,6 +3176,7 @@ function endRun(run, meta, outcome) {
   settleBacking(run, meta, outcome);
   const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
   run.masteryGain = settleMastery(run, meta, outcome);
+  settleDesigns(run, meta);
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
   return { echoes: e + ladder.echoes, snap, rp: rk.rp, trial: rk.trial, ladder, mastery: run.masteryGain };
@@ -3410,7 +3453,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

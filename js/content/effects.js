@@ -171,6 +171,11 @@ const EFFECTS = {
   sixBlock: { say: v => `When a turn starts with a 6 among your dice, gain ${v} Block and a reroll.`, theme: 'dicer' },
   nailMisf: { say: v => `Every 3rd damaging skill you use applies ${v} Misfortune.`, theme: 'jinx' },
   curseWard: { say: v => `The first ${v} Curse you would take each fight is ignored.`, theme: 'jinx' },
+  // Unfiled designs (designs.js)
+  burnBlock: { say: v => `Gain ${v} Block each time Burn on your opponent deals damage.`, theme: ['pyre', 'bastion'] },
+  blockWeaken: { how: 'set', say: () => 'When your Block stops a whole hit, the attacker is Weakened for 1 turn.', theme: ['bastion', 'storm'] },
+  vsBleed: { say: v => `+${pct(v)} damage to bleeding opponents.`, theme: ['blade', 'reaper'] },
+  sixMisf: { say: v => `A die that rolls 6 adds ${v} Misfortune to your opponent.`, theme: ['dicer', 'jinx'] },
   // Reactions
   reactMult: { how: 'mul', say: v => `Reactions are ${pct(v - 1)} stronger.` },
   reactHeal: { how: 'set', say: v => `Toxic Flare and Cauterise heal you ${v}.` },
