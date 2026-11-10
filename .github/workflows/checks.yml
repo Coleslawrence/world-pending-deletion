@@ -61,6 +61,8 @@ jobs:
         run: node tools/runshape-test.js
       - name: Bracket map test
         run: node tools/bracket-test.js
+      - name: Ladder test
+        run: node tools/ladder-test.js
 
   balance:
     name: Balance gate

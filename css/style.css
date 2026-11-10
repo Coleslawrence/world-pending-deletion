@@ -1222,3 +1222,7 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 .title.intro .sysbox p:nth-child(2) { animation-delay: .8s; }
 .title.intro .lede, .title.intro .t-stats, .title.intro .stack { animation: tinup .35s ease-out 1s both; }
 .title.intro .t-stats { animation-delay: 1.1s; } .title.intro .stack { animation-delay: 1.2s; }
+
+/* Difficulty ladder (Phase 4): Mark chips and the chosen row in the Priority and Challenge sheets */
+.tag.mark { border-color: currentColor; } .mk-bronze { color: var(--bronze); } .mk-silver { color: var(--block); } .mk-gold { color: var(--stun); } .mk-plat { color: var(--sys); } .mk-black { color: var(--bad); }
+.choice.on { border-color: var(--sys); }

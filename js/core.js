@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank() }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks() }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -485,6 +485,7 @@ function newRun(world, setup, meta, rng) {
   // Its own stream, so pairing never shifts the draft, shops or opponents (a sim's rng keys it by the world)
   run.pair = genPair(world, setup.seed ? seedRng(setup.seed + ':pair') : rng ? seedRng('pair:' + world.type + ':' + world.name) : undefined);
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
+  if (!setup.seed && !setup.script) { run.priority = sanitizePriority(meta.priority, setup.priority).set; if (CHALLENGES[setup.challenge]) run.challenge = setup.challenge; }
   if (G.includes('bornlucky')) run.stats.LUK += 2;
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // Opening stat points: placed after the opening draft, once the skills and gear are known (placeStartStats).
@@ -511,6 +512,7 @@ function newRun(world, setup, meta, rng) {
     if (run.perks.includes('patron') && run.patron && run.patron !== 'none') run.favour[run.patron] += 1;
     if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
   }
+  ladderStart(run);
   run.draft = rollDraft(run, stream(run, 'draft', rng));
   run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
@@ -675,7 +677,7 @@ function refreshShop(run, rng, kind) {
   });
 }
 function rerollBase(run) { return (hasGift(run, 'f_unlucky') ? 3 : 2) - (customOf(run, 'league') ? 1 : 0); }
-function rerollCost(run) { return run.freeRerolls > 0 ? 0 : Math.max(1, rerollBase(run) - (hasVoucher(run, 'rerolls') ? 1 : 0)); }
+function rerollCost(run) { return run.freeRerolls > 0 ? 0 : Math.max(1, rerollBase(run) - (hasVoucher(run, 'rerolls') ? 1 : 0)) + amendOf(run).rerollUp; }
 function reroll(run, rng, kind) { const c = rerollCost(run); if (run.gold < c) return false; if (c === 0) run.freeRerolls--; else { run.gold -= c; run.shopSpent = true; } refreshShop(run, stream(run, 'shop', rng), kind || 'skill'); return true; }
 function shopItem(run, kind, i) { ensureShop(run); return kind === 'bonus' ? run.bonusSlot : run.shop[kind][i]; }
 function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id && p.star === 1).length; }
@@ -954,7 +956,7 @@ function makeChoices(run, meta, rng) {
   // A Gatekeeper: at a GATES round the hard rival guards the way on, with an extra trait, a second phase and a better reward
   if (GATES.includes(run.round) && hard.kind === 'rival' && !run.practice) hard.gate = true;
   // Monsters and rivals bring traits from the pool, shown on the choice screen (js/content/traits.js)
-  [easy, hard].forEach(c => { const n = run.practice || c.summoned || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0); if (n) c.traits = rollTraits(run, n, rng); });
+  [easy, hard].forEach(c => { const n = run.practice || c.summoned || (c.kind !== 'monster' && c.kind !== 'rival') ? 0 : (TRAIT_COUNT[run.round - 1] || 0) + (c.gate ? 1 : 0) + amendOf(run).traitUp; if (n) c.traits = rollTraits(run, n, rng); });
   return [easy, hard];
 }
 function specKey(spec) { return spec.snap ? 'snap:' + spec.snap.at : spec.id; }
@@ -962,6 +964,7 @@ function specName(spec) {
   if (spec.kind === 'trial') return `${spec.to}-rank Proctor`;
   if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant' || (spec.kind === 'final' && spec.snap)) return spec.snap.champ;
   const n = ENEMIES[spec.id].name;
+  if (spec.depth) return `${n}, Depth ${spec.depth}`;
   if (spec.gate) return n + ', Gatekeeper';
   if (spec.hard) return spec.kind === 'monster' ? 'Alpha ' + n : n + ', Veteran';
   return n;
@@ -1115,6 +1118,58 @@ function tickCurse(run, meta, msgs, rng) {
   delete run.curse;
   msgs.push({ t: 'loot', text: `[${(CURSES[C.id] || {}).name || 'The curse'} lifts. The door pays what it promised.]` });
   shapeApply(C.pay, shapeCtx(run, msgs, 'Cursed door', rng));
+}
+// ---------- The difficulty ladder: Priority, Challenge worlds, Marks of mastery, Past the Undefeated (content in ladder.js) ----------
+function newMarks() { return { arch: {}, world: {}, challenge: {}, depth: 0 }; }
+// meta.priority: max is the highest level open, set the level chosen for the next world. want: a level asked for now
+function sanitizePriority(p, want) {
+  const max = clamp(Math.floor((p && p.max) || 0), 0, PRIORITY.length);
+  return { max, set: clamp(Math.floor(want != null ? want : (p && p.set) || 0), 0, max) };
+}
+function setPriority(meta, n) { meta.priority = sanitizePriority(meta.priority, n); return meta.priority.set; }
+function priorityRules(n) { return PRIORITY.slice(0, clamp(n || 0, 0, PRIORITY.length)); }
+// What a Priority level or a Challenge takes from the run before it starts
+function ladderStart(run) {
+  const rules = priorityRules(run.priority).concat(CHALLENGES[run.challenge] || []);
+  if (!rules.length) return;
+  if (run.priority) run.log.push({ t: 'class', text: `[Priority ${run.priority} confirmed. The System has cleared its schedule.]` });
+  if (run.challenge) run.log.push({ t: 'class', text: `[Challenge world: ${CHALLENGES[run.challenge].name}. ${CHALLENGES[run.challenge].say}]` });
+  rules.forEach(R => {
+    if (R.gold) run.gold += R.gold;
+    if (R.archs) run.arch = run.arch.slice(0, R.archs);
+    if (R.erase) OUTCOME_APPLY.erase(R.erase, { run, msgs: run.log });
+  });
+}
+function markTier(v) { return MARK_TIERS.find(T => v >= T.at) || null; }
+// When a world is spared: the next Priority level opens, Marks are raised, and a Challenge's first clear pays out.
+// Returns what changed, for the end screen: { echoes, opened, marks: [{ kind, key, v, tier }] }
+function settleLadder(run, meta, outcome) {
+  const out = { echoes: 0, opened: 0, marks: [] };
+  if (outcome !== 'spared' || run.seed || run.practice) return out;
+  meta.priority = sanitizePriority(meta.priority); meta.marks = Object.assign(newMarks(), meta.marks);
+  const P = run.priority || 0, v = P + 1;
+  if (P === meta.priority.max && meta.priority.max < PRIORITY.length) { meta.priority.max++; out.opened = meta.priority.max; }
+  const raise = (kind, key) => { const M = meta.marks[kind], was = M[key] || 0; if (v > was) { M[key] = v; if (!was || markTier(v) !== markTier(was)) out.marks.push({ kind, key, v, tier: markTier(v).name }); } return was; };
+  raise('arch', run.arch[0]); raise('world', run.world.type);
+  if (CHALLENGES[run.challenge] && !raise('challenge', run.challenge)) out.echoes += CHALLENGE_ECHOES;
+  run.ladder = out;
+  return out;
+}
+// Past the Undefeated: after the Elite bracket is cleared, the climb goes on one Depth at a time until a loss
+function depthMul(run) { const s = run.elite && run.eliteBracket && run.eliteBracket[run.eliteIdx]; return s && s.depth ? 1 + DEPTH_SCALE * s.depth : 1; }
+function noteDepth(meta, n) { meta.marks = Object.assign(newMarks(), meta.marks); if (n > (meta.marks.depth || 0)) meta.marks.depth = n; }
+function nextDepth(run, rng) {
+  run.endless = (run.endless || 0) + 1;
+  run.eliteBracket.push({ kind: 'legend', id: 'undefeated', depth: run.endless, traits: rollTraits(run, Math.min(DEPTH_TRAITS, run.endless), rng) });
+  run.eliteIdx = run.eliteBracket.length - 1;
+}
+function canClimb(run) { return !!(run.elite && !run.seed && !run.practice && run.eliteBracket && run.eliteIdx >= run.eliteBracket.length - 1); }
+function startEndless(run, meta, rng) {
+  if (!canClimb(run)) return false;
+  nextDepth(run, stream(run, 'loot', rng));
+  run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * 0.3));
+  offerLevel(run, stream(run, 'level', rng)); enterChoose(run, meta, rng);
+  return true;
 }
 // ---------- The bracket map ----------
 // The whole tournament on one page: 3 qualifiers, 4 main bracket rounds and the Final, the field halving each round.
@@ -1760,14 +1815,15 @@ function noticePct(run) { return Math.round(TUNE.notice * noticeOf(run) * 100); 
 // Every rule change in force, as one set: an event's Amendment, the augment rounds' Amendments and a cursed door's curse
 function amendIds(run) { return run.elite || run.practice ? [] : [run.amend].concat(run.augments || []).filter(k => AMENDMENTS[k]); }
 function amendOf(run) {
-  const o = { foeHp: 1, foeDmg: 1, winGold: 0, income: 0, heartCut: 0, trainCut: 0, priceUp: 0, hpCut: 0 };
-  const add = A => { o.foeHp *= A.foeHp || 1; o.foeDmg *= A.foeDmg || 1; ['winGold', 'income', 'heartCut', 'trainCut', 'priceUp', 'hpCut'].forEach(k => o[k] += A[k] || 0); };
+  const o = { foeHp: 1, foeDmg: 1, finalHp: 1, finalDmg: 1, winGold: 0, income: 0, heartCut: 0, trainCut: 0, priceUp: 0, hpCut: 0, traitUp: 0, healCut: 0, rerollUp: 0 };
+  const add = A => { ['foeHp', 'foeDmg', 'finalHp', 'finalDmg'].forEach(k => o[k] *= A[k] || 1); ['winGold', 'income', 'heartCut', 'trainCut', 'priceUp', 'hpCut', 'traitUp', 'healCut', 'rerollUp'].forEach(k => o[k] += A[k] || 0); };
   amendIds(run).forEach(k => add(AMENDMENTS[k]));
+  if (!run.elite && !run.practice) { priorityRules(run.priority).forEach(add); if (CHALLENGES[run.challenge]) add(CHALLENGES[run.challenge]); }
   if (run.curse && CURSES[run.curse.id] && !run.elite && !run.practice) add(CURSES[run.curse.id]);
   return o;
 }
-function enemyPower(run) { return roundPower(curRound(run)) * curveOf(run, 'dmg') * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1); }
-function enemyHpMul(run) { return roundHp(curRound(run)) * curveOf(run, 'hp') * rankMul(run) * (amendOf(run).foeHp || 1); }
+function enemyPower(run) { return roundPower(curRound(run)) * curveOf(run, 'dmg') * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalDmg : 1) * depthMul(run); }
+function enemyHpMul(run) { return roundHp(curRound(run)) * curveOf(run, 'hp') * rankMul(run) * (amendOf(run).foeHp || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalHp : 1) * depthMul(run); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
@@ -2830,7 +2886,7 @@ function resolveFight(run, f, meta, rng) {
   if (won) {
     run.wins++;
     res.gold = noWinGold ? 0 : 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
-    const healF = run.world.mod === 'famine' ? 0.15 : 0.3;
+    const healF = Math.max(0.05, (run.world.mod === 'famine' ? 0.15 : 0.3) - amendOf(run).healCut);
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
@@ -2852,7 +2908,8 @@ function resolveFight(run, f, meta, rng) {
     if ((spec.kind === 'erased' || spec.kind === 'champion') && spec.snap.bar.length) { const p = pick(spec.snap.bar.concat(spec.snap.gear), lr); const id = baseId(p.id); if (pieceDef(id) && !pieceDef(id).basic) { msgs.push({ t: 'loot', text: `[Reclaimed from ${spec.snap.champ}: ${pieceDef(id).name}]` }); addPiece(run, id, p.mods || [], msgs); } }
     if (run.elite) {
       run.eliteWins++;
-      if (run.eliteIdx >= run.eliteBracket.length - 1) { res.eliteOver = true; res.eliteCleared = true; }
+      if (run.eliteIdx >= run.eliteBracket.length - 1 && run.endless) { res.depth = run.endless; noteDepth(meta, run.endless); msgs.push({ t: 'class', text: `[Depth ${run.endless} cleared. The record has no name for where you are.]` }); nextDepth(run, lr); }
+      else if (run.eliteIdx >= run.eliteBracket.length - 1) { res.eliteOver = true; res.eliteCleared = true; }
       else run.eliteIdx++;
     } else if (spec.kind === 'final') { res.spared = true; closeFate(run, msgs, true); }
     else run.round++;
@@ -2914,6 +2971,7 @@ function echoesFor(run, outcome) {
   let e = 3 * run.wins;
   if (outcome === 'spared' || outcome === 'elite') e += 10 + (5 - run.world.rank) * 3;
   e += 8 * run.eliteWins;
+  if (run.priority && !run.seed && !run.practice) e = Math.round(e * (1 + PRIORITY_ECHO * run.priority));
   return bountyOf(run, 'echoes') ? e * BOUNTIES.echoes.mul : e;
 }
 function endRun(run, meta, outcome) {
@@ -2925,9 +2983,10 @@ function endRun(run, meta, outcome) {
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
   settleBacking(run, meta, outcome);
+  const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
-  return { echoes: e, snap, rp: rk.rp, trial: rk.trial };
+  return { echoes: e + ladder.echoes, snap, rp: rk.rp, trial: rk.trial, ladder };
 }
 
 // ---------- Playtest stats ----------
@@ -3200,7 +3259,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
