@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, getCountFromServer } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, getCountFromServer, writeBatch, increment } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({ projectId: 'demo-wpd', firestore: { rules: readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8') } });
 const day = '2026-10-25';
@@ -178,6 +178,24 @@ const poolNoteRef = (db, owner, uid, t) => doc(db, `inbox/${owner}/notes/${uid}_
 await check('a record-held note', assertSucceeds(setDoc(poolNoteRef(alice, 'bob', 'alice', 1700000000100), { by: 'alice', champ: 'Maren of Velmere', t: 1700000000100, pool: 3, won: true })));
 await check('a record-erased note', assertSucceeds(setDoc(poolNoteRef(alice, 'bob', 'alice', 1700000000101), { by: 'alice', champ: 'Maren of Velmere', t: 1700000000101, pool: 3, gone: true })));
 await check('a note for round 8 is refused', assertFails(setDoc(poolNoteRef(alice, 'bob', 'alice', 1700000000102), { by: 'alice', champ: 'Maren of Velmere', t: 1700000000102, pool: 8 })));
+// Shared milestones: a run summary and its count go up together, once
+const sharedRef = db => doc(db, 'shared/totals');
+const postCounted = (db, uid, at, over = {}, counts = {}) => { const b = writeBatch(db), id = uid + '_' + at, R = Object.assign({}, runDoc, { at }, over);
+  b.set(runRef(db, id), R); b.set(sharedRef(db), Object.assign({ runs: increment(1), spared: increment(R.outcome === 'spared' ? 1 : 0), last: id }, counts), { merge: true }); return b.commit(); };
+await check('the first counted run creates the totals', assertSucceeds(postCounted(alice, 'alice', 1700000100000, { outcome: 'spared' })));
+await check('a spared run counts as spared', assertSucceeds(getDoc(sharedRef(bob)).then(d => { if (d.data().runs !== 1 || d.data().spared !== 1) throw new Error(JSON.stringify(d.data())); })));
+await check('an erased run counts as a run only', assertSucceeds(postCounted(bob, 'bob', 1700000100001, { outcome: 'erased' })));
+await check('an erased run cannot count as spared', assertFails(postCounted(bob, 'bob', 1700000100002, { outcome: 'erased' }, { spared: increment(1) })));
+await check('a count of 2 at once is refused', assertFails(postCounted(bob, 'bob', 1700000100003, {}, { runs: increment(2) })));
+await check('a count without its run summary is refused', assertFails(setDoc(sharedRef(alice), { runs: increment(1), spared: increment(0), last: 'alice_1700000100009' }, { merge: true })));
+await check('a run already posted cannot be counted again', assertFails(setDoc(sharedRef(alice), { runs: increment(1), spared: increment(0), last: 'alice_1700000100000' }, { merge: true })));
+await check("counting someone else's run is refused", assertFails(postCounted(bob, 'alice', 1700000100004)));
+await check('an unapproved player cannot count', assertFails(postCounted(erin, 'erin', 1700000100005)));
+await check('an extra field on the totals is refused', assertFails(postCounted(alice, 'alice', 1700000100006, {}, { boost: 1 })));
+await check('the totals cannot be deleted', assertFails(deleteDoc(sharedRef(alice))));
+await check('signed-in players read the totals', assertSucceeds(getDoc(sharedRef(erin))));
+await check('signed-out players cannot', assertFails(getDoc(sharedRef(anon))));
+await check('other shared documents stay closed', assertFails(getDoc(doc(alice, 'shared/other'))));
 await check('other paths stay closed', assertFails(setDoc(doc(alice, 'daily/' + day), { x: 1 })));
 
 console.log(`${pass} passed, ${fail} failed`);

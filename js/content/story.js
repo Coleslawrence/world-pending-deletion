@@ -5,7 +5,7 @@
 // and one each time a new Priority level opens. The next drip page can be bought early for STORY_PRICE Echoes.
 // Every page is written to fit all three open answers to the central mystery (lore-bible.md): none of them answers it.
 //   title, text: what the Archive shows. by: who wrote it, for the page's header.
-//   at: a milestone's moment: 'erased', 'spared', 'rank:<letter>' (promoted to it or past it), 'settled'.
+//   at: a milestone's moment: 'erased', 'spared', 'rank:<letter>' (promoted to it or past it), 'settled', 'shared' (milestones.js).
 //   opens: the milestone's moment, as players read it while the page is sealed.
 const STORY_EVERY = 3;
 const STORY_PRICE = 15;

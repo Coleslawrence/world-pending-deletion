@@ -118,6 +118,11 @@ function states() {
     // Story drip (Phase 7): the Archive's pages with some open, one for sale and the sealed ones; an end screen line
     meta.story = { open: { m_erased: 1, m_spared: 1, d_handbook1: 1, d_handbook7: 1, d_letter: 1 }, since: 1 }; meta.echoes = Math.max(meta.echoes, 20); me.pagesOpened = ['m_rank_d', 'd_broadcast'];
     out.push({ label: 'sheet-pages', stage: 'shop', sheet: 'pages', run: mid.run }, { label: 'sheet-archive-pages', stage: 'shop', sheet: 'archive', run: mid.run });
+    // Phase 8: Field notes at each level, Entrant Quarters with trophies, crowns, shards and decor, the Halls' Shared milestones
+    meta.notes = { goblin: 1, golem: 2, drake: 3, grukk: 3, lyss: 1, leviathan: 2 }; meta.decor = { chair: 1, banner: 1 }; meta.together = { spared: 31, runs: 120 };
+    meta.archive = Object.assign({}, meta.archive, { beat: Object.assign({}, meta.archive && meta.archive.beat, { leviathan: true, herald: true }) });
+    out.push({ label: 'sheet-notes', stage: 'shop', sheet: 'notes', run: mid.run }, { label: 'sheet-quarters', stage: 'shop', sheet: 'quarters', run: mid.run }, { label: 'sheet-halls-shared', stage: 'shop', sheet: 'halls', run: mid.run });
+    me.notesUp = [{ id: 'drake', level: 3 }];
     out.push({ label: 'end-erased', stage: 'end-erased', run: me }, { label: 'end-spared', stage: 'end-spared', run: me });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;

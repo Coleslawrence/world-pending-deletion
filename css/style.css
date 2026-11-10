@@ -1236,3 +1236,10 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 .mst-row .pg-bar { display: block; margin: 6px 0 4px; }
 .tag.mst { flex: none; }
 .mst-l { margin: 0 0 10px; } .mst-l li small { white-space: nowrap; }
+/* Entrant Quarters (Phase 8): the room's tiles, two to a row */
+.quarters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 10px; }
+.qt { border: 1px solid var(--line2); padding: 8px; min-width: 0; overflow-wrap: anywhere; }
+.qt b { display: block; font-size: 0.9em; }
+.qt small { display: block; opacity: 0.7; }
+.qt.tr { border-color: var(--gold-hi); }
+.qt.cr { border-color: var(--elite); }
