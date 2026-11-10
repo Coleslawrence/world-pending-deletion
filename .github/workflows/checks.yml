@@ -75,6 +75,8 @@ jobs:
         run: node tools/designs-test.js
       - name: Clauses test
         run: node tools/clauses-test.js
+      - name: Goals test
+        run: node tools/goals-test.js
 
   balance:
     name: Balance gate
