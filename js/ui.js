@@ -1551,7 +1551,7 @@ function archiveSheet() {
   const evos = Object.keys(A.evos).map(k => { const [a, b] = k.split('>'); return SKILLS[a] && SKILLS[b] ? `<li>${esc(SKILLS[a].name)} → <b>${esc(SKILLS[b].name)}</b></li>` : ''; }).join('');
   const iss = A.issues || {}, ni = KNOWN_ISSUES.filter(K => iss[issueKey(K)]).length;
   const issues = KNOWN_ISSUES.map(K => iss[issueKey(K)] ? `<li class="glitch"><b>${esc(issueName(K))}</b>: [${esc(K.text)}]</li>` : '<li class="unk">[Issue not yet reproduced.]</li>').join('');
-  return sheetWrap('Tournament Archive', `<button class="btn ghost small" data-act="sheet" data-s="mastery">Archetype Mastery ›</button>${marksHTML()}<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul><h4>Known Issues · ${ni} of ${KNOWN_ISSUES.length}</h4><ul class="msgs">${issues}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
+  return sheetWrap('Tournament Archive', `<div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="mastery">Mastery ›</button><button class="btn ghost small" data-act="sheet" data-s="designs">Designs ›</button></div>${marksHTML()}<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul><h4>Known Issues · ${ni} of ${KNOWN_ISSUES.length}</h4><ul class="msgs">${issues}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Entrant Rank in the Halls: grade, RP to the next trial, perks and one line per promotion
 function rankHTML() {
@@ -1672,6 +1672,20 @@ function masteryLines() {
   const L = (run && run.masteryGain) || [];
   return L.map(m => m.opened.map(o => `<p class="pg-next good">[${esc(ARCH[m.k].name)} Mastery ${o.level}: ${esc(o.text.replace(/\.$/, ''))}.]</p>`).join('')).join('');
 }
+// Unfiled designs (Phase 5): the Archive's Designs sheet, where found designs are filed for Echoes
+function designText(id) { const d = pieceDef(id); return isGear(id) ? `${d.slot[0].toUpperCase() + d.slot.slice(1)}. ${gearText(id, 1)}` : `Skill. ${describe(d)}`; }
+function designsSheet() {
+  const D = sanitizeDesigns(meta.designs), ids = designIds(), nf = ids.filter(id => D.found[id]).length, nd = ids.filter(id => D.filed[id]).length;
+  const one = id => {
+    const d = pieceDef(id), tags = d.tags.map(t => ARCH[t].name).join(' + ');
+    if (!D.found[id]) return `<div class="choice static unk"><div class="sr-h"><span class="sr-name">[Unfiled design]</span>${rk(d.rank)}</div><div class="sr-desc">${esc(tags)}. Not yet recovered.</div></div>`;
+    const btn = D.filed[id] ? '<span class="tag">Filed</span>' : `<button class="btn small" data-act="file-design" data-id="${id}" ${meta.echoes < designCost(id) ? 'disabled' : ''}>File · ${designCost(id)} Echoes</button>`;
+    return `<div class="choice static"><div class="sr-h"><span class="sr-name">${esc(d.name)}</span>${rk(d.rank)}</div><div class="sr-desc"><b>${esc(tags)}.</b> ${esc(designText(id))}</div>${btn}</div>`;
+  };
+  const dry = D.dry >= DESIGN_DRY ? ' Your next Gatekeeper win is certain to drop one.' : '';
+  return sheetWrap('[Unfiled designs]', `<p class="sh-p">[Pieces the System never filed. Recover one by beating a Gatekeeper. File it, and it can turn up in your runs from then on.] You have <b>${meta.echoes}</b> Echoes. Found ${nf} of ${ids.length}, filed ${nd}.</p>${ids.map(one).join('')}<p class="sh-p fine">A Gatekeeper drops a design 1 time in 3.${dry} A design you find is kept even if the run is lost. Pending World never uses them.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function designLines() { const L = (run && run.designFound) || []; return L.map(id => `<p class="pg-next good">[Unfiled design recovered: ${esc(pieceDef(id).name)}. File it in the Archive.]</p>`).join(''); }
 function ladderLines() {
   const L = run && run.ladder; if (!L) return '';
   const name = m => m.kind === 'arch' ? ARCH[m.key].name : m.kind === 'world' ? WORLD_TYPES[m.key].name : CHALLENGES[m.key].name;
@@ -1698,7 +1712,7 @@ function steerSheet() {
 }
 function echoesSheet() {
   const list = Object.entries(UNLOCKS).map(([k, u]) => `<div class="choice static"><div class="sr-h"><span class="sr-name">${esc(u.name)}</span><span class="price">${u.cost} Echoes</span></div><div class="sr-desc">${esc(u.desc)}</div>${meta.unlocks[k] ? '<span class="tag">Unlocked</span>' : `<button class="btn small" data-act="unlock" data-k="${k}" ${meta.echoes < u.cost ? 'disabled' : ''}>Unlock</button>`}</div>`).join('');
-  return sheetWrap('Echoes', `<p class="sh-p">Echoes are fragments of the worlds you fought for. You have <b>${meta.echoes}</b>. They buy options, never raw power.</p>${list}<p class="sh-p fine">Echoes also let you ask the System for a world of your choosing, ${STEER_COST} Echoes a time, on the world choice screen.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+  return sheetWrap('Echoes', `<p class="sh-p">Echoes are fragments of the worlds you fought for. You have <b>${meta.echoes}</b>. They buy options, never raw power.</p>${list}<p class="sh-p fine">Echoes also let you ask the System for a world of your choosing, ${STEER_COST} Echoes a time, on the world choice screen, and file Unfiled designs in the Archive.</p><button class="btn ghost small" data-act="sheet" data-s="designs">Unfiled designs ›</button>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function shareBlock(s, erased) {
   if (FIREBASE && !cloud.on && s) return `<p class="sh-p fine center">Sign in from the menu to share champions with other players.</p>`;
@@ -1713,7 +1727,7 @@ function progressHTML(e, s) {
   const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.backing && run.backing.paid || 0) + (run && run.ladder && e.totalEchoes != null ? run.ladder.echoes : 0), titles });
   const unit = { rank: ' RP', echoes: '', titles: '' };
   const rows = masteryRowsFirst(P.bars.map(b => `<div class="pg-row pg-${b.k}" title="${esc(b.text)}"><span class="pg-l">${esc(b.label)}</span><span class="pg-bar" role="progressbar" aria-label="${esc(b.label + ': ' + b.text)}" aria-valuemin="0" aria-valuemax="${b.max}" aria-valuenow="${b.now}"><i style="width:${Math.round(100 * Math.min(1, b.now / (b.max || 1)))}%"></i></span><span class="pg-g">${b.gain ? `+${b.gain}${unit[b.k]}` : ''}</span></div>`).join(''));
-  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
+  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${designLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
 }
 function backLine() {
   const B = run && run.backing && run.backing.settled && BACK_GOALS[run.backing.goal] ? run.backing : null; if (!B) return '';
@@ -1777,7 +1791,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1871,6 +1885,7 @@ function onAct(el) {
     case 'report': return openReport();
     case 'fb-type': ui.fb.type = d.k; return render();
     case 'fb-send': return sendReport();
+    case 'file-design': if (fileDesign(meta, d.id)) { saveMeta(); toast(`[Filed: ${pieceDef(d.id).name}]`, 'level'); } return render();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'hint-read': { const h = HINTS.find(x => x.k === d.k); if (h) ui.sheet = { type: 'hint', k: h.k, text: h.text }; return render(); }
     case 'hint-done': meta.hints = meta.hints || {}; meta.hints[d.k] = true; saveMeta(); ui.sheet = null; return render();

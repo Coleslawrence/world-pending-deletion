@@ -438,7 +438,27 @@
   "hedged_hex",
   "attack",
   "error_skill",
-  "stack_overflow"
+  "stack_overflow",
+  "miasma",
+  "choking_miasma",
+  "charged_miasma",
+  "still_air",
+  "feint_and_cut",
+  "double_feint",
+  "bleeding_feint",
+  "vanishing_feint",
+  "searing_mercy",
+  "merciful_flame",
+  "last_light",
+  "purging_mercy",
+  "blood_price",
+  "dear_price",
+  "paid_in_full",
+  "debt_collector",
+  "vow_of_iron",
+  "oath_of_iron",
+  "iron_and_light",
+  "iron_thorns"
  ],
  "gear": [
   "ember_gauntlets",
@@ -514,7 +534,12 @@
   "countdown_collar",
   "pain_link",
   "unsigned_patch",
-  "missingno"
+  "missingno",
+  "smelters_apron",
+  "grounding_mail",
+  "bloodletter",
+  "hexed_dice",
+  "stormglass"
  ],
  "archetypes": [
   "pyre",

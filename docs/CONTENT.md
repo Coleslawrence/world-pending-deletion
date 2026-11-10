@@ -153,8 +153,8 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bigStop` | 4 | Squall Line (2), Wall Cloud (2), Downburst (3), … | If the opponent is winding up a big attack, Interrupt it. Otherwise Weaken them for 2 turns. | yes |
-| `bleed` | 25 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
-| `block` | 114 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `bleed` | 26 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
+| `block` | 119 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 10 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 9 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
@@ -164,7 +164,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
 | `calamity` | 4 | Calamity (4), Catastrophe (5), Aftermath (4), … | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
 | `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
-| `cleanse` | 28 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
+| `cleanse` | 29 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `coinStun` | 4 | Cursed Coin (1), Bad Penny (1), Heads I Win (1), … | A move you jinx this turn also Stuns its user next turn. | yes |
 | `critBonus` | 3 | Precise Strike (0.5), Exposing Strike (0.5), Homing Missiles (0.25) | +50% critical chance. | no |
 | `cruel` | 4 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5), … | ×2 damage if the opponent has 2 or more effects. | yes |
@@ -177,7 +177,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 40 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 2 | Two-Headed Coin (4), Hedged Bet (3) | (works with other keys on the same skill) | yes |
 | `dieStun` | 5 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 311 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 316 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgHigh` | 4 | Table Stakes (5), High Roller's Bet (7), Covered Bet (5), … | (works with other keys on the same skill) | yes |
 | `dmgPip` | 28 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
@@ -187,7 +187,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `doublePoison` | 5 | Thousand Needles (1), Venom Storm (1), Needle Rain (1), … | (works with other keys on the same skill) | no |
 | `drainPoison` | 1 | Wither (1) | Heal equal to the opponent's Poison. | no |
 | `empower` | 19 | War Cry (2), Gale Step (1), Bonfire (2), … | Deal 30% more damage for 2 turns. | yes |
-| `evade` | 17 | Smoke Bomb (1), Flurry Step (1), Blink (1), … | Evade the next attack. | yes |
+| `evade` | 18 | Smoke Bomb (1), Flurry Step (1), Blink (1), … | Evade the next attack. | yes |
 | `execMult` | 10 | Execute (2.5), Soul Harvest (2), Decapitate (3), … | (works with other keys on the same skill) | yes |
 | `execute` | 10 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
 | `fester` | 4 | Fester (1), Suppurate (1.5), Open Sore (1), … | Deal the opponent's Poison as damage. The Poison stays. | yes |
@@ -195,11 +195,12 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `focus` | 15 | Focus (0.6), Read the Glyph (0.2), Loaded Die (0.2), … | Your next damaging skill deals 60% more. | yes |
 | `fullBlock` | 4 | Lay on Hands (6), Healing Hands (9), Warding Hands (6), … | (works with other keys on the same skill) | yes |
 | `fuse` | 4 | Slow Fuse (3), Short Fuse (5), Powder Trail (3), … | Apply 3 more Burn at the start of each of your next 2 turns. | yes |
+| `grim` | 4 | Blood Price (1), Dear Price (1), Paid in Full (1), … | (works with other keys on the same skill) | yes |
 | `haste` | 10 | Time Warp (2), Blink (1), Spellweave (1), … | Your other cooldowns drop by 2. | yes |
 | `heal` | 41 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 8 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 2 | Lucky Coin (1), Insurance (1) | (works with other keys on the same skill) | yes |
-| `hits` | 53 | Flame Wave (2), Conflagration (3), Quick Slash (2), … | (works with other keys on the same skill) | yes |
+| `hits` | 57 | Flame Wave (2), Conflagration (3), Quick Slash (2), … | (works with other keys on the same skill) | yes |
 | `hold` | 4 | Stand Fast (1), Dig In (1), Bristle (1), … | Your Block does not fade at the start of your next turn. | yes |
 | `interrupt` | 4 | Counterspell (1), Nullify (1), Spell Theft (1), … | Interrupt: cancel the opponent's next move and put it on cooldown. | yes |
 | `jinxDisc` | 5 | Knock on Wood (2), Sore Loser (2), Touch Wood (2), … | Your next jinx this turn costs 2 less. | yes |
@@ -207,7 +208,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `keepHalf` | 1 | Aftermath (1) | (works with other keys on the same skill) | no |
 | `killReset` | 3 | Silent Kill (1), Mercy Kill (1), Last Hour (1) | No cooldown if it kills. | no |
 | `leech` | 4 | Leech (3), Blood Leech (6), Parasite (3), … | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
-| `lifesteal` | 17 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
+| `lifesteal` | 18 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
 | `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
 | `mark` | 17 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | no |
@@ -220,12 +221,13 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `omenGuard` | 5 | Crossed Fingers (1), Twin Omens (1), Fingers and Toes (1), … | Omen: if it guards next, it loses half its Block and gains 3 Misfortune. | yes |
 | `passCurse` | 4 | Pass the Curse (2), Crossed Path (2), Keep a Little (2), … | Move all your Curse onto the opponent as double the Misfortune. | yes |
 | `perCurse` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | (works with other keys on the same skill) | yes |
-| `perHit` | 19 | Flame Wave (1), Conflagration (1), Thousand Cuts (1), … | (works with other keys on the same skill) | no |
+| `perHit` | 20 | Flame Wave (1), Conflagration (1), Thousand Cuts (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
 | `pierce` | 16 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
-| `poison` | 45 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `poison` | 53 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
+| `quench` | 4 | Searing Mercy (12), Merciful Flame (18), Last Light (12), … | Remove the opponent's Burn and heal that much, up to 12. | yes |
 | `read` | 32 | Backdraft ("attack"), Seep ("defend"), Sidestep ("attack"), … | (works with other keys on the same skill) | yes |
 | `readFx` | 32 | Backdraft ({"burn":4,"detonate":1}), Seep ({"poison":7}), Sidestep ({"dmg":4,"evade":1,"mark":2}), … | (works with other keys on the same skill) | yes |
 | `reapHeal` | 4 | Reap (8), Grim Harvest (10), Reap and Sow (8), … | Heal 8 if the opponent is below half HP. | yes |
@@ -236,18 +238,19 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `ride` | 4 | Let It Ride (4), Hot Streak (4), Easy Money (3), … | (works with other keys on the same skill) | yes |
 | `riposte` | 4 | Riposte (1.5), Perfect Riposte (2.5), Parry Master (1.5), … | Until your next turn, damage you block is dealt back ×1.5. | yes |
 | `rollTwice` | 4 | House Edge (3), Stacked Deck (4), Marked Cards (3), … | For 3 turns, your dice roll twice and keep the higher. | yes |
-| `selfDmg` | 4 | Berserk (3), Err̷or (6), Blood Rage (4), … | Costs 3 HP. | yes |
+| `selfDmg` | 8 | Berserk (3), Err̷or (6), Blood Price (5), … | Costs 3 HP. | yes |
 | `setSix` | 1 | Weighted Die (1) | Set your lowest die to 6. | yes |
 | `siphon` | 4 | Siphon (1), Soul Siphon (1), Hex Siphon (1), … | Steal the opponent's Block and remove their Power. | yes |
 | `snake` | 4 | Snake Eyes (45), Boxcars (45), Long Odds (60), … | (works with other keys on the same skill) | yes |
 | `stack` | 1 | Stack Overfl̷ow (0.25) | (works with other keys on the same skill) | no |
 | `stun` | 12 | Thunderclap (1), Thunder God's Wrath (1), Flashpoint (1), … | Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown. | yes |
-| `stunIfWeak` | 6 | Overload (1), Numbing Needles (1), Jolt (1), … | If the opponent is Weakened, Stun them. | yes |
+| `stunIfWeak` | 7 | Overload (1), Numbing Needles (1), Jolt (1), … | If the opponent is Weakened, Stun them. | yes |
 | `tapOut` | 3 | Table Stakes (1), High Roller's Bet (1), Covered Bet (1) | (works with other keys on the same skill) | yes |
-| `thorns` | 11 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
+| `thorns` | 12 | Retribution (8), Blazing Aegis (6), Spiked Guard (5), … | Until your next turn, hit back for 8 when struck. | yes |
 | `thornsFight` | 4 | Shield Wall (3), Phalanx (3), Spiked Wall (5), … | For the rest of the fight, hit back for 3 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
-| `weaken` | 70 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `vowHeal` | 4 | Vow of Iron (0.5), Oath of Iron (0.5), Iron and Light (0.8), … | At the start of your next turn, heal 50% of the Block you still hold. | yes |
+| `weaken` | 75 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -260,7 +263,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `bleedHeal` | 2 | hooked_sickle (0.3), Butcher (0.5) | Heal 30% of the Bleed damage your opponent takes. | add |  |  | Bladedancer, Reaper |
 | `bleedMisf` | 1 | Unlucky Cut (1) | Bleed you apply +1 for every 3 Misfortune. | add |  |  | Jinx, Bladedancer |
 | `bleedMult` | 1 | Bladedancer 6 (2) | Bleed deals double damage. | set |  | rate | Bladedancer |
-| `bleedPlus` | 8 | Bladedancer 4 (2), duelist_rapier (1), bloodstone_amulet (1), … | Bleed you apply +2. | add |  | flat, scales with power | Bladedancer |
+| `bleedPlus` | 9 | Bladedancer 4 (2), duelist_rapier (1), bloodstone_amulet (1), … | Bleed you apply +2. | add |  | flat, scales with power | Bladedancer |
 | `bleedPoison` | 2 | serpent_dagger (1), Viper Dance (2) | Every Bleed you apply also applies 1 Poison. | add |  |  | Bladedancer, Venom |
 | `blockDmgPct` | 2 | studded_mace (1), Juggernaut (1) | Deal 1% more damage for every 2 Block you have (up to 40%). | add |  |  | Bastion, Reaper |
 | `blockKeep` | 2 | Bastion 2 (0.25), tower_shield (0.3) | Keep 25% of your Block between turns. | add |  | rate | Bastion |
@@ -268,13 +271,15 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `blockStrike` | 1 | Bastion 6 (0.5) | Gaining Block also deals 50% of it as damage. | set |  |  | Bastion |
 | `blockStun` | 1 | Thunder Wall (0.25) | When your Block absorbs a hit, 25% chance to Stun the attacker. | add |  |  | Bastion, Stormcaller |
 | `blockThorns` | 2 | spiked_buckler (0.3), crown_of_thorns (0.15) | Gaining Block also gives Thorns equal to 30% of it. | add |  |  | Bastion |
+| `blockWeaken` | 1 | grounding_mail (1) | When your Block stops a whole hit, the attacker is Weakened for 1 turn. | set |  |  | Bastion, Stormcaller |
 | `breakEmpower` | 1 | Lightning Rod (2) | Breaking an opponent Empowers you for 2 turns. | set |  |  | Stormcaller |
+| `burnBlock` | 1 | smelters_apron (2) | Gain 2 Block each time Burn on your opponent deals damage. | add |  |  | Pyre, Bastion |
 | `burnExec` | 3 | ember_gauntlets (0.2), ashen_mantle (0.2), Funeral Pyre (0.25) | +20% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
 | `burnFade` | 2 | Pyre 2 (0.15), Pyre 6 (0) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
 | `burnHeal` | 4 | Cinder Warden (0.2), cinder_robe (0.3), bellows (0.15), … | Heal 20% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
 | `burnLowDie` | 1 | Wildfire Bet (1) | Burn you apply is raised by your lowest die. | set |  |  | Gambler, Pyre |
 | `burnMisf` | 1 | Black Candle (1) | Burning opponents gain 1 Misfortune each turn. | add |  |  | Jinx, Pyre |
-| `burnPlus` | 9 | Pyre 4 (4), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
+| `burnPlus` | 10 | Pyre 4 (4), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 2 | plague_censer (2), tar_flask (1) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
 | `chanceBonus` | 2 | Loaded Dice (15), The House (10) | Chance options in events +15%. | add |  |  |  |
 | `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
@@ -297,7 +302,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
 | `firstCrit` | 1 | duelist_rapier (1) | Your first hit each fight is critical. | set |  |  |  |
 | `firstEvade` | 3 | shadow_leathers (1), Near Miss (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
-| `firstFree` | 1 | Arcanist 4 (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
+| `firstFree` | 2 | Arcanist 4 (1), stormglass (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
 | `firstHit` | 3 | First Strike (1), First Blood (0.5), Arcane Mind (0.3) | Your first damaging skill each fight deals double. | add |  |  |  |
 | `firstJinx` | 1 | The Crow (1) | The opponent's first move each fight goes wrong for them, as if jinxed. | set |  |  |  |
 | `firstSix` | 2 | weighted_dice (1), Lucky Seven (1) | Your first die each fight rolls 6. | set |  |  | Gambler |
@@ -357,7 +362,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `quickMisf` | 1 | Hex Glyph (1) | Quick skills apply 1 Misfortune. | add |  |  | Jinx, Arcanist |
 | `quickPoison` | 1 | Apothecary (2) | Quick skills apply 2 Poison. | add |  |  | Arcanist, Venom |
 | `quickReroll` | 2 | shuffling_shoe (1), Card Trick (1) | Quick skills reroll your lowest die. | set |  |  | Gambler, Arcanist |
-| `quickStun` | 2 | static_cloak (0.15), Tempest Mage (0.25) | Damaging Quick skills have a 15% chance to Stun. | add |  |  | Arcanist, Stormcaller |
+| `quickStun` | 3 | static_cloak (0.15), stormglass (0.1), Tempest Mage (0.25) | Damaging Quick skills have a 15% chance to Stun. | add |  |  | Arcanist, Stormcaller |
 | `quickTwice` | 1 | Arcanist 6 (1) | Quick skills cast twice. | set |  |  | Arcanist |
 | `rakeReroll` | 1 | croupiers_rake (1) | After a Jackpot, gain 1 reroll. | add |  |  | Gambler |
 | `reactHeal` | 1 | Dragon Blood (5) | Toxic Flare and Cauterise heal you 5. | set |  |  |  |
@@ -366,10 +371,11 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
 | `regen` | 11 | Zealot 4 (2), Undying (3), pilgrim_mace (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
 | `relic` | 1 | reliquary (0.2) | Once per fight, dropping below 30% HP heals you 20% of your max HP. | set |  |  | Zealot |
-| `rerolls` | 7 | Gambler 4 (2), Card Counter (1), croupiers_rake (1), … | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
+| `rerolls` | 8 | Gambler 4 (2), Card Counter (1), croupiers_rake (1), … | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
 | `savingGrace` | 1 | Saving Grace (1) | Healing from a die skill showing 6 is doubled. | set |  |  | Gambler, Zealot |
 | `sixBlock` | 1 | house_chip (5) | When a turn starts with a 6 among your dice, gain 5 Block and a reroll. | add |  |  | Gambler |
 | `sixGold` | 3 | weighted_dice (1), gilded_coin (1), house_chip (1) | +1 gold after each win where you rolled a 6. | add |  |  | Gambler |
+| `sixMisf` | 1 | hexed_dice (2) | A die that rolls 6 adds 2 Misfortune to your opponent. | add |  |  | Gambler, Jinx |
 | `sixStun` | 1 | Thunder Roll (1) | A die skill showing 6 also Stuns. | set |  |  | Gambler, Stormcaller |
 | `sleeveFix` | 1 | sharps_sleeve (1) | Once per fight, a die that rolls 1 becomes a 6. | set |  |  | Gambler |
 | `sluggish` | 1 | Sluggish (1) | Start every fight Weakened. | set |  |  |  |
@@ -383,7 +389,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `struckPoison` | 1 | adder_hide (1) | When you are hit, the attacker takes 1 Poison. | add |  |  | Venom |
 | `stunBlock` | 1 | stormbreak_plate (10) | Gain 10 Block whenever you Stun or Interrupt. | add |  |  | Stormcaller |
 | `stunBurn` | 1 | Wildstorm (5) | Your Stuns and Interrupts also apply 5 Burn. | add |  |  | Stormcaller, Pyre |
-| `stunDmg` | 8 | Stormcaller 2 (16), Tempest (10), thunder_maul (6), … | Your Stuns and Interrupts deal 16 damage. | add | yes |  | Stormcaller |
+| `stunDmg` | 10 | Stormcaller 2 (16), Tempest (10), thunder_maul (6), … | Your Stuns and Interrupts deal 16 damage. | add | yes |  | Stormcaller |
 | `stunEmpower` | 5 | Tempest (2), conductive_mail (1), storm_ring (1), … | Whenever you Stun or Interrupt, you are Empowered for 2 turns. | add |  |  | Stormcaller |
 | `stunHeal` | 1 | Inquisitor (8) | Your Stuns and Interrupts heal you 8. | add |  |  | Stormcaller, Zealot |
 | `stunMisf` | 2 | crow_feather (2), Ill Wind (3) | Stunned opponents gain 2 Misfortune. | add |  |  | Jinx, Stormcaller |
@@ -398,6 +404,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `tickDown` | 1 | robe_of_hours (1) | Every 3rd turn, all your cooldowns drop by 1. | set |  |  | Arcanist |
 | `twinHit` | 1 | twin_fangs (1) | Multi-hit skills hit one more time, and each hit deals 1 less. | set |  |  | Bladedancer |
 | `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |
+| `vsBleed` | 1 | bloodletter (0.15) | +15% damage to bleeding opponents. | add |  |  | Bladedancer, Reaper |
 | `vsDisabled` | 4 | verdict_hammer (0.2), shock_gauntlet (0.15), lodestone (0.1), … | +20% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
 | `vsHalf` | 4 | Reaper 2 (0.35), whetstone_charm (0.1), notched_cleaver (0.12), … | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
 | `vsHard` | 1 | Underdog (0.1) | +10% damage to hard opponents. | add |  |  |  |
@@ -431,11 +438,11 @@ Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (
 | Archetype | Stat | Discipline | Line | Owns | Allies | Words |
 | --- | --- | --- | --- | --- | --- | --- |
 | Pyre | INT | Bane | Sets a fire and lets it finish the work. | `burn` `detonate` `fuse` `flash` | Venom, Jinx, Arcanist | ember, ash, flame, cinder, blaze, smoke |
-| Venom | AGI | Bane | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` `fester` | Pyre, Jinx, Bladedancer | fang, rot, drip, plague, patience, thorn |
+| Venom | AGI | Bane | Patient and certain: every turn makes it worse. | `poison` `doublePoison` `malice` `leech` `weaken` `drainPoison` `fester` `grim` | Pyre, Jinx, Bladedancer | fang, rot, drip, plague, patience, thorn |
 | Bladedancer | AGI | Might | Never stops moving: a hundred cuts beat one. | `bleed` `hits` `perHit` `mark` `critBonus` `cruel` `riposte` `evade` `alwaysCrit` `nextCrit` `deepen` | Reaper, Venom | edge, dance, cut, flurry, quick, step |
-| Bastion | VIT | Ward | Takes the hit, then gives it back. | `thorns` `blockDmg` `riposte` `keep` `reflect` `thornsFight` `hold` | Zealot | wall, iron, shield, anvil, stand, weight |
+| Bastion | VIT | Ward | Takes the hit, then gives it back. | `thorns` `blockDmg` `riposte` `keep` `reflect` `thornsFight` `hold` `vowHeal` | Zealot | wall, iron, shield, anvil, stand, weight |
 | Arcanist | INT | Sway | Does more in a turn than anyone should. | `focus` `pierce` `siphon` `haste` `evade` `interrupt` `hits` `mirror` `again` | Stormcaller, Gambler, Pyre | glyph, mind, spell, time, trick, sky |
-| Zealot | VIT | Mend | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` `fullBlock` | Bastion | light, prayer, vow, saint, tide, undying |
+| Zealot | VIT | Mend | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` `fullBlock` `quench` | Bastion | light, prayer, vow, saint, tide, undying |
 | Reaper | STR | Might | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` `reapHeal` `doomExec` | Bladedancer, Stormcaller | scythe, grave, harvest, end, hollow, bone |
 | Stormcaller | STR | Sway | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` `bigStop` | Arcanist, Gambler, Reaper | thunder, lightning, crack, break, sky, gale |
 | Gambler | LUK | Sway | Makes its own luck, then bets all of it. | `die` `dmgPip` `blockPip` `healPip` `dieMin` `dbl` `snake` `boxcars` `bust` `bustAt` `dmgAll` `cashOut` `progressive` `reroll` `setSix` `rollTwice` `mark` `dieStun` `ride` `dmgHigh` `tapOut` | Arcanist, Stormcaller, Jinx | dice, coin, card, odds, stake, jackpot |
