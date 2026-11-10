@@ -905,6 +905,7 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 .opp .nx-traits span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* A long trait (Corrupted) must shorten with an ellipsis, not widen the card past a 320-wide screen */
 .op-r > *, .opp .nx-traits span { min-width: 0; }
+.opp .nx-traits span.reflex { white-space: normal; }
 .op-meta { font-family: var(--f-b); font-size: var(--fs-2); font-weight: 600; }
 /* Fight: status chips on one line that scrolls sideways; HP numbers in the body font, larger */
 .foe .chips, .me .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; min-height: 22px; }

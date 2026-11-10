@@ -192,7 +192,12 @@ function styleOf(spec) {
 }
 // A flavour line (skills, gear, Gifts, Titles): the world's voice under the rules, never instead of them.
 function flavHTML(f) { return f ? `<span class="flav">${esc(f)}</span>` : ''; }
-function traitsHTML(spec) { return spec.traits && spec.traits.length ? `<div class="nx-traits">${spec.traits.filter(k => TRAIT_POOL[k]).map(k => `<span${TRAIT_POOL[k].glitch ? ' class="glitch"' : ''}><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`).join('')}</div>` : ''; }
+// An opponent's Reflex (its one if-then rule, REFLEXES in enemies.js) leads the list, then its rolled traits
+function hasReflex(spec) { return !!(spec && !spec.snap && spec.id && REFLEXES[spec.id] && !(run && run.practice)); }
+function traitsHTML(spec) {
+  const rows = (hasReflex(spec) ? [`<span class="reflex"><b>Reflex:</b> ${esc(reflexText(spec.id))}</span>`] : []).concat((spec.traits || []).filter(k => TRAIT_POOL[k]).map(k => `<span${TRAIT_POOL[k].glitch ? ' class="glitch"' : ''}><b>${esc(TRAIT_POOL[k].name)}:</b> ${esc(TRAIT_POOL[k].desc)}</span>`));
+  return rows.length ? `<div class="nx-traits">${rows.join('')}</div>` : '';
+}
 function rankTag(spec) { const r = specRank(spec, meta); return r ? ` · <span class="nw">${r}-rank</span>` : ''; }
 function specCrest(spec) { return crest(specName(spec), spec.hard && spec.kind !== 'erased' ? spec.kind + ' hard' : spec.kind, false, spec.snap ? { sigil: spec.snap.sigil, color: spec.snap.color } : null, spec.snap && spec.snap.rank); }
 function rankChip(r) { return `<span class="rank r${r}">${WORLD_RANKS[r]}</span>`; }
@@ -918,6 +923,7 @@ function fightHTML() {
 }
 function chipsHTML(X, f) {
   const c = [];
+  if (!X.isPlayer && X.reflex) c.push(`<span class="chip trait reflex" title="${esc(reflexText(X.id))}">Reflex: ${esc(REFLEX_ON[X.reflex.on].chip)}</span>`);
   if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait${TRAIT_POOL[k].glitch ? ' glitch' : ''}">${esc(TRAIT_POOL[k].name)}</span>`));
   if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
   if (X.burn > 0) c.push(`<span class="chip burn">Burn ${n0(X.burn)}</span>`);
@@ -961,7 +967,7 @@ function updateFight() {
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
-    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
+    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
@@ -1418,7 +1424,7 @@ function scoutSheet() {
   const spec = currentSpec(run);
   let body = '';
   if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
-  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}${traitsHTML(spec)}`; }
+  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">They use their skills in a fixed order, which you can learn. In the fight you'll also see their move after next.</p>${hasReflex(spec) ? (R => `<p class="sh-p fine">[Reflex. ${esc(REFLEX_ON[R.on].if)}, their next move is <b>${esc(R.move ? R.move.n : t.skills[R.use].n)}</b>${R.move ? ': ' + esc(describe({ fx: R.move.fx })) : '.'} Never two turns running.]</p>`)(REFLEXES[spec.id]) : ''}${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}${traitsHTML(spec)}`; }
   if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }

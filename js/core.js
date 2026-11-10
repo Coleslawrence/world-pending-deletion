@@ -1836,11 +1836,14 @@ function buildEnemy(run, spec) {
   const mhp = Math.round(t.hp * hm * (fin ? TUNE.finalHp : 1));
   let hp = mhp; if (run.nextFlags.bribe) hp = Math.round(hp * 0.8); if (spec.sabotaged) hp = Math.round(hp * 0.85); if (spec.kind === 'final' && run.finalCut) hp = Math.round(hp * (1 - run.finalCut)); if (run.nextFlags.foeHp) hp = Math.max(1, Math.round(hp * run.nextFlags.foeHp));
   if (run.nextFlags.foeTraits) spec = Object.assign({}, spec, { traits: (spec.traits || []).concat(run.nextFlags.foeTraits.filter(k => !(spec.traits || []).includes(k))) });
-  return blankFighter(Object.assign({
+  const E = blankFighter(Object.assign({
     side: 'B', name: specName(spec), id: spec.id, hard: !!spec.hard, maxHp: mhp, hp, crit: 0.04, critMult: 1.5, dodge: 0, script: t.script, scriptIdx: 0, turns: 0,
     skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
     weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0, burn: run.nextFlags.foeBurn || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
+  const R = !run.practice && REFLEXES[spec.id];
+  if (R) E.reflex = { on: R.on, say: R.say, use: R.use, s: R.move ? Object.assign(enemyMove(R.move, 0, mp), { key: 'r0' }) : null };
+  return E;
 }
 // A finalist: another player's round-8 build at its own strength, with its world's Final Champion's mechanic on top
 // (the Storm Herald, whose mechanic is its moves, lends an enrage instead) and the final's own effects (bribes, tampering).
@@ -2595,6 +2598,7 @@ function playerAct(f, idx) {
   // [REDACTED]: the prefix is disclosed on the skill's first use (the run's piece is updated when the fight is settled)
   if (s.u && (s.mods || []).some(m => PREFIXES[m] && PREFIXES[m].hide) && !(f.disclosed || {})[s.u]) { f.disclosed = Object.assign(f.disclosed || {}, { [s.u]: true }); say(f, `[Disclosure: the [REDACTED] prefix on ${s.def.name} is ${s.mods.filter(m => PREFIXES[m].hide).map(m => PREFIXES[PREFIXES[m].hide].name).join(', ')}.]`, 'skill'); }
   f.useCounts[s.key] = (f.useCounts[s.key] || 0) + 1;
+  noteReflex(f, s.def.fx);
   if (s.key !== 'attack' && s.key !== 'copycat' && !s.def.quick && !s.def.fx.replay) f.lastPlayerSkill = s;
   if (s.def.quick) { f.tally.quickTurn++; f.tally.maxQuick = Math.max(f.tally.maxQuick, f.tally.quickTurn); } else f.tally.quickTurn = 0;
   const mu = Object.entries(f.useCounts).sort((a, b) => b[1] - a[1])[0]; f.tally.mostUsed = mu ? mu[0] : null;
@@ -2606,8 +2610,35 @@ function playerAct(f, idx) {
 }
 function skipPlayer(f) { f.events = []; endTurn(f, f.A, null); if (!checkOver(f)) f.phase = 'enemy'; }
 function scoreSkill(s, low) { const fx = s.def.fx; return ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) + (fx.poison || 0) * 1.5 + (fx.bleed || 0) + (fx.detonate ? 10 : 0) + (fx.doom ? fx.doom * 0.5 : 0) + (fx.blockDmg ? 6 : 0)) * s.power + (low ? ((fx.heal || 0) + (fx.healMissing ? 25 : 0) + (fx.block || 0) * 0.8) * s.power * 2 : (fx.block || 0) * 0.5 * s.power) + (fx.stun ? 8 : 0) + (fx.interrupt ? 6 : 0); }
-function planIntent(f, B) {
+// Reflexes (REFLEXES in enemies.js): an opponent's one if-then rule. What you did on your turn (f.pt) is checked when it
+// plans its next move: if the rule fires, that move is the Reflex's instead of the next in its script, a line says why,
+// and the script carries on afterwards from where it was. Never two turns running, never off a turn you lost, and the
+// intent stays honest: the Reflex move is shown as the intent before you act again.
+function noteReflex(f, fx) {
+  const t = f.pt || (f.pt = { hits: 0 });
+  t.acted = true;
+  if (fx.block || fx.blockPip) t.block = true;
+  if (fx.burn || fx.poison || fx.bleed) t.status = true;
+  if (fx.heal || fx.healMissing) t.heal = true;
+  if (fx.dmg || fx.dmgPip || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity) t.hits += fx.hits || 1;
+}
+const REFLEX_TEST = { block: t => t.block, status: t => t.status, heal: t => t.heal, flurry: t => t.hits >= 2, passive: t => t.hits === 0 };
+function reflexMove(B) { const R = B.reflex; return R ? R.s || B.skills[R.use] : null; }
+// The rule as the player reads it: "If you Block: Ankle Stab."
+function reflexText(id) { const R = REFLEXES[id], t = R && ENEMIES[id]; return R ? `${REFLEX_ON[R.on].if}: ${R.move ? R.move.n : t.skills[R.use].n}.` : ''; }
+function planReflex(f, B) {
+  const R = B.reflex, t = f.pt, s = reflexMove(B);
+  if (R && R.s && R.s.cd > 0) R.s.cd--;
+  if (!R || !s || !t || !t.acted || B.stun > 0 || s.cd > 0 || (B.reflexAt != null && B.turns - B.reflexAt < 2) || !REFLEX_TEST[R.on](t)) return false;
+  B.reflexAt = B.turns; B.reflexNow = true; B.intent = s; B.interrupted = null;
+  f.tally.reflexes = (f.tally.reflexes || 0) + 1;
+  say(f, R.say, 'loss'); ev(f, { k: 'reflex', side: B.side, name: s.def.name });
+  return true;
+}
+function planIntent(f, B, turnEnd) {
   rollDice(f, B);
+  B.reflexNow = false;
+  if (turnEnd) { const hit = !B.smart && planReflex(f, B); f.pt = null; if (hit) return; }
   if (B.hexer) { const A = f.A, can = A.skills.filter(s => s.key !== 'attack' && !s.def.cheat); const s = can.length ? can[Math.floor(rnd(f.rng) * can.length)] : null; A.hexKey = s ? s.key : null; A.hexT = f.turn + 1; } // Mott: one of your skills, shown // an opponent with dice (Delphine Coyle, a Gambler Entrant) rolls as it plans, so you see the roll
   if (B.smart) {
     const ready = B.skills.filter(s => s.cd <= 0);
@@ -2623,7 +2654,7 @@ function planIntent(f, B) {
 function peekNext(f) {
   // the move after the current intent (best guess for scripted foes)
   const B = f.B; if (B.smart || !B.script) return null;
-  const n = B.script.length; return B.skills[B.script[(B.scriptIdx + 1) % n]];
+  const n = B.script.length; return B.skills[B.script[(B.scriptIdx + (B.reflexNow ? 0 : 1)) % n]];
 }
 function enemyTurn(f) {
   if (f.over) return;
@@ -2639,13 +2670,13 @@ function enemyTurn(f) {
     if (!s.def.fx.mirror) f.lastEnemySkill = { def: s.def, power: s.power };
     if (B.twincast && B.turns % B.twincast === 0 && f.A.hp > 0) { say(f, `[${B.name} casts twice!]`, 'loss'); useSkill(f, B, s, { echo: true }); }
     s.cd = s.def.cd || 0;
-    if (!B.smart && !B.phaseFresh) B.scriptIdx++;
+    if (!B.smart && !B.phaseFresh && !B.reflexNow) B.scriptIdx++;
     endTurn(f, B, s.key);
   } else endTurn(f, B, null);
   if (B.phaseFresh) { B.phaseFresh = false; phaseTraits(B); }
   if (checkOver(f)) return;
   checkPhase(f, B);
-  planIntent(f, B);
+  planIntent(f, B, true);
   f.turn++;
   f.phase = 'player';
   f.events.push({ k: 'mark' });
@@ -2681,6 +2712,7 @@ function intentInfo(f) {
   const r = intentText(f, s, B);
   if (B.twincast && (B.turns + 1) % B.twincast === 0) r.text += ' · twice';
   if (B.flood && (B.turns + 1) % B.flood === 0) r.text += ' · flood';
+  if (B.reflexNow && B.reflex) r.reflex = REFLEX_ON[B.reflex.on].why;
   if (f.foresight || B.showNext) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; } // the Hanged Augur shows two moves
   return r;
 }
@@ -3264,5 +3296,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
