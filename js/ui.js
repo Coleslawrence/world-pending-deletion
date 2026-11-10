@@ -914,11 +914,11 @@ function fightHTML() {
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
   return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn rr-btn" id="rrBtn" data-act="reroll-mode" hidden></button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
-      <div class="bar foe-bar"><s id="lgB"></s><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
+      <div class="bar foe-bar"><s id="lgB"></s><i id="hbB"></i><u id="gbB"></u><b id="bkB"></b></div><div class="bar brk-bar" title="Guard: wear it down to nothing and the opponent is Broken" aria-label="Guard bar"><i id="brB"></i><u id="gbR"></u></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
     <section class="log" id="log" aria-live="polite"></section></div><div class="col col-b">
     <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(shortName(run.name))}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
-      <div class="bar hp-bar"><s id="lgA"></s><i id="hbA"></i><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
+      <div class="bar hp-bar"><s id="lgA"></s><i id="hbA"></i><u id="gbA"></u><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
     <section class="skills c${run.slots}" id="skills"></section></div></main>`;
 }
 function chipsHTML(X, f) {
@@ -950,13 +950,30 @@ function chipsHTML(X, f) {
   if (X.isPlayer && run.wagerOn && run.wager) c.push(`<span class="chip wagerc">Wager: ${esc(WAGERS[run.wager.key].text)}</span>`);
   return c.join('');
 }
+// What a previewed move sets off, as one short tag on its button (the HP numbers and bars say the rest)
+function previewTags(p) {
+  if (p.win) return 'Wins the fight';
+  if (p.lose) return 'You fall';
+  const t = [];
+  if (p.broke) t.push(`Breaks ${p.broke}`);
+  if (p.guard) t.push('Breaks guard');
+  if (p.reflex) t.push(`Reflex: ${p.reflex} next`);
+  return t.join(' · ');
+}
+function previewSay(p) { const t = previewTags(p); return `Their HP ${p.bHp}, yours ${p.aHp} after their reply${p.quick ? ' (Quick: no reply yet)' : ''}.${t ? ' ' + t + '.' : ''}`; }
 function updateFight() {
   const f = ui.fight; if (!f) return;
   applyMoment();
+  // Move preview: the first tap on a skill shows what it would do (forecast in core.js), the second uses it
+  const pv = ui.preview && ui.preview.f === f && !ui.busy && !ui.info && !ui.reroll && f.phase === 'player' && !f.over ? forecast(f, ui.preview.i) : null;
+  if (!pv) ui.preview = null;
   [['A', f.A], ['B', f.B]].forEach(([k, X]) => {
     const hp = document.getElementById('hp' + k); if (!hp) return;
     hpCount(hp, k, X);
     const w = Math.max(0, X.hp / X.maxHp * 100), lg = document.getElementById('lg' + k);
+    const after = pv ? (k === 'A' ? pv.aHp : pv.bHp) : null, now = Math.max(0, Math.round(X.hp)), gb = document.getElementById('gb' + k);
+    if (pv) hp.innerHTML = `${now} → <b class="fc-to ${after < now ? 'down' : after > now ? 'up' : ''}">${after}</b>`;
+    if (gb) { const a = after == null ? w : Math.max(0, Math.min(100, after / X.maxHp * 100)); gb.className = a > w ? 'up' : ''; gb.style.left = Math.min(a, w) + '%'; gb.style.width = Math.abs(w - a) + '%'; }
     document.getElementById('hb' + k).style.width = w + '%';
     // The pale chunk behind the bar drains a beat after a hit; healing moves it at once
     if (lg) { const was = parseFloat(lg.style.width); lg.classList.toggle('now', !(was > w)); lg.style.width = w + '%'; }
@@ -964,11 +981,16 @@ function updateFight() {
     document.getElementById('st' + k).innerHTML = chipsHTML(X, f);
   });
   const br = document.getElementById('brB');
-  if (br && f.B.breakMax) { br.style.width = Math.min(100, f.B.brk / f.B.breakMax * 100) + '%'; br.parentNode.classList.toggle('near', f.B.brk >= f.B.breakMax * 0.7); }
+  if (br && f.B.breakMax) {
+    const g = Math.max(0, 100 - f.B.brk / f.B.breakMax * 100), gr = document.getElementById('gbR');
+    br.style.width = g + '%'; br.parentNode.classList.toggle('near', g <= 30);
+    // the preview's stripe: the guard this move would take (all of it, when it breaks)
+    if (gr) { const a = !pv ? g : pv.guard ? 0 : Math.max(0, 100 - pv.brk / pv.brkMax * 100); gr.style.left = Math.min(a, g) + '%'; gr.style.width = Math.max(0, g - a) + '%'; }
+  }
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
-    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${i.windup ? `<small class="windup" title="Deal this much damage this turn to break the wind-up">Break: ${i.windup} dmg</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
+    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.classList.toggle('fc-broke', !!(pv && pv.broke)); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t"><span class="in-n">${esc(i.label || i.name)}</span>${pv && pv.broke ? `<small class="fc">Broken${pv.next ? ` · ${esc(pv.next)} instead` : ''}</small>` : i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${!(pv && pv.broke) && i.windup ? `<small class="windup" title="Deal this much damage this turn to break the wind-up">Break: ${i.windup} dmg</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
@@ -983,9 +1005,10 @@ function updateFight() {
       const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
       const off = ui.reroll ? !(can && s.pip && !cd) : (!can || cd) && !ui.info;
       const die = s.pip ? `<span class="sk-die ${s.jackpot ? 'jp' : ''}" aria-label="Die shows ${s.pip}${s.jackpot ? ', Jackpot' : ''}">${DIE_FACES[s.pip - 1]}</span>` : '';
-      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''} ${ui.reroll && s.pip ? 'rr' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${off ? 'disabled' : ''}>
+      const on = pv && ui.preview.i === i, fcx = on ? previewTags(pv) : '';
+      return `<button class="sk ${wide ? 'wide' : ''} ${tag} ${cd ? 'cd' : ''} ${d.quick ? 'quick' : ''} ${ui.reroll && s.pip ? 'rr' : ''} ${on ? 'pv' : ''}" data-act="use" data-i="${i}" data-key="${i || run.slots + 1}" title="${esc(skillTip(d, i || run.slots + 1))}" ${on ? `aria-label="${esc(d.name)}. ${esc(previewSay(pv))} Tap again to use it."` : ''} ${off ? 'disabled' : ''}>
         <span class="sk-h"><span class="sk-name">${esc(d.name)}</span>${die}${d.quick ? '<span class="sk-q">Quick</span>' : ''}${s.star > 1 ? `<span class="sk-lv">${'★'.repeat(s.star)}</span>` : ''}</span>
-        ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}<span class="sk-fx">${esc(prev)}</span>${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
+        ${s.mods && s.mods.length ? `<span class="mods">${s.mods.map(m => esc(PREFIXES[m].name)).join(' · ')}</span>` : ''}${on ? `<span class="sk-fx fc">${fcx ? `<span class="fc-tag">${esc(fcx)}</span>` : ''}Tap again to use</span>` : `<span class="sk-fx">${esc(prev)}</span>`}${cd ? `<span class="sk-cd">${s.cd}</span>` : ''}</button>`;
     };
     const list = f.A.skills.slice(1).map((s, i) => btn(s, i + 1));
     while (list.length < run.slots) list.push('<div class="sk empty">Empty slot</div>');
@@ -1093,6 +1116,8 @@ async function onUse(i) {
   if (ui.info) { ui.sheet = { type: 'skillinfo', i }; return render(); }
   if (ui.reroll) { ui.reroll = false; rerollDie(f, i); return updateFight(); }
   if (!canUse(s)) return;
+  if (SET.preview !== false && !(ui.preview && ui.preview.f === f && ui.preview.i === i) && forecast(f, i)) { ui.preview = { f, i }; return updateFight(); }
+  ui.preview = null;
   ui.busy = true; f.replied = true;
   const before = f.log.length;
   playerAct(f, i);
@@ -1445,9 +1470,10 @@ function menuSheet() {
 const HINTS = [
   { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
   { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into extra stat points, on top of the one each level gives.]' },
+  { k: 'preview', scr: 'fight', when: () => ui.fight && SET.preview !== false && !ui.busy && !ui.fight.over, text: '[Tap a skill to see what it would do: the striped part of each bar is what this turn takes. Tap it again to use it.]' },
   { k: 'windup', scr: 'fight', when: () => ui.fight && ui.fight.B.windup && !ui.busy, text: "[A big move takes a turn to wind up. Deal the damage shown under it this turn and it falls apart: they must do something else.]" },
   { k: 'reflex', scr: 'fight', when: () => ui.fight && ui.fight.B.reflex && !ui.busy, text: "[Every opponent has a Reflex: one thing you do that changes their next move. It is on their card, and you always see the move before it lands.]" },
-  { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. Damage past Block fills it. Full, they are Broken: a lost turn and 50% more damage.]" },
+  { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. It starts full and only you wear it down: damage past Block. Empty, they are Broken: a lost turn and 50% more damage.]" },
   { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
 ];
 function hintHTML() {
@@ -1480,6 +1506,7 @@ function settingsSheet() {
     + row('Sound', '', seg('vol', [[0, 'Off'], [1, 'Low'], [2, 'Mid'], [3, 'High']]))
     + row('Vibration', navigator.vibrate ? '' : 'Not supported on this device.', seg('vib', [[true, 'On'], [false, 'Off']]))
     + row('Fight speed', 'How fast turns play out.', speed)
+    + row('Move preview', 'On: the first tap on a skill shows what it would do this turn, the second uses it. Off: one tap uses it.', seg('preview', [[true, 'On'], [false, 'Off']]))
     + row('Fast wins', 'Off: every fight ends on a summary, then each notification to tap through. On: ordinary wins go straight on, with notices.', seg('fastWins', [[false, 'Off'], [true, 'On']]))
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
@@ -1521,7 +1548,7 @@ function howtoSheet() {
     <li><b>Each round:</b> choose your opponent, shop, visit one district, then fight.</li>
     <li><b>Fights:</b> pick one skill a turn. The opponent's next move is always shown. Quick skills don't end your turn.</li>
     <li><b>Stun and Interrupt</b> cancel the opponent's telegraphed move and put it on cooldown.</li>
-    <li><b>Break:</b> damage past the opponent's Block fills their gold break bar, big hits twice as fast, and some skills add Break. Full, they are Broken: they lose a turn and take 50% more damage for 2 turns. Stunning a Weakened opponent Breaks them too.</li>
+    <li><b>Break:</b> the gold bar under the opponent's HP is their guard. It starts full and never recovers on its own; damage past their Block wears it down, big hits twice as fast, and some skills add Break. Empty, they are Broken: they lose a turn and take 50% more damage for 2 turns, then the guard is full again. Stunning a Weakened opponent Breaks them too.</li>
     <li><b>Archetypes:</b> every piece has 1 or 2. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap the chips at the top of the shop to see them.</li>
     <li><b>Stars:</b> 3 copies of a piece merge into ★2. Three ★2 make ★3, and skills evolve.</li>
     <li><b>Gold:</b> 5 a round, +interest of 1 per 4 gold you hold (up to 5, so a 20-gold bank doubles your income). Reroll for 2.</li>
@@ -1532,7 +1559,7 @@ function howtoSheet() {
     <li><b>Titles</b> come from feats and world firsts. Equip one for a small bonus; many unlock new Gifts.</li>
     <li><b>System quests</b> appear each run. Some are hidden until you complete them.</li>
     <li><b>Hidden Paths:</b> reach 4 pieces in two archetypes at once for a hybrid bonus.</li>
-    <li><b>Stats</b> have three faces. Power: the archetypes whose skills they strengthen. Finesse: STR fills break bars faster, AGI adds dodge, INT shortens long cooldowns, VIT strengthens healing you receive, LUK adds crit. Resistance: each point shrugs off 4% of one status, up to 60% (STR Weaken, AGI Bleed, INT Burn, VIT Poison, LUK the chance a Stun lands).</li>
+    <li><b>Stats</b> have three faces. Power: the archetypes whose skills they strengthen. Finesse: STR wears guards down faster, AGI adds dodge, INT shortens long cooldowns, VIT strengthens healing you receive, LUK adds crit. Resistance: each point shrugs off 4% of one status, up to 60% (STR Weaken, AGI Bleed, INT Burn, VIT Poison, LUK the chance a Stun lands).</li>
     <li><b>Stat milestones:</b> 10 in a stat grants a named perk.</li>
     <li><b>Gatekeepers</b> guard rounds 4 and 7: the hard pick there has an extra trait and a second phase, and pays a stat point too.</li>
     <li><b>The System takes notice</b> of a win streak: each straight win makes opponents 6% stronger, up to 30%. Losing a Heart resets it.</li>
@@ -2044,10 +2071,10 @@ function onAct(el) {
     case 'stat': if (run.statPts > 0) { const before = maxHp(run); run.statPts--; run.stats[d.k]++; run.hp += maxHp(run) - before; checkMilestones(run, msgs); pushMsgs(msgs, false, `+1 ${d.k}`); saveRun(); } return render();
     case 'equip-title': run.title = run.title === d.k ? null : d.k; saveRun(); return render();
     case 'use': return onUse(+d.i);
-    case 'reply': { const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
+    case 'reply': { ui.preview = null; const f = ui.fight, t = f && rivalReply(run, f, +d.i); if (t) say2(f, t, 'me'); return updateFight(); }
     case 'info': ui.info = !ui.info; return render();
-    case 'jinx': if (ui.fight && !ui.busy && jinxMove(ui.fight)) { playEvents(ui.fight); updateFight(); } return;
-    case 'reroll-mode': ui.reroll = !ui.reroll; return updateFight();
+    case 'jinx': ui.preview = null; if (ui.fight && !ui.busy && jinxMove(ui.fight)) { playEvents(ui.fight); updateFight(); } return;
+    case 'reroll-mode': ui.preview = null; ui.reroll = !ui.reroll; return updateFight();
     case 'rewind': ui.sheet = null; ui.result = null; saveRun(); return startFightUI();
     case 'patch-open': ui.sheet = { type: 'patch', u: +d.u }; saveRun(); return render();
     case 'patch-pick': { const S = ui.sheet; if (S && usePatch(run, S.u, d.k, meta, msgs)) { sfx('buy'); ui.sheet = null; pushMsgs(msgs, false, 'Unsigned Patch'); saveRun(); saveMeta(); } return render(); }
@@ -2108,7 +2135,7 @@ const COACH = [
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on extra stat points. Levels come from battles. Gold you keep earns interest: +1 for every 4, up to 5.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
   { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
-  { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'Damage past their Block fills the gold break bar, and big hits fill it twice as fast. Full, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },
+  { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'The gold bar is their guard. It starts full: damage past their Block wears it down, and big hits twice as fast. Empty, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Tap a skill to use it. Numbers include your stats and stars. Used skills go on cooldown for a few turns; Attack never does.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Use Venom Blade first, then Firebolt: Burn landing on a Poisoned target triggers the reaction Toxic Flare.', until: () => ui.fight && (ui.fight.tally.reactions > 0 || ui.fight.over), skippable: true },
   { scr: 'fight', pos: 'mid', text: 'Reaction! There are six to discover. Now finish the fight, and use Iron Guard when a big hit is coming.', until: () => ui.fight && ui.fight.over, skippable: true },

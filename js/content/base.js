@@ -18,7 +18,7 @@ const STAT_INFO = {
 //                (Burn, Poison and Bleed damage, Weaken's damage cut, or the chance a Stun lands)
 const RESIST = { per: 0.04, max: 0.6 };
 const STAT_FACES = {
-  STR: { finesse: { say: 'Fills the break bar 4% faster a point', tag: n => `Break +${n * 4}%`, brk: 0.04 }, resist: 'weaken' },
+  STR: { finesse: { say: 'Wears guards down 4% faster a point', tag: n => `Break +${n * 4}%`, brk: 0.04 }, resist: 'weaken' },
   AGI: { finesse: { say: '+1% dodge a point', tag: n => `Dodge +${n}%`, dodge: 0.01 }, resist: 'bleed' },
   INT: { finesse: { say: 'Cooldowns of 4 turns or more are 1 turn shorter for every 6 points (never under 3)', tag: n => n < 6 ? 'Long cooldowns −1 at 6' : `Long cooldowns −${Math.floor(n / 6)}`, cdEvery: 6, cdFrom: 4, cdMin: 3 }, resist: 'burn' },
   VIT: { finesse: { say: 'Healing you receive +2% a point', tag: n => `Healing +${n * 2}%`, heal: 0.02 }, resist: 'poison' },

@@ -1236,3 +1236,14 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 .mst-row .pg-bar { display: block; margin: 6px 0 4px; }
 .tag.mst { flex: none; }
 .mst-l { margin: 0 0 10px; } .mst-l li small { white-space: nowrap; }
+/* Move preview (tap a skill once): striped ghost on each bar for what this turn takes, HP "now → after", the picked button lit */
+div.bar u { position: absolute; top: 0; bottom: 0; left: 0; width: 0; display: block; pointer-events: none; background: repeating-linear-gradient(135deg, rgba(255,255,255,.8) 0 3px, rgba(255,255,255,.15) 3px 6px); }
+div.bar u.up { background: repeating-linear-gradient(135deg, rgba(143,211,154,.9) 0 3px, rgba(143,211,154,.2) 3px 6px); }
+.fc-to { color: var(--h-k, #0b0b0d); background: var(--sys, #e6ff2e); padding: 0 3px; border-radius: 2px; font-weight: 700; }
+.me-hp .fc-to.down { background: #ff8a80; }
+.me-hp .fc-to:not(.down) { background: #8fd39a; }
+.sk.pv { border-color: var(--sys, #e6ff2e); outline: 2px solid var(--sys, #e6ff2e); outline-offset: -2px; box-shadow: 3px 3px 0 var(--h-m, #ff2e9a); }
+.sk-fx.fc { color: var(--text); font-weight: 700; }
+.sk-fx.fc .fc-tag { display: block; color: var(--sys, #e6ff2e); }
+.intent.fc-broke .in-n { text-decoration: line-through; opacity: .6; }
+.in-t small.fc { color: var(--sys, #e6ff2e); }

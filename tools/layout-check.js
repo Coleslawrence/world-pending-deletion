@@ -57,6 +57,8 @@ function states() {
     const jx = JSON.parse(JSON.stringify(mid.run)), jids = ['evil_eye', 'ill_omen', 'knock_wood', 'thirteenth', 'calamity', 'pass_curse'];
     jx.bar = jx.bar.map((p, i) => ({ id: jids[i], star: 2, mods: [], u: 'jinx' + i })); jx.gear.accessory = { id: 'black_cat_collar', star: 3, mods: [], u: 'jinxg' };
     out.push({ label: 'r5-fight-jinx', stage: 'fight', run: jx });
+    // Move preview: a skill tapped once, with the HP arrows, striped bars and its tag line
+    out.push({ label: 'r5-fight-preview', stage: 'fight', run: dice, preview: true });
     // Choose screen with the longest traits on every opponent, glitch ones included (Corrupted widened a card at 320)
     const ch = out.find(s => s.label === 'r5-choose');
     if (ch) { const t = JSON.parse(JSON.stringify(ch.run)); t.choices.forEach(c => c.traits = ['corrupted', 'desynced']); out.push({ label: 'r5-choose-traits', stage: 'choose', run: t }); }
@@ -193,7 +195,7 @@ function inspect() {
     const page = await browser.newPage({ viewport: { width: S.w, height: S.h }, deviceScaleFactor: S.desktop ? 1 : 2, isMobile: !S.desktop, hasTouch: !S.desktop });
     // Safe-area insets as a home screen app sees them (Chromium has no env() emulation)
     const insets = `#app { padding-top: ${S.top}px !important; padding-bottom: ${Math.max(0, S.bottom - 24)}px !important; } .sheet { padding-bottom: ${S.bottom}px !important; max-height: calc(100% - 24px - ${S.top}px) !important; } #toasts { display: none !important; }`;
-    for (const st of list) {
+    for (const st of list.filter(x => !arg('--only') || arg('--only').split(',').includes(x.label))) {
       const run = JSON.parse(JSON.stringify(st.run)); if (st.stage === 'fight') run.stage = 'ready';
       await page.goto(url);
       await page.evaluate(([rk, mk, r, m]) => { localStorage.clear(); localStorage.setItem(rk, JSON.stringify(r)); localStorage.setItem(mk, JSON.stringify(m)); localStorage.setItem('wpd-news-seen', '99'); }, ['le-run-1', 'le-meta-1', run, meta]);
@@ -207,6 +209,7 @@ function inspect() {
       }, [st.stage, st.sheet, st.pending, st.result]);
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(st.stage === 'fight' ? 900 : st.sheet || st.pending ? 450 : 150);
+      if (st.preview) { await page.evaluate(() => { const f = ui.fight; let i = 0, best = -1; f.A.skills.forEach((x, k) => { const p = forecast(f, k); if (p && p.dealt > best) { best = p.dealt; i = k; } }); ui.preview = { f, i }; meta.hints = Object.assign(meta.hints || {}, { preview: 1 }); render(); updateFight(); }); await page.waitForTimeout(300); }
       const bad = await page.evaluate(inspect);
       if (bad.length) fails++;
       console.log(`${bad.length ? 'FAIL' : 'ok  '} ${S.name} ${st.label}${bad.length ? '\n     ' + bad.slice(0, 8).join('\n     ') + (bad.length > 8 ? `\n     ... ${bad.length - 8} more` : '') : ''}`);
