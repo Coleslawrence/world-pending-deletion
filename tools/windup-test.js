@@ -13,7 +13,7 @@ function fight() {
   run.bar = [null]; while (run.bar.length < run.slots) run.bar.push(null);
   G.chooseOpponent(run, 0, false);
   const spec = G.currentSpec(run); Object.keys(spec).forEach(k => delete spec[k]); Object.assign(spec, { kind: 'monster', id: 'brute', traits: [] });
-  const f = G.newFight(run); f.B.dodge = 0; f.A.dodge = 0; f.A.crit = 0; f.rng = () => 0.99; f.B.reflex = null;
+  const f = G.newFight(run); f.B.fixed = true; f.B.dodge = 0; f.A.dodge = 0; f.A.crit = 0; f.rng = () => 0.99; f.B.reflex = null;
   return f;
 }
 // Show Crushing Swing (the Pit Brute's big hit) as the intent
