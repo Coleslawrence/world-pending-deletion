@@ -161,8 +161,27 @@ function pulseChanged() {
 // ---------- Small helpers ----------
 const KIND_LABEL = { monster: 'Qualifier', rival: 'Rival', final: 'Final Champion', erased: 'Erased champion', legend: 'Legend', champion: 'Past champion', trial: 'Rank Trial', entrant: 'Filed record' };
 function initials(name) { const w = name.replace(/[^A-Za-z ]/g, ' ').split(/\s+/).filter(x => x && !['the', 'of'].includes(x.toLowerCase())); return ((w[0] || '?')[0] + (w[1] ? w[1][0] : '')).toUpperCase(); }
+// S3: opponents without a champion's sigil get a face of their own: a mark drawn from their name, always the same
+// for the same name, so a rival or a monster is recognisable when it comes back.
+const GSIG_COLS = ['#e6ff2e', '#ff2e9a', '#72d0ff', '#ffb257', '#9fd86a', '#c27ce6', '#efe6d8', '#ff6b62'];
+function genSigil(name) {
+  let h = 2166136261; const str = String(name || '?'); for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } h >>>= 0;
+  const pick = n => { const v = h % n; h = Math.floor(h / n) ^ ((h << 7) >>> 0); h >>>= 0; return v; };
+  const sides = 3 + pick(5), star = pick(3) === 0, rot = pick(4) * (Math.PI / (sides * 2)), c1 = GSIG_COLS[pick(GSIG_COLS.length)]; let c2 = GSIG_COLS[pick(GSIG_COLS.length)]; if (c2 === c1) c2 = '#0b0b0d';
+  const inner = pick(5), fill = pick(2) === 0;
+  const pts = (n, r, r2, a0) => Array.from({ length: r2 ? n * 2 : n }, (_, i) => { const m = r2 ? n * 2 : n, a = a0 + i * 2 * Math.PI / m - Math.PI / 2, rr = r2 && i % 2 ? r2 : r; return (Math.cos(a) * rr).toFixed(1) + ',' + (Math.sin(a) * rr).toFixed(1); }).join(' ');
+  const outer = `<polygon points="${pts(sides, 15, star ? 7.5 : 0, rot)}" fill="${fill ? c1 : 'none'}" stroke="${c1}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  const ic = fill ? '#0b0b0d' : c2;
+  const mark = [
+    `<circle r="4" fill="${ic}"/>`,
+    `<circle r="5.5" fill="none" stroke="${ic}" stroke-width="2.2"/>`,
+    `<path d="M-6 0H6M0 -6V6" stroke="${ic}" stroke-width="2.6" stroke-linecap="square"/>`,
+    `<polygon points="${pts(3, 6, 0, rot + Math.PI)}" fill="${ic}"/>`,
+    `<path d="M-6 -3H6M-6 3H6" stroke="${ic}" stroke-width="2.4"/>`][inner];
+  return `<svg class="gsig" viewBox="-20 -20 40 40" aria-hidden="true">${outer}${mark}</svg>`;
+}
 function crest(name, kind, big, sig, rank) {
-  const inner = sig ? `<span class="sig" style="color:${SIGIL_COLS[sig.color] || '#fff'}">${SIGILS[sig.sigil] || '✦'}</span>` : `<span>${esc(initials(name))}</span>`;
+  const inner = sig ? `<span class="sig" style="color:${SIGIL_COLS[sig.color] || '#fff'}">${SIGILS[sig.sigil] || '✦'}</span>` : genSigil(name);
   return `<div class="crest k-${kind}${big ? ' big' : ''}" aria-hidden="true">${inner}${rank ? `<b class="crest-rk">${esc(rank)}</b>` : ''}</div>`;
 }
 function styleOf(spec) {
@@ -528,7 +547,8 @@ function compareSheet() {
 // ---------- Title / worlds ----------
 function titleHTML() {
   const saved = lsGet(RUN_KEY), canResume = saved && saved.v === VERSION && !saved.ended;
-  return `<main class="screen title ${canResume ? 'resume' : ''}">${titleChunks()}
+  const intro = !ui.titleSeen && !REDUCED; ui.titleSeen = true; // M3: the title assembles itself, once per session
+  return `<main class="screen title ${canResume ? 'resume' : ''}${intro ? ' intro' : ''}">${titleChunks()}
     <div class="t-top"><div class="t-eb"><div class="eyebrow">[System notice] · Prototype ${esc(releaseLabel())}</div><button class="icon-btn t-set" data-act="sheet" data-s="settings" aria-label="Settings">⚙</button></div><h1 class="logo"><span class="brk">[</span>World Pending Deletion<span class="brk">]</span></h1>
     <div class="sysbox"><p>${meta.runs && meta.rank ? esc(rankAddress(meta, meta.champions[0] && meta.champions[0].name, meta.runs)) : '[The Grand Tournament has begun.]'}</p><p>[Worlds awaiting judgement: many. Champions remaining: one per world.]</p></div>
     <p class="lede">Pick a world and fight for it through an 8-round divine tournament. Choose your opponents, buy and merge skills and gear, and build into archetypes. Every loss erases part of your world.</p></div>
@@ -803,6 +823,8 @@ function applyMoment() { if (!app) return; app.dataset.fx = REDUCED ? 'off' : 'o
 // H Broadcast at full volume: the System puts the run's headline moments on air.
 // Gatekeeper and Final fights, Fate Crisis events, and the end of a world (erased or spared).
 function broadcastFight(spec) { return !!spec && (spec.gate || spec.kind === 'final'); }
+// M2: named opponents get the versus card too, with both faces on it
+function splashFight(spec) { return broadcastFight(spec) || (!!spec && ['rival', 'erased', 'champion', 'legend', 'entrant'].includes(spec.kind)); }
 function crisisPending() { const p = run && run.pending && run.pending[0]; return !!(p && p.type === 'event' && EVENTS[p.key] && EVENTS[p.key].crisis); }
 function broadcastOn() {
   if (ui.screen === 'fight') return !!(ui.fight && broadcastFight(ui.fight.spec));
@@ -812,14 +834,14 @@ function broadcastOn() {
 }
 // A one-second VS card as the fight opens; any tap skips it. Not at 2x/3x speed or with reduced motion.
 function broadcastSplash(f) {
-  if (REDUCED || ui.speed > 1 || !broadcastFight(f.spec) || !app) return;
-  const fin = f.spec.kind === 'final';
-  const top = fin ? '++ LIVE +++ [FINAL] +++ ONE WORLD IS SPARED +++' : '++ LIVE +++ [GATEKEEPER ASSIGNED] +++ LIVE ++';
-  const bot = fin ? '[The other is not.]' : '[Passage is a privilege.]';
+  if (REDUCED || ui.speed > 1 || !splashFight(f.spec) || !app) return;
+  const fin = f.spec.kind === 'final', k = f.spec.kind, big = broadcastFight(f.spec);
+  const top = fin ? '++ LIVE +++ [FINAL] +++ ONE WORLD IS SPARED +++' : f.spec.gate ? '++ LIVE +++ [GATEKEEPER ASSIGNED] +++ LIVE ++' : k === 'rival' ? '++ LIVE +++ [RIVAL ENTRANT] +++ LIVE ++' : k === 'erased' ? '++ LIVE +++ [RETURNED FROM AN ERASED WORLD] +++' : k === 'entrant' ? '++ LIVE +++ [FILED RECORD] +++ LIVE ++' : '++ LIVE +++ [PAST CHAMPION] +++ LIVE ++';
+  const bot = fin ? '[The other is not.]' : f.spec.gate ? '[Passage is a privilege.]' : k === 'erased' ? '[They remember.]' : '[The System is watching this one.]';
   const el = document.createElement('div'); el.className = 'bc-splash'; el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `<div class="bc-tick">${esc(top)}</div><div class="bc-foe">${esc(f.B.name)}</div><div class="bc-vs">VS</div><div class="bc-me">${esc(run.name)}</div><div class="bc-tick b">${esc(bot)}</div>`;
+  el.innerHTML = `<div class="bc-tick">${esc(top)}</div><div class="bc-foe">${specCrest(f.spec)}<span>${esc(f.B.name)}</span></div><div class="bc-vs">VS</div><div class="bc-me"><span>${esc(shortName(run.name))}</span>${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}</div><div class="bc-tick b">${esc(bot)}</div>`;
   const done = () => el.remove();
-  el.addEventListener('pointerdown', done); app.appendChild(el); setTimeout(done, 1100);
+  el.addEventListener('pointerdown', done); if (!big) el.classList.add('minor'); app.appendChild(el); setTimeout(done, big ? 1100 : 900);
 }
 function logLine(l, isNew) {
   return `<p class="t-${l.t} ${isNew ? 'new' : ''}">${esc(l.text)}</p>`;
@@ -1633,9 +1655,33 @@ function backLine() {
   const B = run && run.backing && run.backing.settled && BACK_GOALS[run.backing.goal] ? run.backing : null; if (!B) return '';
   return `<p class="pg-next ${B.met ? 'good' : 'bad'}">${B.met ? `[Backing paid: ${esc(BACK_GOALS[B.goal].name)}. +${B.paid} Echoes.]` : `[Backing lost: ${B.stake} Echoes. The House thanks you.]`}</p>`;
 }
+// M1: the ending plays the World Record before the end screen: erased, each entry is struck and deleted; spared, each
+// is stamped KEPT. Then the word lands and the screen behind it fills its bars. Once per ending; a tap skips it.
+function endIntro(e) {
+  const s = e.snap, erased = e.kind === 'erased';
+  let names = []; try { names = recEntries(Object.assign({}, s.rec, { lost: 0, partial: 0 }), s.worldType, true).map(x => x.name); } catch (err) { }
+  const kept = erased ? [] : (() => { try { return recEntries(s.rec, s.worldType, true).map(x => !x.lost); } catch (err) { return []; } })();
+  if (!names.length) return;
+  document.querySelectorAll('.endfx').forEach(x => x.remove());
+  const el = document.createElement('div'); el.className = 'endfx ' + (erased ? 'erased' : 'spared'); el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<div class="ef-box"><span class="ef-k">World Record · ${esc(s.worldName)}</span><div class="ef-list">${names.map((n, i) => `<div class="${!erased && kept[i] === false ? 'gone' : ''}">${esc(n)}</div>`).join('')}</div><div class="ef-word"></div></div>`;
+  document.body.appendChild(el);
+  const rows = [...el.querySelectorAll('.ef-list div')], gap = Math.max(110, Math.min(300, 1900 / rows.length)), timers = [];
+  rows.forEach((r, i) => timers.push(setTimeout(() => {
+    if (!erased) { if (!r.classList.contains('gone')) r.classList.add('kept'); return; }
+    r.classList.add('struck'); const full = r.textContent; let n = full.length;
+    const bs = setInterval(() => { n -= 3; r.textContent = n > 0 ? full.slice(0, n) + '▌' : '[deleted]'; if (n <= 0) clearInterval(bs); }, 20); timers.push(bs);
+  }, 350 + i * gap)));
+  let closed = false;
+  const close = () => { if (closed) return; closed = true; timers.forEach(t => { clearTimeout(t); clearInterval(t); }); el.classList.add('out'); setTimeout(() => el.remove(), 300); const m = app.querySelector('main.end'); if (m) m.classList.add('reveal'); };
+  timers.push(setTimeout(() => { if (erased) el.classList.add('glitch'); const w = el.querySelector('.ef-word'); w.textContent = erased ? 'Erased' : 'Spared'; w.classList.add('slam'); sfx(erased ? 'erase' : 'win'); }, 350 + rows.length * gap + 350));
+  timers.push(setTimeout(close, 350 + rows.length * gap + 1700));
+  el.addEventListener('pointerdown', close);
+}
 function endHTML() {
   const e = ui.end, s = e.snap;
   const erased = e.kind === 'erased';
+  if (!e.introDone) { e.introDone = true; if (!REDUCED && s && s.rec) setTimeout(() => { if (ui.screen === 'end' && ui.end === e) endIntro(e); }, 30); }
   const lines = (e.observed ? [e.observed] : []).concat(erased ? [`[Entrant eliminated. ${s.worldName} is erased.]`, `[${s.champ} has been added to the Hall of the Erased.]`].concat(e.filed ? [`[${s.worldName}'s records remain on file.]`] : []).concat(e.opened ? [] : ['[Next world.]']) : [`[${s.worldName} is spared.]`, `[${s.champ} enters the Hall of Champions.]`], e.opened ? [`[Rank Trial unlocked: ${e.opened}-rank. It waits in your next world.]`] : []);
   return `<main class="screen title end ${erased ? 'erased' : 'spared'}">${broadcastTicker(erased ? `++ BREAKING +++ [Entrant eliminated. ${s.worldName} is erased.] +++` : `++ LIVE +++ [${s.worldName} is spared.] +++`)}<div class="t-top"><div class="eyebrow">${erased ? 'World erased' : 'World spared'}</div><h1>${erased ? 'Erased' : 'Spared'}</h1>
     <div class="sysbox ${erased ? 'bad' : ''}">${lines.map(l => `<p>${esc(l)}</p>`).join('')}</div>

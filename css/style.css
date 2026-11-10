@@ -1169,3 +1169,56 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 .link.mk { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
 :root[data-theme="broadcast"] .sheet.k-rules .sh-f .btn { color: #1a1814; border-color: #1a1814; background: transparent; }
 :root[data-theme="broadcast"] .sheet.k-rules .sh-f { background: #ece6d6; border-color: #1a1814; }
+
+/* ===== design review style and moments (S1-S4, M1-M3) ===== */
+/* S1: a yellow fill means "tap this". Sheet headers go black with a yellow edge; the kinds from U3 keep their own frames */
+:root[data-theme="broadcast"] .sheet:not(.k-spoils):not(.k-rules):not(.k-door):not(.k-intake):not(.k-level):not(.k-gift):not(.lose):not(.crisis) .sh-h { background: var(--h-k); border-left: 6px solid var(--h-y); border-bottom: 2px solid var(--line2); }
+:root[data-theme="broadcast"] .sheet:not(.k-spoils):not(.k-rules):not(.k-door):not(.k-intake):not(.k-level):not(.k-gift):not(.lose):not(.crisis) .sh-h h3 { color: var(--h-y); }
+:root[data-theme="broadcast"] .sheet:not(.k-spoils):not(.k-rules):not(.k-door):not(.k-intake):not(.k-level):not(.k-gift):not(.lose):not(.crisis) .sh-h :is(.icon-btn, .btn) { color: var(--text); border-color: var(--line2); }
+/* S2: the typewriter face is the System's voice. Numbers and readouts use the body face with lining figures */
+:root[data-theme="broadcast"] :is(.hcount, .gold, .st-hp, .st-prog b, .chip, .sk-fx, .in-v, .st-inc, .op-meta, .achip small, .cl-l) { font-family: var(--f-b); font-variant-numeric: lining-nums tabular-nums; }
+:root[data-theme="broadcast"] :is(.hcount, .gold, .st-hp, .st-prog b, .chip) { font-weight: 700; }
+:root[data-theme="broadcast"] .sk-fx { font-weight: 500; letter-spacing: .01em; }
+/* S4: a little life at rest */
+.fight .crest { animation: breathe 3.4s ease-in-out infinite; }
+.fight .me .crest { animation-delay: -1.7s; }
+@keyframes breathe { 50% { scale: 1.05; } }
+.foot .btn.primary:not(:disabled), .foot2 .btn.primary:not(:disabled) { animation: arrive .5s cubic-bezier(.2, 1.4, .4, 1) .15s 1 both; }
+@keyframes arrive { from { scale: .94; filter: brightness(1.5); } }
+/* S3: drawn faces for opponents */
+.crest .gsig { width: 70%; height: 70%; display: block; }
+:root[data-theme="broadcast"] .st-prog b { word-spacing: .18em; }
+/* M1: the ending plays the World Record */
+.endfx { position: fixed; inset: 0; z-index: 70; background: rgba(6,6,8,.96); display: grid; place-items: center; padding: 24px 20px; animation: bgin .2s ease-out; transition: opacity .3s; }
+.endfx.out { opacity: 0; pointer-events: none; }
+.ef-box { width: min(340px, 100%); display: grid; gap: 8px; }
+.ef-k { font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.ef-list { display: grid; gap: 3px; font-family: var(--f-m); font-size: var(--fs-2); color: var(--text); }
+.ef-list div { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.4em; }
+.ef-list .struck { color: var(--bad); text-decoration: line-through; }
+.ef-list .gone { color: var(--dim); text-decoration: line-through; }
+.ef-list .kept::after { content: 'KEPT'; position: absolute; right: 0; top: 0; font-family: var(--f-d); font-size: var(--fs-1); line-height: 1.2; padding: 0 5px; color: var(--good, #6fe39a); border: 2px solid currentColor; background: #060608; rotate: -4deg; animation: rollstamp .28s cubic-bezier(.2, 1.4, .4, 1) both; }
+.ef-word { font-family: var(--f-d); text-transform: uppercase; font-size: clamp(64px, 24vw, 110px); line-height: .9; min-height: .9em; margin-top: 6px; }
+.endfx.erased .ef-word { color: var(--h-m, #ff2e9a); } .endfx.spared .ef-word { color: var(--h-y, #e6ff2e); }
+.ef-word.slam { animation: slam .42s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes slam { from { scale: 2.4; opacity: 0; letter-spacing: .2em; } to { scale: 1; opacity: 1; } }
+.endfx.glitch .ef-box { animation: glitch .5s steps(6) 1; }
+.end.reveal .pg-bar i { animation: barfill 1s cubic-bezier(.2, .8, .2, 1) both; }
+.end.reveal .pg-row:nth-child(2) .pg-bar i { animation-delay: .15s; } .end.reveal .pg-row:nth-child(3) .pg-bar i { animation-delay: .3s; }
+@keyframes barfill { from { width: 0; } }
+/* M2: versus card with both faces; a shorter, smaller one for named opponents who are not Gatekeepers or the Final */
+.bc-splash .bc-foe, .bc-splash .bc-me { display: flex; align-items: center; gap: 10px; }
+.bc-splash .bc-me { justify-content: flex-end; }
+.bc-splash .bc-foe span, .bc-splash .bc-me span { min-width: 0; }
+.bc-splash .crest { animation: none; flex: none; }
+.bc-splash .bc-foe { animation: vsl .35s cubic-bezier(.2, 1.2, .4, 1) both; } .bc-splash .bc-me { animation: vsr .35s cubic-bezier(.2, 1.2, .4, 1) .08s both; }
+@keyframes vsl { from { transform: translateX(-60%); opacity: 0; } } @keyframes vsr { from { transform: translateX(60%); opacity: 0; } }
+.bc-splash.minor .bc-foe { font-size: clamp(30px, 11vw, 56px); } .bc-splash.minor .bc-me { font-size: clamp(24px, 8vw, 40px); }
+/* M3: the title assembles itself once per session */
+.title.intro .t-eb { animation: fadein .3s ease-out both; }
+.title.intro h1.logo { animation: titlein .5s steps(7, end) .2s both; }
+@keyframes titlein { 0% { opacity: 0; transform: translateX(-10px) skewX(-12deg); clip-path: inset(0 0 70% 0); } 30% { opacity: 1; transform: translateX(8px) skewX(8deg); clip-path: inset(40% 0 0 0); } 60% { transform: translateX(-4px); clip-path: inset(0 0 20% 0); } 100% { opacity: 1; transform: none; clip-path: inset(0); } }
+.title.intro .sysbox p { animation: fadein .3s ease-out .55s both; }
+.title.intro .sysbox p:nth-child(2) { animation-delay: .8s; }
+.title.intro .lede, .title.intro .t-stats, .title.intro .stack { animation: tinup .35s ease-out 1s both; }
+.title.intro .t-stats { animation-delay: 1.1s; } .title.intro .stack { animation-delay: 1.2s; }
