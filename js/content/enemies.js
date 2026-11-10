@@ -51,6 +51,58 @@ const ENEMIES = {
   legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
   undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
 };
+// Reflexes: each opponent's one if-then rule, shown on its card. on is what you did on your turn (REFLEX_ON); when it
+// fires, the opponent's next move is the Reflex's instead of the next in its script: move (a move of its own, written
+// like any other) or use (the index of one of its skills). say is the System's line when it fires, so the player sees why.
+// It never fires two turns running, and the move is shown as the intent before the player acts (planReflex in core.js).
+// Rank Trial examiners, legends, the Undefeated and other players' builds have none.
+const REFLEX_ON = {
+  block: { chip: 'Block', if: 'If you Block', why: 'you Blocked' },
+  flurry: { chip: '2 hits', if: 'If you hit twice in a turn', why: 'you hit twice' },
+  status: { chip: 'afflictions', if: 'If you Burn, Poison or Bleed it', why: 'you afflicted it' },
+  heal: { chip: 'healing', if: 'If you heal', why: 'you healed' },
+  passive: { chip: 'no attack', if: 'If you do not attack', why: 'you held back' },
+};
+const REFLEXES = {
+  goblin: { on: 'block', move: { n: 'Ankle Stab', fx: { dmg: 5, pierce: 1 } }, say: '[The Goblin sees your guard go up. It goes low.]' },
+  golem: { on: 'status', move: { n: 'Shed Stone', fx: { cleanse: 1, block: 6 } }, say: '[The Golem sheds a layer of stone, and your handiwork with it.]' },
+  drake: { on: 'heal', move: { n: 'Second Spit', fx: { poison: 6 } }, say: '[The Drake watches you mend. It spits again.]' },
+  ghoul: { on: 'passive', move: { n: 'Lunge', fx: { dmg: 9, bleed: 1 } }, say: '[You held back. The Ghoul did not.]' },
+  imp: { on: 'block', move: { n: 'Scorch', fx: { burn: 5 } }, say: '[The Imp cannot get through your guard. It sets fire to it instead.]' },
+  brute: { on: 'flurry', move: { n: 'Backhand', fx: { dmg: 8, weaken: 1 } }, say: '[Too many small hits. The Brute swats you away.]' },
+  wisp: { on: 'heal', move: { n: 'Overload', fx: { dmg: 11 } }, say: '[The Wisp is drawn to the mending. It discharges.]' },
+  lucky_rat: { on: 'passive', move: { n: 'Snatch', fx: { dmg: 8 } }, say: '[You left an opening. The Rat considers itself lucky.]' },
+  hex_toad: { on: 'status', move: { n: 'Spit It Back', fx: { dmg: 4, weaken: 2 } }, say: '[The Toad does not care for the taste. It spits it back.]' },
+  acolyte: { on: 'status', move: { n: 'Purging Rite', fx: { cleanse: 1, heal: 5 } }, say: '[The Acolyte knows a rite for that.]' },
+  glyph_moth: { on: 'block', move: { n: 'Dust Cloud', fx: { dmg: 2, pierce: 1, weaken: 2 } }, say: '[Your guard is up. The dust goes around it.]' },
+  briar_cub: { on: 'flurry', move: { n: 'Curl Up', fx: { block: 10 } }, say: '[The Cub has had enough of that. It curls up.]' },
+  grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes for the throat early.]' },
+  thunder_ram: { on: 'passive', use: 1, say: '[You stood still. The Ram takes that as a target.]' },
+  sunken_knight: { on: 'block', use: 2, say: '[The Knight sees you shell up. It knows that trick.]' },
+  seraphine: { on: 'status', move: { n: 'Lay on Hands', fx: { cleanse: 1, heal: 8 } }, say: '[Seraphine notices the stain. She prays it off.]' },
+  grukk: { on: 'flurry', use: 1, say: '[Grukk felt every one of those. Grukk is delighted.]' },
+  lyss: { on: 'block', use: 1, say: '[Lyss notes your guard. Poison does not mind it.]' },
+  masked: { on: 'heal', move: { n: 'Mirror Mend', fx: { heal: 12 } }, say: '[The Masked Entrant copies that as well.]' },
+  kaito: { on: 'status', use: 1, say: '[Kaito has seen that before. He seals it away.]' },
+  delphine: { on: 'passive', use: 2, say: '[You hesitated. Delphine raises.]' },
+  mott: { on: 'block', move: { n: 'Trip', fx: { dmg: 6, pierce: 1 } }, say: '[Mott trips and goes under your guard. He is sorry.]' },
+  calder: { on: 'passive', use: 0, say: '[You did not attack. Ser Calder considers that an invitation.]' },
+  ossian: { on: 'block', move: { n: 'Smoke Out', fx: { burn: 6 } }, say: '[Ossian cannot reach you in there. The smoke can.]' },
+  wren: { on: 'flurry', move: { n: 'Slip Away', fx: { evade: 1 } }, say: '[Wren has counted your hits. She will not be there for the next.]' },
+  bram: { on: 'heal', use: 2, say: '[Bram stops counting. The thunder comes early.]' },
+  sable: { on: 'heal', move: { n: 'Reopen', fx: { dmg: 8, bleed: 3 } }, say: '[Mother Sable watches you mend. She undoes it.]' },
+  vey_twins: { on: 'status', move: { n: 'Trade Looks', fx: { cleanse: 1, block: 6 } }, say: '[The Veys trade a look. What you left on them is gone.]' },
+  brook_pair: { on: 'flurry', use: 1, say: '[The Brooks have seen fast hands before. They brace.]' },
+  leviathan: { on: 'block', move: { n: 'Undertow', fx: { dmg: 8, pierce: 1, weaken: 1 } }, say: '[The Queen sees your wall. The tide goes under it.]' },
+  kharros: { on: 'heal', move: { n: 'Imperial Decree', fx: { burn: 6 } }, say: '[The Emperor does not permit recovery. It is decreed.]' },
+  bone_saint: { on: 'status', move: { n: 'Absolution', fx: { cleanse: 1, heal: 6 } }, say: '[The Bone Saint absolves itself. It has had practice.]' },
+  thorn_mother: { on: 'flurry', move: { n: 'Bramble Wall', fx: { block: 12 } }, say: '[The Thorn Mother pulls the forest in close.]' },
+  archmage: { on: 'passive', use: 2, say: '[The Archmage notices nobody is attacking him. He fills the silence.]' },
+  forge_king: { on: 'status', move: { n: 'Burn It Off', fx: { cleanse: 1, dmg: 6 } }, say: '[The Forge King puts it to the fire. It does not survive.]' },
+  dealer: { on: 'block', move: { n: 'Marked Card', fx: { dmg: 7, pierce: 1 } }, say: '[The Dealer saw that hand coming. It plays around it.]' },
+  augur: { on: 'heal', move: { n: 'Foreseen', fx: { dmg: 9, weaken: 1 } }, say: '[The Augur read that you would mend. It had an answer ready.]' },
+  herald: { on: 'passive', use: 1, say: '[You gave the Storm Herald time. It used it.]' },
+};
 const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute', 'wisp', 'lucky_rat', 'hex_toad', 'acolyte', 'glyph_moth', 'briar_cub', 'grave_hound', 'thunder_ram', 'sunken_knight'];
 // The qualifier ladder: each qualifier round draws its two monsters from its own list, so each round has its own feel.
 // Round 1 the light ones, round 2 the ones that put a status on you, round 3 the heavy hitters. Every monster in MONSTERS

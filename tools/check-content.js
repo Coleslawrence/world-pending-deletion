@@ -10,7 +10,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ROOT = path.join(__dirname, '..');
 const G = require('../js/core.js');
 // Content names are globals under Node (core.js loads js/content/ into the global scope).
-const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT, LEVEL_PERKS })');
+const C = vm.runInThisContext('({ ADVANCE, EFFECTS, FEATS, FEAT_ATS, OUTCOMES, outcomeText, STATS, RANKS, ARCH, START_ARCH, DISCIPLINES, themeAllies, PIE, themeNear, themePairOk, themeFits, MOVE_ROLES, MOVE_NUMBERS, MOVE_NEEDS, BIG_HIT, moveRole, moveDmg, SKILLS, FLAVOUR_ORPHANS, GEAR, GEAR_SLOTS, GEAR_BUDGET, GODS, WORLD_TYPES, MODIFIERS, LORE, FATES, PEOPLES, CONFLUENCE, PULSE, FINAL_GREET, GIFTS, GIFT_CATS, TITLES, FINAL_TITLE, QUESTS, HIDDEN_PATHS, ENEMIES, REFLEXES, REFLEX_ON, MONSTERS, MONSTER_ROUNDS, RIVALS, RIVAL_LINES, EVENTS, CHAINS, AMENDMENTS, TRAIT_POOL, TRAIT_COUNT, LEVEL_PERKS })');
 const WRITE = process.argv.includes('--write');
 const IDS_FILE = 'tools/content-ids.json', DOC_FILE = 'docs/CONTENT.md';
 const errors = [], warnings = [];
@@ -294,6 +294,18 @@ Object.entries(C.ENEMIES).forEach(([k, e]) => {
   if (e.revive && ph.at <= e.revive) warn(w + ' phase', `starts at ${ph.at} of max HP, at or below where it rises (${e.revive}), so it may start only after it rises`);
 });
 C.MONSTERS.concat(C.RIVALS).forEach(k => ref('enemies', C.ENEMIES[k], `${k} is listed in MONSTERS or RIVALS but not defined`));
+// Reflexes: a known trigger, one move (its own or one of the enemy's skills), a System line, and one for every monster, rival and Final Champion
+Object.entries(C.REFLEXES).forEach(([k, R]) => {
+  const w = 'reflexes ' + k, e = C.ENEMIES[k];
+  if (!e) return err(w, 'is not an enemy in ENEMIES');
+  Object.keys(R).filter(f => !['on', 'move', 'use', 'say'].includes(f)).forEach(f => err(w, `unknown field ${f} (on, move, use, say)`));
+  ref(w, C.REFLEX_ON[R.on], `on must be one of ${Object.keys(C.REFLEX_ON).join(', ')}`);
+  ref(w, (R.move != null) !== (R.use != null), 'needs move or use, not both');
+  if (R.move) ref(w, R.move.n && R.move.fx && Object.keys(R.move.fx).length, 'move needs a name n and effects fx');
+  if (R.use != null) ref(w, Number.isInteger(R.use) && e.skills[R.use], `use ${R.use} is not one of its skills`);
+  ref(w, typeof R.say === 'string' && /^\[.*\]$/.test(R.say), 'say must be a [System line]');
+});
+C.MONSTERS.concat(C.RIVALS, Object.keys(C.ENEMIES).filter(k => C.ENEMIES[k].final)).forEach(k => ref('reflexes', C.REFLEXES[k], `${k} has no Reflex`));
 C.MONSTERS.forEach(k => ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.filter(r => r.includes(k)).length === 1, `${k} must be in exactly one qualifier round`));
 ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.length === 3 && C.MONSTER_ROUNDS.every(r => r.length >= 2 && r.every(k => C.MONSTERS.includes(k))), 'three qualifier rounds of at least 2 monsters each, all from MONSTERS');
 C.RIVALS.forEach(k => ref('enemies ' + k, C.ENEMIES[k] && C.ENEMIES[k].rival, 'is in RIVALS but not marked rival: true'));
@@ -350,6 +362,7 @@ Object.values(C.TITLES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) 
 Object.values(G.PERKS).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('perk', k, t.name, v)));
 Object.values(G.MILESTONES).forEach(t => Object.entries(t.p || {}).forEach(([k, v]) => use('milestone', k, t.name, v)));
 Object.values(C.GODS).forEach(g => Object.entries(g.bless).forEach(([k, v]) => use('god', k, g.name, v)));
+Object.entries(C.REFLEXES).forEach(([k, R]) => R.move && Object.entries(R.move.fx).forEach(([x, v]) => use('skill', x, `${C.ENEMIES[k].name}: ${R.move.n} (Reflex)`, v)));
 Object.values(C.ENEMIES).forEach(e => MECHANICS.filter(k => e[k] != null).forEach(k => use('enemy', k, e.name, e[k])));
 Object.values(C.ENEMIES).forEach(e => e.phase && Object.entries(e.phase.set || {}).forEach(([k, v]) => use('enemy', k, e.name + ' (phase)', v)));
 Object.values(C.ENEMIES).forEach(e => Object.entries(e.passives || {}).forEach(([k, v]) => use('passive', k, e.name, v)));
