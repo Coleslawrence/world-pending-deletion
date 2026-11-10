@@ -1217,7 +1217,7 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 /* M3: the title assembles itself once per session */
 .title.intro .t-eb { animation: fadein .3s ease-out both; }
 .title.intro h1.logo { animation: titlein .5s steps(7, end) .2s both; }
-@keyframes titlein { 0% { opacity: 0; transform: translateX(-10px) skewX(-12deg); clip-path: inset(0 0 70% 0); } 30% { opacity: 1; transform: translateX(8px) skewX(8deg); clip-path: inset(40% 0 0 0); } 60% { transform: translateX(-4px); clip-path: inset(0 0 20% 0); } 100% { opacity: 1; transform: none; clip-path: inset(0); } }
+@keyframes titlein { 0% { opacity: 0; clip-path: inset(0 0 70% 0); } 30% { opacity: 1; clip-path: inset(40% 0 0 0); filter: hue-rotate(60deg); } 60% { clip-path: inset(0 0 20% 0); filter: none; } 100% { opacity: 1; clip-path: inset(0); } }
 .title.intro .sysbox p { animation: fadein .3s ease-out .55s both; }
 .title.intro .sysbox p:nth-child(2) { animation-delay: .8s; }
 .title.intro .lede, .title.intro .t-stats, .title.intro .stack { animation: tinup .35s ease-out 1s both; }
