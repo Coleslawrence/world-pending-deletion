@@ -108,6 +108,16 @@ function states() {
       const rc2 = out.find(s => s.stage === 'choose' && s.run && s.run.choices && s.run.choices.length > 1);
       if (rc2) { const rg = JSON.parse(JSON.stringify(rc2.run)); rg.choices = rg.choices.map((c, i) => i ? Object.assign(c, { kind: 'rival', id: 'lyss', grudge: true }) : c); out.push({ label: 'choose-grudge', stage: 'choose', run: rg }); }
       out.push({ label: 'sheet-archive-grudges', stage: 'shop', sheet: 'archive', run: mid.run }); me.retired = ['grukk']; }
+    meta.bonds = { war: 72, trick: 23, ruin: 5 }; me.bondUp = [{ g: 'war', level: 4, text: G.bondText('war', 4) }, { g: 'trick', level: 2, text: G.bondText('trick', 2) }];
+    out.push({ label: 'sheet-archive-bonds', stage: 'shop', sheet: 'archive', run: mid.run });
+    // Settle the Erased (Phase 7): the win result offering to settle, after settling, and the Halls with the Settled
+    { const er = Object.assign(JSON.parse(JSON.stringify((meta.erased || [])[0] || meta.champions[0] || G.snapshot(mid.run))), { at: 4242, champ: 'Velka the Unwritten of Morrowmere', name: 'Velka', worldName: 'Morrowmere' }); meta.erased = [er].concat(meta.erased || []);
+      const res = { won: true, gold: 5, enemy: er.champ, msgs: [], heartsLost: 0, tally: {}, settle: 4242 };
+      meta.settled = [{ at: 1, champ: 'Orrin Vale of Dunmarch', worldName: 'Dunmarch', line: G.settleLine({ at: 1, champ: 'Orrin Vale of Dunmarch', worldName: 'Dunmarch' }), when: 0 }];
+      out.push({ label: 'result-settle', stage: 'shop', sheet: 'result', run: mid.run, result: res }, { label: 'result-settled', stage: 'shop', sheet: 'result', run: mid.run, result: Object.assign({}, res, { settled: meta.settled[0] }) }, { label: 'sheet-halls-settled', stage: 'shop', sheet: 'halls', run: mid.run }); }
+    // Story drip (Phase 7): the Archive's pages with some open, one for sale and the sealed ones; an end screen line
+    meta.story = { open: { m_erased: 1, m_spared: 1, d_handbook1: 1, d_handbook7: 1, d_letter: 1 }, since: 1 }; meta.echoes = Math.max(meta.echoes, 20); me.pagesOpened = ['m_rank_d', 'd_broadcast'];
+    out.push({ label: 'sheet-pages', stage: 'shop', sheet: 'pages', run: mid.run }, { label: 'sheet-archive-pages', stage: 'shop', sheet: 'archive', run: mid.run });
     out.push({ label: 'end-erased', stage: 'end-erased', run: me }, { label: 'end-spared', stage: 'end-spared', run: me });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
@@ -188,13 +198,13 @@ function inspect() {
       await page.goto(url);
       await page.evaluate(([rk, mk, r, m]) => { localStorage.clear(); localStorage.setItem(rk, JSON.stringify(r)); localStorage.setItem(mk, JSON.stringify(m)); localStorage.setItem('wpd-news-seen', '99'); }, ['le-run-1', 'le-meta-1', run, meta]);
       await page.goto(url); await page.addStyleTag({ content: insets });
-      await page.evaluate(([stage, sheet, pending]) => {
-        ui.sheet = null; run.pending = pending || [];
+      await page.evaluate(([stage, sheet, pending, result]) => {
+        ui.sheet = null; run.pending = pending || []; if (result) ui.result = result;
         if (stage === 'fight') startFightUI();
         else if (stage === 'worlds') { if (sheet) { meta.priority = { max: 10, set: 4 }; meta.marks.challenge = { glass: 3 }; meta.wins = Math.max(1, meta.wins); ui.challenge = 'sudden'; } onAct({ dataset: { act: 'new' } }); if (sheet) { ui.challenge = 'sudden'; ui.sheet = sheet; render(); } }
         else if (stage.startsWith('end-')) { const kind = stage.slice(4), out = endRun(run, meta, kind); ui.end = { kind, echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial }; run.ended = true; ui.screen = 'end'; render(); }
         else { ui.screen = stage; ui.sheet = sheet || null; render(); }
-      }, [st.stage, st.sheet, st.pending]);
+      }, [st.stage, st.sheet, st.pending, st.result]);
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(st.stage === 'fight' ? 900 : st.sheet || st.pending ? 450 : 150);
       const bad = await page.evaluate(inspect);

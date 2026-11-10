@@ -289,36 +289,36 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `blockStun` | 1 | Thunder Wall (0.25) | When your Block absorbs a hit, 25% chance to Stun the attacker. | add |  |  | Bastion, Stormcaller |
 | `blockThorns` | 2 | spiked_buckler (0.3), crown_of_thorns (0.15) | Gaining Block also gives Thorns equal to 30% of it. | add |  |  | Bastion |
 | `blockWeaken` | 1 | grounding_mail (1) | When your Block stops a whole hit, the attacker is Weakened for 1 turn. | set |  |  | Bastion, Stormcaller |
-| `breakEmpower` | 1 | Lightning Rod (2) | Breaking an opponent Empowers you for 2 turns. | set |  |  | Stormcaller |
+| `breakEmpower` | 2 | Lightning Rod (2), Blood Oath (2) | Breaking an opponent Empowers you for 2 turns. | set |  |  | Stormcaller |
 | `burnBlock` | 1 | smelters_apron (2) | Gain 2 Block each time Burn on your opponent deals damage. | add |  |  | Pyre, Bastion |
 | `burnExec` | 3 | ember_gauntlets (0.2), ashen_mantle (0.2), Funeral Pyre (0.25) | +20% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
 | `burnFade` | 2 | Pyre 2 (0.15), Pyre 6 (0) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
 | `burnHeal` | 4 | Cinder Warden (0.2), cinder_robe (0.3), bellows (0.15), … | Heal 20% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
 | `burnLowDie` | 1 | Wildfire Bet (1) | Burn you apply is raised by your lowest die. | set |  |  | Gambler, Pyre |
 | `burnMisf` | 1 | Black Candle (1) | Burning opponents gain 1 Misfortune each turn. | add |  |  | Jinx, Pyre |
-| `burnPlus` | 10 | Pyre 4 (4), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
+| `burnPlus` | 11 | Pyre 4 (4), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 2 | plague_censer (2), tar_flask (1) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
-| `chanceBonus` | 2 | Loaded Dice (15), The House (10) | Chance options in events +15%. | add |  |  |  |
+| `chanceBonus` | 3 | Loaded Dice (15), House Credit (10), The House (10) | Chance options in events +15%. | add |  |  |  |
 | `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `countdown` | 1 | countdown_collar (12) | You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted. | set |  |  |  |
-| `critBonus` | 7 | Swordmaster (0.15), duelist_rapier (0.1), whetstone_charm (0.08), … | +15% critical chance. | add |  |  |  |
+| `critBonus` | 8 | Swordmaster (0.15), duelist_rapier (0.1), whetstone_charm (0.08), … | +15% critical chance. | add |  |  |  |
 | `critMult` | 2 | Swordmaster (2), Executioner (1.75) | Critical hits deal ×2 instead of ×1.5. | set |  |  |  |
 | `curseBlock` | 1 | mirror_shard_mail (4) | Each Curse you take gives you 4 Block. | add |  |  | Jinx |
 | `curseWard` | 1 | salt_pouch (3) | The first 3 Curse you would take each fight is ignored. | add |  |  | Jinx |
 | `dieMin` | 2 | Gambler 2 (2), Card Counter (3) | Your dice never roll below 2. | set |  |  | Gambler |
-| `dmgPct` | 8 | Glass Cannon (0.3), Demon Blood (0.15), Ascendant (0.05), … | All your damage +30%. | add |  | rate |  |
+| `dmgPct` | 9 | Glass Cannon (0.3), Demon Blood (0.15), Blood Oath (0.1), … | All your damage +30%. | add |  | rate |  |
 | `dodge` | 5 | shadow_leathers (0.06), dancers_wraps (0.04), Elf-touched (0.1), … | +6% dodge. | add |  |  |  |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
-| `dotPlus` | 2 | plague_censer (1), The Trickster (2) | Burn, Poison and Bleed you apply +1. | add |  | flat, scales with power |  |
+| `dotPlus` | 3 | plague_censer (1), Card Up the Sleeve (1), The Trickster (2) | Burn, Poison and Bleed you apply +1. | add |  | flat, scales with power |  |
 | `echoNext` | 1 | echo_chamber (0.5) | Every skill plays again next turn at 50% power. | set |  |  |  |
 | `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
 | `execBonus` | 6 | Headsman (0.5), executioner_axe (0.4), grave_shroud (0.15), … | +50% damage to opponents below 30% HP. | add |  |  | Reaper |
 | `execPip` | 1 | Dead Man's Hand (0.02) | Execute thresholds rise by 2% for each pip on your highest die. | add |  |  | Gambler, Reaper |
 | `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
-| `firstCrit` | 1 | duelist_rapier (1) | Your first hit each fight is critical. | set |  |  |  |
-| `firstEvade` | 3 | shadow_leathers (1), Near Miss (1), Afterimage (1) | Evade the first attack each fight. | set |  |  |  |
+| `firstCrit` | 2 | duelist_rapier (1), Crow's Eye (1) | Your first hit each fight is critical. | set |  |  |  |
+| `firstEvade` | 4 | shadow_leathers (1), Near Miss (1), Card Up the Sleeve (1), … | Evade the first attack each fight. | set |  |  |  |
 | `firstFree` | 2 | Arcanist 4 (1), stormglass (1) | Your first skill each fight has no cooldown. | set |  |  | Arcanist |
 | `firstHit` | 3 | First Strike (1), First Blood (0.5), Arcane Mind (0.3) | Your first damaging skill each fight deals double. | add |  |  |  |
 | `firstJinx` | 1 | The Crow (1) | The opponent's first move each fight goes wrong for them, as if jinxed. | set |  |  |  |
@@ -327,7 +327,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `flareFull` | 2 | tar_flask (1), Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
 | `flatDR` | 5 | tower_shield (1), bastion_plate (1), Thick Skin (2), … | Every hit you take deals 1 less damage. | add |  | flat, scales with power |  |
 | `goldDmg` | 1 | misers_ring (0.05) | +5% damage for every 10 gold you hold when a fight starts, up to +25%. | add |  |  |  |
-| `goldPerWin` | 3 | misers_ring (1), gilded_coin (1), The House (1) | +1 gold after each win. | add |  |  |  |
+| `goldPerWin` | 4 | misers_ring (1), gilded_coin (1), House Credit (2), … | +1 gold after each win. | add |  |  |  |
 | `healBlock` | 2 | templar_plate (0.3), Paladin (0.5) | Healing also gives Block equal to 30% of it. | add |  |  | Zealot, Bastion |
 | `healBreak` | 1 | flail_of_penance (2) | Your healing skills also deal 2 Break. | add |  |  | Zealot |
 | `healDmg` | 1 | Last Rites (0.3) | Your healing also deals 30% of it as damage to the opponent. | add |  |  | Reaper, Zealot |
@@ -350,7 +350,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `lifesteal` | 6 | Reaper 4 (0.3), Undying (0.15), Vampirism (0.08), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDieUp` | 1 | tampered_dice (1) | Your lowest die each turn shows 1 more. | add |  |  | Gambler |
 | `lowDR` | 3 | soul_lantern (0.15), gravecloth (0.15), Comeback Kid (0.2) | Below 25% HP, take 15% less damage. | set |  | rate |  |
-| `lowHpDmg` | 2 | Berserker's Blood (0.3), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
+| `lowHpDmg` | 3 | Berserker's Blood (0.3), Last Ember (0.2), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
 | `lowLifesteal` | 3 | soul_lantern (0.25), gravecloth (0.1), tally_bone (0.1) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
 | `luckyCut` | 1 | Lucky Cut (1) | A critical hit from a die skill showing 6 hits once more. | set |  |  | Gambler, Bladedancer |
 | `mighty` | 1 | Mighty Frame (0.1) | Reaper and Stormcaller skills deal 10% more. | set |  |  |  |
