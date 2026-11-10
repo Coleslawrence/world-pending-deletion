@@ -925,6 +925,7 @@ function chipsHTML(X, f) {
   const c = [];
   if (!X.isPlayer && X.reflexes) X.reflexes.forEach((R, k) => c.push(`<span class="chip trait reflex" title="${esc(reflexText(X.id, k))}">Reflex: ${esc(REFLEX_ON[R.on].chip)}</span>`));
   if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait${TRAIT_POOL[k].glitch ? ' glitch' : ''}">${esc(TRAIT_POOL[k].name)}</span>`));
+  if (X.isPlayer && f.goal) { const st = goalState(f), g = SIDE_GOALS[f.goal.key]; c.push(`<span class="chip goal ${st}" title="${esc(g.text)}">${st === 'met' ? '✓ ' : st === 'lost' ? '✗ ' : ''}${esc(g.name)} +${f.goal.gold}g</span>`); }
   if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
   if (X.burn > 0) c.push(`<span class="chip burn">Burn ${n0(X.burn)}</span>`);
   if (X.poison > 0) c.push(`<span class="chip poison">Poison ${n0(X.poison)}</span>`);
@@ -967,7 +968,7 @@ function updateFight() {
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
-    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${i.windup ? `<small class="windup">Wind-up: ${i.windup} dmg breaks it</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
+    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${i.windup ? `<small class="windup" title="Deal this much damage this turn to break the wind-up">Break: ${i.windup} dmg</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);

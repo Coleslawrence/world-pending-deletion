@@ -2283,9 +2283,17 @@ function newFight(run, rng) {
   if (A.P.startMisf) B.misfortune += A.P.startMisf; // Black Cat Collar
   if (A.P.firstJinx || run.nextFlags.jinxFirst) B.jinxed = true; // The Crow; feeding the cat
   A.isJinx = A.skills.some(s => s.def.tags && s.def.tags.includes('jinx')) || !!A.P.jinxCheap; // the Jinx button needs a Jinx skill
+  // Side goal (SIDE_GOALS in enemies.js)
+  if (!run.practice && !run.elite && !run.script && B.reflexes && ['monster', 'rival'].includes(spec.kind)) {
+    const ks = Object.keys(SIDE_GOALS).filter(k => SIDE_GOALS[k].can(f, B));
+    if (ks.length) { const k = ks[Math.floor(rnd(f.rng) * ks.length)], g = SIDE_GOALS[k]; f.goal = { key: k, gold: SIDE_GOAL_GOLD[ENEMIES[B.id].tier] || 3 }; say(f, `[Side goal: ${g.text}. +${f.goal.gold} gold if you win.]`, 'skill'); }
+  }
   planIntent(f, B);
   startTurn(f, A, true);
   return f;
+}
+// A side goal's state for the chip: met, lost (can no longer be met) or open
+function goalState(f) { if (!f.goal) return null; const g = SIDE_GOALS[f.goal.key]; return g.lost && g.lost(f) ? 'lost' : g.lost ? 'open' : g.done(f) ? 'met' : 'open';
 }
 function opp(f, X) { return X === f.A ? f.B : f.A; }
 function say(f, text, t) { f.log.push({ text, t: t || 'sys' }); if (f.log.length > 40) f.log.shift(); }
@@ -3259,6 +3267,7 @@ function resolveFight(run, f, meta, rng) {
   if (won) {
     run.wins++;
     res.gold = noWinGold ? 0 : 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 5 : 0); run.gold += res.gold;
+    if (f.goal && SIDE_GOALS[f.goal.key].done(f)) { run.gold += f.goal.gold; res.gold += f.goal.gold; res.goal = f.goal.key; run.goalsMet = (run.goalsMet || 0) + 1; msgs.push({ t: 'favour', text: `[Side goal met: ${SIDE_GOALS[f.goal.key].text}. +${f.goal.gold} gold.]` }); }
     const healF = Math.max(0.05, (run.world.mod === 'famine' ? 0.15 : 0.3) - amendOf(run).healCut);
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
@@ -3643,5 +3652,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, reflexRules, WINDUP, planIntentForTest: planIntent, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, reflexRules, SIDE_GOALS, goalState, WINDUP, planIntentForTest: planIntent, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
