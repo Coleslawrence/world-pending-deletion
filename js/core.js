@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' }, contracts: { week: null, done: {}, weeks: 0 }, grudges: {}, bonds: {}, settled: [], story: { open: {}, since: 0 } }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' }, contracts: { week: null, done: {}, weeks: 0 }, grudges: {}, bonds: {}, settled: [], story: { open: {}, since: 0 }, notes: {}, decor: {}, together: { spared: 0, runs: 0 } }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; n.grudges = sanitizeGrudges(m.grudges); n.bonds = sanitizeBonds(m.bonds); n.settled = sanitizeSettled(m.settled); n.story = sanitizeStory(m.story); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; n.grudges = sanitizeGrudges(m.grudges); n.bonds = sanitizeBonds(m.bonds); n.settled = sanitizeSettled(m.settled); n.story = sanitizeStory(m.story); n.notes = sanitizeNotes(m.notes); n.decor = sanitizeDecor(m.decor); n.together = sanitizeTogether(m.together); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -1251,6 +1251,41 @@ function settleMastery(run, meta, outcome) {
   });
 }
 
+// ---------- Shared milestones (Phase 8; content in milestones.js) ----------
+// meta.together: { spared, runs }, the shared totals last read from the cloud (shared/totals). Milestones reached open a
+// System line, decor or an Archive page for everyone in the group.
+function sanitizeTogether(T) { const n = v => Math.max(0, Math.min(1e9, Math.floor(+v) || 0)); return { spared: n(T && T.spared), runs: n(T && T.runs) }; }
+function sharedReached(meta) { const n = sanitizeTogether(meta && meta.together).spared; return SHARED_MILESTONES.filter(M => n >= M.at); }
+function sharedNext(meta) { const n = sanitizeTogether(meta && meta.together).spared; return SHARED_MILESTONES.find(M => n < M.at) || null; }
+
+// ---------- Entrant Quarters (Phase 8; decor in quarters.js) ----------
+// What the room shows, all from the save: retired rivals' trophies, a crown per Final Champion beaten, a shard per world lost
+// (Erased and Settled champions), and the decor bought (meta.decor: { id: 1 }). Cosmetic only.
+function quartersOf(meta) {
+  const G = meta.grudges || {}, beat = (meta.archive && meta.archive.beat) || {};
+  const trophies = RIVALS.filter(k => G[k] && G[k].retired && GRUDGES[k]).map(k => ({ k, name: GRUDGES[k].trophy, from: ENEMIES[k].name }));
+  const crowns = Object.keys(ENEMIES).filter(k => ENEMIES[k].final && beat[k]).map(k => ({ k, name: `Crown of ${ENEMIES[k].name.replace(/^The /, 'the ')}` }));
+  const seen = {}, shards = (meta.erased || []).concat(meta.settled || []).map(s => s.worldName).filter(w => w && !seen[w] && (seen[w] = 1)).map(w => ({ name: `Shard of ${w}` }));
+  const shared = sharedReached(meta).map(M => M.decor).filter(Boolean), decor = Object.keys(DECOR).filter(k => (meta.decor && meta.decor[k]) || shared.includes(k));
+  return { trophies, crowns, shards, decor };
+}
+function sanitizeDecor(D) { const out = {}; Object.keys(DECOR).forEach(k => { if (D && D[k]) out[k] = 1; }); return out; }
+function buyDecor(meta, k) { if (!DECOR[k] || DECOR[k].shared || (meta.decor && meta.decor[k]) || meta.echoes < DECOR[k].cost) return false; meta.echoes -= DECOR[k].cost; meta.decor = Object.assign(sanitizeDecor(meta.decor), { [k]: 1 }); return true; }
+
+// ---------- Field notes (Phase 8) ----------
+// meta.notes: { enemy id: fights against it }. Each fight (not practice) fills in its Archive notes: 1 fight its HP and
+// rank, 2 its style and Reflexes, 3 its full move list. Knowledge only: nothing about a fight changes.
+const NOTE_LEVELS = 3;
+function noteFoes() { return MONSTERS.concat(RIVALS, Object.keys(ENEMIES).filter(k => ENEMIES[k].final)); }
+function sanitizeNotes(N) { const out = {}; noteFoes().forEach(k => { const v = Math.max(0, Math.min(99, Math.floor(+(N && N[k]) || 0))); if (v) out[k] = v; }); return out; }
+function noteLevel(meta, id) { return Math.min(NOTE_LEVELS, (meta && meta.notes && meta.notes[id]) || 0); }
+function noteFoe(run, meta, spec, msgs) {
+  if (!meta || run.practice || run.script || !spec || spec.snap || !ENEMIES[spec.id] || !noteFoes().includes(spec.id)) return 0;
+  meta.notes = meta.notes || {}; const b = noteLevel(meta, spec.id); meta.notes[spec.id] = Math.min(99, (meta.notes[spec.id] || 0) + 1);
+  const a = noteLevel(meta, spec.id); if (a > b) { (run.notesUp = run.notesUp || []).push({ id: spec.id, level: a }); if (msgs && a === NOTE_LEVELS) msgs.push({ t: 'class', text: `[Field notes complete: ${ENEMIES[spec.id].name}. Full move list filed in the Archive.]` }); }
+  return a;
+}
+
 // ---------- Story drip (Phase 7; pages in story.js) ----------
 // meta.story: { open: { page id: 1 }, since: runs since the last drip page }. Pages open at the end of a run (not practice):
 // milestones when their moment has come, and the next drip page every STORY_EVERY runs and for each new Priority level.
@@ -1261,6 +1296,7 @@ function storyMoment(at, meta, outcome) {
   if (at === 'erased') return (meta.erased || []).length > 0 || outcome === 'erased';
   if (at === 'spared') return (meta.wins || 0) > 0;
   if (at === 'settled') return (meta.settled || []).length > 0;
+  if (at === 'shared') return sharedReached(meta).some(M => M.page && STORY_PAGES[M.page] && STORY_PAGES[M.page].at === 'shared');
   if (at.startsWith('rank:')) return !!meta.rank && rankIdx(meta.rank.letter) >= rankIdx(at.slice(5));
   return false;
 }
@@ -3349,6 +3385,7 @@ function resolveFight(run, f, meta, rng) {
   f.rx.forEach(k => meta.archive.reactions[k] = true);
   if (spec.kind === 'rival') meta.archive.rivals[spec.id] = true;
   if (spec.kind === 'rival' && !spec.snap) noteGrudge(run, meta, spec.id, won, msgs);
+  noteFoe(run, meta, spec, msgs);
   if ((spec.kind === 'rival' || (spec.kind === 'final' && !spec.snap)) && won) meta.archive.beat[spec.id] = true;
   if (spec.kind === 'final') meta.archive.finals[spec.id] = true;
   if (run.path) meta.archive.paths[run.path] = true;
@@ -3783,7 +3820,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, SHARED_MILESTONES, sanitizeTogether, sharedReached, sharedNext, DECOR, quartersOf, sanitizeDecor, buyDecor, NOTE_LEVELS, noteFoes, sanitizeNotes, noteLevel, noteFoe, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

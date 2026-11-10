@@ -1247,3 +1247,10 @@ div.bar u.up { background: repeating-linear-gradient(135deg, rgba(143,211,154,.9
 .sk-fx.fc .fc-tag { display: block; color: var(--sys, #e6ff2e); }
 .intent.fc-broke .in-n { text-decoration: line-through; opacity: .6; }
 .in-t small.fc { color: var(--sys, #e6ff2e); }
+/* Entrant Quarters (Phase 8): the room's tiles, two to a row */
+.quarters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0 10px; }
+.qt { border: 1px solid var(--line2); padding: 8px; min-width: 0; overflow-wrap: anywhere; }
+.qt b { display: block; font-size: 0.9em; }
+.qt small { display: block; opacity: 0.7; }
+.qt.tr { border-color: var(--gold-hi); }
+.qt.cr { border-color: var(--elite); }

@@ -397,7 +397,8 @@ async function postRuns() {
   ui.postingRuns = true;
   // A refused post stays queued (rules not published yet): it goes at a later sync, and the queue keeps the last 20
   for (const r of lsGet(RUNQ_KEY) || []) {
-    try { await cloud.db.doc(`runs/${cloud.uid}_${r.at}`).set(r); lsSet(RUNQ_KEY, (lsGet(RUNQ_KEY) || []).filter(x => x.at !== r.at)); }
+    // Counted towards the Shared milestones in the same write; if that is refused (rules not published yet), posted alone
+    try { const id = `${cloud.uid}_${r.at}`; if (cloud.db.countRun) { try { await cloud.db.countRun(id, r); } catch (e) { if (e && e.code === 'invalid_argument') await cloud.db.doc(`runs/${id}`).set(r); else throw e; } } else await cloud.db.doc(`runs/${id}`).set(r); lsSet(RUNQ_KEY, (lsGet(RUNQ_KEY) || []).filter(x => x.at !== r.at)); }
     catch (e) { console.warn('[cloud] post run stats failed:', e && e.code, e); break; }
   }
   ui.postingRuns = false;
@@ -1582,7 +1583,7 @@ function archiveSheet() {
   const evos = Object.keys(A.evos).map(k => { const [a, b] = k.split('>'); return SKILLS[a] && SKILLS[b] ? `<li>${esc(SKILLS[a].name)} → <b>${esc(SKILLS[b].name)}</b></li>` : ''; }).join('');
   const iss = A.issues || {}, ni = KNOWN_ISSUES.filter(K => iss[issueKey(K)]).length;
   const issues = KNOWN_ISSUES.map(K => iss[issueKey(K)] ? `<li class="glitch"><b>${esc(issueName(K))}</b>: [${esc(K.text)}]</li>` : '<li class="unk">[Issue not yet reproduced.]</li>').join('');
-  return sheetWrap('Tournament Archive', `<div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="mastery">Mastery ›</button><button class="btn ghost small" data-act="sheet" data-s="designs">Designs ›</button></div><button class="btn ghost small" data-act="sheet" data-s="pages">Pages · ${Object.keys(sanitizeStory(meta.story).open).length} of ${Object.keys(STORY_PAGES).length} ›</button>${marksHTML()}${bondsHTML()}<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul><h4>Known Issues · ${ni} of ${KNOWN_ISSUES.length}</h4><ul class="msgs">${issues}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
+  return sheetWrap('Tournament Archive', `<div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="mastery">Mastery ›</button><button class="btn ghost small" data-act="sheet" data-s="designs">Designs ›</button></div><div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="pages">Pages ${Object.keys(sanitizeStory(meta.story).open).length}/${Object.keys(STORY_PAGES).length} ›</button><button class="btn ghost small" data-act="sheet" data-s="notes">Field notes ›</button></div>${marksHTML()}${bondsHTML()}<h4>Rivals</h4><ul class="msgs">${rivals}</ul><h4>Final Champions</h4><ul class="msgs">${finals}</ul><h4>Reactions</h4><ul class="msgs">${rx}</ul><h4>Paths recognised</h4><ul class="msgs">${paths || '<li class="unk">None yet. Equip 4 pieces of one archetype.</li>'}</ul><h4>Evolutions</h4><ul class="msgs">${evos || '<li class="unk">None yet. Merge a skill to ★3.</li>'}</ul><h4>Titles</h4><ul class="msgs">${titles}</ul><h4>Hidden Paths · ${fh} of ${nh}</h4><ul class="msgs">${hidden || '<li class="unk">None found. Reach 4 pieces in two archetypes at once.</li>'}</ul><h4>Hidden quests</h4><ul class="msgs">${quests}</ul><h4>Known Issues · ${ni} of ${KNOWN_ISSUES.length}</h4><ul class="msgs">${issues}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Entrant Rank in the Halls: grade, RP to the next trial, perks and one line per promotion
 function rankHTML() {
@@ -1593,10 +1594,24 @@ function rankHTML() {
   return `<h4>Entrant Rank: ${R.letter}</h4><p class="sh-p sysl">${esc(rankAddress(meta, champ, meta.runs))}</p><p class="sh-p fine">${R.rp} Rank Points. ${next}</p>${perks}
     <ul class="rank-hist"><li>[Entrant registered. F-rank.]</li>${R.history.map(h => `<li>${esc(historyLine(h))}</li>`).join('')}</ul>`;
 }
+// Entrant Quarters (Phase 8): the room between runs, its trophies, crowns and shards, and decor bought with Echoes
+// Shared milestones (Phase 8): the group's total in the Halls, with every line reached and the next one
+function togetherHTML() {
+  if (!FIREBASE) return '';
+  const T = sanitizeTogether(meta.together), got = sharedReached(meta), N = sharedNext(meta);
+  const bar = N ? `<div class="pg-row"><span class="pg-l">Spared</span><span class="pg-bar" role="progressbar" aria-label="Worlds spared by everyone" aria-valuemin="0" aria-valuemax="${N.at}" aria-valuenow="${T.spared}"><i style="width:${Math.round(100 * T.spared / N.at)}%"></i></span><span class="pg-g">${T.spared}/${N.at}</span></div>` : '';
+  return `<h4>Shared milestones</h4><p class="sh-p fine">Worlds spared by everyone who plays with you: <b>${T.spared}</b>${T.runs ? ` in ${T.runs} runs` : ''}. ${cloud.on ? 'Every run you finish signed in adds to it.' : 'Sign in to add your runs and see the latest count.'}</p>${bar}${got.length ? `<ul class="msgs">${got.map(M => `<li>${esc(M.line)}${M.decor ? ` <small>Opened for everyone: ${esc(DECOR[M.decor].name)} in Entrant Quarters.</small>` : M.page ? ` <small>Opened for everyone: an Archive page.</small>` : ''}</li>`).join('')}</ul>` : ''}${N ? `<p class="sh-p fine">Next, at ${N.at}: ${N.decor ? 'decor for everyone\'s Quarters' : N.page ? 'an Archive page' : 'a new System line'}.</p>` : ''}`;
+}
+function quartersSheet() {
+  const Q = quartersOf(meta), tile = (name, sub, cls) => `<div class="qt ${cls || ''}"><b>${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</div>`;
+  const wall = (title, list, empty) => `<h4>${title} · ${list.length}</h4>${list.length ? `<div class="quarters">${list.join('')}</div>` : `<p class="sh-p fine">${empty}</p>`}`;
+  const shop = Object.keys(DECOR).filter(k => !Q.decor.includes(k) && !DECOR[k].shared).map(k => `<div class="choice static"><div class="sr-h"><span class="sr-name">${esc(DECOR[k].name)}</span></div><div class="sr-desc">${flavHTML(DECOR[k].flavour)}</div><button class="btn small" data-act="buy-decor" data-k="${k}" ${meta.echoes < DECOR[k].cost ? 'disabled' : ''}>Buy · ${DECOR[k].cost} Echoes</button></div>`).join('');
+  return sheetWrap('Entrant Quarters', `<p class="sh-p">[Accommodation for Entrants between tournaments. Furnishings at your own expense.] You have <b>${meta.echoes}</b> Echoes.</p>${wall('Decor', Q.decor.map(k => tile(DECOR[k].name, '', 'dc')), 'Bare walls. Echoes buy decor below.')}${wall('Trophies', Q.trophies.map(t => tile(t.name, t.from, 'tr')), 'Retire a rival by beating them three times.')}${wall('Crowns', Q.crowns.map(c => tile(c.name, '', 'cr')), 'Beat a Final Champion.')}${wall('Shards', Q.shards.map(x => tile(x.name, '', 'sh')), 'One for each world you lose.')}${shop ? `<h4>Decor for sale</h4>${shop}` : ''}<p class="sh-p fine">Nothing here changes a fight.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
 function hallsSheet() {
   const row = (s, erased) => runCard(s, { erased }) + (canShare() ? (meta.shared && meta.shared[s.at] ? '<p class="sh-p fine">Shared with other entrants.</p>' : `<button class="btn small ghost" data-act="share-hall" data-k="${erased ? 'erased' : 'spared'}" data-at="${s.at}">Share with other entrants</button>`) : '');
   const others = cloud.shared.length ? `<h4>Other entrants' champions</h4><p class="sh-p fine">Shared by people who play this game with you. They can appear in your tournaments.</p><div class="cards">${cloud.shared.map(x => `<p class="sh-p fine">${x.kind === 'spared' ? 'Champion of' : 'Erased in'} ${esc(ownerName(x.snap.owner))}'s tournament</p>` + runCard(x.snap, { erased: x.kind === 'erased' })).join('')}</div>` : (cloud.on ? '<h4>Other entrants\' champions</h4><p class="sh-p fine">None shared yet. When people you share this game with share their champions, they appear here and in your brackets.</p>' : '');
-  return sheetWrap('The Halls', `${rankHTML()}${cloud.on && cloud.tester === false ? `<p class="sh-p fine">${PENDING} Sharing champions opens once you are approved.</p>` : ''}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div>${(meta.settled || []).length ? `<h4>Hall of the Settled · ${meta.settled.length}</h4><p class="sh-p fine">Erased champions you beat and settled. They do not return.</p><ul class="msgs">${meta.settled.map(x => `<li><b>${esc(x.champ)}</b><br><small>${esc(x.line)}</small></li>`).join('')}</ul>` : ''}<h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
+  return sheetWrap('The Halls', `<button class="btn ghost small" data-act="sheet" data-s="quarters">Entrant Quarters ›</button>${rankHTML()}${cloud.on && cloud.tester === false ? `<p class="sh-p fine">${PENDING} Sharing champions opens once you are approved.</p>` : ''}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div>${(meta.settled || []).length ? `<h4>Hall of the Settled · ${meta.settled.length}</h4><p class="sh-p fine">Erased champions you beat and settled. They do not return.</p><ul class="msgs">${meta.settled.map(x => `<li><b>${esc(x.champ)}</b><br><small>${esc(x.line)}</small></li>`).join('')}</ul>` : ''}${togetherHTML()}<h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Steer the next world: one requested world joins the offer (asking again replaces it). Only shown when you can pay.
 // Below the world offer: Back yourself and Steer, side by side when both are open
@@ -1702,6 +1717,20 @@ function pagesSheet() {
   const rest = sealed.length ? `<h4>Sealed · ${sealed.length}</h4><ul class="msgs">${sealed.map(k => `<li class="unk"><b>[Sealed page]</b>: ${esc(STORY_PAGES[k].opens)}</li>`).join('')}</ul>` : '';
   return sheetWrap('[Archive pages]', `<p class="sh-p">[Pages the System has let slip. It would prefer you did not collect them.] You have <b>${meta.echoes}</b> Echoes. ${drips.filter(k => S.open[k]).length} of ${drips.length} pages in order, ${Object.keys(STORY_PAGES).filter(k => STORY_PAGES[k].at && S.open[k]).length} sealed pages opened.</p>${opened}${buy}${rest}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
+// Field notes (Phase 8): what each fight has taught you about an opponent, filled in over three fights
+function notesSheet() {
+  const all = noteFoes(), done = all.filter(k => noteLevel(meta, k) >= NOTE_LEVELS).length;
+  const one = k => {
+    const L = noteLevel(meta, k), t = ENEMIES[k];
+    if (!L) return `<li class="unk">[No notes]</li>`;
+    const moves = L >= 3 ? `<br><small>${t.skills.map(x => `<b>${esc(x.n)}</b>: ${esc(describe({ fx: x.fx }))}`).join(' · ')}</small>` : '';
+    const style = L >= 2 ? `<br><small>${esc(t.style)}.${reflexRules(k).map((x, i) => ` Reflex: ${esc(reflexText(k, i))}`).join('')}</small>` : '';
+    return `<li><b>${esc(t.name)}</b> <small>${t.rank ? t.rank + '-rank · ' : ''}${t.hp} HP${L < NOTE_LEVELS ? ` · ${L} of ${NOTE_LEVELS} fights noted` : ''}</small>${style}${moves}</li>`;
+  };
+  const group = (name, ids) => `<h4>${name}</h4><ul class="msgs">${ids.map(one).join('')}</ul>`;
+  return sheetWrap('[Field notes]', `<p class="sh-p">[Opponent files, completed by observation.] Each fight fills in more: first HP, then style and Reflexes, then every move. ${done} of ${all.length} complete.</p>${group('Monsters', MONSTERS)}${group('Rivals', RIVALS)}${group('Final Champions', all.filter(k => ENEMIES[k].final))}<p class="sh-p fine">HP shown is before the round and world make them stronger.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function noteLines() { const L = ((run && run.notesUp) || []).filter(x => x.level >= NOTE_LEVELS); return L.length ? `<p class="pg-next good">[Field notes complete: ${L.map(x => esc(ENEMIES[x.id].name)).join(', ')}.]</p>` : ''; }
 function pageLines() { return ((run && run.pagesOpened) || []).map(k => `<p class="pg-next good">[New page in the Archive: ${esc(STORY_PAGES[k].title)}.]</p>`).join(''); }
 function retiredLines() { return ((run && run.retired) || []).map(id => `<p class="pg-next good">[Rival retired: ${esc(ENEMIES[id].name)}. Trophy filed in the Archive.]</p>`).join(''); }
 function goalEchoes() { return run ? (run.goal && run.goal.paid || 0) + (run.contractsDone || []).reduce((a, x) => a + x.pay, 0) : 0; }
@@ -1809,7 +1838,7 @@ function progressHTML(e, s) {
   const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.backing && run.backing.paid || 0) + (run && run.ladder && e.totalEchoes != null ? run.ladder.echoes : 0) + goalEchoes(), titles });
   const unit = { rank: ' RP', echoes: '', titles: '' };
   const rows = masteryRowsFirst(P.bars.map(b => `<div class="pg-row pg-${b.k}" title="${esc(b.text)}"><span class="pg-l">${esc(b.label)}</span><span class="pg-bar" role="progressbar" aria-label="${esc(b.label + ': ' + b.text)}" aria-valuemin="0" aria-valuemax="${b.max}" aria-valuenow="${b.now}"><i style="width:${Math.round(100 * Math.min(1, b.now / (b.max || 1)))}%"></i></span><span class="pg-g">${b.gain ? `+${b.gain}${unit[b.k]}` : ''}</span></div>`).join(''));
-  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${goalLines()}${retiredLines()}${bondLines()}${pageLines()}${designLines()}${clauseLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
+  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${goalLines()}${retiredLines()}${bondLines()}${pageLines()}${noteLines()}${designLines()}${clauseLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
 }
 function backLine() {
   const B = run && run.backing && run.backing.settled && BACK_GOALS[run.backing.goal] ? run.backing : null; if (!B) return '';
@@ -1873,7 +1902,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, pages: pagesSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, pages: pagesSheet, notes: notesSheet, quarters: quartersSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1970,6 +1999,7 @@ function onAct(el) {
     case 'fb-type': ui.fb.type = d.k; return render();
     case 'fb-send': return sendReport();
     case 'set-clause': setClause(meta, d.k); saveMeta(); ui.sheet = null; return render();
+    case 'buy-decor': { if (buyDecor(meta, d.k)) { saveMeta(); toast(`[Furnishing delivered: ${DECOR[d.k].name}. Invoice filed.]`, 'class'); } return render(); }
     case 'buy-page': { const k = buyPage(meta); if (k) { saveMeta(); toast(`[Page released early: ${STORY_PAGES[k].title}. The System has noted your curiosity.]`, 'class'); } return render(); }
     case 'settle-erased': { const r = ui.result, e = r && r.settle && settleErased(meta, r.settle); if (e) { r.settled = e; saveMeta(); } return render(); }
     case 'set-goal': setGoal(meta, d.k || null); saveMeta(); ui.sheet = null; return render();
@@ -2281,6 +2311,7 @@ async function cloudInit() {
     await checkTester();
     await syncPublicName();
     await loadShared();
+    await loadTotals();
     await checkRests();
     postDaily();
     postRuns();
@@ -2422,6 +2453,17 @@ async function ensureChampionKey() {
   const ref = cloud.db.doc('champions/' + cloud.uid), cur = await ref.get();
   if (cur.exists && typeof cur.data().r !== 'number') await ref.set({ list: cur.data().list || [], r: Math.random() });
   meta.champKey = cloud.uid; saveMeta();
+}
+// Shared milestones (Phase 8): the totals every tester adds to, kept in meta.together so they show offline too
+async function loadTotals() {
+  if (!cloud.on) return;
+  try {
+    const d = await cloud.db.doc('shared/totals').get(); if (!d.exists) return;
+    const x = d.data() || {}, before = sharedReached(meta).length;
+    meta.together = { spared: Math.max(0, Math.floor(+x.spared) || 0), runs: Math.max(0, Math.floor(+x.runs) || 0) };
+    const now = sharedReached(meta); saveMeta();
+    if (now.length > before) { toast(now[now.length - 1].line, 'class'); render(); }
+  } catch (e) { console.warn('[cloud] load shared totals failed:', e && e.code, e); }
 }
 async function loadShared() {
   if (!cloud.on) return;

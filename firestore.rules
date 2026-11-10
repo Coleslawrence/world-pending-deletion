@@ -144,6 +144,22 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['day', 'at', 'outcome', 'world', 'round', 'wins', 'hearts'])
         && runFields(request.resource.data);
     }
+    // Shared milestones (Phase 8): one totals document every tester adds to. A run summary and its count go up together in
+    // one batch: runs +1, spared +1 only for a spared run, last = that summary's id, which must be created in the same
+    // batch. So each run counts once, and nobody can count a run they did not post. Signed-in players read the totals.
+    match /shared/{docId} {
+      allow get: if request.auth != null && docId == 'totals';
+      allow create, update: if isTester() && docId == 'totals'
+        && request.resource.data.keys().hasOnly(['runs', 'spared', 'last'])
+        && request.resource.data.runs == sharedPrior('runs') + 1
+        && request.resource.data.last is string
+        && request.resource.data.last.matches(request.auth.uid + '_[0-9]+')
+        && !exists(/databases/$(database)/documents/runs/$(request.resource.data.last))
+        && existsAfter(/databases/$(database)/documents/runs/$(request.resource.data.last))
+        && request.resource.data.spared == sharedPrior('spared')
+          + (getAfter(/databases/$(database)/documents/runs/$(request.resource.data.last)).data.outcome == 'spared' ? 1 : 0);
+    }
+    function sharedPrior(k) { return resource == null ? 0 : resource.data[k]; }
     // Bug reports and feedback from the in-game Report form: any signed-in player, approved or not, files their own
     // (feedback/{uid}_{time}). Never a name or account detail. Nobody reads them in game, only the console and exports.
     match /feedback/{reportId} {

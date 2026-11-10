@@ -89,6 +89,8 @@ jobs:
         run: node tools/settle-test.js
       - name: Story drip test
         run: node tools/story-test.js
+      - name: Collection test
+        run: node tools/collection-test.js
 
   balance:
     name: Balance gate

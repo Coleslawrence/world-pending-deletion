@@ -10,7 +10,7 @@ function newRun(meta, setup, seed) {
   const rng = G.seedRng(seed || 's'), w = G.offerWorlds(meta, rng)[0];
   return G.newRun(w, Object.assign({ name: 'T', stats: { STR: 3, AGI: 3, INT: 3, VIT: 3, LUK: 3 }, gifts: [], patron: 'war', startPts: 4, rollSeed: 'r' }, setup), meta, rng);
 }
-Object.entries(G.STORY_PAGES).forEach(([k, P]) => { ok(P.title && P.text && P.by, `${k} has a title, text and author`); if (P.at) ok(P.opens && /^(erased|spared|settled|rank:[A-Z]+)$/.test(P.at), `${k} has a moment and says what opens it`); });
+Object.entries(G.STORY_PAGES).forEach(([k, P]) => { ok(P.title && P.text && P.by, `${k} has a title, text and author`); if (P.at) ok(P.opens && /^(erased|spared|settled|shared|rank:[A-Z]+)$/.test(P.at), `${k} has a moment and says what opens it`); });
 ok(G.storyDrips().length >= 8, 'at least eight drip pages');
 // --- milestones
 { const m = G.newMeta(), r = newRun(m, {}, 'a'); G.endRun(r, m, 'erased');

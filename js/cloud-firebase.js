@@ -34,6 +34,16 @@
   };
   const db = {
     doc: wrapDoc,
+    // Shared milestones (Phase 8): a run summary and the shared totals' count go up together, in one batch
+    countRun: async (id, d) => {
+      if (window.WPD_PREVIEW) return;
+      try {
+        const b = api.writeBatch(api.fs);
+        b.set(api.doc(api.fs, 'runs/' + id), d);
+        b.set(api.doc(api.fs, 'shared/totals'), { runs: api.increment(1), spared: api.increment(d.outcome === 'spared' ? 1 : 0), last: id }, { merge: true });
+        await b.commit();
+      } catch (e) { throw mapErr(e); }
+    },
     collection: path => ({
       get: async () => { try { return wrapDocs(await api.getDocs(api.collection(api.fs, path))); } catch (e) { throw mapErr(e); } },
       // q: { where: [field, op, value], orderBy: field or [field, 'desc'], limit: n }
@@ -74,7 +84,7 @@
       const app = A.initializeApp(cfg);
       const auth = Au.getAuth(app);
       const fs = F.getFirestore(app);
-      api = { auth, fs, doc: F.doc, getDoc: F.getDoc, setDoc: F.setDoc, collection: F.collection, getDocs: F.getDocs, query: F.query, where: F.where, orderBy: F.orderBy, limit: F.limit, getCountFromServer: F.getCountFromServer, GoogleAuthProvider: Au.GoogleAuthProvider, GithubAuthProvider: Au.GithubAuthProvider, signInWithPopup: Au.signInWithPopup, signInWithRedirect: Au.signInWithRedirect, signOut: Au.signOut };
+      api = { auth, fs, writeBatch: F.writeBatch, increment: F.increment, doc: F.doc, getDoc: F.getDoc, setDoc: F.setDoc, collection: F.collection, getDocs: F.getDocs, query: F.query, where: F.where, orderBy: F.orderBy, limit: F.limit, getCountFromServer: F.getCountFromServer, GoogleAuthProvider: Au.GoogleAuthProvider, GithubAuthProvider: Au.GithubAuthProvider, signInWithPopup: Au.signInWithPopup, signInWithRedirect: Au.signInWithRedirect, signOut: Au.signOut };
       Au.getRedirectResult(auth).catch(() => { });
       Au.onAuthStateChanged(auth, u => { me = u; C.ready = true; window.dispatchEvent(new CustomEvent('wpd-auth', { detail: { signedIn: !!u } })); });
     } catch (e) {
