@@ -28,6 +28,12 @@ function choosePlayer(f) {
     if (fx.doom || fx.leech) sc += ((fx.doom || 0) * 0.6 + (fx.leech || 0) * 3) * p;
     if (fx.riposte && (intent.kind === 'attack' || intent.kind === 'big')) sc += 10;
     if (fx.thorns) sc += fx.thorns * p * 0.6;
+    // Mastery pieces (Phase 5)
+    if (fx.fester) sc += B.poison * fx.fester; if (fx.flash) sc += Math.min(B.burn, fx.flash) * 1.6; if (fx.fuse) sc += fx.fuse * 3.2;
+    if (fx.deepen && B.bleed > 0) sc += (fx.bleed || 0) * 1.5; if (fx.thornsFight) sc += fx.thornsFight * 4; if (fx.hold && (intent.kind === 'attack' || intent.kind === 'big')) sc += 3;
+    if (fx.fullBlock && A.hp >= A.maxHp && (intent.kind === 'attack' || intent.kind === 'big')) sc += fx.fullBlock * p; if (fx.reapHeal && low && B.hp < B.maxHp / 2) sc += fx.reapHeal * p;
+    if (fx.doomExec && B.hp < B.maxHp * 0.45) sc += 6; if (fx.bigStop) sc += intent.kind === 'big' ? 25 : 5; if (fx.again) sc += f.lastPlayerSkill ? 15 * p * fx.again : 0;
+    if (fx.curseSelf) sc -= 1; if (fx.tapOut) sc -= 3; if (fx.ride || fx.dmgHigh) sc += 0;
     if (fx.regen) sc += fx.regen * p * 2;
     if (fx.mark || fx.focus || fx.haste || fx.siphon) sc += 12;
     // Dice skills arrive resolved for this turn's roll (fx.dmgPip, fx.blockPip, fx.healPip, fx.dbl, fx.snake, fx.boxcars,

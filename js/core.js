@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks() }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {} }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -513,6 +513,7 @@ function newRun(world, setup, meta, rng) {
     if (meta.rank.trial) run.trial = { to: meta.rank.trial, round: TRIAL_ROUND[meta.rank.trial], done: false };
   }
   ladderStart(run);
+  masteryStart(run, meta, !!setup.seed);
   run.draft = rollDraft(run, stream(run, 'draft', rng));
   run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
@@ -592,7 +593,7 @@ function oddsFor(run) { const l = run.level + (hasGift(run, 'lucky') ? 1 : 0) + 
 function poolIds(run) {
   const maxed = new Set(allPieces(run).filter(p => p.star >= 3).map(p => baseId(p.id)));
   const ids = SHOP_SKILLS.concat(Object.keys(GEAR).filter(k => !GEAR[k].glitch));
-  return ids.filter(id => pieceDef(id).tags.some(t => run.arch.includes(t)) && !maxed.has(id));
+  return ids.filter(id => pieceDef(id).tags.some(t => run.arch.includes(t)) && !maxed.has(id) && masteryOpen(run, id));
 }
 function rollPiece(run, rng, opts = {}) {
   let pool = poolIds(run);
@@ -1176,6 +1177,67 @@ function startEndless(run, meta, rng) {
 // Each round says what is known about it by the tournament's own rules: fights already fought, the opponents on the
 // card now, and what is scheduled ahead (a Gatekeeper, a rules review, a crisis, a Rank Trial...). It draws nothing,
 // so it never shifts a seeded run. Unlisted doors are on no map, this one included.
+// ---------- Archetype Mastery (Phase 5; content in mastery.js) ----------
+// meta.mastery: { archetype: total XP }. A run carries the levels it began with (run.mastery), or 'all' in Pending World,
+// so what a run can find never changes mid-run and the daily pool is the same for everyone.
+const MASTERY_MAX = MASTERY_XP.length;
+function masteryLevel(xp) { let n = 0; while (n < MASTERY_MAX && (xp || 0) >= MASTERY_XP[n]) n++; return n; }
+function sanitizeMastery(m) { const o = {}; ARCH_KEYS.forEach(k => { const v = Math.floor(Number(m && m[k]) || 0); if (v > 0) o[k] = Math.min(v, 99999); }); return o; }
+function masteryOf(meta, k) {
+  const xp = (meta && meta.mastery && meta.mastery[k]) || 0, level = masteryLevel(xp), lo = level ? MASTERY_XP[level - 1] : 0, hi = level < MASTERY_MAX ? MASTERY_XP[level] : null;
+  return { k, xp, level, lo, hi, need: hi == null ? 0 : hi - xp };
+}
+// The Mastery pieces of an archetype, lowest level first
+function masteryPieces(k) {
+  return SHOP_SKILLS.filter(id => SKILLS[id].mastery && SKILLS[id].tags[0] === k).concat(Object.keys(GEAR).filter(id => GEAR[id].mastery && GEAR[id].tags[0] === k)).sort((a, b) => pieceDef(a).mastery - pieceDef(b).mastery);
+}
+function masteryPiece(k, level) { return masteryPieces(k).find(id => pieceDef(id).mastery === level) || null; }
+function masteryLevels(meta) { const o = {}; ARCH_KEYS.forEach(k => { const l = masteryOf(meta, k).level; if (l) o[k] = l; }); return o; }
+// Can this run find this piece: anything that isn't a Mastery piece, and Mastery pieces the run began with
+function masteryOpen(run, id) { const d = pieceDef(id), m = d && d.mastery; if (!m) return true; const M = run && run.mastery; return M === 'all' || !!(M && M[d.tags[0]] >= m); }
+function masteryStart(run, meta, seeded) {
+  if (run.practice) return;
+  run.mastery = seeded ? 'all' : masteryLevels(meta);
+  if (seeded) return;
+  if ((run.mastery[run.arch[0]] || 0) >= 5) run.rerolls += 1;
+}
+function masteryKit(run) { return run.mastery && run.mastery !== 'all' && (run.mastery[run.arch[0]] || 0) >= 9 ? 3 : 2; }
+// What a level gives, in the words players read
+function masteryReward(k, level) {
+  const L = MASTERY_LEVELS[level - 1]; if (!L) return '';
+  if (L.kind === 'piece') { const id = masteryPiece(k, level); return id ? `${pieceDef(id).name} joins the ${ARCH[k].name} pool.` : 'A new piece joins the pool.'; }
+  return L.kind === 'title' ? `Gold crest frame, and the name Master ${ARCH[k].path}.` : L.text;
+}
+function masteryFrame(level) { let f = null; MASTERY_LEVELS.slice(0, level).forEach(L => { if (L.frame) f = L.frame; }); return f; }
+// The System's title-screen line: the archetype mastered furthest, from level 3
+function masteryLine(meta) { const top = ARCH_KEYS.map(k => masteryOf(meta, k)).filter(m => m.level >= 3).sort((a, b) => b.xp - a.xp)[0]; return top ? MASTERY_LINES[top.k] : null; }
+// The XP a finished run pays, and how it is shared: by the pieces on the bar and in the gear slots, a piece with two
+// archetypes counting for both. Largest shares are rounded up first, so the parts always add up to the total.
+function masteryXp(run, outcome) {
+  if (run.practice) return 0;
+  const spared = outcome === 'spared' || outcome === 'elite';
+  return MASTERY_PAY.win * (run.wins || 0) + (spared ? MASTERY_PAY.spared + MASTERY_PAY.priority * (run.priority || 0) : 0) + MASTERY_PAY.elite * (run.eliteWins || 0);
+}
+function masteryShares(run, total) {
+  const c = {}; run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean)).forEach(p => { const d = pieceDef(baseId(p.id)) || pieceDef(p.id); (d && d.tags || []).forEach(t => { if (ARCH[t]) c[t] = (c[t] || 0) + 1; }); });
+  if (!Object.keys(c).length) c[run.arch[0]] = 1;
+  const sum = Object.values(c).reduce((a, b) => a + b, 0), keys = Object.keys(c).sort((a, b) => c[b] - c[a] || ARCH_KEYS.indexOf(a) - ARCH_KEYS.indexOf(b));
+  const out = {}; let left = total;
+  keys.forEach(k => { out[k] = Math.floor(total * c[k] / sum); left -= out[k]; });
+  keys.slice().sort((a, b) => (total * c[b] / sum) % 1 - (total * c[a] / sum) % 1).forEach(k => { if (left > 0) { out[k]++; left--; } });
+  return out;
+}
+// Settle a run's Mastery: adds the XP and returns, for each archetype paid, what moved and what opened
+function settleMastery(run, meta, outcome) {
+  const total = masteryXp(run, outcome); if (!total) return [];
+  meta.mastery = sanitizeMastery(meta.mastery);
+  return Object.entries(masteryShares(run, total)).filter(([, v]) => v > 0).map(([k, gain]) => {
+    const before = masteryOf(meta, k); meta.mastery[k] = before.xp + gain; const after = masteryOf(meta, k), opened = [];
+    for (let l = before.level + 1; l <= after.level; l++) opened.push({ level: l, text: masteryReward(k, l), piece: MASTERY_LEVELS[l - 1].kind === 'piece' ? masteryPiece(k, l) : null });
+    return { k, gain, from: before.level, level: after.level, xp: after.xp, lo: after.lo, hi: after.hi, need: after.need, opened };
+  });
+}
+
 const BRACKET_FIELD = [256, 128, 64, 32, 16, 8, 4, 2];
 const BRACKET_STAGES = { qualifier: 'Qualifier', main: 'Main bracket', final: 'Final' };
 function bracketStage(r) { return r >= ROUNDS ? 'final' : r <= 3 ? 'qualifier' : 'main'; }
@@ -1676,7 +1738,7 @@ function applyGift(run, k, msgs) {
 // Stage machine: draft -> (choose -> shop -> district -> fight)*
 function rollDraft(run, rng) {
   if (run.script && run.script.draft) return run.script.draft.slice();
-  const pool = SHOP_SKILLS.filter(id => SKILLS[id].tags.some(t => run.arch.includes(t)) && ['E', 'D'].includes(SKILLS[id].rank));
+  const pool = SHOP_SKILLS.filter(id => SKILLS[id].tags.some(t => run.arch.includes(t)) && ['E', 'D'].includes(SKILLS[id].rank) && masteryOpen(run, id));
   const out = []; let g = 0;
   // at least one from the home archetype
   const home = pool.filter(id => SKILLS[id].tags.includes(run.arch[0]));
@@ -1689,14 +1751,16 @@ function rollDraft(run, rng) {
 function rollGearDraft(run, rng) {
   if (run.script && !run.script.gearDraft) return [];
   if (run.script) return run.script.gearDraft.slice();
-  const ok = id => { const g = GEAR[id]; return g.rank === 'E' && !g.glitch && !g.experimental && !g.consumable && g.tags.some(t => run.arch.includes(t)); };
+  const ok = id => { const g = GEAR[id]; return g.rank === 'E' && !g.glitch && !g.experimental && !g.consumable && g.tags.some(t => run.arch.includes(t)) && masteryOpen(run, id); };
   const pool = Object.keys(GEAR).filter(ok), home = pool.filter(id => GEAR[id].tags.includes(run.arch[0]));
   const out = []; if (home.length) out.push(pick(home, rng));
   const rest = shuffle(pool.filter(id => !out.includes(id)), rng);
   // a different slot from the first when one is on offer, so the pick is weapon or armour, not two weapons
   const other = rest.find(id => !out.length || GEAR[id].slot !== GEAR[out[0]].slot) || rest[0];
   if (other) out.push(other);
-  return out.slice(0, 2);
+  // Mastery level 9 of the home archetype: a third piece on offer
+  if (masteryKit(run) > 2) { const third = rest.find(id => !out.includes(id)); if (third) out.push(third); }
+  return out.slice(0, masteryKit(run));
 }
 // The opening stat points, after the draft: place them one at a time, or roll ROLL_PTS once (seeded per Awakening, so
 // it can't be fished for). Nothing counts until placeStartStats.
@@ -1786,6 +1850,7 @@ function fighterSkills(barPieces, s, P) {
     if (!p || !SKILLS[p.id]) return;
     const def = moddedDef(p.id, p.mods);
     if (P.extraHit && (def.fx.hits || 1) >= 2) def.fx.hits = def.fx.hits + 1;
+    if (P.twinHit && (def.fx.hits || 1) >= 2) { def.fx.hits += 1; def.fx.dmg = Math.max(1, (def.fx.dmg || 0) - 1); } // Twin Fangs
     if (def.quick && P.quickCd) def.cd = Math.max(1, def.cd - P.quickCd);
     const fin = STAT_FACES.INT.finesse; // INT's Finesse: long cooldowns shorten
     if (!def.quick && def.cd >= fin.cdFrom) def.cd = Math.max(fin.cdMin, def.cd - Math.floor((s.INT || 0) / fin.cdEvery));
@@ -1804,7 +1869,7 @@ function buildPlayer(run) {
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
     crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
     breath: hasGift(run, 'breath') && !run.usedBreath, weaken: (P.sluggish ? 1 : 0) + (run.nextFlags.weaken || 0), empower: run.nextFlags.empower || 0, lastWords: P.lastWords || 0, str: s.STR,
-    res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT,
+    res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT, won: run.wins || 0,
   });
 }
 function lateRamp(run) { return run.elite ? 1 : 1 + TUNE.late * Math.max(0, run.round - 4); }
@@ -2048,6 +2113,8 @@ function newFight(run, rng) {
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
+    if (P.startBurn) (X === A ? B : A).burn += P.startBurn; // Soot Wraps
+    X.curseWard = P.curseWard || 0; // Salt Pouch
     X.rerolls = P.rerolls || 0; X.firstSix = !!P.firstSix; X.sleeve = !!P.sleeveFix; X.jackpots = 0;
     X.curse = Math.min(CURSE_MAX, P.startCurse || 0); X.misfortune = 0; X.omens = [];
     X.quickFree = P.quickFree || 0; X.firstFree = !!P.firstFree; X.firstStun = !!P.firstStun; X.firstHit = P.firstHit || 0;
@@ -2089,6 +2156,7 @@ function dmgMult(f, X, Y) {
     if (P.burnExec && Y.burn > 0 && half(Y)) m *= 1 + P.burnExec;
   }
   if (P.blockDmgPct) m *= 1 + Math.min(0.4, X.block / 200);
+  if (P.winDmg) m *= 1 + Math.min(0.12, P.winDmg * (X.won || 0)); // Tally Bone
   if (P.countdown) m *= 0.8; // Countdown Collar (experimental)
   return m;
 }
@@ -2118,11 +2186,13 @@ function hit(f, X, Y, raw, o = {}) {
   if (Y.isPlayer) { f.tally.blocked += absorbed; f.tally.taken += rest; if (o.src) f.tally.hurtBy[o.src] = (f.tally.hurtBy[o.src] || 0) + rest; }
   if (X.isPlayer) { f.tally.bigHit = Math.max(f.tally.bigHit, d); if (o.src) f.dealt[o.src] = (f.dealt[o.src] || 0) + rest; if (Y.hp <= 0) f.tally.overkill = Math.max(f.tally.overkill, -Y.hp); }
   if (Y.lastWords && Y.hp > 0 && Y.hp < Y.maxHp * 0.25 && !Y.lwUsed) { Y.lwUsed = true; const b = Math.round(Y.maxHp * Y.lastWords); Y.block += b; say(f, `[Last Words: +${b} Block.]`, 'class'); }
+  if (Y.P.relic && !Y.relicUsed && Y.hp > 0 && Y.hp < Y.maxHp * 0.3) { Y.relicUsed = true; say(f, '[Reliquary: opened.]', 'class'); heal(f, Y, Y.maxHp * Y.P.relic); }
+  if (Y.P.struckPoison && rest > 0 && !o.isThorns && X.hp > 0) addStatus(f, Y, X, 'poison', Y.P.struckPoison); // Adder Hide
   if (Y.P.blockStun && absorbed > 0 && !o.isThorns && X.hp > 0 && X.stunT !== f.turn && rnd(f.rng) < Y.P.blockStun) { X.stunT = f.turn; say(f, '[Thunder Wall: Stun!]', 'skill'); stunTarget(f, Y, X); }
   if (!o.isThorns && rest > 0) addBreak(f, X, Y, rest * (o.heavy ? BREAK.heavy : 1));
   ev(f, { k: 'hit', side: Y.side, amt: rest, blocked: absorbed, crit, tag: o.tag });
   if (!o.isThorns && X.hp > 0) {
-    const th = ((Y.thorns || 0) + (Y.P.thornsAlways ? Y.P.thornsAlways * (half(Y) ? 2 : 1) : 0)) * (Y.P.thornMult || 1);
+    const th = ((Y.thorns || 0) + (Y.spikes || 0) + (Y.P.thornsAlways ? Y.P.thornsAlways * (half(Y) ? 2 : 1) : 0)) * (Y.P.thornMult || 1);
     if (th > 0) { if (Y.P.thornBurn) addStatus(f, Y, X, 'burn', Y.P.thornBurn); if (Y.P.thornPoison) addStatus(f, Y, X, 'poison', Y.P.thornPoison); }
     if (th > 0) { const t = Math.round(th); X.hp -= t; ev(f, { k: 'hit', side: X.side, amt: t, blocked: 0, thorns: true }); if (Y.isPlayer) f.dealt['Thorns'] = (f.dealt['Thorns'] || 0) + t; }
     if (Y.riposte > 0 && absorbed > 0) { const t = Math.round(absorbed * Y.riposte * (Y.P.thornMult || 1)); X.hp -= t; ev(f, { k: 'hit', side: X.side, amt: t, blocked: 0, thorns: true }); if (Y.isPlayer) f.dealt['Riposte'] = (f.dealt['Riposte'] || 0) + t; }
@@ -2188,8 +2258,8 @@ function react(f, X, Y, kind) {
 function applyStatus(f, X, Y, fx, p) {
   if (fx.burn) addStatus(f, X, Y, 'burn', Math.round(fx.burn * p));
   if (fx.poison) { const had = Y.poison > 0; addStatus(f, X, Y, 'poison', Math.round(fx.poison * p)); if (fx.doublePoison && had) Y.poison = Math.round(Y.poison * 1.5); }
-  if (fx.bleed) addStatus(f, X, Y, 'bleed', Math.round(fx.bleed * p));
-  if (fx.weaken) { Y.weaken = Math.max(Y.weaken, fx.weaken); if (X.P.weakPoison) addStatus(f, X, Y, 'poison', X.P.weakPoison); react(f, X, Y); }
+  if (fx.bleed) addStatus(f, X, Y, 'bleed', Math.round(fx.bleed * p) * (fx.deepen && Y.bleed > 0 ? 2 : 1)); // Open Vein: doubled on a bleeding target
+  if (fx.weaken) { Y.weaken = Math.max(Y.weaken, fx.weaken + (X.P.weakenPlus || 0)); if (X.P.weakPoison) addStatus(f, X, Y, 'poison', X.P.weakPoison); react(f, X, Y); }
   if (fx.stun) stunTarget(f, X, Y);
 }
 // The break bar fills from the player's side only; full, the enemy is Broken (a Stun with the Broken state)
@@ -2230,6 +2300,7 @@ function interrupt(f, X, Y, stunned) {
   if (X.isPlayer) f.tally.stuns++;
   if (X.P.stunDmg) hit(f, X, Y, X.P.stunDmg, { noCrit: 1, noDodge: 1, isThorns: true, src: 'Static' });
   if (X.P.stunEmpower) X.empower = Math.max(X.empower, X.P.stunEmpower + 1);
+  if (X.P.stunBlock) gainBlock(f, X, X.P.stunBlock); // Stormbreak Plate
   if (X.P.stormBreak && Y.block > 0) { say(f, `[Stormcaller: ${Math.round(Y.block)} Block shattered.]`, 'skill'); Y.block = 0; }
   if (X.P.stunBurn) addStatus(f, X, Y, 'burn', X.P.stunBurn);
   if (X.P.stunHeal) heal(f, X, X.P.stunHeal);
@@ -2256,8 +2327,14 @@ function rollPip(f, X, s) {
 }
 function rollDice(f, X, only) {
   if (!hasDice(X)) return;
-  X.skills.forEach(s => { if (s.unstable || !s.baseDef) s.baseDef = s.def; if (s.baseDef.fx.die && (!only || only.includes(s))) s.pip = rollPip(f, X, s); });
+  // Let It Ride: a die that rode keeps its number until the skill is next used (a reroll throws it again)
+  X.skills.forEach(s => { if (s.unstable || !s.baseDef) s.baseDef = s.def; if (s.baseDef.fx.die && (!only || only.includes(s))) { if (s.ride && !only) s.pip = s.ride; else { s.ride = 0; s.pip = rollPip(f, X, s); } } });
   if (!only && X.rollTwiceT > 0) X.rollTwiceT--;
+  if (!only) {
+    const dice = X.skills.filter(s => s.baseDef && s.baseDef.fx.die);
+    if (X.tapOut) { dice.forEach(s => { if (s !== X.tapOut && !s.ride) s.pip = 1; }); X.tapOut = null; } // Table Stakes: the rest of the table is empty
+    if (X.P.lowDieUp && dice.length) { const lo = dice.reduce((a, o) => o.pip < a.pip ? o : a); lo.pip = Math.min(6, lo.pip + X.P.lowDieUp); } // Tampered Dice
+  }
   resolveDice(X);
 }
 function resolveDice(X) {
@@ -2267,6 +2344,7 @@ function resolveDice(X) {
     const fx = Object.assign({}, b.fx), v = s.pip || 0;
     if (fx.die) {
       if (fx.dmgPip) fx.dmg = (fx.dmg || 0) + fx.dmgPip * v;
+      if (fx.dmgHigh) fx.dmg = (fx.dmg || 0) + fx.dmgHigh * Math.max(...pips); // Table Stakes
       if (fx.blockPip) fx.block = (fx.block || 0) + fx.blockPip * v;
       if (fx.healPip) fx.heal = (fx.heal || 0) + fx.healPip * v;
       if (fx.dbl) fx.dmg *= v >= fx.dbl ? 2 : 0.5;
@@ -2280,7 +2358,7 @@ function resolveDice(X) {
     if (fx.dmgAll) fx.dmg = (fx.dmg || 0) + (fx.dmgAll + (fx.progressive ? X.jackpots || 0 : 0)) * sum;
     if (fx.cashOut) fx.lifesteal = fx.cashOut;
     const die = !!fx.die;
-    ['die', 'dmgPip', 'blockPip', 'healPip', 'dieMin', 'dieStun', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
+    ['die', 'dmgPip', 'dmgHigh', 'blockPip', 'healPip', 'dieMin', 'dieStun', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
     s.jackpot = die && pips.filter(x => x === v).length >= 2;
     s.def = Object.assign({}, b, { fx, pip: die ? v : null, jackpot: s.jackpot });
   });
@@ -2317,6 +2395,7 @@ function canJinx(f) {
   return (B.misfortune || 0) >= jinxCost(f);
 }
 function addCurse(f, X, n) {
+  if (X.curseWard > 0 && n > 0) { const w = Math.min(n, X.curseWard); X.curseWard -= w; n -= w; if (X.isPlayer) say(f, `[Salt Pouch: ${w} Curse thrown over your shoulder.]`, 'class'); if (!n) return; } // Salt Pouch
   const was = X.curse || 0; X.curse = Math.min(CURSE_MAX, was + n);
   if (X.P.curseBlock && X.curse > was) gainBlock(f, X, X.P.curseBlock * (X.curse - was)); // Mirror-Shard Mail
   if (X.curse >= CURSE_MAX && was < CURSE_MAX && X.isPlayer) say(f, '[Entrant is carrying more bad luck than is advisable.]', 'loss');
@@ -2405,6 +2484,12 @@ function useSkill(f, X, s, opt) {
     const rm = def.fx.readFx.readMult || 1; def = readDef(def); p *= rm;
     f.tally.reads = (f.tally.reads || 0) + 1; say(f, `[Read: ${def.name} answers ${READ_WORD[s.def.fx.read]}.]`, 'skill');
   }
+  // Second Casting: your last skill again, at part of its power
+  if (def.fx.again && !opt.echo && X.isPlayer) {
+    const last = f.lastPlayerSkill;
+    if (last && last !== s) { say(f, `[${def.name}: ${last.def.name} again.]`, 'skill'); useSkill(f, X, last, { echo: true, mult: def.fx.again }); }
+    else say(f, `[${def.name}: nothing to repeat yet.]`, 'skill');
+  }
   const fx = def.fx;
   // Jackpot: this skill's die matches another shown die
   if (def.jackpot && !opt.echo) {
@@ -2426,7 +2511,7 @@ function useSkill(f, X, s, opt) {
   if (fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: fx.selfDmg, kind: 'self' }); }
   let m = dmgMult(f, X, Y);
   const resist = Y.adapt && X.isPlayer && f.tally.mostUsed === s.key ? Y.adapt : 0;
-  const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity);
+  const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity || fx.fester);
   if (fx.calamity && X.isPlayer) jinxMove(f, true); // Calamity: jinx the shown move for free first
   if (damaging && X.focus) { m *= 1 + X.focus; X.focus = 0; }
   if (damaging && !def.quick && X.aq) { m *= 1 + X.aq; X.aq = 0; }
@@ -2435,6 +2520,7 @@ function useSkill(f, X, s, opt) {
   let dealt = 0;
   if (fx.dmg || fx.blockDmg || fx.malice || fx.perMisf || fx.calamity) {
     let base = (fx.dmg || 0) * p;
+    if (def.quick && X.P.quickDmg && fx.dmg) base += X.P.quickDmg; // Glyph Knife
     if (fx.perMisf) base += (fx.perMisf * (Y.misfortune || 0) + (fx.perCurse || 0) * (X.curse || 0)) * p; // Thirteenth Hour
     if (fx.calamity) base += fx.calamity * (Y.misfortune || 0) * p;
     if (fx.blockDmg) base += X.block * fx.blockDmg;
@@ -2451,15 +2537,22 @@ function useSkill(f, X, s, opt) {
       if (hits >= 2 && X.P.hitBurn) addStatus(f, X, Y, 'burn', X.P.hitBurn);
     }
     if (hits >= 2 && X.P.multiWeaken && Y.hp > 0) { Y.weaken = Math.max(Y.weaken, 1); react(f, X, Y); }
+    if (hits >= 2 && X.P.multiBlock) gainBlock(f, X, X.P.multiBlock); // Dancer's Wraps
   }
   if (fx.overflow && X.isPlayer && Y.hp < 0) f.overflowOut = Math.max(f.overflowOut || 0, Math.round(-Y.hp)); // Overflow: overkill carries over
   if (fx.brk && Y.hp > 0) addBreak(f, X, Y, fx.brk * p);
   if (!fx.perHit) applyStatus(f, X, Y, fx, p);
+  if (fx.fester && Y.poison > 0 && Y.hp > 0) dealt += hit(f, X, Y, Y.poison * fx.fester * (1 + (p - 1) * 0.5) * m, { src }); // Fester: the Poison stays
+  if (fx.flash && Y.burn > 0 && Y.hp > 0) { const v = Math.min(Y.burn, Math.round(fx.flash * p)); Y.burn += v; if (X.isPlayer) f.tally.burn += v; say(f, `[${def.name}: +${v} Burn.]`, 'skill'); react(f, X, Y, 'burn'); }
+  if (fx.fuse) { X.fuseT = 2; X.fuseV = Math.round(fx.fuse * p); } // Slow Fuse: more Burn at the start of your next 2 turns
+  if (fx.reapHeal && half(Y)) heal(f, X, fx.reapHeal * p); // Reap
+  if (damaging && dealt > 0 && X.P.nailMisf) { X.nailN = (X.nailN || 0) + 1; if (X.nailN % 3 === 0) { addMisfortune(f, Y, X.P.nailMisf); say(f, `[Thirteenth Nail: +${X.P.nailMisf} Misfortune.]`, 'class'); } }
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
   if (damaging && X.P.poisonOnHit && dealt > 0) addStatus(f, X, Y, 'poison', X.P.poisonOnHit);
   if (damaging && X.P.hitMisf && dealt > 0) addMisfortune(f, Y, X.P.hitMisf); // Bent Horseshoe
   if (fx.block) gainBlock(f, X, fx.block * p);
-  if (fx.heal) heal(f, X, fx.heal * p);
+  if (fx.heal) { if (fx.fullBlock && X.hp >= X.maxHp) gainBlock(f, X, fx.fullBlock * p); else heal(f, X, fx.heal * p); } // Lay on Hands: Block when there is nothing to heal
+  if ((fx.heal || fx.healMissing || fx.regen) && X.P.healBreak && !opt.echo) addBreak(f, X, Y, X.P.healBreak); // Flail of Penance
   if (fx.healMissing) heal(f, X, (X.maxHp - X.hp) * fx.healMissing);
   if ((fx.heal || fx.healMissing || fx.lifesteal || fx.regen) && X.P.healPoison && !opt.echo) addStatus(f, X, Y, 'poison', X.P.healPoison);
   if (fx.drainPoison) heal(f, X, Y.poison);
@@ -2467,6 +2560,10 @@ function useSkill(f, X, s, opt) {
   if (fx.evade) X.evade += fx.evade;
   if (fx.nextCrit) X.critNext = true;
   if (fx.thorns) X.thorns = Math.max(X.thorns, fx.thorns * p);
+  if (fx.thornsFight) X.spikes = (X.spikes || 0) + Math.round(fx.thornsFight * p); // Shield Wall: Thorns that stay
+  if (fx.hold) X.holdBlock = true; // Stand Fast: this Block is still there next turn
+  if (fx.curseSelf) addCurse(f, X, fx.curseSelf); // Broken Mirror
+  if (fx.bigStop) { if (!Y.isPlayer && Y.intent && !Y.interrupted && isBig(f, Y)) interrupt(f, X, Y, false); else if (Y.hp > 0) { Y.weaken = Math.max(Y.weaken, fx.bigStop + (X.P.weakenPlus || 0)); react(f, X, Y); } } // Squall Line
   if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); const keepPoison = Y.P && Y.P.misfNoCleanse && (X.misfortune || 0) >= Y.P.misfNoCleanse; X.burn = 0; if (!keepPoison) X.poison = 0; else say(f, '[Bad Water: the Poison stays.]'); X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
   if (ls && dealt > 0) heal(f, X, dealt * ls);
@@ -2499,10 +2596,13 @@ function useSkill(f, X, s, opt) {
   if (fx.stunIfWeak && Y.weaken > 0 && Y.hp > 0) stunTarget(f, X, Y);
   if (fx.riposte) X.riposte = fx.riposte;
   if (fx.regen) { X.regen = fx.regen * p; X.regenT = 3; }
-  if (fx.doom) { Y.doom = Math.round(fx.doom * p * (1 + (X.P.doomLeech || 0))); Y.doomT = Math.max(1, (fx.doomT || 3) - (X.P.doomFaster ? 1 : 0)); Y.doomHastened = false; react(f, X, Y); }
+  if (fx.doom) { Y.doom = Math.round(fx.doom * p * (1 + (X.P.doomLeech || 0))); Y.doomT = Math.max(1, (fx.doomT || 3) - (X.P.doomFaster ? 1 : 0)); Y.doomHastened = false; Y.doomExec = !!fx.doomExec; react(f, X, Y); }
   if (fx.leech) { Y.leech = Math.round(fx.leech * p * (1 + (X.P.doomLeech || 0))); Y.leechT = 4; Y.blight = false; react(f, X, Y); }
   if (fx.siphon) { const b = Y.block; X.block += b; Y.block = 0; Y.empower = 0; if (b) say(f, `[${X.isPlayer ? 'You steal' : X.name + ' steals'} ${Math.round(b)} Block.]`); }
   if (opt.echo) return;
+  // dice that carry over: Let It Ride keeps a high roll for its next use, once; Table Stakes empties the other dice
+  if (s.baseDef && s.baseDef.fx.ride) { const rode = !!s.ride; s.ride = !rode && s.pip >= s.baseDef.fx.ride ? Math.min(6, s.pip + 1) : 0; if (s.ride && X.isPlayer) say(f, `[${def.name}: the die rides. Next roll ${s.ride}.]`, 'skill'); }
+  if (s.baseDef && s.baseDef.fx.tapOut) X.tapOut = s;
   // passives that trigger on use
   if (damaging && X.firstStun && Y.hp > 0) { X.firstStun = false; say(f, '[Thunder Maul: Stun!]', 'skill'); stunTarget(f, X, Y); }
   if (!def.basic) { X.uses++; if (X.P.every3Stun && X.uses % 3 === 0 && Y.hp > 0) { say(f, '[Stormlord: every third skill Stuns!]', 'skill'); stunTarget(f, X, Y); } }
@@ -2531,15 +2631,19 @@ function startTurn(f, X, first) {
   if (X.isPlayer) X.skills.forEach(s => { if (!s.unstable) return; s.unstableId = s.unstableId || s.def.id; const ids = SKILLS[s.unstableId].unstable, e = ids[(f.turn + 1) % 2]; s.def = Object.assign(moddedDef(e, s.mods), { name: `${s.unstable.name}: ${SKILLS[e].name}`, cd: s.unstable.cd, id: s.unstableId }); });
   if (X.isPlayer) rollDice(f, X);
   if (!first) {
-    if (X.forge) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
+    if (X.forge || X.holdBlock) X.block = X.block; else X.block = P.blockKeep ? Math.round(X.block * Math.min(0.6, P.blockKeep)) : 0;
+    X.holdBlock = false;
   }
   if (X.forge) X.block += X.forge;
   if (X.jinxBlock) { gainBlock(f, X, X.jinxBlock); say(f, `[The jinxed guard is yours: +${X.jinxBlock} Block.]`, 'class'); X.jinxBlock = 0; }
   X.thorns = 0; X.riposte = 0;
+  if (P.sixBlock && X.skills.some(s => s.pip === 6)) { gainBlock(f, X, P.sixBlock); X.rerolls = (X.rerolls || 0) + 1; if (X.isPlayer) say(f, `[House Chip: a six. +${P.sixBlock} Block and a reroll.]`, 'skill'); }
+  if (X.fuseT > 0 && Y.hp > 0 && !first) { X.fuseT--; addStatus(f, X, Y, 'burn', X.fuseV); }
+  if (P.tickDown && !first && (X.isPlayer ? f.turn : (X.turns || 0)) % 3 === 0) { X.skills.forEach(o => { if (o.cd > 0) o.cd--; }); if (X.isPlayer) say(f, '[Robe of Hours: every cooldown drops by 1.]', 'skill'); }
   if (X.regenT > 0) { heal(f, X, X.regen); X.regenT--; }
   if (P.regen) heal(f, X, P.regen);
   if (X.leechT > 0) { const v = Math.min(X.leech * (X.poison > 0 && X.blight ? 2 : 1), Math.max(0, X.hp)); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' }); heal(f, Y, Math.min(v, X.leech)); X.leechT--; if (Y.isPlayer) f.dealt['Leech'] = (f.dealt['Leech'] || 0) + v; }
-  if (X.doomT > 0) { X.doomT--; if (X.doomT === 0) { X.hp -= X.doom; ev(f, { k: 'dot', side: X.side, amt: X.doom, kind: 'doom' }); say(f, `[Doom falls on ${X.isPlayer ? 'you' : X.name}: ${X.doom} damage.]`, 'skill'); if (Y.isPlayer) f.dealt['Doom'] = (f.dealt['Doom'] || 0) + X.doom; X.doom = 0; } }
+  if (X.doomT > 0) { X.doomT--; if (X.doomT === 0) { if (X.doomExec && X.hp < X.maxHp * 0.3) X.doom *= 2; X.hp -= X.doom; ev(f, { k: 'dot', side: X.side, amt: X.doom, kind: 'doom' }); say(f, `[Doom falls on ${X.isPlayer ? 'you' : X.name}: ${X.doom} damage.]`, 'skill'); if (Y.isPlayer) f.dealt['Doom'] = (f.dealt['Doom'] || 0) + X.doom; X.doom = 0; } }
   if (X.misfT > 0) { X.misfT--; addMisfortune(f, X, X.misfTv || 0); }
   if (!X.isPlayer && X.aura) addStatus(f, X, Y, 'burn', Math.round(X.aura));
   if (!X.isPlayer && X.briar) addStatus(f, X, Y, 'bleed', Math.round(X.briar));
@@ -2557,6 +2661,7 @@ function startTurn(f, X, first) {
     X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'poison' });
     if (Y.isPlayer) f.dealt['Poison'] = (f.dealt['Poison'] || 0) + v; else f.tally.hurtBy['Poison'] = (f.tally.hurtBy['Poison'] || 0) + v;
     if (Y.P.poisonHeal) heal(f, Y, v * Math.min(POISON_HEAL_CAP, Y.P.poisonHeal));
+    if (Y.P.poisonGrow) X.poison += Y.P.poisonGrow; // Apothecary's Case
   }
   checkRevive(f, X);
   if (X.hp <= 0) return false;
@@ -2599,7 +2704,7 @@ function playerAct(f, idx) {
   if (s.u && (s.mods || []).some(m => PREFIXES[m] && PREFIXES[m].hide) && !(f.disclosed || {})[s.u]) { f.disclosed = Object.assign(f.disclosed || {}, { [s.u]: true }); say(f, `[Disclosure: the [REDACTED] prefix on ${s.def.name} is ${s.mods.filter(m => PREFIXES[m].hide).map(m => PREFIXES[PREFIXES[m].hide].name).join(', ')}.]`, 'skill'); }
   f.useCounts[s.key] = (f.useCounts[s.key] || 0) + 1;
   noteReflex(f, s.def.fx);
-  if (s.key !== 'attack' && s.key !== 'copycat' && !s.def.quick && !s.def.fx.replay) f.lastPlayerSkill = s;
+  if (s.key !== 'attack' && s.key !== 'copycat' && !s.def.quick && !s.def.fx.replay && !s.def.fx.again) f.lastPlayerSkill = s;
   if (s.def.quick) { f.tally.quickTurn++; f.tally.maxQuick = Math.max(f.tally.maxQuick, f.tally.quickTurn); } else f.tally.quickTurn = 0;
   const mu = Object.entries(f.useCounts).sort((a, b) => b[1] - a[1])[0]; f.tally.mostUsed = mu ? mu[0] : null;
   if (s.def.quick) { checkOver(f); return true; }
@@ -2618,9 +2723,9 @@ function noteReflex(f, fx) {
   const t = f.pt || (f.pt = { hits: 0 });
   t.acted = true;
   if (fx.block || fx.blockPip) t.block = true;
-  if (fx.burn || fx.poison || fx.bleed) t.status = true;
+  if (fx.burn || fx.poison || fx.bleed || fx.fuse || fx.flash) t.status = true;
   if (fx.heal || fx.healMissing) t.heal = true;
-  if (fx.dmg || fx.dmgPip || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity) t.hits += fx.hits || 1;
+  if (fx.dmg || fx.dmgPip || fx.dmgHigh || fx.fester || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity) t.hits += fx.hits || 1;
 }
 const REFLEX_TEST = { block: t => t.block, status: t => t.status, heal: t => t.heal, flurry: t => t.hits >= 2, passive: t => t.hits === 0 };
 function reflexMove(B) { const R = B.reflex; return R ? R.s || B.skills[R.use] : null; }
@@ -2778,12 +2883,19 @@ function describe(def, p = 1) {
   const per = fx.perHit ? ' with each hit' : '';
   if (fx.burn) r.push(`Apply ${n(fx.burn)} Burn${per}.`);
   if (fx.poison) r.push(`Apply ${n(fx.poison)} Poison${per}${fx.doublePoison ? ', then raise their Poison by half if they already had some' : ''}.`);
-  if (fx.bleed) r.push(`Apply ${n(fx.bleed)} Bleed${per}.`);
+  if (fx.bleed) r.push(`Apply ${n(fx.bleed)} Bleed${per}${fx.deepen ? ', doubled if they are already bleeding' : ''}.`);
+  if (fx.fester) r.push(`Deal ${fx.fester === 1 ? '' : fx.fester + '× '}the opponent's Poison as damage. The Poison stays.`);
+  if (fx.flash) r.push(`Double the opponent's Burn, adding up to ${n(fx.flash)}.`);
+  if (fx.fuse) r.push(`Apply ${n(fx.fuse)} more Burn at the start of each of your next 2 turns.`);
+  if (fx.bigStop) r.push(`If the opponent is winding up a big attack, Interrupt it. Otherwise Weaken them for ${fx.bigStop} turns.`);
   if (fx.weaken) r.push(`Weaken the opponent for ${fx.weaken} turn${fx.weaken > 1 ? 's' : ''}.`);
   if (fx.stun) r.push('Stun: the opponent loses their next turn, and the move they were about to use goes on cooldown.');
   if (fx.stunIfWeak) r.push('If the opponent is Weakened, Stun them.');
   if (fx.block) r.push(`Gain ${n(fx.block)} Block.`);
-  if (fx.heal) r.push(`Heal ${n(fx.heal)}.`);
+  if (fx.heal) r.push(fx.fullBlock ? `Heal ${n(fx.heal)}, or gain ${n(fx.fullBlock)} Block if you are at full HP.` : `Heal ${n(fx.heal)}.`);
+  if (fx.reapHeal) r.push(`Heal ${n(fx.reapHeal)} if the opponent is below half HP.`);
+  if (fx.hold) r.push('Your Block does not fade at the start of your next turn.');
+  if (fx.thornsFight) r.push(`For the rest of the fight, hit back for ${n(fx.thornsFight)} when struck.`);
   if (fx.healMissing) r.push(`Heal ${fx.healMissing * 100}% of your missing HP.`);
   if (fx.drainPoison) r.push("Heal equal to the opponent's Poison.");
   if (fx.brk) r.push(`Break ${n(fx.brk)}: fills the opponent's break bar.`);
@@ -2801,7 +2913,8 @@ function describe(def, p = 1) {
   if (fx.haste) r.push(`Your other cooldowns drop by ${fx.haste}.`);
   if (fx.interrupt) r.push("Interrupt: cancel the opponent's next move and put it on cooldown.");
   if (fx.regen) r.push(`Heal ${n(fx.regen)} at the start of your next 3 turns.`);
-  if (fx.doom) r.push(`Doom: after ${fx.doomT || 3} of the opponent's turns, they take ${n(fx.doom)} damage.`);
+  if (fx.doom) r.push(`Doom: after ${fx.doomT || 3} of the opponent's turns, they take ${n(fx.doom)} damage${fx.doomExec ? ', doubled if they are below 30% HP then' : ''}.`);
+  if (fx.again) r.push(`Use your last skill again at ${Math.round(fx.again * 100)}% power.`);
   if (fx.leech) r.push(`Leech: for 4 turns, drain ${n(fx.leech)} HP from the opponent each turn.`);
   if (fx.siphon) r.push("Steal the opponent's Block and remove their Power.");
   if (fx.xburn) r.push(`Also apply ${n(fx.xburn)} Burn.`);
@@ -2815,6 +2928,9 @@ function describe(def, p = 1) {
     const base = fx.dmg && (fx.dmgPip || fx.snake) ? n(fx.dmg) : 0;
     if (fx.snake) r.splice(0, r.length, `On a 1${fx.boxcars ? ' or a 6' : ''}: deal ${n(fx.snake)} and Stun. Otherwise deal ${base}.`);
     else if (fx.dmgPip) { if (fx.dmg) r.shift(); r.unshift(`Deal ${base ? base + ' + ' : ''}${n(fx.dmgPip)} per pip.`); }
+    else if (fx.dmgHigh) r.unshift(`Deal ${n(fx.dmgHigh)} per pip of your highest die.`);
+    if (fx.ride) r.push(`On a ${fx.ride} or more, this die keeps its number plus 1 for its next use.`);
+    if (fx.tapOut) r.push('Your other dice show 1 next turn.');
     if (fx.blockPip) r.push(`Block ${n(fx.blockPip)} per pip.`);
     if (fx.healPip) r.push(`Heal ${n(fx.healPip)} per pip.`);
     if (fx.dbl) r.push(`On ${fx.dbl}+ deal double, otherwise half.`);
@@ -2831,6 +2947,7 @@ function describe(def, p = 1) {
   if (fx.omenAtk) r.push(`Omen: if the opponent attacks next, it takes ${n(fx.omenAtk)} and gains 3 Misfortune.`);
   if (fx.omenGuard) r.push('Omen: if it guards next, it loses half its Block and gains 3 Misfortune.');
   if (fx.jinxDisc) r.push(`Your next jinx this turn costs ${fx.jinxDisc} less.`);
+  if (fx.curseSelf) r.push(`You take ${fx.curseSelf} Curse.`);
   if (fx.uncurse) r.push(`Remove ${fx.uncurse} Curse.`);
   if (fx.passCurse) r.push(`Move ${fx.curseKeep ? `all but ${fx.curseKeep} of your` : 'all your'} Curse onto the opponent as ${fx.passCurse === 2 ? 'double' : fx.passCurse + '×'} the Misfortune${fx.curseDmg ? `, and deal ${n(fx.curseDmg)} per Curse moved` : ''}.`);
   if (fx.perMisf) r.push(`Deal ${n(fx.perMisf)} per Misfortune on the opponent plus ${n(fx.perCurse || 0)} per Curse on you.`);
@@ -3016,9 +3133,10 @@ function endRun(run, meta, outcome) {
   const e = echoesFor(run, outcome); meta.echoes += e;
   settleBacking(run, meta, outcome);
   const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
+  run.masteryGain = settleMastery(run, meta, outcome);
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
-  return { echoes: e + ladder.echoes, snap, rp: rk.rp, trial: rk.trial, ladder };
+  return { echoes: e + ladder.echoes, snap, rp: rk.rp, trial: rk.trial, ladder, mastery: run.masteryGain };
 }
 
 // ---------- Playtest stats ----------
@@ -3285,13 +3403,14 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
+  blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,

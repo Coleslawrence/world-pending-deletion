@@ -1227,3 +1227,8 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 /* Difficulty ladder (Phase 4): Mark chips and the chosen row in the Priority and Challenge sheets */
 .tag.mark { border-color: currentColor; } .mk-bronze { color: var(--bronze); } .mk-silver { color: var(--block); } .mk-gold { color: var(--stun); } .mk-plat { color: var(--sys); } .mk-black { color: var(--bad); }
 .choice.on { border-color: var(--sys); }
+
+/* Archetype Mastery (Phase 5): the sheet's rows and level list */
+.mst-row .pg-bar { display: block; margin: 6px 0 4px; }
+.tag.mst { flex: none; }
+.mst-l { margin: 0 0 10px; } .mst-l li small { white-space: nowrap; }

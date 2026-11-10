@@ -10,6 +10,9 @@ sk('siphon', 'Siphon', ['arcanist'], 'C', 3, { siphon: 1 }, [['soul_siphon', 'So
 sk('time_warp', 'Time Warp', ['arcanist'], 'B', 6, { haste: 2 }, [['haste', 'Haste', { haste: 3 }], ['chrono_loop', 'Chrono Loop', { haste: 2 }, 4], ['stolen_moment', 'Stolen Moment', { haste: 2, block: 10 }]], { quick: true });
 sk('cataclysm', 'Arcane Cataclysm', ['arcanist'], 'A', 4, { dmg: 24, pierce: 1 }, [['singularity', 'Singularity', { dmg: 34, pierce: 1 }], ['starfall', 'Starfall', { dmg: 8, hits: 4, pierce: 1 }], ['unmaking', 'Unmaking', { dmg: 20, pierce: 1, weaken: 2 }]]);
 sk('read_the_glyph', 'Read the Glyph', ['arcanist'], 'D', 2, { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1 } }, [['unwrite', 'Unwrite', { focus: 0.2, read: 'defend', readFx: { focus: 0.4, nextCrit: 1, haste: 1 } }], ['glyph_breaker', 'Glyph Breaker', { dmg: 5, focus: 0.2, read: 'defend', readFx: { dmg: 10, pierce: 1, focus: 0.2 } }], ['counter_glyph', 'Counter-Glyph', { focus: 0.2, read: 'defend', readFx: { focus: 0.2, siphon: 1 } }]], { quick: true });
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('blink', 'Blink', ['arcanist'], 'D', 3, { evade: 1, haste: 1 }, [['phase_shift', 'Phase Shift', { evade: 2, haste: 1 }], ['blink_strike', 'Blink Strike', { dmg: 6, evade: 1, haste: 1 }], ['fold_space', 'Fold Space', { evade: 1, haste: 2 }]], { quick: true, mastery: 4 });
+sk('second_casting', 'Second Casting', ['arcanist'], 'B', 4, { again: 0.6 }, [['double_image', 'Double Image', { again: 0.8 }], ['lingering_image', 'Lingering Image', { again: 0.6, block: 8 }], ['rote_casting', 'Rote Casting', { again: 0.6, haste: 1 }]], { mastery: 8 });
 flav({
   spark: "The first spell every apprentice learns, and the last one they forget.",
   arc_spark: "The spark jumps the gap before you have finished pointing.",
@@ -51,4 +54,12 @@ flav({
   stolen_moment: "A second borrowed from the clock, spent on standing still.",
   unmaking: "Less an explosion than an edit.",
   counter_glyph: "You write over their ward in your own hand.",
+  blink: "You were there. Then you had always been here.",
+  phase_shift: "Two blows pass through the place you declined to occupy.",
+  blink_strike: "Gone, back, and something of theirs is missing.",
+  fold_space: "The arena is shorter than it looks if you crease it.",
+  second_casting: "The spell is finished. The air has not been told.",
+  double_image: "Hard to say which of them is the copy. Both of them hurt.",
+  lingering_image: "It stays a moment and takes the hit for you.",
+  rote_casting: "Seen once, understood, and done again faster.",
 });

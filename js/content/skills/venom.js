@@ -9,6 +9,9 @@ sk('leech', 'Leech', ['venom', 'reaper'], 'C', 3, { leech: 3 }, [['blood_leech',
 sk('toxic_needles', 'Thousand Needles', ['venom'], 'B', 3, { poison: 4, doublePoison: 1 }, [['venom_storm', 'Venom Storm', { poison: 6, doublePoison: 1 }], ['needle_rain', 'Needle Rain', { dmg: 3, hits: 3, poison: 5, doublePoison: 1 }], ['numbing_needles', 'Numbing Needles', { poison: 4, doublePoison: 1, stunIfWeak: 1 }]]);
 sk('seep', 'Seep', ['venom'], 'D', 2, { poison: 3, read: 'defend', readFx: { poison: 7 } }, [['stagnant_pool', 'Stagnant Pool', { poison: 3, read: 'defend', readFx: { poison: 6, weaken: 2 } }], ['rising_damp', 'Rising Damp', { poison: 4, read: 'defend', readFx: { poison: 6, doublePoison: 1 } }], ['soak', 'Soak', { poison: 3, read: 'defend', readFx: { poison: 5, siphon: 1 } }]]);
 sk('sour_luck', 'Sour Luck', ['venom', 'jinx'], 'C', 3, { dmg: 5, poison: 5, misf: 2 }, [['rotten_luck', 'Rotten Luck', { dmg: 5, poison: 5, misf: 2, misfT: 2 }], ['bitter_draught', 'Bitter Draught', { dmg: 5, poison: 5, misf: 2, lifesteal: 0.3 }], ['blighted_omen', 'Blighted Omen', { dmg: 5, poison: 5, misf: 2, omenAtk: 8 }]]);
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('slow_drip', 'Slow Drip', ['venom'], 'E', 2, { poison: 2 }, [['steady_drip', 'Steady Drip', { poison: 4 }], ['bitter_drip', 'Bitter Drip', { poison: 2, weaken: 1 }], ['numbing_drip', 'Numbing Drip', { poison: 2, block: 5 }]], { quick: true, mastery: 2 });
+sk('fester', 'Fester', ['venom'], 'C', 3, { fester: 1 }, [['suppurate', 'Suppurate', { fester: 1.5 }], ['open_sore', 'Open Sore', { fester: 1, poison: 3 }], ['gangrene', 'Gangrene', { fester: 1, weaken: 2 }]], { mastery: 6 });
 flav({
   venom_blade: "A thin coat of green on a thin blade.",
   viper_fang: "Bitten, not cut. The difference shows later.",
@@ -46,4 +49,12 @@ flav({
   rotten_luck: "Spoiled from the inside, and getting worse.",
   bitter_draught: "You take a sip of what you gave them. It suits you better.",
   blighted_omen: "The crows saw this coming. So did you.",
+  slow_drip: "One drop. You have all the time in the world.",
+  steady_drip: "It keeps count so you don't have to.",
+  bitter_drip: "They taste it first. Then their arms get heavy.",
+  numbing_drip: "A drop for them, and one to take the edge off for you.",
+  fester: "The poison was already there. You only remind it.",
+  suppurate: "What was under the skin comes up to look around.",
+  open_sore: "It will not close. You made sure.",
+  gangrene: "The limb decides to stop helping.",
 });
