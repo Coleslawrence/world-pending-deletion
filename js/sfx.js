@@ -64,7 +64,7 @@ const SOUNDS = {
   heart: () => { tone(95, 55, 0.3, 'sine', 0.5); noise(0.18, 400, 0.25); },
   erase: () => { noise(0.9, 4000, 0.3, 0, 120); tone(440, 55, 0.9, 'sawtooth', 0.05); },
 };
-const HAPTICS = { hit: 12, crit: [0, 22], break: [0, 40, 40, 60], heart: [0, 80, 60, 80], loss: [0, 120], erase: [0, 60, 50, 60, 50, 200], win: [0, 15, 40, 15] };
+const HAPTICS = { tap: 6, hit: 12, crit: [0, 22], break: [0, 40, 40, 60], heart: [0, 80, 60, 80], loss: [0, 120], erase: [0, 60, 50, 60, 50, 200], win: [0, 15, 40, 15] };
 function sfx(name) {
   if (SET.vib && HAPTICS[name] && navigator.vibrate) { try { navigator.vibrate(HAPTICS[name]); } catch (e) { } }
   if (!SOUNDS[name] || !audio()) return;

@@ -883,11 +883,11 @@ function fightHTML() {
   const sig = f.spec.snap ? { sigil: f.spec.snap.sigil, color: f.spec.snap.color } : null;
   return `<main class="screen fight">${fightBar(`<button class="icon-btn spd ${ui.speed > 1 ? 'on' : ''}" data-act="speed-cycle" aria-label="Fight speed ${ui.speed}×. Tap to change">${ui.speed}×</button><button class="icon-btn rr-btn" id="rrBtn" data-act="reroll-mode" hidden></button><button class="icon-btn ${ui.info ? 'on' : ''}" data-act="info" aria-label="Skill details mode">?</button>`)}
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
-      <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
+      <div class="bar foe-bar"><s id="lgB"></s><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
     <section class="log" id="log" aria-live="polite"></section></div><div class="col col-b">
     <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(shortName(run.name))}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
-      <div class="bar hp-bar"><i id="hbA"></i><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
+      <div class="bar hp-bar"><s id="lgA"></s><i id="hbA"></i><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
     <section class="skills c${run.slots}" id="skills"></section></div></main>`;
 }
 function chipsHTML(X, f) {
@@ -922,8 +922,11 @@ function updateFight() {
   applyMoment();
   [['A', f.A], ['B', f.B]].forEach(([k, X]) => {
     const hp = document.getElementById('hp' + k); if (!hp) return;
-    hp.textContent = `${n0(X.hp)} / ${X.maxHp}`;
-    document.getElementById('hb' + k).style.width = Math.max(0, X.hp / X.maxHp * 100) + '%';
+    hpCount(hp, k, X);
+    const w = Math.max(0, X.hp / X.maxHp * 100), lg = document.getElementById('lg' + k);
+    document.getElementById('hb' + k).style.width = w + '%';
+    // The pale chunk behind the bar drains a beat after a hit; healing moves it at once
+    if (lg) { const was = parseFloat(lg.style.width); lg.classList.toggle('now', !(was > w)); lg.style.width = w + '%'; }
     document.getElementById('bk' + k).style.width = Math.min(100, X.block / X.maxHp * 100) + '%';
     document.getElementById('st' + k).innerHTML = chipsHTML(X, f);
   });
@@ -941,6 +944,7 @@ function updateFight() {
   const sk = document.getElementById('skills');
   if (sk) {
     const can = f.phase === 'player' && !ui.busy && !f.over;
+    sk.classList.toggle('wait', !!ui.busy && !f.over); // G2: skills dim while the opponent acts
     const btn = (s, i, wide) => {
       const d = s.def, cd = s.cd > 0, prev = previewSkill(f, s);
       const tag = d.basic ? '' : 'a-' + (d.tags[0] || '');
@@ -959,12 +963,29 @@ function updateFight() {
     if (rb) { rb.hidden = !rr; rb.disabled = !can; rb.classList.toggle('on', !!ui.reroll); rb.textContent = `${DIE_FACES[4]}${f.A.rerolls || 0}`; rb.setAttribute('aria-label', ui.reroll ? 'Cancel reroll' : `Reroll a die, ${f.A.rerolls || 0} left. Tap this, then a skill`); rb.setAttribute('aria-pressed', ui.reroll ? 'true' : 'false'); }
   }
 }
+// HP numbers count to their new value instead of jumping (G1). A redraw of the fight shows the value at once.
+const hpShown = { A: null, B: null };
+function hpCount(el, k, X) {
+  const to = +n0(X.hp) || 0, st = hpShown[k], fresh = !st || st.f !== ui.fight || st.el !== el, from = fresh ? to : st.v;
+  if (st && st.raf) cancelAnimationFrame(st.raf);
+  const S = hpShown[k] = { f: ui.fight, el, v: from, raf: 0 }, put = v => { S.v = v; el.textContent = `${v} / ${X.maxHp}`; };
+  if (from === to || REDUCED) return put(to);
+  const t0 = performance.now(), dur = 360 / (ui.speed || 1);
+  const step = t => { const q = Math.min(1, (t - t0) / dur); put(Math.round(from + (to - from) * (1 - Math.pow(1 - q, 3)))); if (q < 1 && S.el.isConnected) S.raf = requestAnimationFrame(step); };
+  S.raf = requestAnimationFrame(step);
+}
+// A hit's first frame: the target flashes white and is knocked a few pixels (big hits shake instead)
+function hitFx(side, big, crit) {
+  if (REDUCED) return; const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return;
+  el.classList.remove('hitflash', 'knock'); void el.offsetWidth; el.classList.add('hitflash'); if (!big) el.classList.add('knock');
+  if (crit) { const a = document.getElementById('app'); a.classList.add('hitstop'); setTimeout(() => a.classList.remove('hitstop'), 90); }
+}
 function floatAt(side, text, cls) {
   const host = document.getElementById('fl' + side); if (!host || host.children.length > 8) return;
   const el = document.createElement('span'); el.className = 'fl ' + cls; el.textContent = text;
   el.style.left = (18 + Math.random() * 60) + '%'; host.appendChild(el); setTimeout(() => el.remove(), 1000);
 }
-function shake(side) { if (!SET.shake || REDUCED) return; const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function shake(side) { if (!SET.shake || REDUCED) return; const el = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!el) return; el.classList.remove('shake', 'knock'); void el.offsetWidth; el.classList.add('shake'); }
 // Break and reaction impact (#15): a beat of hit-stop, a stamp over the target and the break bar shattering
 function stamp(side, text, cls) {
   const host = document.getElementById(side === 'A' ? 'me' : 'foe'); if (!host) return;
@@ -984,7 +1005,7 @@ function playEvents(f) {
   let d = 0;
   f.events.forEach(e => {
     const at = d;
-    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); if (e.amt >= f[e.side].maxHp * 0.12) shake(e.side); if (e.side === 'A' && e.amt >= f.A.maxHp * EROSION.bigHit) tearFx(); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
+    if (e.k === 'hit') { setTimeout(() => { if (e.amt > 0 || e.blocked) sfx(e.amt > 0 ? (e.crit ? 'crit' : 'hit') : 'block'); if (e.amt > 0) { floatAt(e.side, (e.crit ? 'Crit ' : '') + e.amt, e.crit ? 'crit' : e.tag === 'flare' ? 'burn' : e.thorns ? 'thorns' : 'dmg'); { const big = e.amt >= f[e.side].maxHp * 0.12; hitFx(e.side, big && SET.shake, e.crit); if (big) shake(e.side); } if (e.side === 'A' && e.amt >= f.A.maxHp * EROSION.bigHit) tearFx(); } else if (e.blocked > 0) floatAt(e.side, 'Blocked ' + e.blocked, 'blk'); }, at); d += 120; }
     else if (e.k === 'dot' && e.amt > 0) { setTimeout(() => floatAt(e.side, e.amt, e.kind), at); d += 90; }
     else if (e.k === 'heal') { setTimeout(() => { floatAt(e.side, '+' + e.amt, 'heal'); sfx('heal'); }, at); d += 90; }
     else if (e.k === 'miss') { setTimeout(() => floatAt(e.side, e.text, 'blk'), at); d += 90; }
@@ -1045,6 +1066,8 @@ async function onUse(i) {
   await wait(f.over ? 300 : 650);
   while (!f.over) {
     const b2 = f.log.length;
+    // G7: the shown move winds up for a beat before it lands
+    { const it = document.getElementById('intent'); if (it && !REDUCED && f.phase !== 'stunned') { it.classList.add('windup'); await wait(240); it.classList.remove('windup'); } }
     enemyTurn(f);
     const eng = f.log.splice(b2); summarize(f, 'B'); eng.forEach(l => f.log.push(l)); playEvents(f); updateFight();
     if (f.over) break;
@@ -1065,6 +1088,7 @@ function finishFight() {
   const plain = res.won && goesOn && SET.fastWins;
   if (plain) res.msgs.unshift({ t: 'win', text: `[Victory. +${res.gold} gold, healed 30%.]` });
   sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
+  if (res.heartsLost && !REDUCED) { app.classList.add('bleed'); setTimeout(() => app.classList.remove('bleed'), 420); }
   if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); recordRest(res.rested); }
   if (goesOn && !plain) { res.msgs.forEach(m => logRun(m.text, m.t)); ui.notes = noteList(res.msgs); ui.noteN = ui.notes.length; } else { ui.notes = null; pushMsgs(res.msgs); }
   ui.result = res; ui.erDone = 0; ui.erBusy = false; res.changes = evDiff(before, run);
@@ -1186,7 +1210,13 @@ function evResultSheet() {
   const R = ui.sheet;
   const lines = R.lines.map(m => `<p class="t-${esc(m.t || 'sys')}">${esc(m.text)}</p>${itemCard(m)}`).join('');
   const chips = R.changes.length ? `<div class="ev-ch">${R.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
-  return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p><div class="sysbox ev-out">${lines}</div>${chips}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
+  let meter = '', wait = '';
+  if (R.roll) {
+    const fresh = !R.rolled && !REDUCED; if (!R.rolled) setTimeout(() => { R.rolled = true; }, 1500);
+    if (fresh) wait = ' rolling';
+    meter = `<div class="rollm${fresh ? ' go' : ''} ${R.roll.won ? 'won' : 'lost'}" style="--ch:${R.roll.ch}%;--land:${R.roll.land}%" role="img" aria-label="${R.roll.stat} check, ${R.roll.ch}% chance: ${R.roll.won ? 'success' : 'failed'}"><span class="rm-z"></span><span class="rm-n"></span><span class="rm-l">${R.roll.stat} ${R.roll.ch}%</span><span class="rm-s">${R.roll.won ? 'Success' : 'Failed'}</span></div>`;
+  }
+  return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p>${meter}<div class="sysbox ev-out${wait}">${lines}</div>${chips ? `<div class="${wait.trim()}">${chips}</div>` : ''}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
 }
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
@@ -1307,7 +1337,13 @@ function resultSheet() {
   // summary says how many instead of listing them
   const shown = noteList(r.msgs), chips = r.changes && r.changes.length ? `<div class="ev-ch">${r.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
   const msgs = ui.notes ? (ui.noteN ? `<p class="sh-p fine">[${ui.noteN} notification${ui.noteN > 1 ? 's' : ''} to review.]</p>` : '') : shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
-  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}<p class="sh-p">${lines.join(' ')}</p>${chips ? `<p class="sh-p fine">Altogether this fight:</p>${chips}` : ''}${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
+  // G4: the lost Hearts drop out of the row, once (later redraws of this sheet show them already gone)
+  let hrow = '';
+  if (!r.won && !run.elite && r.heartsLost > 0) {
+    const fresh = !r.hfx && !REDUCED; if (!r.hfx) setTimeout(() => { r.hfx = true; }, 1200);
+    hrow = `<div class="hrow" aria-hidden="true">${'<i>♥</i>'.repeat(Math.max(0, run.hearts))}${fresh ? Array.from({ length: Math.min(r.heartsLost, 6) }, (_, i) => `<i class="lose" style="animation-delay:${200 + i * 140}ms">♥</i>`).join('') : ''}</div>`;
+  }
+  return sheetWrap(r.won ? 'Victory' : 'Defeat', `<p class="sh-p big">${r.won ? `${esc(r.enemy)} is defeated.` : `${esc(r.enemy)} wins this round.`}</p>${foeHTML(r)}${hrow}<p class="sh-p">${lines.join(' ')}</p>${chips ? `<p class="sh-p fine">Altogether this fight:</p>${chips}` : ''}${eraseRows(steps)}${r.won ? '' : lastTurnsHTML()}${steps.length ? '' : recapHTML(r)}${msgs}`, eraseFoot(steps, `<button class="btn primary" data-act="result-ok">Continue</button>`), r.won ? 'win' : 'lose', true);
 }
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
@@ -1644,7 +1680,15 @@ function render() {
 }
 
 // ---------- Actions ----------
-function go(screen) { ui.screen = screen; ui.sheet = null; render(); }
+// U6: a change of screen slides instead of cutting, where the browser can (View Transitions). The redraw itself is
+// unchanged; without the feature, or with Reduce motion, it cuts as before.
+function go(screen) {
+  const from = ui.screen; ui.screen = screen; ui.sheet = null;
+  if (from !== screen && !REDUCED && document.startViewTransition && !document.hidden) {
+    try { const vt = document.startViewTransition(() => render()); if (vt && vt.finished) vt.finished.catch(() => {}); if (vt && vt.ready) vt.ready.catch(() => {}); return; } catch (e) { }
+  }
+  render();
+}
 function onAct(el) {
   const a = el.dataset.act, d = el.dataset;
   switch (a) {
@@ -1768,7 +1812,10 @@ function onAct(el) {
       // The outcome stays in the event until Continue; if the event moved the game on (run over, a new screen), toasts as before
       if (ui.screen !== scr0 || run.ended || run.hearts <= 0) { pushMsgs(lines, false, `${(EVENTS[p.key] || {}).title || 'Event'}: ${o.label}`); return render(); }
       lines.forEach(m => logRun(m.text, m.t));
-      ui.sheet = { type: 'evresult', title: (EVENTS[p.key] || {}).title || '[Event]', label: o.label, lines, changes: evDiff(before, run) };
+      // G5: a chance option shows its roll: a needle sweeps the bar and settles before the outcome appears
+      let roll = null;
+      if (o.roll) { const m = lines.map(l => /^\[(\w+) check: (\d+)%\. (Success|Failed)\.\]$/.exec(l.text)).find(Boolean); if (m) { const ch = +m[2], won = m[3] === 'Success'; roll = { stat: m[1], ch, won, land: Math.round(won ? Math.random() * Math.max(1, ch - 2) : Math.min(99, ch + 1 + Math.random() * (99 - ch))) }; } }
+      ui.sheet = { type: 'evresult', title: (EVENTS[p.key] || {}).title || '[Event]', label: o.label, lines, changes: evDiff(before, run), roll };
       return render();
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
