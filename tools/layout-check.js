@@ -87,6 +87,8 @@ function states() {
     // Tournament bracket: mid-run, at the start, and in the Elite bracket
     out.push({ label: 'sheet-bracket', stage: 'choose', sheet: 'bracket', run: mid.run });
     { const r1 = out.find(s => s.label === 'r1-choose'), el = out.find(s => s.label.startsWith('elite')); if (r1) out.push({ label: 'sheet-bracket-r1', stage: 'choose', sheet: 'bracket', run: r1.run }); if (el) out.push({ label: 'sheet-bracket-elite', stage: 'choose', sheet: 'bracket', run: el.run }); }
+    // Difficulty ladder: the world screen with Priority and a Challenge chosen, both sheets, and the Archive's Marks
+    out.push({ label: 'worlds-ladder', stage: 'worlds', sheet: 'none', run: mid.run }, { label: 'sheet-priority', stage: 'worlds', sheet: 'priority', run: mid.run }, { label: 'sheet-challenge', stage: 'worlds', sheet: 'challenge', run: mid.run }, { label: 'sheet-archive', stage: 'shop', sheet: 'archive', run: mid.run });
     // End screens: an erased world and a spared one, with the progress bars and next goal
     out.push({ label: 'end-erased', stage: 'end-erased', run: mid.run }, { label: 'end-spared', stage: 'end-spared', run: mid.run });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
@@ -171,7 +173,7 @@ function inspect() {
       await page.evaluate(([stage, sheet, pending]) => {
         ui.sheet = null; run.pending = pending || [];
         if (stage === 'fight') startFightUI();
-        else if (stage === 'worlds') onAct({ dataset: { act: 'new' } });
+        else if (stage === 'worlds') { if (sheet) { meta.priority = { max: 10, set: 4 }; meta.marks.challenge = { glass: 3 }; meta.wins = Math.max(1, meta.wins); ui.challenge = 'sudden'; } onAct({ dataset: { act: 'new' } }); if (sheet) { ui.challenge = 'sudden'; ui.sheet = sheet; render(); } }
         else if (stage.startsWith('end-')) { const kind = stage.slice(4), out = endRun(run, meta, kind); ui.end = { kind, echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial }; run.ended = true; ui.screen = 'end'; render(); }
         else { ui.screen = stage; ui.sheet = sheet || null; render(); }
       }, [st.stage, st.sheet, st.pending]);
