@@ -105,6 +105,15 @@ const REFLEXES = {
   augur: { on: 'heal', move: { n: 'Foreseen', fx: { dmg: 9, weaken: 1 } }, say: '[The Augur read that you would mend. It had an answer ready.]' , also: { on: 'passive', use: 2, say: '[The Augur read this pause. It was ready.]' } },
   herald: { on: 'passive', use: 1, say: '[You gave the Storm Herald time. It used it.]' , also: { on: 'block', move: { n: 'Lightning Seeks', fx: { dmg: 7, pierce: 1 } }, say: '[Lightning does not care about your shield.]' } },
 };
+// Side goals: one extra objective in each monster and rival fight (not Final Champions, trials, Elite or practice),
+// picked from the ones that fit this opponent and shown as a chip on your side. Win and meet it for bonus gold
+// (SIDE_GOAL_GOLD by the opponent's tier). can and done are read by core.js; done is judged when you win.
+const SIDE_GOALS = {
+  calm: { name: 'Calm hands', text: 'Win without setting off a Reflex', can: (f, B) => !!(B.reflexes && B.reflexes.length), done: f => !(f.tally.reflexes > 0), lost: f => f.tally.reflexes > 0 },
+  windup: { name: 'Break the wind-up', text: 'Break one of its wind-ups', can: (f, B) => B.skills.some(s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power >= f.A.maxHp * 0.15), done: f => f.tally.windups > 0 },
+  guard: { name: 'Crack the guard', text: 'Break its guard (the gold bar) once', can: (f, B) => !!B.breakMax, done: f => f.tally.breaks > 0 },
+};
+const SIDE_GOAL_GOLD = { 1: 3, 2: 4 };
 const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute', 'wisp', 'lucky_rat', 'hex_toad', 'acolyte', 'glyph_moth', 'briar_cub', 'grave_hound', 'thunder_ram', 'sunken_knight'];
 // The qualifier ladder: each qualifier round draws its two monsters from its own list, so each round has its own feel.
 // Round 1 the light ones, round 2 the ones that put a status on you, round 3 the heavy hitters. Every monster in MONSTERS

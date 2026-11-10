@@ -141,9 +141,21 @@ When the trigger is met, the opponent's next move is the Reflex's instead of the
 
 Opponents with a Reflex do not loop their `script`: each turn they pick a move by chance, and a move's chance is how many times it appears in the script (so `[0, 0, 1]` is two parts move 0 to one part move 1). Never the same move three turns running (`MOVE_PICK.repeat`), never a big move twice running. The move after next is rolled a turn ahead, so Foresight, scouting and the Hanged Augur still show it truly. Rivals and Final Champions also weight up (`MOVE_PICK.tactic`, ×3) a move that answers the fight: one that goes around Block when yours is big, a cleanse when they are afflicted, a heal when they are below 40%, their hardest hit when you are below 35%. Practice fights, Rank Trial examiners, legends and the Undefeated keep their fixed order. `node tools/moves-test.js` checks it.
 
+### Side goals
+
+Every monster and rival fight (not Final Champions, Rank Trials, the Elite bracket or practice) gets one side goal, picked from `SIDE_GOALS` in `js/content/enemies.js` among those that fit the opponent, and announced by the System at the start. It shows as a chip on the player's side: open, ✓ met, or ✗ lost. Win and meet it for `SIDE_GOAL_GOLD` bonus gold (3 against monsters, 4 against rivals).
+
+| Goal | Fits when | Met when |
+| --- | --- | --- |
+| Calm hands | it has a Reflex | you win without setting one off |
+| Break the wind-up | one of its moves is big enough to be a wind-up | you break a wind-up |
+| Crack the guard | it has a guard (break) bar | you break its guard once |
+
+`node tools/goal-test.js` checks it.
+
 ### Wind-ups
 
-Any move big enough to show as a big move (`isBig` in `js/core.js`: at least 15% of the player's max HP) is a **wind-up**. Under the intent the player sees how much damage breaks it (`WINDUP.share`, 15% of the opponent's max HP). Damage the player deals on their own turn, past Block, counts towards it; reach the number and the move falls apart: it goes on cooldown (`WINDUP.cd`) and the opponent shows another move. Stuns and Interrupts still cancel it outright. `node tools/windup-test.js` checks it.
+Any move big enough to show as a big move (`isBig` in `js/core.js`: at least 15% of the player's max HP) is a **wind-up**. Under the intent the player sees how much damage breaks it ("Break: N dmg") (`WINDUP.share`, 15% of the opponent's max HP). Damage the player deals on their own turn, past Block, counts towards it; reach the number and the move falls apart: it goes on cooldown (`WINDUP.cd`) and the opponent shows another move. Stuns and Interrupts still cancel it outright. `node tools/windup-test.js` checks it.
 
 ## The effect menu
 

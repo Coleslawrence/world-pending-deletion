@@ -159,6 +159,9 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .nx-traits b { color: var(--elite); font-weight: 600; }
 .nx-traits .glitch b, .chip.trait.glitch, .tag.glitch, .sysl.glitch, .msgs li.glitch b { color: var(--bad); }
 .chip.trait { color: var(--elite); border-style: dashed; }
+.chip.goal { color: var(--elite); border-style: dotted; }
+.chip.goal.met { color: var(--good); }
+.chip.goal.lost { color: var(--muted); text-decoration: line-through; }
 .nx-scout { font-size: var(--fs-1); color: var(--sys); font-family: var(--f-m); margin-top: 2px; }
 .crest { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; flex: none; border: 2px solid var(--line2); background: radial-gradient(circle at 35% 30%, var(--panel2), var(--bg)); font-family: var(--f-d); font-size: var(--fs-4); color: var(--text); position: relative; }
 .crest::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; border: 1px dashed currentColor; opacity: .25; }
@@ -383,7 +386,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .tile.empty { display: grid; place-items: center; color: var(--dim); background: transparent; border-style: dashed; border-top-width: 1px; font-size: var(--fs-1); cursor: default; text-transform: capitalize; }
 .tile.locked { box-shadow: inset 0 0 0 1px var(--sys); }
 .tile.bonus { box-shadow: inset 0 0 0 1px var(--elite); } .tile.bonus::before { content: "Reward"; position: absolute; right: 5px; top: -9px; font-family: var(--f-m); font-size: var(--fs-1); color: var(--ink); background: var(--elite); border-radius: var(--r-s); padding: 0 4px; }
-.tl-h { display: flex; gap: 5px; align-items: center; justify-content: space-between; }
+.tl-h { display: flex; flex-wrap: wrap; gap: 0 5px; align-items: center; justify-content: space-between; } /* stars wrap under the rank on a 4-wide skill bar at 320 */
 .tl-h .stars { letter-spacing: -2px; } /* three stars beside a rank chip fit a 320-wide bench tile */
 .tl-n { font-size: var(--fs-1); font-weight: 700; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .tl-n .pfx { font-weight: 500; }

@@ -51,6 +51,8 @@ jobs:
         run: node tools/windup-test.js
       - name: Weighted moves test
         run: node tools/moves-test.js
+      - name: Side goal test
+        run: node tools/goal-test.js
       - name: Path evolution test
         run: node tools/advance-test.js
       - name: Prefix test
