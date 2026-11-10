@@ -103,6 +103,11 @@ function states() {
     { const wk = G.contractWeek(), b = G.contractBoard(wk); meta.goal = { offer: ['giant', 'overkill', 'nohosp'], pick: 'nohosp' }; meta.contracts = { week: wk, done: { [b[0]]: 1 }, weeks: 2 };
       out.push({ label: 'sheet-goal', stage: 'worlds', sheet: 'goal', run: mid.run }, { label: 'sheet-contracts', stage: 'worlds', sheet: 'contracts', run: mid.run });
       me.goal = { id: 'nohosp', met: true, paid: 10, xp: 15 }; me.contractsDone = b.map(id => ({ id, pay: G.CONTRACT_ECHOES[G.GOALS[id.split(':')[0]].tier] })); me.contractWeek = 3; }
+    // Rival grudges (Phase 7): a grudge match on the choice screen, the Archive with records and a retired rival
+    { meta.grudges = { grukk: { w: 3, l: 1, last: 'w', retired: 1 }, lyss: { w: 0, l: 2, last: 'l', retired: 0 }, kaito: { w: 2, l: 0, last: 'w', retired: 0 } }; meta.archive = Object.assign({}, meta.archive, { rivals: Object.assign({}, meta.archive && meta.archive.rivals, { grukk: true, lyss: true, kaito: true }) });
+      const rc2 = out.find(s => s.stage === 'choose' && s.run && s.run.choices && s.run.choices.length > 1);
+      if (rc2) { const rg = JSON.parse(JSON.stringify(rc2.run)); rg.choices = rg.choices.map((c, i) => i ? Object.assign(c, { kind: 'rival', id: 'lyss', grudge: true }) : c); out.push({ label: 'choose-grudge', stage: 'choose', run: rg }); }
+      out.push({ label: 'sheet-archive-grudges', stage: 'shop', sheet: 'archive', run: mid.run }); me.retired = ['grukk']; }
     out.push({ label: 'end-erased', stage: 'end-erased', run: me }, { label: 'end-spared', stage: 'end-spared', run: me });
     ['stats', 'archetypes', 'menu', 'report'].forEach(sh => out.push({ label: 'sheet-' + sh, stage: 'shop', sheet: sh, run: mid.run }));
     meta.tutorialDone = true;
