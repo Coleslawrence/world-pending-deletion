@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 } }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' } }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -515,6 +515,7 @@ function newRun(world, setup, meta, rng) {
   ladderStart(run);
   masteryStart(run, meta, !!setup.seed);
   run.designs = designsOn(run) ? Object.keys(sanitizeDesigns(meta.designs).filed) : [];
+  clauseStart(run, meta);
   run.draft = rollDraft(run, stream(run, 'draft', rng));
   run.gearDraft = rollGearDraft(run, stream(run, 'gearDraft', rng));
   // Divine Gifts were marked before the Silence, so they arrive even in a Silence world
@@ -657,6 +658,7 @@ function price(run, item) {
   let v = PRICE[pieceDef(item.id).rank] + (item.mods ? item.mods.length : 0) + (hasGift(run, 'f_cursed') ? 1 : 0);
   if (hasGift(run, 'affinity') && pieceDef(item.id).tags.includes(run.arch[0])) v = Math.max(1, v - 1);
   v += amendOf(run).priceUp;
+  if (clauseOf(run).skillTax && SKILLS[item.id]) v += clauseOf(run).skillTax; // Collector's Clause
   if (run.tokenOn === 'discount') v = Math.max(0, v - 1);
   if (run.haggle) v = Math.max(0, v - 1);
   return v;
@@ -688,7 +690,7 @@ function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id &&
 const INCOME = { base: 5, per: 4, cap: 5, golden: 8 };
 function interestCap(run) { return (hasGift(run, 'golden') ? INCOME.golden : INCOME.cap) + (hasPerk(run, 'ledger') ? 1 : 0) + (hasVoucher(run, 'interest') ? 2 : 0); }
 function interestOf(run) { return Math.min(interestCap(run), Math.floor(run.gold / INCOME.per)); }
-function income(run) { return Math.max(0, INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0) + (hasVoucher(run, 'income') ? 2 : 0) + amendOf(run).income); }
+function income(run) { return Math.max(0, INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0) + (hasVoucher(run, 'income') ? 2 : 0) + amendOf(run).income + (clauseOf(run).income || 0)); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
   let i = run.bar.findIndex(p => p && p.u === u); if (i >= 0) return { p: run.bar[i], at: 'bar', i };
@@ -1125,7 +1127,7 @@ function tickCurse(run, meta, msgs, rng) {
   shapeApply(C.pay, shapeCtx(run, msgs, 'Cursed door', rng));
 }
 // ---------- The difficulty ladder: Priority, Challenge worlds, Marks of mastery, Past the Undefeated (content in ladder.js) ----------
-function newMarks() { return { arch: {}, world: {}, challenge: {}, depth: 0 }; }
+function newMarks() { return { arch: {}, world: {}, challenge: {}, clause: {}, depth: 0 }; }
 // meta.priority: max is the highest level open, set the level chosen for the next world. want: a level asked for now
 function sanitizePriority(p, want) {
   const max = clamp(Math.floor((p && p.max) || 0), 0, PRIORITY.length);
@@ -1157,6 +1159,7 @@ function settleLadder(run, meta, outcome) {
   const raise = (kind, key) => { const M = meta.marks[kind], was = M[key] || 0; if (v > was) { M[key] = v; if (!was || markTier(v) !== markTier(was)) out.marks.push({ kind, key, v, tier: markTier(v).name }); } return was; };
   raise('arch', run.arch[0]); raise('world', run.world.type);
   if (CHALLENGES[run.challenge] && !raise('challenge', run.challenge)) out.echoes += CHALLENGE_ECHOES;
+  if (CLAUSES[run.clause] && run.clause !== 'standard') raise('clause', run.clause);
   run.ladder = out;
   return out;
 }
@@ -1274,6 +1277,40 @@ function fileDesign(meta, id) {
   meta.echoes -= designCost(id); meta.designs.filed[id] = 1; return true;
 }
 
+// ---------- Entry Clauses (Phase 5; content in clauses.js) ----------
+// meta.clauses: { open: { key: 1 }, set: the Clause chosen for the next world }. A run carries its Clause (run.clause);
+// Pending World and practice runs have none. Feats are checked as the run goes (resolveFight) and when it ends.
+function sanitizeClauses(c) { const open = { standard: 1 }; Object.keys(CLAUSES).forEach(k => { if (c && c.open && c.open[k]) open[k] = 1; }); return { open, set: c && open[c.set] ? c.set : 'standard' }; }
+function setClause(meta, k) { meta.clauses = sanitizeClauses(meta.clauses); if (meta.clauses.open[k]) meta.clauses.set = k; return meta.clauses.set; }
+function clauseOf(run) { return (run && run.clause && CLAUSES[run.clause]) || {}; }
+function clauseStart(run, meta) {
+  if (run.seed || run.practice || run.script) return;
+  const k = sanitizeClauses(meta.clauses).set; if (k === 'standard') return;
+  const C = CLAUSES[k]; run.clause = k;
+  if (C.gold) run.gold += C.gold;
+  if (C.level) run.level = Math.max(run.level, C.level);
+  if (C.heartCut) { run.maxHearts -= C.heartCut; run.hearts = Math.min(run.hearts, run.maxHearts); }
+  if (C.patronFavour && run.patron && run.patron !== 'none') run.favour[run.patron] += C.patronFavour;
+  if (C.statPts) { if (run.startPts != null) run.startPts += C.statPts; else run.statPts += C.statPts; }
+}
+// The feats that open Clauses. at: 'fight' (after a win) or 'end' (when the run ends, with its outcome)
+const CLAUSE_FEATS = {
+  pauper: { at: 'end', ok: run => run.gold >= 30 },
+  collector: { at: 'fight', ok: run => GEAR_SLOTS.every(s => run.gear[s] && run.gear[s].star >= 2) },
+  veteran: { at: 'end', ok: (run, meta) => (meta.wins || 0) >= 5 },
+  gambler: { at: 'end', ok: run => (run.wagersWon || 0) >= 3 },
+  patron: { at: 'end', ok: run => Object.values(run.favour || {}).some(v => v >= 8) },
+  hermit: { at: 'end', ok: (run, meta, outcome) => (outcome === 'spared' || outcome === 'elite') && !run.infirmaryUsed },
+  barehands: { at: 'fight', ok: run => GEAR_SLOTS.every(s => !run.gear[s]) },
+};
+function openClauses(run, meta, at, outcome, msgs) {
+  if (!meta || run.practice || run.script) return [];
+  meta.clauses = sanitizeClauses(meta.clauses);
+  const got = Object.keys(CLAUSE_FEATS).filter(k => !meta.clauses.open[k] && (CLAUSE_FEATS[k].at === at || (at === 'end' && CLAUSE_FEATS[k].at === 'fight')) && CLAUSE_FEATS[k].ok(run, meta, outcome));
+  got.forEach(k => { meta.clauses.open[k] = 1; (run.clauseOpened = run.clauseOpened || []).push(k); if (msgs) msgs.push({ t: 'class', text: `[Entry Clause on file: ${CLAUSES[k].name}. Choose it before your next world.]` }); });
+  return got;
+}
+
 const BRACKET_FIELD = [256, 128, 64, 32, 16, 8, 4, 2];
 const BRACKET_STAGES = { qualifier: 'Qualifier', main: 'Main bracket', final: 'Final' };
 function bracketStage(r) { return r >= ROUNDS ? 'final' : r <= 3 ? 'qualifier' : 'main'; }
@@ -1307,8 +1344,9 @@ function bracketMap(run) {
   return { rows, elite };
 }
 function chooseOpponent(run, i, wagerOn) {
-  run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= 5);
-  if (run.wagerOn) { run.gold -= 5; notePick(run, 'w:' + run.wager.god); }
+  const stake = clauseOf(run).freeWager ? 0 : 5; // Gambler's Clause: wagers cost nothing to place
+  run.chosen = run.choices[i]; run.wagerOn = !!(wagerOn && run.wager && run.gold >= stake);
+  if (run.wagerOn) { run.gold -= stake; notePick(run, 'w:' + run.wager.god); }
   toDistrict(run);
 }
 function currentSpec(run) { return run.elite ? run.eliteBracket[run.eliteIdx] : run.chosen; }
@@ -1343,6 +1381,7 @@ function godZeros() { const o = {}; Object.keys(GODS).forEach(g => o[g] = 0); re
 function addFavour(run, god, n, meta, msgs, rng) {
   if (n < 0) { const b = run.favour[god] || 0; run.favour[god] = Math.max(0, b + n); if (b > run.favour[god]) msgs && msgs.push({ t: 'loss', text: `[${GODS[god].name} is displeased. Favour −${b - run.favour[god]}.]` }); return; }
   if (customOf(run, 'temple')) { n++; customPaid(run, msgs); } // Temple State: omens, every Favour gain +1
+  if (clauseOf(run).otherFavour && god !== run.patron) { n = Math.floor(n * clauseOf(run).otherFavour); if (!n) return; } // Patron's Clause
   // The Silence: the gods don't answer in this world until its Fate is lifted. Favour earned meanwhile is held, not lost
   if (silent(run)) { run.heldFavour = run.heldFavour || {}; run.heldFavour[god] = (run.heldFavour[god] || 0) + n; msgs && msgs.push({ t: 'sys', text: `[${run.world.name} is silent. ${GODS[god].name} did not hear. Favour held: +${n}.]` }); return; }
   run.favour[god] = (run.favour[god] || 0) + n;
@@ -1384,7 +1423,7 @@ function rollDistricts(run, rng) {
   if (run.script && run.script.districts && run.script.districts[run.round - 1]) return run.script.districts[run.round - 1].slice();
   let keys = Object.keys(DISTRICTS).filter(k => !(k === 'sanctum' && run.hearts >= run.maxHearts) && !(k === 'infirmary' && run.hp >= maxHp(run)) && !(k === 'scout' && hasGift(run, 'appraisal')));
   const w = { infirmary: 3, sanctum: 2, undercity: 3, scout: 2, enchanter: 3 };
-  const want = (customOf(run, 'pilgrims') ? 4 : 3) + (hasVoucher(run, 'district') ? 1 : 0) + (run.tokenOn === 'district' ? 1 : 0); // Pilgrims: the road, one more district to pick from
+  const want = (customOf(run, 'pilgrims') ? 4 : 3) + (hasVoucher(run, 'district') ? 1 : 0) + (run.tokenOn === 'district' ? 1 : 0) - (clauseOf(run).districtCut || 0); // Pilgrims: the road, one more district to pick from
   const out = []; let g = 0; while (out.length < want && g++ < 50) { const k = wpick(keys, keys.map(x => w[x]), rng); if (!out.includes(k)) out.push(k); }
   if (run.hp < maxHp(run) * 0.45 && !out.includes('infirmary')) out[2] = 'infirmary';
   if (run.world.mod === 'strange' && !out.includes('undercity')) out[out[2] === 'infirmary' ? 1 : 2] = 'undercity'; // Strange Times: the Undercity is always open
@@ -1779,7 +1818,8 @@ function rollDraft(run, rng) {
   // at least one from the home archetype
   const home = pool.filter(id => SKILLS[id].tags.includes(run.arch[0]));
   if (home.length) out.push(pick(home, rng));
-  while (out.length < 6 && g++ < 200) { const id = pick(pool, rng); if (!out.includes(id)) out.push(id); }
+  const size = 6 - (clauseOf(run).draftCut || 0);
+  while (out.length < size && g++ < 200) { const id = pick(pool, rng); if (!out.includes(id)) out.push(id); }
   return shuffle(out, rng);
 }
 // The opening gear pick (Pick Your Kit): after the 3 skills, 1 of 2 E-rank gear pieces from the run's archetypes, one of
@@ -1787,6 +1827,7 @@ function rollDraft(run, rng) {
 function rollGearDraft(run, rng) {
   if (run.script && !run.script.gearDraft) return [];
   if (run.script) return run.script.gearDraft.slice();
+  if (clauseOf(run).noGear) return []; // Bare Hands
   const ok = id => { const g = GEAR[id]; return g.rank === 'E' && !g.glitch && !g.experimental && !g.consumable && g.tags.some(t => run.arch.includes(t)) && masteryOpen(run, id); };
   const pool = Object.keys(GEAR).filter(ok), home = pool.filter(id => GEAR[id].tags.includes(run.arch[0]));
   const out = []; if (home.length) out.push(pick(home, rng));
@@ -1795,8 +1836,9 @@ function rollGearDraft(run, rng) {
   const other = rest.find(id => !out.length || GEAR[id].slot !== GEAR[out[0]].slot) || rest[0];
   if (other) out.push(other);
   // Mastery level 9 of the home archetype: a third piece on offer
-  if (masteryKit(run) > 2) { const third = rest.find(id => !out.includes(id)); if (third) out.push(third); }
-  return out.slice(0, masteryKit(run));
+  const want = masteryKit(run) + (clauseOf(run).gearPlus || 0); // Mastery level 9, the Collector's Clause
+  rest.filter(id => !out.includes(id)).slice(0, Math.max(0, want - out.length)).forEach(id => out.push(id));
+  return out.slice(0, want);
 }
 // The opening stat points, after the draft: place them one at a time, or roll ROLL_PTS once (seeded per Awakening, so
 // it can't be fished for). Nothing counts until placeStartStats.
@@ -1870,7 +1912,7 @@ function enterChoose(run, meta, rng, msgs) {
 // Each round: choose an opponent, visit a district, shop, fight. The district comes first, so the shop's exit is the fight.
 function toDistrict(run, rng) { run.stage = 'district'; run.districts = rollDistricts(run, stream(run, 'opps', rng)); }
 function leaveShop(run, rng, msgs) { questEvent(run, 'shop', {}, msgs); if (tokenReady(run)) { run.token = run.tokenOffer; msgs && msgs.push({ t: 'loot', text: `[Nothing spent. Issued: ${TOKENS[run.token].name}, ${TOKENS[run.token].say}.]` }); } run.tokenOffer = null; run.stage = 'ready'; }
-function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; if (run.districts.length > 3 && customOf(run, 'pilgrims')) customPaid(run, run.log); if (k === 'enchanter' && customOf(run, 'archive')) customPaid(run, run.log); run.districts = []; run.stage = 'shop'; notePick(run, 'd:' + k); if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
+function useDistrict(run, k, rng) { if (!run.districts.includes(k)) return false; if (k === 'infirmary') run.infirmaryUsed = true; if (run.districts.length > 3 && customOf(run, 'pilgrims')) customPaid(run, run.log); if (k === 'enchanter' && customOf(run, 'archive')) customPaid(run, run.log); run.districts = []; run.stage = 'shop'; notePick(run, 'd:' + k); if (k === 'scout') { run.scouted = true; if (districtUp(run, k)) run.nextFlags.foeWeaken = 1; } if (k === 'undercity') pushEvent(run, undercityEvent(run, stream(run, 'event', rng)), rng); return true; }
 // District upgrades from stats: the stat that improves each district, at STAT_EASY
 const DISTRICT_STAT = { infirmary: 'VIT', scout: 'AGI', enchanter: 'INT' };
 function districtUp(run, k) { return !!DISTRICT_STAT[k] && effStats(run)[DISTRICT_STAT[k]] >= STAT_EASY; }
@@ -3078,7 +3120,7 @@ function resolveFight(run, f, meta, rng) {
       msgs.push({ t: 'favour', text: `[Wager won: ${W.text}. +${pay} gold.]` }); applyOutcomes(prize, ctx, true);
       titleFeats('wager');
     }
-    else msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.]` });
+    else { const lost = Math.min(run.gold, clauseOf(run).wagerLoss || 0); run.gold -= lost; msgs.push({ t: 'loss', text: `[Wager lost: ${W.text}.${lost ? ` The Clause collects ${lost} gold.` : ''}]` }); }
     run.wagerOn = false;
   }
   run.met.push(specKey(spec));
@@ -3101,6 +3143,7 @@ function resolveFight(run, f, meta, rng) {
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
     if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
+    openClauses(run, meta, 'fight', null, msgs);
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); dropDesign(run, meta, msgs, rng); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }
     if (runP(run).goldPerWin) { run.gold += runP(run).goldPerWin; msgs.push({ t: 'loot', text: `[The House pays out: +${runP(run).goldPerWin} gold.]` }); }
     if (META && !META.unlocks.arch_jinx && !run.practice && (spec.id === 'mott' || (f.tally.missed || 0) >= 3)) { META.unlocks.arch_jinx = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Jinx. Please stand well back.]' }); } // beat Mott, or win a fight where 3 attacks missed you
@@ -3194,6 +3237,7 @@ function endRun(run, meta, outcome) {
   settleBacking(run, meta, outcome);
   const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
   run.masteryGain = settleMastery(run, meta, outcome);
+  openClauses(run, meta, 'end', outcome, null);
   settleDesigns(run, meta);
   const rk = awardRank(run, meta, outcome); run.rpEarned = rk.rp; run.trialOpened = rk.trial;
   run.ended = true;
@@ -3471,7 +3515,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
