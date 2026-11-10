@@ -10,6 +10,10 @@ sk('sacred_flame', 'Sacred Flame', ['zealot', 'pyre'], 'B', 3, { dmg: 9, burn: 4
 sk('pandemic', 'Pandemic', ['venom', 'pyre'], 'A', 4, { burn: 8, poison: 6 }, [['apocalypse', 'Apocalypse', { burn: 12, poison: 10 }], ['black_death', 'Black Death', { burn: 8, poison: 6, weaken: 2 }], ['fever_dream', 'Fever Dream', { burn: 8, poison: 6, misf: 3 }]]);
 sk('backdraft', 'Backdraft', ['pyre'], 'D', 3, { burn: 4, read: 'attack', readFx: { burn: 4, detonate: 1 } }, [['blowback', 'Blowback', { burn: 4, read: 'attack', readFx: { burn: 4, detonate: 1, keep: 1 } }], ['smoke_screen', 'Smoke Screen', { burn: 4, read: 'attack', readFx: { burn: 4, evade: 1 } }], ['flash_fire', 'Flash Fire', { burn: 4, read: 'attack', readFx: { burn: 4, detonate: 1, block: 8 } }]]);
 sk('hex_brand', 'Hex Brand', ['pyre', 'jinx'], 'C', 3, { burn: 6, misf: 3 }, [['cursed_brand', 'Cursed Brand', { burn: 6, misf: 3, mark: 2 }], ['ashen_hex', 'Ashen Hex', { burn: 6, misf: 3, weaken: 1 }], ['warding_brand', 'Warding Brand', { burn: 6, misf: 3, block: 6 }]]);
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('slow_fuse', 'Slow Fuse', ['pyre'], 'D', 3, { burn: 3, fuse: 3 }, [['short_fuse', 'Short Fuse', { burn: 5, fuse: 5 }], ['powder_trail', 'Powder Trail', { dmg: 5, burn: 3, fuse: 3 }], ['banked_coals', 'Banked Coals', { burn: 3, fuse: 3, block: 6 }]], { mastery: 4 });
+sk('flashover', 'Flashover', ['pyre'], 'B', 4, { dmg: 6, flash: 12 }, [['white_heat', 'White Heat', { dmg: 6, flash: 18 }], ['rollover', 'Rollover', { dmg: 6, flash: 12, weaken: 2 }], ['flash_burn', 'Flash Burn', { dmg: 10, flash: 12 }]], { mastery: 6 });
+sk('conflagration', 'Conflagration', ['pyre'], 'A', 5, { dmg: 6, hits: 3, burn: 4, perHit: 1 }, [['pyroclasm', 'Pyroclasm', { dmg: 6, hits: 4, burn: 4, perHit: 1 }], ['ashfall', 'Ashfall', { dmg: 6, hits: 3, burn: 4, perHit: 1, weaken: 2 }], ['ring_of_fire', 'Ring of Fire', { dmg: 6, hits: 3, burn: 4, perHit: 1, block: 10 }]], { mastery: 8 });
 flav({
   firebolt: "Fire, thrown. The oldest argument in the Burning Empire.",
   fireball: "It gets bigger on the way.",
@@ -51,4 +55,16 @@ flav({
   cursed_brand: "The brand glows brighter wherever you strike next.",
   ashen_hex: "Ash in the joints. Their swing comes slow and late.",
   warding_brand: "You keep the hot iron between you and them.",
+  slow_fuse: "Lit now. It will get to them in its own time.",
+  short_fuse: "Less waiting. Considerably less.",
+  powder_trail: "A line of black powder, and you at the safe end of it.",
+  banked_coals: "Covered over for the night. Still hot in the morning.",
+  flashover: "The moment a room stops having a fire in it and becomes one.",
+  white_heat: "Past red, past orange. The colour of nothing surviving.",
+  rollover: "Flame running across the ceiling, looking for the door.",
+  flash_burn: "It is over before the heat arrives.",
+  conflagration: "[Fire has exceeded the arena. The arena has been notified.]",
+  pyroclasm: "The mountain's opinion, delivered four times.",
+  ashfall: "Grey snow. It settles on them and they slow.",
+  ring_of_fire: "You stand in the middle. That is the only good place to stand.",
 });

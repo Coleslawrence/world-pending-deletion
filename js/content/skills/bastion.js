@@ -9,6 +9,9 @@ sk('unbreakable', 'Unbreakable', ['bastion'], 'B', 4, { block: 20, cleanse: 1 },
 sk('bulwark_slam', 'Bulwark Slam', ['bastion'], 'A', 3, { dmg: 4, blockDmg: 1.2 }, [['titan_slam', 'Titan Slam', { dmg: 6, blockDmg: 1.6 }], ['shield_quake', 'Shield Quake', { dmg: 4, blockDmg: 1.2, stun: 1 }, 4], ['siege_slam', 'Siege Slam', { dmg: 4, blockDmg: 1.2, pierce: 1 }]]);
 sk('brace_for_it', 'Brace for It', ['bastion'], 'D', 2, { block: 6, read: 'attack', readFx: { block: 18, thorns: 6 } }, [['riposte_stance', 'Riposte Stance', { block: 6, read: 'attack', readFx: { block: 16, riposte: 1 } }], ['steady_footing', 'Steady Footing', { block: 10, regen: 3, read: 'attack', readFx: { block: 20, regen: 3 } }], ['baited_guard', 'Baited Guard', { block: 6, read: 'attack', readFx: { block: 12, mark: 2 } }]]);
 sk('hold_the_line', 'Hold the Line', ['bastion', 'zealot'], 'C', 3, { block: 10, regen: 3 }, [['hallowed_line', 'Hallowed Line', { block: 10, regen: 3, cleanse: 1 }], ['thorned_line', 'Thorned Line', { block: 10, regen: 3, thorns: 6 }], ['watchfire', 'Watchfire', { block: 10, regen: 3, heal: 6 }]]);
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('shield_wall', 'Shield Wall', ['bastion'], 'D', 3, { block: 7, thornsFight: 3 }, [['phalanx', 'Phalanx', { block: 11, thornsFight: 3 }], ['spiked_wall', 'Spiked Wall', { block: 7, thornsFight: 5 }], ['wall_of_faith', 'Wall of Faith', { block: 7, thornsFight: 3, heal: 5 }]], { mastery: 4 });
+sk('stand_fast', 'Stand Fast', ['bastion'], 'C', 3, { block: 12, hold: 1 }, [['dig_in', 'Dig In', { block: 17, hold: 1 }], ['bristle', 'Bristle', { block: 12, hold: 1, thorns: 5 }], ['second_rank', 'Second Rank', { block: 12, hold: 1, heal: 6 }]], { mastery: 6 });
 flav({
   iron_guard: "Feet planted, shield up. The oldest lesson in the Iron Hold.",
   fortress: "They hit the shield. The shield does not notice.",
@@ -46,4 +49,12 @@ flav({
   hallowed_line: "Nothing unclean crosses this line, including what is already on you.",
   thorned_line: "The line bites anyone who leans on it.",
   watchfire: "A small fire behind the shield wall. Someone always keeps it lit.",
+  shield_wall: "One shield is a decision. A wall of them is a policy.",
+  phalanx: "Shoulder to shoulder with nobody. It still holds.",
+  spiked_wall: "Built by someone who has been leaned on before.",
+  wall_of_faith: "It stands because you believe it does. So far that has been enough.",
+  stand_fast: "The next blow lands where this one did. You will still be there.",
+  dig_in: "Heels in the sand. The arena can move round you.",
+  bristle: "Come closer and find out what the edges are for.",
+  second_rank: "Someone behind the wall, binding wounds between blows.",
 });

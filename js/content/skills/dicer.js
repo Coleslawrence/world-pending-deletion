@@ -13,6 +13,9 @@ sk('thunder_dice', 'Thunder Dice', ['dicer', 'storm'], 'D', 3, { die: 1, dmg: 4,
 sk('crooked_odds', 'Crooked Odds', ['dicer', 'jinx'], 'E', 2, { reroll: 1, misf: 2 }, [['sore_loser', 'Sore Loser', { reroll: 1, misf: 2, jinxDisc: 2 }], ['loaded_luck', 'Loaded Luck', { reroll: 1, block: 6 }], ['fixed_game', 'Fixed Game', { reroll: 1, misf: 2, focus: 0.2 }]], { quick: true });
 sk('call_the_bluff', 'Call the Bluff', ['dicer'], 'D', 2, { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2 } }, [['raise_the_stakes', 'Raise the Stakes', { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2, weaken: 1 } }], ['fold', 'Fold', { die: 1, blockPip: 3, dmgPip: 2, read: 'attack', readFx: { readMult: 2 } }], ['poker_face', 'Poker Face', { die: 1, dmgPip: 3, read: 'attack', readFx: { readMult: 2, evade: 1 } }]]);
 sk('storm_chaser', 'Storm Chaser', ['dicer', 'storm'], 'C', 3, { die: 1, dmg: 5, dmgPip: 2, brk: 6 }, [['charged_roll', 'Charged Roll', { die: 1, dmg: 5, dmgPip: 2, brk: 6, dieStun: 6 }], ['static_bet', 'Static Bet', { die: 1, dmg: 5, dmgPip: 2, brk: 6, weaken: 1 }], ['grounded_bet', 'Grounded Bet', { die: 1, dmg: 5, dmgPip: 2, brk: 6, blockPip: 2 }]]);
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('let_it_ride', 'Let It Ride', ['dicer'], 'D', 2, { die: 1, dmgPip: 3, ride: 4 }, [['hot_streak', 'Hot Streak', { die: 1, dmgPip: 4, ride: 4 }], ['easy_money', 'Easy Money', { die: 1, dmgPip: 3, ride: 3 }], ['ride_or_die', 'Ride or Die', { die: 1, dmgPip: 3, blockPip: 1, ride: 4 }]], { mastery: 4 });
+sk('table_stakes', 'Table Stakes', ['dicer'], 'C', 3, { die: 1, dmgHigh: 5, tapOut: 1 }, [['high_roller_bet', "High Roller's Bet", { die: 1, dmgHigh: 7, tapOut: 1 }], ['covered_bet', 'Covered Bet', { die: 1, dmgHigh: 5, blockPip: 2, tapOut: 1 }], ['house_money', 'House Money', { die: 1, dmgHigh: 5 }]], { mastery: 6 });
 flav({
   thunder_dice: "Two bones carved from a tree the lightning picked twice.",
   rolling_thunder: "The odds are bad. The storm doesn't read them.",
@@ -58,4 +61,12 @@ flav({
   charged_roll: "The die crackles. Roll a six and so do they.",
   static_bet: "Hair on end, arms gone numb. Theirs, not yours.",
   grounded_bet: "Half the stake on the strike, half on the shelter.",
+  let_it_ride: "You leave the winnings where they are. The table goes quiet.",
+  hot_streak: "Nobody touches the dice. Nobody wants to be the reason it stops.",
+  easy_money: "A low bar, cleared again.",
+  ride_or_die: "Some of it stays on the table. Some of it stands in front of you.",
+  table_stakes: "Your best die, and everything else you brought, on one number.",
+  high_roller_bet: "The pit boss comes over to watch. That is never free.",
+  covered_bet: "Everything in, with a little held back under the table.",
+  house_money: "It was never yours to lose. That makes it easy.",
 });

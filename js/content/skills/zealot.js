@@ -8,6 +8,9 @@ sk('second_wind', 'Second Wind', ['zealot'], 'D', 4, { healMissing: 0.25, brk: 4
 sk('consecrate', 'Consecrate', ['zealot'], 'C', 4, { regen: 4, brk: 4 }, [['hallowed_ground', 'Hallowed Ground', { regen: 7, brk: 6 }], ['holy_fire', 'Holy Fire', { regen: 4, burn: 4, brk: 6 }], ['sanctified_ground', 'Sanctified Ground', { regen: 4, brk: 4, thorns: 5 }]]);
 sk('miracle', 'Miracle', ['zealot'], 'A', 6, { healMissing: 0.5, cleanse: 1, block: 10, brk: 10 }, [['resurrection', 'Resurrection', { healMissing: 0.7, cleanse: 1, block: 12, brk: 10 }], ['divine_wrath', 'Divine Wrath', { healMissing: 0.4, dmg: 15, brk: 14 }], ['ascension', 'Ascension', { healMissing: 0.4, cleanse: 1, empower: 3, brk: 10 }]]);
 sk('vigil', 'Vigil', ['zealot'], 'D', 2, { heal: 6, read: 'debuff', readFx: { heal: 10, cleanse: 1, block: 8 } }, [['night_watch', 'Night Watch', { heal: 6, regen: 2, read: 'debuff', readFx: { heal: 8, cleanse: 1, regen: 4 } }], ['warding_prayer', 'Warding Prayer', { heal: 6, read: 'debuff', readFx: { heal: 6, cleanse: 1, block: 16 } }], ['lantern_watch', 'Lantern Watch', { heal: 6, read: 'debuff', readFx: { heal: 6, cleanse: 1, empower: 1 } }]]);
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('lay_on_hands', 'Lay on Hands', ['zealot'], 'D', 3, { heal: 8, fullBlock: 6 }, [['healing_hands', 'Healing Hands', { heal: 12, fullBlock: 9 }], ['warding_hands', 'Warding Hands', { heal: 8, fullBlock: 6, block: 5 }], ['cleansing_hands', 'Cleansing Hands', { heal: 8, fullBlock: 6, cleanse: 1 }]], { mastery: 2 });
+sk('martyrs_vow', "Martyr's Vow", ['zealot'], 'C', 4, { regen: 5, brk: 6, block: 4 }, [['saints_vow', "Saint's Vow", { regen: 8, brk: 6, block: 4 }], ['stubborn_vow', 'Stubborn Vow', { regen: 5, brk: 6, block: 10 }], ['shattering_vow', 'Shattering Vow', { regen: 5, brk: 12, block: 4 }]], { mastery: 6 });
 flav({
   penance: "Every blow a prayer. Every prayer a blow.",
   atonement: "You strike once for every sin of theirs you can name.",
@@ -41,4 +44,12 @@ flav({
   sanctified_ground: "Holy ground that bites anyone who steps on it uninvited.",
   ascension: "You rise, and you keep rising.",
   lantern_watch: "The lamp shows the curse coming, and you answer it.",
+  lay_on_hands: "The oldest medicine. It works if you mean it.",
+  healing_hands: "Warm, steady and not in any hurry.",
+  warding_hands: "Palms out. Whatever comes next can wait.",
+  cleansing_hands: "What was in the wound is no longer in the wound.",
+  martyrs_vow: "Sworn aloud, so the gods could not pretend they missed it.",
+  saints_vow: "The Marches keep a list of people who said this. It is short.",
+  stubborn_vow: "You promised to stay standing. Nobody asked you to be reasonable.",
+  shattering_vow: "Kept so hard that something of theirs gives way.",
 });

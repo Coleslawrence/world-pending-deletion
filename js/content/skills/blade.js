@@ -9,6 +9,9 @@ sk('mark_prey', 'Mark Prey', ['blade'], 'C', 3, { mark: 2 }, [['hunters_mark', "
 sk('assassinate', 'Assassinate', ['blade', 'reaper'], 'B', 3, { dmg: 12, cruel: 2 }, [['death_blossom', 'Death Blossom', { dmg: 8, hits: 2, cruel: 2 }], ['coup_de_grace', 'Coup de Grace', { dmg: 16, cruel: 2.5 }], ['silent_kill', 'Silent Kill', { dmg: 12, cruel: 2, killReset: 1 }]]);
 sk('thousand_cuts', 'Thousand Cuts', ['blade'], 'A', 4, { dmg: 3, hits: 6, bleed: 1, perHit: 1 }, [['dance_of_death', 'Dance of Death', { dmg: 4, hits: 7, bleed: 1, perHit: 1 }], ['crimson_tempest', 'Crimson Tempest', { dmg: 3, hits: 6, bleed: 2, perHit: 1 }], ['cutting_wind', 'Cutting Wind', { dmg: 3, hits: 6, bleed: 1, perHit: 1, evade: 1 }]]);
 sk('sidestep', 'Sidestep', ['blade'], 'D', 2, { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 2 } }, [['shadowstep', 'Shadowstep', { dmg: 4, read: 'attack', readFx: { dmg: 4, evade: 1, nextCrit: 1 } }], ['dancing_feint', 'Dancing Feint', { dmg: 4, mark: 1, read: 'attack', readFx: { dmg: 4, evade: 1, mark: 3 } }], ['slipstream', 'Slipstream', { dmg: 4, read: 'attack', readFx: { dmg: 8, evade: 1, haste: 1 } }]], { quick: true });
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('open_vein', 'Open Vein', ['blade'], 'D', 2, { dmg: 5, bleed: 3, deepen: 1 }, [['arterial_cut', 'Arterial Cut', { dmg: 7, bleed: 4, deepen: 1 }], ['salted_wound', 'Salted Wound', { dmg: 5, bleed: 3, deepen: 1, poison: 2 }], ['twist_the_knife', 'Twist the Knife', { dmg: 5, bleed: 3, deepen: 1, mark: 2 }]], { mastery: 4 });
+sk('flurry_step', 'Flurry Step', ['blade'], 'B', 4, { dmg: 4, hits: 3, evade: 1 }, [['whirlwind_step', 'Whirlwind Step', { dmg: 4, hits: 4, evade: 1 }], ['bleeding_step', 'Bleeding Step', { dmg: 4, hits: 3, evade: 1, bleed: 2, perHit: 1 }], ['shadow_step', 'Shadow Step', { dmg: 4, hits: 3, evade: 2 }]], { mastery: 6 });
 flav({
   quick_slash: "Two cuts before the first one starts to sting.",
   flurry: "Steel everywhere at once. The crowd can only count the sparks.",
@@ -46,4 +49,12 @@ flav({
   silent_kill: "Nobody heard it. Nobody will hear the next one either.",
   cutting_wind: "You pass through them like weather.",
   slipstream: "You ride the wind of their swing straight into your next move.",
+  open_vein: "The first cut shows you where the second one goes.",
+  arterial_cut: "Deeper, and to the left.",
+  salted_wound: "The old remedy, used the wrong way round.",
+  twist_the_knife: "You leave it in a moment longer than you need to.",
+  flurry_step: "Three cuts on the way past, and you are already somewhere else.",
+  whirlwind_step: "A full turn. The blade comes round four times.",
+  bleeding_step: "Every step leaves a line, and none of them are yours.",
+  shadow_step: "They turn to face you twice. Wrong both times.",
 });

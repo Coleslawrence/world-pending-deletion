@@ -8,6 +8,9 @@ sk('momentum', 'Momentum', ['reaper'], 'C', 1, { dmg: 5, momentum: 4 }, [['unsto
 sk('doom', 'Doom', ['reaper'], 'B', 5, { doom: 26 }, [['swift_doom', 'Swift Doom', { doom: 22, doomT: 2 }], ['inevitable_doom', 'Inevitable Doom', { doom: 40 }], ['doom_and_gloom', 'Doom and Gloom', { doom: 22, weaken: 2 }]]);
 sk('soul_harvest', 'Soul Harvest', ['reaper'], 'A', 4, { dmg: 14, lifesteal: 0.6, execute: 0.3, execMult: 2 }, [['reaping', 'The Reaping', { dmg: 18, lifesteal: 0.6, execute: 0.3, execMult: 2.5 }], ['soul_feast', 'Soul Feast', { dmg: 14, lifesteal: 1, execute: 0.3, execMult: 2 }], ['grim_toll', 'Grim Toll', { dmg: 14, lifesteal: 0.6, execute: 0.3, execMult: 2, doom: 12 }]]);
 sk('punish', 'Punish', ['reaper'], 'D', 2, { dmg: 8, read: 'defend', readFx: { dmg: 20, pierce: 1 } }, [['no_hiding', 'No Hiding', { dmg: 8, read: 'defend', readFx: { dmg: 16, pierce: 1, weaken: 2 } }], ['exploit', 'Exploit', { dmg: 10, execute: 0.3, execMult: 2, read: 'defend', readFx: { dmg: 18, pierce: 1, execute: 0.3, execMult: 2 } }], ['make_an_example', 'Make an Example', { dmg: 8, read: 'defend', readFx: { dmg: 16, pierce: 1, brk: 10 } }]]);
+// Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
+sk('reap', 'Reap', ['reaper'], 'C', 3, { dmg: 12, reapHeal: 8 }, [['grim_harvest', 'Grim Harvest', { dmg: 16, reapHeal: 10 }], ['reap_and_sow', 'Reap and Sow', { dmg: 12, reapHeal: 8, bleed: 3 }], ['gleaning', 'Gleaning', { dmg: 12, reapHeal: 8, execute: 0.3, execMult: 1.5 }]], { mastery: 4 });
+sk('death_knell', 'Death Knell', ['reaper'], 'B', 4, { doom: 18, doomT: 2, doomExec: 1 }, [['final_rites', 'Final Rites', { doom: 26, doomT: 2, doomExec: 1 }], ['swift_rites', 'Swift Rites', { doom: 18, doomT: 1, doomExec: 1 }], ['tolling_bell', 'Tolling Bell', { dmg: 8, doom: 18, doomT: 2, doomExec: 1 }]], { mastery: 8 });
 flav({
   cleave: "A wide swing. It needs no skill, only commitment.",
   great_cleave: "The blade goes all the way round.",
@@ -41,4 +44,12 @@ flav({
   doom_and_gloom: "They know it is coming. Knowing makes them weaker.",
   grim_toll: "The bell rings once now, and once more later.",
   make_an_example: "Their shield goes in pieces into the crowd.",
+  reap: "The scythe does not ask whether the field is ready.",
+  grim_harvest: "A good year, by one way of counting.",
+  reap_and_sow: "What you cut down, you plant something in.",
+  gleaning: "After the harvest, you go back for what is left standing.",
+  death_knell: "Said early, as a courtesy. They will be needed.",
+  final_rites: "The long form. Nobody has ever heard the end of it.",
+  swift_rites: "The short form, for when the grave is already dug.",
+  tolling_bell: "One stroke now. The rest are on their way.",
 });
