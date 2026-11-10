@@ -136,6 +136,10 @@ grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes 
 
 When the trigger is met, the opponent's next move is the Reflex's instead of the next in its script, and the script then carries on from where it was. The move is shown as the intent before the player acts again, with the reason under it. A Reflex never fires two turns running, never off a turn the player lost, and not in practice fights. Examiners, legends, the Undefeated and other players' builds have none. `node tools/reflex-test.js` checks all of this for every Reflex.
 
+### Weighted moves and tactics
+
+Opponents with a Reflex do not loop their `script`: each turn they pick a move by chance, and a move's chance is how many times it appears in the script (so `[0, 0, 1]` is two parts move 0 to one part move 1). Never the same move three turns running (`MOVE_PICK.repeat`), never a big move twice running. The move after next is rolled a turn ahead, so Foresight, scouting and the Hanged Augur still show it truly. Rivals and Final Champions also weight up (`MOVE_PICK.tactic`, ×3) a move that answers the fight: one that goes around Block when yours is big, a cleanse when they are afflicted, a heal when they are below 40%, their hardest hit when you are below 35%. Practice fights, Rank Trial examiners, legends and the Undefeated keep their fixed order. `node tools/moves-test.js` checks it.
+
 ### Wind-ups
 
 Any move big enough to show as a big move (`isBig` in `js/core.js`: at least 15% of the player's max HP) is a **wind-up**. Under the intent the player sees how much damage breaks it (`WINDUP.share`, 15% of the opponent's max HP). Damage the player deals on their own turn, past Block, counts towards it; reach the number and the move falls apart: it goes on cooldown (`WINDUP.cd`) and the opponent shows another move. Stuns and Interrupts still cancel it outright. `node tools/windup-test.js` checks it.

@@ -1984,6 +1984,9 @@ function buildEnemy(run, spec) {
     skills: t.skills.map((x, i) => enemyMove(x, i, mp)), movePower: mp, power: p, phase: t.phase || (spec.gate ? gatePhase(t) : null), P: enemyPassives(t.passives, p),
     weaken: (spec.sabotaged ? 3 : 0) + (run.nextFlags.foeWeaken || 0), poison: run.nextFlags.foePoison || 0, burn: run.nextFlags.foeBurn || 0,
   }, enemyTraits(t, p), poolTraits(spec, t, p)));
+  // Weighted moves: opponents with a Reflex pick by chance (MOVE_PICK); practice fights, examiners, legends and the
+  // Undefeated keep their fixed order. Rivals and Final Champions also read the fight (tactics).
+  E.fixed = !!run.practice || !REFLEXES[spec.id]; E.tactics = !E.fixed && !!(t.rival || t.final); E.hist = []; E.next = null;
   const R = !run.practice && REFLEXES[spec.id];
   if (R) E.reflex = { on: R.on, say: R.say, use: R.use, s: R.move ? Object.assign(enemyMove(R.move, 0, mp), { key: 'r0' }) : null };
   return E;
@@ -2036,7 +2039,7 @@ function checkPhase(f, B, playerTurn) {
   B.phased = true;
   (ph.add || []).forEach(x => B.skills.push(enemyMove(x, B.skills.length, B.movePower)));
   if (playerTurn) B.phaseFresh = true; else phaseTraits(B);
-  if (ph.script) { B.script = ph.script; B.scriptIdx = 0; }
+  if (ph.script) { B.script = ph.script; B.scriptIdx = 0; B.next = null; }
   // A duo's partner tags in: a new name, and (clear) none of the Burn, Poison or Bleed that was on the first
   if (ph.swap) { B.name = ph.swap.name + (B.hard ? ', Veteran' : ''); if (ph.swap.clear) { B.burn = 0; B.poison = 0; B.bleed = 0; } }
   say(f, ph.say, 'loss'); ev(f, { k: 'phase', side: B.side });
@@ -2851,13 +2854,50 @@ function planMove(f, B, turnEnd) {
     ready.forEach(s => { if (scoreSkill(s, lowHp) > scoreSkill(best, lowHp)) best = s; });
     B.intent = best; B.interrupted = null; return;
   }
+  if (!B.fixed && B.hist) {
+    let i = B.next;
+    if (i == null || !B.skills[i] || B.skills[i].cd > 0 || moveBanned(f, B, i, B.hist)) i = rollMove(f, B, B.hist, false);
+    B.intent = B.skills[i]; B.interrupted = null;
+    B.next = rollMove(f, B, B.hist.concat(i), true);
+    return;
+  }
   const n = B.script.length;
   for (let k = 0; k < n; k++) { const s = B.skills[B.script[(B.scriptIdx + k) % n]]; if (s.cd <= 0) { B.scriptIdx += k; B.intent = s; B.interrupted = null; return; } }
   B.intent = B.skills[B.script[B.scriptIdx % n]]; B.interrupted = null;
 }
+// Weighted moves (Slay the Spire style): each move's chance is how often it appears in the opponent's script, so the
+// script still says what it favours, but you can't learn a loop. Never the same move three turns running, never a big
+// move twice running. The move after next is rolled ahead, so Foresight and the Hanged Augur still show it.
+const MOVE_PICK = { repeat: 2, tactic: 3 };
+function moveBig(f, B, s) { const fx = s.def.fx; return (fx.dmg || 0) * (fx.hits || 1) * s.power >= f.A.maxHp * 0.15; }
+function moveBanned(f, B, i, hist) {
+  const n = hist.length, s = B.skills[i];
+  if (n >= MOVE_PICK.repeat && hist.slice(-MOVE_PICK.repeat).every(h => h === i)) return true;
+  return n >= 1 && hist[n - 1] === i && moveBig(f, B, s);
+}
+// Tactics (rivals and Final Champions): a move that answers the fight as it stands is weighted up
+function moveTactic(f, B, s) {
+  const fx = s.def.fx, A = f.A; let m = 1;
+  if (A.block >= 8 * B.movePower && (fx.pierce || fx.blockDmg || fx.poison || fx.burn || fx.bleed)) m *= MOVE_PICK.tactic; // your Block is up: go around it
+  if (A.hp <= A.maxHp * 0.35 && (fx.dmg || 0) * (fx.hits || 1) >= Math.max(...B.skills.map(x => (x.def.fx.dmg || 0) * (x.def.fx.hits || 1)))) m *= MOVE_PICK.tactic; // you are low: finish it
+  if (fx.cleanse && (B.burn + B.poison + B.bleed > 0 || B.weaken > 0)) m *= MOVE_PICK.tactic; // it is afflicted: clean up
+  if ((fx.heal || fx.healMissing) && B.hp <= B.maxHp * 0.4) m *= MOVE_PICK.tactic; // it is low: patch up
+  return m;
+}
+function rollMove(f, B, hist, ahead) {
+  const w = {}; B.script.forEach(i => { w[i] = (w[i] || 0) + 1; });
+  let ids = Object.keys(w).map(Number).filter(i => B.skills[i] && !moveBanned(f, B, i, hist) && (ahead ? !(i === hist[hist.length - 1] && B.skills[i].def.cd) : B.skills[i].cd <= 0));
+  if (!ids.length) ids = Object.keys(w).map(Number).filter(i => B.skills[i] && B.skills[i].cd <= 0);
+  if (!ids.length) return B.script[0];
+  const ws = ids.map(i => w[i] * (B.tactics && !ahead ? moveTactic(f, B, B.skills[i]) : 1)), tot = ws.reduce((a, b) => a + b, 0);
+  let r = rnd(f.rng) * tot;
+  for (let k = 0; k < ids.length; k++) { r -= ws[k]; if (r < 0) return ids[k]; }
+  return ids[ids.length - 1];
+}
 function peekNext(f) {
   // the move after the current intent (best guess for scripted foes)
   const B = f.B; if (B.smart || !B.script) return null;
+  if (!B.fixed && B.hist) return B.next != null ? B.skills[B.next] : null;
   const n = B.script.length; return B.skills[B.script[(B.scriptIdx + (B.reflexNow ? 0 : 1)) % n]];
 }
 function enemyTurn(f) {
@@ -2875,6 +2915,7 @@ function enemyTurn(f) {
     if (B.twincast && B.turns % B.twincast === 0 && f.A.hp > 0) { say(f, `[${B.name} casts twice!]`, 'loss'); useSkill(f, B, s, { echo: true }); }
     s.cd = s.def.cd || 0;
     if (!B.smart && !B.phaseFresh && !B.reflexNow) B.scriptIdx++;
+    if (B.hist) B.hist.push(B.skills.indexOf(s));
     endTurn(f, B, s.key);
   } else endTurn(f, B, null);
   if (B.phaseFresh) { B.phaseFresh = false; phaseTraits(B); }

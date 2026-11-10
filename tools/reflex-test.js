@@ -22,7 +22,7 @@ function fightWith(id, skill) {
   run.gear = []; run.hp = 9999;
   G.chooseOpponent(run, 0, false);
   const spec = G.currentSpec(run); Object.keys(spec).forEach(k => delete spec[k]); Object.assign(spec, { kind: G.ENEMIES[id].final ? 'final' : G.ENEMIES[id].rival ? 'rival' : 'monster', id, traits: [] });
-  const f = G.newFight(run); f.A.hp = f.A.maxHp = 9999; f.B.hp = f.B.maxHp = 99999; f.B.dodge = 0; f.A.dodge = 0; f.rng = () => 0.99;
+  const f = G.newFight(run); f.B.fixed = true; f.A.hp = f.A.maxHp = 9999; f.B.hp = f.B.maxHp = 99999; f.B.dodge = 0; f.A.dodge = 0; f.rng = () => 0.99;
   return f;
 }
 const use = (f, id) => { f.A.stun = 0; if (f.phase === 'stunned') f.phase = 'player'; const i = f.A.skills.findIndex(s => (s.baseDef || s.def).id === id); f.A.skills[i].cd = 0; ok(G.playerAct(f, i), `can use ${id}`); f.B.stun = 0; G.enemyTurn(f); };
