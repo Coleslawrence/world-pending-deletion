@@ -130,9 +130,10 @@ grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes 
 
 | Field | What it is |
 | --- | --- |
-| `on` | The trigger, one of `REFLEX_ON`: `block` (you used a Block skill), `flurry` (you hit twice or more in a turn), `status` (you put Burn, Poison or Bleed on it), `heal` (you healed), `passive` (you did not attack) |
+| `on` | The trigger, one of `REFLEX_ON`: `block` (you used a Block skill), `flurry` (you hit twice or more in a turn), `status` (you put Burn, Poison or Bleed on it), `heal` (you healed), `passive` (you did not attack), `hurt` (it is below half HP; once a fight) |
 | `move` or `use` | The answer: a move of its own (`n` and `fx`, like any enemy move) or the index of one of its `skills` |
 | `say` | The System's line when it fires, so the player sees why |
+| `also` | A second rule, written the same way, with a different trigger (rivals and Final Champions). `hurt` fires once, the first time the opponent is below half HP |
 
 When the trigger is met, the opponent's next move is the Reflex's instead of the next in its script, and the script then carries on from where it was. The move is shown as the intent before the player acts again, with the reason under it. A Reflex never fires two turns running, never off a turn the player lost, and not in practice fights. Examiners, legends, the Undefeated and other players' builds have none. `node tools/reflex-test.js` checks all of this for every Reflex.
 
@@ -157,18 +158,18 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bigStop` | 4 | Squall Line (2), Wall Cloud (2), Downburst (3), … | If the opponent is winding up a big attack, Interrupt it. Otherwise Weaken them for 2 turns. | yes |
-| `bleed` | 26 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
-| `block` | 119 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `bleed` | 27 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
+| `block` | 122 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 10 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 9 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
 | `brk` | 39 | Penance (6), Holy Light (6), Purify (4), … | Break 6: fills the opponent's break bar. | yes |
-| `burn` | 58 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
+| `burn` | 60 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `bust` | 4 | Double Down (6), All In (8), Press Your Luck (6), … | (works with other keys on the same skill) | yes |
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
 | `calamity` | 4 | Calamity (4), Catastrophe (5), Aftermath (4), … | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
 | `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
-| `cleanse` | 29 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
+| `cleanse` | 31 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `coinStun` | 4 | Cursed Coin (1), Bad Penny (1), Heads I Win (1), … | A move you jinx this turn also Stuns its user next turn. | yes |
 | `critBonus` | 3 | Precise Strike (0.5), Exposing Strike (0.5), Homing Missiles (0.25) | +50% critical chance. | no |
 | `cruel` | 4 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5), … | ×2 damage if the opponent has 2 or more effects. | yes |
@@ -181,7 +182,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 40 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 2 | Two-Headed Coin (4), Hedged Bet (3) | (works with other keys on the same skill) | yes |
 | `dieStun` | 5 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 316 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 319 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgHigh` | 4 | Table Stakes (5), High Roller's Bet (7), Covered Bet (5), … | (works with other keys on the same skill) | yes |
 | `dmgPip` | 28 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
@@ -201,7 +202,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `fuse` | 4 | Slow Fuse (3), Short Fuse (5), Powder Trail (3), … | Apply 3 more Burn at the start of each of your next 2 turns. | yes |
 | `grim` | 4 | Blood Price (1), Dear Price (1), Paid in Full (1), … | (works with other keys on the same skill) | yes |
 | `haste` | 10 | Time Warp (2), Blink (1), Spellweave (1), … | Your other cooldowns drop by 2. | yes |
-| `heal` | 41 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
+| `heal` | 42 | Sacred Flame (8), Penance (2), Holy Light (10), … | Heal 8. | yes |
 | `healMissing` | 8 | Second Wind (0.25), Miracle (0.5), Last Breath (0.4), … | Heal 25% of your missing HP. | yes |
 | `healPip` | 2 | Lucky Coin (1), Insurance (1) | (works with other keys on the same skill) | yes |
 | `hits` | 57 | Flame Wave (2), Conflagration (3), Quick Slash (2), … | (works with other keys on the same skill) | yes |
@@ -227,8 +228,8 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perCurse` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | (works with other keys on the same skill) | yes |
 | `perHit` | 20 | Flame Wave (1), Conflagration (1), Thousand Cuts (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
-| `pierce` | 16 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
-| `poison` | 53 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `pierce` | 19 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | no |
+| `poison` | 54 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `quench` | 4 | Searing Mercy (12), Merciful Flame (18), Last Light (12), … | Remove the opponent's Burn and heal that much, up to 12. | yes |
