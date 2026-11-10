@@ -63,6 +63,8 @@ jobs:
         run: node tools/bracket-test.js
       - name: Ladder test
         run: node tools/ladder-test.js
+      - name: Mastery test
+        run: node tools/mastery-test.js
 
   balance:
     name: Balance gate

@@ -1515,24 +1515,13 @@
   }
  },
  "botIgnores": [
-  "again",
   "alwaysCrit",
-  "bigStop",
   "critBonus",
   "curseKeep",
-  "curseSelf",
-  "deepen",
   "die",
-  "dmgHigh",
-  "doomExec",
   "doomT",
   "doublePoison",
   "drainPoison",
-  "fester",
-  "flash",
-  "fullBlock",
-  "fuse",
-  "hold",
   "keep",
   "keepHalf",
   "killReset",
@@ -1541,12 +1530,8 @@
   "nextCrit",
   "perHit",
   "pierce",
-  "reapHeal",
   "reflect",
-  "ride",
   "stack",
-  "tapOut",
-  "thornsFight",
   "uncurse"
  ]
 }
