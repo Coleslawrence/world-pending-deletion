@@ -47,6 +47,8 @@ jobs:
         run: node tools/read-test.js
       - name: Reflex test
         run: node tools/reflex-test.js
+      - name: Wind-up test
+        run: node tools/windup-test.js
       - name: Path evolution test
         run: node tools/advance-test.js
       - name: Prefix test

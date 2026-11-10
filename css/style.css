@@ -457,6 +457,7 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .fl.doom { color: var(--hex); }
 .chip.mark { color: var(--a-blade); } .chip.doom { color: var(--hex); } .chip.regen { color: var(--hp); } .chip.wagerc { color: var(--faith); border-style: dashed; }
 .in-t small { display: block; font-weight: 400; font-size: var(--fs-1); color: var(--muted); font-family: var(--f-m); }
+.in-t small.windup { color: var(--elite); }
 .skills.c5 .sk { min-height: 54px; }
 .sk-lv { color: var(--stun); }
 @container app (max-height: 700px) { .tile { min-height: 52px; } .barrow .tile, .gearrow .tile { min-height: 44px; } .tile.sm { min-height: 36px; } .opp { padding: 8px 10px; } .shop { gap: 5px; } }

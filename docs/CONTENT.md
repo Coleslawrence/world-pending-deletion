@@ -136,6 +136,10 @@ grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes 
 
 When the trigger is met, the opponent's next move is the Reflex's instead of the next in its script, and the script then carries on from where it was. The move is shown as the intent before the player acts again, with the reason under it. A Reflex never fires two turns running, never off a turn the player lost, and not in practice fights. Examiners, legends, the Undefeated and other players' builds have none. `node tools/reflex-test.js` checks all of this for every Reflex.
 
+### Wind-ups
+
+Any move big enough to show as a big move (`isBig` in `js/core.js`: at least 15% of the player's max HP) is a **wind-up**. Under the intent the player sees how much damage breaks it (`WINDUP.share`, 15% of the opponent's max HP). Damage the player deals on their own turn, past Block, counts towards it; reach the number and the move falls apart: it goes on cooldown (`WINDUP.cd`) and the opponent shows another move. Stuns and Interrupts still cancel it outright. `node tools/windup-test.js` checks it.
+
 ## The effect menu
 
 Written from the content itself by the checker, so it is always current. "Bot scores it: no" means the balance sims undervalue skills that lean on that effect.
