@@ -1101,3 +1101,71 @@ button.st-prog { background: none; border: 0; padding: 0; width: 100%; cursor: p
 .screen > header.strip { view-transition-name: wpd-strip; }
 ::view-transition-group(wpd-strip) { animation-duration: .2s; }
 :root[data-motion="reduce"]::view-transition-group(*), :root[data-motion="reduce"]::view-transition-old(*), :root[data-motion="reduce"]::view-transition-new(*) { animation: none !important; }
+
+/* ===== design review flow (U1-U5, G3, G6) ===== */
+/* U1: opponents are compact rows that open in place */
+.opp { align-items: flex-start; }
+.opp:not(.open) { padding-block: 8px; }
+.opp:not(.open) .nx-style, .opp:not(.open) .nx-traits { display: none; }
+.opp:not(.open) .crest { width: 40px; height: 40px; font-size: var(--fs-2); }
+.opp.open { border-color: var(--h-y, var(--bronze)); box-shadow: var(--shadow-m, inset 0 0 0 1px var(--bronze)); background: var(--panel2); view-transition-name: wpd-foe; }
+.opp.back { opacity: .6; }
+.opp .face { margin-top: 8px; width: 100%; }
+.opp.grow { animation: oppgrow .28s cubic-bezier(.2, 1.2, .4, 1); transform-origin: top center; }
+@keyframes oppgrow { from { transform: scaleY(.72); opacity: .5; } }
+.opp.grow .nx-style, .opp.grow .nx-traits, .opp.grow .face { animation: fadein .25s ease-out .08s both; }
+.opp:focus-visible { outline: 2px solid var(--h-y, var(--sys)); outline-offset: 2px; }
+.district .next, .fight .foe { view-transition-name: wpd-foe; }
+::view-transition-group(wpd-foe) { animation-duration: .32s; animation-timing-function: cubic-bezier(.2, 1.1, .4, 1); }
+/* G3: choices arrive one after another; the one you take grows and flies up, the rest shrink away */
+.sheet .choice { animation: choicein .28s cubic-bezier(.2, 1.3, .4, 1) both; }
+.sheet .choice:nth-of-type(2) { animation-delay: .05s; } .sheet .choice:nth-of-type(3) { animation-delay: .1s; } .sheet .choice:nth-of-type(4) { animation-delay: .15s; } .sheet .choice:nth-of-type(n+5) { animation-delay: .2s; }
+@keyframes choicein { from { opacity: 0; transform: translateY(14px); } }
+.sheet .choice.chosen { animation: chosen .34s cubic-bezier(.4, 0, .6, 1) both; position: relative; z-index: 2; border-color: var(--h-y, var(--bronze)); }
+@keyframes chosen { 0% { transform: none; opacity: 1; } 35% { transform: scale(1.05); opacity: 1; } 100% { transform: translateY(-46vh) scale(.3); opacity: 0; } }
+.sheet .choice.unchosen { animation: unchosen .22s ease-in both; }
+@keyframes unchosen { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.88); } }
+/* U2: what the fight caused arrives on the summary one line after another */
+.msgs.reel li { animation: fadein .3s ease-out both; }
+/* G6: win and merge beats */
+.fight .downed { filter: grayscale(1) brightness(.6); transition: filter .4s ease-out; }
+.fight .downed .intent { visibility: hidden; }
+.tile.mergepop { animation: mergepop .5s cubic-bezier(.2, 1.5, .4, 1); position: relative; z-index: 2; }
+@keyframes mergepop { 0% { scale: .6; filter: brightness(2.2); } 55% { scale: 1.14; filter: brightness(1.5); } 100% { scale: 1; filter: none; } }
+/* U4: archetype counters fill toward their next tier */
+.achip { background-image: linear-gradient(var(--sc, var(--line2)), var(--sc, var(--line2))); background-repeat: no-repeat; background-size: var(--fill, 0%) 3px; background-position: left bottom; border-bottom-color: var(--line2) !important; }
+/* U3: each kind of moment has its own frame */
+:root[data-theme="broadcast"] .sheet.k-event .sh-h { background: var(--h-k); border-bottom: 2px solid var(--h-y); border-left: 6px solid var(--h-y); }
+:root[data-theme="broadcast"] .sheet.k-event .sh-h h3 { color: var(--h-y); }
+:root[data-theme="broadcast"] .sheet.k-event.crisis .sh-h { background: var(--h-y); border-left: 0; } :root[data-theme="broadcast"] .sheet.k-event.crisis .sh-h h3 { color: var(--h-k); }
+:root[data-theme="broadcast"] .sheet.k-spoils .sh-h { background: #f2cc5c; }
+:root[data-theme="broadcast"] .sheet.k-spoils { border-color: #f2cc5c; }
+:root[data-theme="broadcast"] .sheet.k-spoils .choice { border-color: #8a6a1e; }
+:root[data-theme="broadcast"] .sheet.k-rules { background: #ece6d6; color: #1a1814; border-color: #1a1814; }
+:root[data-theme="broadcast"] .sheet.k-rules .sh-h { background: #ece6d6; border-bottom: 3px double #1a1814; }
+:root[data-theme="broadcast"] .sheet.k-rules .sh-h h3 { font-family: var(--f-m); text-transform: none; letter-spacing: .04em; }
+:root[data-theme="broadcast"] .sheet.k-rules :is(.sh-p, .sysbox, .sysbox p) { color: #1a1814; background: none; }
+:root[data-theme="broadcast"] .sheet.k-rules .choice { background: #f7f2e4; border: 1px solid #1a1814; color: #1a1814; }
+:root[data-theme="broadcast"] .sheet.k-rules .choice * { color: #1a1814; }
+:root[data-theme="broadcast"] .sheet.k-rules .choice .ctag, :root[data-theme="broadcast"] .sheet.k-rules .choice small { color: #a01245; border-color: #a01245; }
+:root[data-theme="broadcast"] .sheet.k-door { background: #050506; border-color: var(--h-m); box-shadow: -3px 0 0 rgba(255,46,154,.5), 3px 0 0 rgba(114,208,255,.35); }
+:root[data-theme="broadcast"] .sheet.k-door .sh-h { background: #050506; border-bottom: 2px solid var(--h-m); }
+:root[data-theme="broadcast"] .sheet.k-door .sh-h h3 { color: var(--h-m); text-shadow: -2px 0 rgba(114,208,255,.6); }
+:root[data-theme="broadcast"] .sheet.k-intake .sh-h { background: var(--h-k); border-bottom: 2px dashed var(--h-y); }
+:root[data-theme="broadcast"] .sheet.k-intake .sh-h h3 { color: var(--h-y); font-family: var(--f-m); text-transform: none; }
+:root[data-theme="broadcast"] .sheet.k-intake .choice { border-style: dashed; }
+:root[data-theme="broadcast"] .sheet.k-level .sh-h, :root[data-theme="broadcast"] .sheet.k-gift .sh-h { background: var(--h-m); }
+:root[data-theme="broadcast"] .sheet.k-level .sh-h h3, :root[data-theme="broadcast"] .sheet.k-gift .sh-h h3 { color: #fff; }
+/* U5: the bracket thins after a win */
+.climb { position: fixed; inset: 0; z-index: 60; display: grid; place-items: start center; padding-top: calc(env(safe-area-inset-top, 0px) + 22vh); pointer-events: none; animation: fadein .2s ease-out; transition: opacity .25s; }
+.climb.out { opacity: 0; }
+.cl-box { background: var(--h-k, #0b0b0d); border: 2px solid var(--h-y, #e6ff2e); box-shadow: 5px 5px 0 var(--h-m, #ff2e9a); padding: 12px 16px 14px; width: min(280px, calc(100vw - 40px)); display: grid; justify-items: center; gap: 2px; }
+.cl-k { font-family: var(--f-m); font-size: var(--fs-1); color: var(--h-y, #e6ff2e); letter-spacing: .08em; }
+.cl-n { font-family: var(--f-d); font-weight: 400; font-size: 64px; line-height: 1; color: var(--h-y, #e6ff2e); font-variant-numeric: lining-nums tabular-nums; }
+.cl-l { font-family: var(--f-m); font-size: var(--fs-1); color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.cl-d { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 8px; justify-content: center; }
+.cl-d i { width: 7px; height: 7px; background: var(--h-y, #e6ff2e); transition: opacity .3s, scale .3s; }
+.cl-d i.me { background: var(--h-m, #ff2e9a); } .cl-d i.out { opacity: .12; scale: .5; }
+.link.mk { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+:root[data-theme="broadcast"] .sheet.k-rules .sh-f .btn { color: #1a1814; border-color: #1a1814; background: transparent; }
+:root[data-theme="broadcast"] .sheet.k-rules .sh-f { background: #ece6d6; border-color: #1a1814; }

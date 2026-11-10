@@ -191,7 +191,7 @@ function fightBar(extra) {
   return `<header class="strip fstrip"><div class="st-1"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="st-sp"></span>${extra}${hc}<button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div>${stripProg()}</header>`;
 }
 function archChips(counts, small) {
-  return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> <i class="an-l">${ARCH[k].name}</i><i class="an-s" aria-hidden="true">${ARCH_TAG[k] || ARCH[k].name.slice(0, 3).toUpperCase()}</i></span><small>/${next}</small></button>`; }).join('')}</div>`;
+  return `<div class="achips${small ? ' small' : ''}">${run.arch.map(k => { const n = counts[k] || 0, t = archTier(n), next = n >= 6 ? 6 : n >= 4 ? 6 : n >= 2 ? 4 : 2; return `<button class="achip a-${k} t${t}" style="--fill:${Math.min(100, Math.round(n / next * 100))}%" data-act="sheet" data-s="archetypes" aria-label="${ARCH[k].name}: ${n} pieces"><b>${n}</b><span><span class="dots2" aria-hidden="true"><i class="a-${k}"></i></span> <i class="an-l">${ARCH[k].name}</i><i class="an-s" aria-hidden="true">${ARCH_TAG[k] || ARCH[k].name.slice(0, 3).toUpperCase()}</i></span><small>/${next}</small></button>`; }).join('')}</div>`;
 }
 function playerPower(p) { const def = moddedDef(p.id, p.mods); return skillPower(def, effStats(run), p.star) * def.powerMult; }
 // One top strip for the board screens (choose, district, shop): world and round, Hearts, gold, Log and menu on the
@@ -672,9 +672,13 @@ function kitStatsHTML() {
 // ---------- Choose opponent ----------
 function chooseHTML() {
   poolLoad();
-  const cards = run.choices.map((spec, i) => `<button class="opp ${spec.hard ? 'hard' : ''}" data-act="pick-opp" data-i="${i}">
+  // U1: opponents are compact rows; tap one and it opens with the full card and "Face them" while the others step back.
+  // A lone opponent (the Final) is open from the start. Tapping the open card again also faces them.
+  if (run.choices.length === 1) ui.pick = 0; else if (ui.pick != null && !run.choices[ui.pick]) ui.pick = null;
+  const justOpened = ui.pickNew; ui.pickNew = false;
+  const cards = run.choices.map((spec, i) => `<div class="opp ${spec.hard ? 'hard' : ''}${ui.pick === i ? ' open' + (justOpened ? ' grow' : '') : ui.pick != null ? ' back' : ''}" role="button" tabindex="0" data-act="opp-open" data-i="${i}" aria-expanded="${ui.pick === i}">
       ${specCrest(spec)}<div class="op-r"><div class="nx-k">${spec.kind === 'trial' ? KIND_LABEL.trial : spec.gate ? 'Gatekeeper' : spec.hard ? (spec.kind === 'erased' ? 'Erased · Hard' : spec.kind === 'entrant' ? 'Filed record · Hard' : 'Hard') : KIND_LABEL[spec.kind]}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${traitsHTML(spec)}
-      <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div></div></button>`).join('');
+      <div class="op-meta"><span class="good">Win: ${esc(specReward(spec))}</span><span class="bad">Loss: −${heartCost(run, spec)} ♥</span></div>${ui.pick === i ? `<button class="btn primary face" data-act="pick-opp" data-i="${i}">Face them ›</button>` : ''}</div></div>`).join('');
   const W = run.wager && WAGERS[run.wager.key], G = run.wager && GODS[run.wager.god];
   const wager = W ? `<section class="wager ${ui.wagerOn ? 'on' : ''}"><div class="wg-t"><span class="eyebrow">${esc(G.name)} offers a wager</span><b>${esc(W.text)}</b><small>Stake 5 gold. Win it: 10 gold back and +2 Favour.</small></div><button class="btn small ${ui.wagerOn ? 'primary' : ''}" data-act="wager" ${run.gold < 5 && !ui.wagerOn ? 'disabled' : ''}>${ui.wagerOn ? 'Accepted' : 'Accept'}</button></section>` : '';
   const fin = run.choices.length === 1;
@@ -683,7 +687,7 @@ function chooseHTML() {
   return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${deskBtn()}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
    ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
-    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'Tap the Final Champion to face them' : 'Tap an opponent to face them'}</span></footer></main>`;
+    <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'The Final Champion awaits' : ui.pick != null ? 'Face them, or tap another' : 'Tap an opponent to see them'}</span></footer></main>`;
 }
 
 // ---------- Shop ----------
@@ -1048,7 +1052,10 @@ function startFightUI() {
   if (f.spec.gate && !run.gateSeen) { run.gateSeen = true; say2(f, '[Gatekeeper assigned. Passage is a privilege.]', 'sys'); }
   if (f.spec.kind === 'final') say2(f, run.pair ? `[Final. ${run.world.name} against ${f.spec.snap ? f.spec.snap.worldName || pairOf(run).name : pairOf(run).name}. One world is spared. The other is not.]` : `[The Final Champion of ${run.world.name}'s judgement. Win, and your world is spared.]`, 'sys');
   if (f.spec.id === 'undefeated' && !intro.some(l => l.replaces === 'sealed')) say2(f, '[Entrant record for the Undefeated: ERROR. Record sealed.]', 'loss');
-  render(); playEvents(f); updateFight(); broadcastSplash(f);
+  // The fight slides in (U6), and the opponent's card grows into their panel
+  const draw = () => { render(); playEvents(f); updateFight(); broadcastSplash(f); };
+  if (!REDUCED && document.startViewTransition && !document.hidden) { try { const vt = document.startViewTransition(draw); vt.finished.catch(() => {}); vt.ready.catch(() => {}); return; } catch (e) { } }
+  draw();
 }
 const wait = ms => new Promise(r => setTimeout(r, ms / ui.speed));
 async function onUse(i) {
@@ -1075,7 +1082,12 @@ async function onUse(i) {
     break;
   }
   ui.busy = false; updateFight();
-  if (f.over) { await wait(700); finishFight(); }
+  if (f.over) {
+    // G6: the loser's panel drains to grey under a stamp before the summary comes up
+    const lost = f.B.hp <= 0 ? 'B' : f.A.hp <= 0 ? 'A' : null, el = lost && document.getElementById(lost === 'A' ? 'me' : 'foe');
+    if (el && !REDUCED) { el.classList.add('downed'); stamp(lost, lost === 'B' ? 'Defeated' : 'Down', 'brk'); await wait(450); }
+    await wait(700); finishFight();
+  }
 }
 function finishFight() {
   const f = ui.fight, before = evSnap(run);
@@ -1090,7 +1102,7 @@ function finishFight() {
   sfx(res.death ? 'erase' : res.won ? 'win' : res.heartsLost ? 'heart' : 'loss');
   if (res.heartsLost && !REDUCED) { app.classList.add('bleed'); setTimeout(() => app.classList.remove('bleed'), 420); }
   if (res.rested) { meta.echoes += 3; res.msgs.push({ t: 'broadcast', text: `[You laid ${res.rested.champ} to rest. +3 Echoes.${canShare() ? ` ${ownerName(res.rested.owner)} will hear of it.` : ''}]` }); recordRest(res.rested); }
-  if (goesOn && !plain) { res.msgs.forEach(m => logRun(m.text, m.t)); ui.notes = noteList(res.msgs); ui.noteN = ui.notes.length; } else { ui.notes = null; pushMsgs(res.msgs); }
+  if (goesOn && !plain) { res.msgs.forEach(m => logRun(m.text, m.t)); ui.notes = null; } // U2: what the fight caused is listed on the summary itself, one line after another, with one Continue else { ui.notes = null; pushMsgs(res.msgs); }
   ui.result = res; ui.erDone = 0; ui.erBusy = false; res.changes = evDiff(before, run);
   if (res.practiceDone) { ui.practiceAfter = true; }
   if (res.fell) recordWin(res.fell);
@@ -1225,34 +1237,34 @@ function pendingSheet() {
     const chainTag = E.crisis && FATES[E.fate] ? `<p class="sh-p fine">[Live from ${esc(run.world.name)}: ${esc(FATES[E.fate].name)}. Fate: ${fateState(run)}. ${esc(run.world.name)} can hear you. Its Hearts are in your hands.]</p>` : E.chain && CHAINS[E.chain].start !== p.key ? `<p class="sh-p fine">[Event chain: ${esc(CHAINS[E.chain].name)}]</p>` : '';
     const evHint = eventHint(E, E.opts.some((_, i) => { const o = eventOpt(run, p.key, i); return o && o.roll; }));
     const lead = `${chainTag}${evHint}<p class="sh-p big">${esc(eventText(run, p.key))}</p>`;
-    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, E.crisis ? 'sys crisis' : E.chain ? 'sys' : '');
+    return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, (E.crisis ? 'sys crisis' : E.chain ? 'sys' : '') + ' k-event');
   }
   if (p.type === 'gift') {
-    return sheetWrap('[Additional Gift]', `<p class="sh-p">${p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys');
+    return sheetWrap('[Additional Gift]', `<p class="sh-p">${p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys k-gift');
   }
   if (p.type === 'intake') {
     const body = p.offers.map((k, i) => { const D = INTAKE[k]; return D ? `<button class="choice ${D.cost ? 'chk' : ''}" data-act="take-intake" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(D.name)}</span><span class="tagn">${D.cost ? 'At a price' : 'Plain'}</span></div><div class="sr-desc">${esc(D.say)}${flavHTML(D.flavour)}</div></button>` : ''; }).join('');
-    return sheetWrap('[Intake Interview]', `<p class="sh-p">[Before your first match, the System offers every Entrant one deal. Two are plain. Two give more and take something. Choose 1.]</p>` + body, false, 'sys', true);
+    return sheetWrap('[Intake Interview]', `<p class="sh-p">[Before your first match, the System offers every Entrant one deal. Two are plain. Two give more and take something. Choose 1.]</p>` + body, false, 'sys k-intake', true);
   }
   if (p.type === 'augment') {
     const body = p.offers.map((k, i) => `<button class="choice" data-act="take-augment" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(AMENDMENTS[k].name)}</span><span class="tagn">Amendment</span></div><div class="sr-desc">${esc(AMENDMENTS[k].say)}</div></button>`).join('');
-    return sheetWrap('[Rules review]', `<p class="sh-p">[The tournament's rules are open for review. The System will pass one Amendment of your choosing. It lasts the rest of the run.]</p>` + body, `<button class="btn ghost" data-act="take-augment" data-i="skip">Pass none</button>`, 'sys', true);
+    return sheetWrap('[Rules review]', `<p class="sh-p">[The tournament's rules are open for review. The System will pass one Amendment of your choosing. It lasts the rest of the run.]</p>` + body, `<button class="btn ghost" data-act="take-augment" data-i="skip">Pass none</button>`, 'sys k-rules', true);
   }
   if (p.type === 'door') {
     const C = CURSES[p.curse] || {};
-    return sheetWrap('[Unlisted door]', `<p class="sh-p big">[There is a door here that is on no map of the arena. The System declines to comment.]</p><p class="sh-p">Behind it: <b>${esc(C.name)}</b>, ${esc(C.say)} for your next ${CURSE_FIGHTS} fights. When it lifts, the door pays: <b>${esc(outcomeText(p.pay))}</b>.</p><button class="choice chk" data-act="take-door" data-i="open"><div class="sr-h"><span class="sr-name">Open the door</span><span class="tagn">Cursed</span></div><div class="sr-desc">Take the curse now and the payoff after ${CURSE_FIGHTS} fights, won or lost.</div></button>`, `<button class="btn ghost" data-act="take-door" data-i="pass">Walk past</button>`, 'sys', true);
+    return sheetWrap('[Unlisted door]', `<p class="sh-p big">[There is a door here that is on no map of the arena. The System declines to comment.]</p><p class="sh-p">Behind it: <b>${esc(C.name)}</b>, ${esc(C.say)} for your next ${CURSE_FIGHTS} fights. When it lifts, the door pays: <b>${esc(outcomeText(p.pay))}</b>.</p><button class="choice chk" data-act="take-door" data-i="open"><div class="sr-h"><span class="sr-name">Open the door</span><span class="tagn">Cursed</span></div><div class="sr-desc">Take the curse now and the payoff after ${CURSE_FIGHTS} fights, won or lost.</div></button>`, `<button class="btn ghost" data-act="take-door" data-i="pass">Walk past</button>`, 'sys k-door', true);
   }
   if (p.type === 'spoils') {
     const K = SPOILS[p.kind] || SPOILS.supplies;
     const body = p.offers.map((o, i) => o.k === 'piece' && pieceDef(o.id) ? `<button class="choice ${mainTag(o.id)}" data-act="take-spoils" data-i="${i}">${pieceBody(o.id, 1, o.mods)}</button>`
       : `<button class="choice" data-act="take-spoils" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(spoilsText(o))}</span><span class="tagn">${esc(K.name)}</span></div></button>`).join('');
-    return sheetWrap(`[Spoils · ${K.name}]`, `<p class="sh-p">[Victory logged. ${esc(K.say)} Or leave it for ${SPOILS_SKIP} gold.]</p>` + body, `<button class="btn ghost" data-act="take-spoils" data-i="skip">Leave it · +${SPOILS_SKIP} gold</button>`, 'sys', true);
+    return sheetWrap(`[Spoils · ${K.name}]`, `<p class="sh-p">[Victory logged. ${esc(K.say)} Or leave it for ${SPOILS_SKIP} gold.]</p>` + body, `<button class="btn ghost" data-act="take-spoils" data-i="skip">Leave it · +${SPOILS_SKIP} gold</button>`, 'sys k-spoils', true);
   }
   if (p.type === 'levelup') {
     const L = p.perk && LEVEL_PERKS[p.perk], nx = run.level + 1, lb = hasGift(run, 'latebloomer');
     const lvBtn = `<button class="choice" data-act="take-level" data-k="level"><div class="sr-h"><span class="sr-name">Level up</span><span class="tagn">Lv ${nx}</span></div><div class="sr-desc">+4 Max HP, rarer pieces in the shop and ${lb ? '2 stat points' : '1 stat point'} to place.</div></button>`;
     const pBtn = L ? `<button class="choice" data-act="take-level" data-k="perk"><div class="sr-h"><span class="sr-name">Take ${esc(L.name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(levelPerkText(run, p.perk))}${flavHTML(L.flavour)}</div></button>` : '';
-    return sheetWrap('[Level available]', `<p class="sh-p">[Battle logged. Level ${nx} is ready. Take it, or skip it for the perk on offer.]</p>` + lvBtn + pBtn, false, 'sys');
+    return sheetWrap('[Level available]', `<p class="sh-p">[Battle logged. Level ${nx} is ready. Take it, or skip it for the perk on offer.]</p>` + lvBtn + pBtn, false, 'sys k-level');
   }
   if (p.type === 'perk') {
     return sheetWrap(`[Class advancement · ${p.to}-rank]`, `<p class="sh-p">[Promotion recorded. Rank letters carry no official meaning. Choose 1 permanent perk. It applies from your next world, but never in the Pending World.]</p>` + p.offers.map(k => `<button class="choice" data-act="take-perk" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(PERKS[k].name)}</span><span class="tagn">Perk</span></div><div class="sr-desc">${esc(PERKS[k].desc)} <i class="fine">${esc(PERKS[k].flavour)}</i></div></button>`).join(''), false, 'sys');
@@ -1336,7 +1348,7 @@ function resultSheet() {
   // erase lines become rows, and the defeat lines repeat the summary above. With notification cards to follow, the
   // summary says how many instead of listing them
   const shown = noteList(r.msgs), chips = r.changes && r.changes.length ? `<div class="ev-ch">${r.changes.map(c => `<span class="${c.good ? 'good' : 'bad'}">${esc(c.text)}</span>`).join('')}</div>` : '';
-  const msgs = ui.notes ? (ui.noteN ? `<p class="sh-p fine">[${ui.noteN} notification${ui.noteN > 1 ? 's' : ''} to review.]</p>` : '') : shown.length ? `<ul class="msgs">${shown.map(m => `<li class="t-${m.t}">${esc(m.text)}</li>`).join('')}</ul>` : '';
+  const msgs = ui.notes ? (ui.noteN ? `<p class="sh-p fine">[${ui.noteN} notification${ui.noteN > 1 ? 's' : ''} to review.]</p>` : '') : shown.length ? `<ul class="msgs reel">${shown.map((m, i) => `<li class="t-${m.t}" style="animation-delay:${Math.min(1200, 350 + i * 180)}ms">${esc(m.text)}${itemCard(m)}</li>`).join('')}</ul>` : '';
   // G4: the lost Hearts drop out of the row, once (later redraws of this sheet show them already gone)
   let hrow = '';
   if (!r.won && !run.elite && r.heartsLost > 0) {
@@ -1673,6 +1685,8 @@ function render() {
   if (scr === 'fight') updateFight();
   fitNames();
   pulseChanged();
+  // G6: a merge lands with a pop on the piece it made
+  if (ui.merged && run) { const id = ui.merged; ui.merged = null; const ps = allPieces(run).filter(q => q.id === id).sort((x, y) => y.star - x.star)[0], t = ps && app.querySelector(`.tile[data-u="${ps.u}"]`); if (t && !REDUCED) { t.classList.add('mergepop'); sfx('react'); } }
   setUnder(!!app.querySelector('.sheet')); // notices that wait for a tap step aside while a sheet is open
   placeToasts();
   if (focusName) { const el = document.getElementById('aw-name'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
@@ -1776,12 +1790,13 @@ function onAct(el) {
     case 'kit-roll': if (rollStart(run)) { saveRun(); toast(`[Stats rolled. ${ROLL_PTS} points placed.]`, 'sys'); } return render();
     case 'kit-unroll': if (unrollStart(run, 4)) saveRun(); return render();
     case 'kit-ok': if (placeStartStats(run, msgs)) { pushMsgs(msgs, false); saveRun(); } return go(stageScreen());
+    case 'opp-open': { if (ui.pick === +d.i) return onAct({ dataset: { act: 'pick-opp', i: d.i } }); ui.pick = +d.i; ui.pickNew = true; return render(); }
     case 'pick-opp': { chooseOpponent(run, +d.i, ui.wagerOn); if (run.wagerOn) toast(`[Wager accepted: ${WAGERS[run.wager.key].text}]`, 'favour'); ui.pick = null; ui.wagerOn = false; ui.distDone = null; saveRun(); return go('district'); }
     case 'wager': ui.wagerOn = !ui.wagerOn; return render();
     case 'shop-item': ui.sheet = { type: 'piece', shop: d.k, i: +d.i }; return render();
     case 'shop-tab': ui.shopTab = d.k; return render();
     case 'own': ui.sheet = { type: 'piece', u: +d.u }; return render();
-    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs, false, `Bought ${pieceDef(it.id).name}`); ui.sheet = null; saveRun(); } return render(); }
+    case 'quick-buy': case 'buy': { const it = shopItem(run, d.k, +d.i); if (buy(run, d.k, +d.i, msgs)) { sfx('buy'); if (msgs.some(m => m.text.startsWith('[Merge'))) ui.merged = it.id; if (!msgs.some(m => m.text.startsWith('[Merge'))) toast(`[Bought ${pieceDef(it.id).name}]`, 'loot'); pushMsgs(msgs, false, `Bought ${pieceDef(it.id).name}`); ui.sheet = null; saveRun(); } return render(); }
     case 'lock': run.locks[d.k][+d.i] = !run.locks[d.k][+d.i]; ui.sheet = null; saveRun(); return render();
     case 'reroll': if (reroll(run, null, ui.shopTab || 'skill')) saveRun(); return render();
     case 'train': if (ui.screen === 'shop' && trainStat(run, d.k, msgs)) { pushMsgs(msgs, false, `Trained ${d.k}`); saveRun(); } return render();
@@ -1855,8 +1870,10 @@ function onAct(el) {
       if (ui.notes && ui.notes.length) { ui.sheet = { type: 'note' }; return render(); }
       if (ui.practiceAfter) { ui.practiceAfter = false; ui.result = null; ui.sheet = { type: 'practicedone' }; return render(); }
       if (ui.result && ui.result.won) while (coachStep() && coachStep().scr === 'fight') coachAdvance(); // tutorial steps that wait on the fight screen are over once it closes
+      const climbed = ui.result && ui.result.won && run && !run.elite && !run.practice && !run.ended && run.round >= 2 && run.round <= ROUNDS;
       ui.notes = null; ui.sheet = null; ui.fight = null; ui.result = null;
       if (ui.end && ui.end.kind === 'erased') return go('end');
+      if (climbed) climbFx(256 >> (run.round - 2), 256 >> (run.round - 1));
       saveRun(); return go(stageScreen());
     }
     case 'enter-elite': startElite(run, meta); ui.end = null; ui.sheet = null; ui.fight = null; saveRun(); return go(stageScreen());
@@ -1891,7 +1908,7 @@ const COACH = [
   { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-skills' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
-  { scr: 'choose', pos: 'top', hl: '[data-act="pick-opp"][data-i="0"]', text: 'Tap the Goblin to face it.', wait: 'pick-opp' },
+  { scr: 'choose', pos: 'top', hl: '.opp[data-i="0"]', text: 'Tap the Goblin to see it, then Face them.', wait: 'pick-opp' },
   { scr: 'district', pos: 'bottom', hl: '.inter', text: "Before the shop, visit one district. Scout's Post shows what your opponent will do two moves ahead. Pick one.", wait: 'district' },
   { scr: 'shop', pos: 'bottom', hl: '.achips', text: 'Archetype counters. Equip 2, 4 or 6 pieces of one archetype for its bonuses. Tap a counter any time to read them.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs', text: 'There are two shops: Skills and Gear. Each has 5 slots and its own reroll. A badge on the tab tells you when it holds copies of things you own.', wait: 'next' },
@@ -2372,19 +2389,49 @@ function cloudSignInHTML(compact) {
   return `<div class="cloudbox ${compact ? 'compact' : ''}">${compact ? '' : '<p class="sh-p">Sign in to save your progress to the cloud, play on any device, and share champions with other players.</p>'}<div class="${provs.length > 1 ? 'row2 even' : 'stack'}">${provs.map(k => `<button class="btn ${compact ? 'small' : ''}" data-act="signin" data-k="${k}">Sign in with ${k === 'github' ? 'GitHub' : 'Google'}</button>`).join('')}</div></div>`;
 }
 
-app.addEventListener('click', e => { const el = e.target.closest('[data-act]'); if (el && !el.disabled) { if (!['use', 'buy', 'quick-buy'].includes(el.dataset.act)) sfx('tap'); onAct(el); } });
+// U5: after a win the bracket thins on screen for a moment: the count of Entrants left drops and their marks go dark.
+// It sits over the next screen without blocking it; a tap anywhere clears it.
+function climbFx(from, to) {
+  if (REDUCED || !(from > to)) return;
+  document.querySelectorAll('.climb').forEach(x => x.remove());
+  const el = document.createElement('div'); el.className = 'climb'; el.setAttribute('aria-hidden', 'true');
+  const N = Math.min(64, from), keep = Math.max(1, Math.round(N * to / from));
+  el.innerHTML = `<div class="cl-box"><span class="cl-k">[Bracket updated]</span><b class="cl-n">${from}</b><span class="cl-l">Entrants left</span><div class="cl-d">${Array.from({ length: N }, (_, i) => `<i class="${i === 0 ? 'me' : ''}"></i>`).join('')}</div></div>`;
+  document.body.appendChild(el);
+  const dots = [...el.querySelectorAll('.cl-d i')], num = el.querySelector('.cl-n'), t0 = performance.now();
+  dots.forEach((d, i) => { if (i >= keep) setTimeout(() => d.classList.add('out'), 250 + Math.random() * 600); });
+  const step = t => { const q = Math.min(1, Math.max(0, (t - t0 - 250) / 700)); num.textContent = Math.round(from - (from - to) * q); if (q < 1 && el.isConnected) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+  const done = () => { el.classList.add('out'); setTimeout(() => el.remove(), 260); document.removeEventListener('pointerdown', done, true); };
+  setTimeout(done, 1900); document.addEventListener('pointerdown', done, true);
+}
+// G3: a reward you pick grows and flies up to the top bar while the others shrink away, then the choice happens
+const FLY_ACTS = ['take-spoils', 'take-level', 'take-intake', 'take-perk', 'take-augment', 'take-door', 'take-gift', 'evolve', 'event'];
+let flying = false;
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled || flying) return;
+  if (!['use', 'buy', 'quick-buy'].includes(el.dataset.act)) sfx('tap');
+  if (!REDUCED && el.classList.contains('choice') && FLY_ACTS.includes(el.dataset.act) && el.closest('.sheet')) {
+    flying = true; const act = { dataset: Object.assign({}, el.dataset) };
+    el.closest('.sheet').querySelectorAll('.choice').forEach(c => c.classList.add(c === el ? 'chosen' : 'unchosen'));
+    setTimeout(() => { flying = false; onAct(act); }, 330);
+    return;
+  }
+  onAct(el);
+});
 app.addEventListener('input', e => { if (e.target.id === 'aw-name' && ui.aw) { ui.aw.name = e.target.value; const b = app.querySelector('[data-act="aw-ok"]'); if (b) { render(); } } });
 app.addEventListener('input', e => { if (e.target.id === 'fb-text' && ui.fb) ui.fb.text = e.target.value; });
 app.addEventListener('change', e => { if (e.target.id === 'fb-attach' && ui.fb) ui.fb.attach = e.target.checked; if (e.target.id === 'cloud-name') { meta.handle = e.target.value.trim().slice(0, 18); saveMeta(); syncPublicName(); } });
 // Keyboard (#17): Escape closes, Enter presses the main button, number keys pick the Nth choice on screen
 // (skills in a fight, as before), S opens Stats and L the System log during a run
-const KEY_PICKS = { choose: '[data-act="pick-opp"]', district: '[data-act="district"]', draft: '[data-act="draft-pick"]', worlds: '[data-act="pick-world"]', shop: '.shopgrid [data-act="shop-item"]' };
+const KEY_PICKS = { choose: '[data-act="opp-open"]', district: '[data-act="district"]', draft: '[data-act="draft-pick"]', worlds: '[data-act="pick-world"]', shop: '.shopgrid [data-act="shop-item"]' };
 function keyClick(el) { if (el && !el.disabled) { el.focus({ preventScroll: true }); el.click(); return true; } return false; }
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
   if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note', 'savepick'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
   if (typing) return;
+  if ((e.key === 'Enter' || e.key === ' ') && tgt && tgt.matches && tgt.matches('div[role="button"][data-act]')) { e.preventDefault(); tgt.click(); return; }
   const sheet = app.querySelector('.sheet');
   if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }
   if (e.key === 'Enter') {
