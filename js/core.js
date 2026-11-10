@@ -915,6 +915,9 @@ function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers
 // together) count BREAK.heavy times, a skill's brk adds to it directly, and STR's Finesse (STAT_FACES) adds to all of it. Full, the
 // enemy is Broken: it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns.
 // The bar drains BREAK.drain of its size at the start of each of the enemy's turns.
+// Wind-ups: a big move shown as the intent can be broken. Deal share of the opponent's max HP in damage on your turn
+// (past its Block) and the move falls apart: it goes on cooldown and the opponent has to do something else instead.
+const WINDUP = { share: 0.15, cd: 2 };
 const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
 // The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
 // notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
@@ -2180,6 +2183,7 @@ function hit(f, X, Y, raw, o = {}) {
   // Pain Link (experimental): every hit is split evenly between both fighters
   if ((X.P.painLink || Y.P.painLink) && rest > 1) { const share = Math.floor(rest / 2); Y.hp -= rest - share; X.hp -= share; ev(f, { k: 'hit', side: X.side, amt: share, blocked: 0, thorns: true }); }
   else Y.hp -= rest;
+  hitWindup(f, X, Y, rest);
   // Mirror Cuirass (experimental): once per fight, below the line, the two fighters' HP shares trade places
   if (Y.P.swapHp && !Y.swapped && Y.hp > 0 && X.hp > 0 && Y.hp < Y.maxHp * Y.P.swapHp) { Y.swapped = true; const a = Y.hp / Y.maxHp, b = X.hp / X.maxHp; Y.hp = Math.round(b * Y.maxHp); X.hp = Math.max(1, Math.round(a * X.maxHp)); say(f, `[Mirror Cuirass: HP reflected. ${Y.isPlayer ? 'You' : Y.name} ${Math.round(b * 100)}%, ${X.isPlayer ? 'you' : X.name} ${Math.round(a * 100)}%.]`, 'class'); }
   if (X.P.reapBlood && !Y.bloodied && Y.hp > 0 && half(Y)) { Y.bloodied = true; heal(f, X, X.maxHp * X.P.reapBlood); say(f, '[Reaper: first blood. You feed on it.]', 'class'); } // Reaper: heal on bringing a foe below half
@@ -2295,7 +2299,7 @@ function interrupt(f, X, Y, stunned) {
     f.tally.bigStopped++;
     if (X.P.stormBreak) { X.empower = Math.max(X.empower, 3); say(f, '[Stormcaller: big attack broken. Empowered for 2 turns.]', 'skill'); }
   }
-  s.cd = Math.max(s.cd, 2); Y.interrupted = s.def.name;
+  s.cd = Math.max(s.cd, 2); Y.interrupted = s.def.name; Y.windup = null;
   say(f, `[${s.def.name} interrupted! It goes on cooldown.]`, 'skill'); ev(f, { k: 'interrupt', side: Y.side, name: s.def.name });
   if (X.isPlayer) f.tally.stuns++;
   if (X.P.stunDmg) hit(f, X, Y, X.P.stunDmg, { noCrit: 1, noDodge: 1, isThorns: true, src: 'Static' });
@@ -2741,6 +2745,19 @@ function planReflex(f, B) {
   return true;
 }
 function planIntent(f, B, turnEnd) {
+  planMove(f, B, turnEnd);
+  B.windup = B.intent && !(B.stun > 0) && isBig(f, B) ? { need: Math.max(1, Math.round(B.maxHp * WINDUP.share)), got: 0 } : null;
+}
+// Damage you deal on your own turn counts against a wind-up; enough of it and the move is wasted
+function hitWindup(f, X, Y, v) {
+  const W = Y.windup; if (!W || !X.isPlayer || f.phase !== 'player' || v <= 0 || Y.hp <= 0 || !Y.intent || Y.stun > 0 || Y.interrupted) return;
+  W.got += v; if (W.got < W.need) return;
+  const s = Y.intent; Y.windup = null;
+  s.cd = Math.max(s.cd, WINDUP.cd); Y.interrupted = s.def.name; f.tally.bigStopped++; f.tally.windups = (f.tally.windups || 0) + 1;
+  say(f, `[${s.def.name} falls apart. The wind-up is wasted.]`, 'skill'); ev(f, { k: 'interrupt', side: Y.side, name: s.def.name });
+  planIntent(f, Y);
+}
+function planMove(f, B, turnEnd) {
   rollDice(f, B);
   B.reflexNow = false;
   if (turnEnd) { const hit = !B.smart && planReflex(f, B); f.pt = null; if (hit) return; }
@@ -2818,6 +2835,7 @@ function intentInfo(f) {
   if (B.twincast && (B.turns + 1) % B.twincast === 0) r.text += ' · twice';
   if (B.flood && (B.turns + 1) % B.flood === 0) r.text += ' · flood';
   if (B.reflexNow && B.reflex) r.reflex = REFLEX_ON[B.reflex.on].why;
+  if (B.windup) r.windup = Math.max(1, Math.ceil(B.windup.need - B.windup.got));
   if (f.foresight || B.showNext) { const n = peekNext(f); if (n) r.then = n.def.label || n.def.name; } // the Hanged Augur shows two moves
   return r;
 }
@@ -3415,5 +3433,5 @@ if (typeof module !== 'undefined') module.exports = {
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
   TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
-  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
+  buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, WINDUP, planIntentForTest: planIntent, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };

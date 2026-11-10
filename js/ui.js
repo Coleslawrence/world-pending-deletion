@@ -967,7 +967,7 @@ function updateFight() {
   const it = document.getElementById('intent');
   if (it) {
     if (f.over) it.innerHTML = '';
-    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
+    else { const i = intentInfo(f), jz = !ui.busy && canJinx(f), jd = f.B.jinxed; it.className = 'intent k-' + i.kind + (jd ? ' jinxed' : '') + (jz ? ' can-jinx' : ''); it.innerHTML = `<span class="in-l">${jd ? 'Jinxed' : 'Next'}</span><span class="in-t">${esc(i.label || i.name)}${i.reflex ? `<small>Reflex: ${esc(i.reflex)}</small>` : ''}${i.windup ? `<small class="windup">Wind-up: ${i.windup} dmg breaks it</small>` : ''}${i.then ? `<small>then ${esc(i.then)}</small>` : ''}</span><span class="in-v">${esc(i.text)}</span>${jz ? `<button class="jinx-btn" data-act="jinx" aria-label="Jinx this move for ${jinxCost(f)} Misfortune. It goes wrong for them">Jinx (${jinxCost(f)})</button>` : ''}`; }
   }
   const lg = document.getElementById('log');
   const rr = ui.busy ? [] : rivalReplies(run, f);
@@ -1442,6 +1442,8 @@ function menuSheet() {
 const HINTS = [
   { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
   { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into extra stat points, on top of the one each level gives.]' },
+  { k: 'windup', scr: 'fight', when: () => ui.fight && ui.fight.B.windup && !ui.busy, text: "[A big move takes a turn to wind up. Deal the damage shown under it this turn and it falls apart: they must do something else.]" },
+  { k: 'reflex', scr: 'fight', when: () => ui.fight && ui.fight.B.reflex && !ui.busy, text: "[Every opponent has a Reflex: one thing you do that changes their next move. It is on their card, and you always see the move before it lands.]" },
   { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. Damage past Block fills it. Full, they are Broken: a lost turn and 50% more damage.]" },
   { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
 ];

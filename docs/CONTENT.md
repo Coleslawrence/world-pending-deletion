@@ -119,6 +119,27 @@ At or below `at` of max HP, the System says `say`, the moves in `add` join its m
 
 A **duo** (two Entrants on one entry) is a phase with `swap: { name, clear }`: at the line, the partner tags in under its own name, and with `clear` none of the Burn, Poison or Bleed on the first one carries over. Example: `vey_twins`.
 
+### Reflexes
+
+Every monster, rival and Final Champion has one **Reflex** in `REFLEXES` (`js/content/enemies.js`): an if-then rule that answers what the player did on their turn. It is shown on the opponent's card, as a chip in the fight and on the scout sheet.
+
+```js
+goblin: { on: 'block', move: { n: 'Ankle Stab', fx: { dmg: 5, pierce: 1 } }, say: '[The Goblin sees your guard go up. It goes low.]' },
+grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes for the throat early.]' },
+```
+
+| Field | What it is |
+| --- | --- |
+| `on` | The trigger, one of `REFLEX_ON`: `block` (you used a Block skill), `flurry` (you hit twice or more in a turn), `status` (you put Burn, Poison or Bleed on it), `heal` (you healed), `passive` (you did not attack) |
+| `move` or `use` | The answer: a move of its own (`n` and `fx`, like any enemy move) or the index of one of its `skills` |
+| `say` | The System's line when it fires, so the player sees why |
+
+When the trigger is met, the opponent's next move is the Reflex's instead of the next in its script, and the script then carries on from where it was. The move is shown as the intent before the player acts again, with the reason under it. A Reflex never fires two turns running, never off a turn the player lost, and not in practice fights. Examiners, legends, the Undefeated and other players' builds have none. `node tools/reflex-test.js` checks all of this for every Reflex.
+
+### Wind-ups
+
+Any move big enough to show as a big move (`isBig` in `js/core.js`: at least 15% of the player's max HP) is a **wind-up**. Under the intent the player sees how much damage breaks it (`WINDUP.share`, 15% of the opponent's max HP). Damage the player deals on their own turn, past Block, counts towards it; reach the number and the move falls apart: it goes on cooldown (`WINDUP.cd`) and the opponent shows another move. Stuns and Interrupts still cancel it outright. `node tools/windup-test.js` checks it.
+
 ## The effect menu
 
 Written from the content itself by the checker, so it is always current. "Bot scores it: no" means the balance sims undervalue skills that lean on that effect.
