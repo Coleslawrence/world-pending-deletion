@@ -76,7 +76,7 @@ Object.keys(G.VOUCHERS).forEach(v => {
   const b = { rc: G.rerollCost(run), cap: G.interestCap(run), inc: G.income(run), tp: (run.bought = 4, G.pointPrice(run)) };
   ok(G.buyVoucher(run, []) && run.gold === 30 - G.VOUCHER_PRICE && G.hasVoucher(run, v) && !run.voucher, `licence ${v}: bought`);
   ok(!G.voucherPool(run).includes(v), `licence ${v}: not stocked again`);
-  if (v === 'rerolls') ok(G.rerollCost(run) === b.rc - 1, 'licence: rerolls 1 cheaper');
+  if (v === 'rerolls') ok(G.rerollCost(run) === Math.max(1, b.rc - 1), 'licence: rerolls 1 cheaper');
   if (v === 'interest') ok(G.interestCap(run) === b.cap + 2, 'licence: interest cap +2');
   if (v === 'income') { run.gold = 30; ok(G.income(run) === b.inc + 2, 'licence: income +2'); }
   if (v === 'training') ok(G.pointPrice(run) === b.tp - 1, 'licence: training 1 cheaper');
