@@ -584,7 +584,7 @@ function worldsHTML() {
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
     <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.</p>
-    <div class="picks">${cards}</div>${ladderRow()}${worldExtras()}
+    <div class="picks">${cards}</div>${ladderRow()}${goalRow()}${worldExtras()}
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
 }
 
@@ -1632,6 +1632,30 @@ function ladderRow() {
   const K = sanitizeClauses(meta.clauses), cl = Object.keys(K.open).length > 1 ? `<button class="btn ghost small" data-act="sheet" data-s="clauses">Entry: ${esc(CLAUSES[K.set].name)}</button>` : '';
   return (p && c ? `<div class="row2 even">${p}${c}</div>` : p + c) + cl;
 }
+// Goals (Phase 6): the run goal and this week's System Contracts, side by side on the world screen
+function goalRow() {
+  if (ui.daily) return '';
+  const M = goalOffer(meta), C = contractsOf(meta), n = contractBoard(C.week).filter(id => C.done[id]).length;
+  return `<div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="goal">${M.pick ? 'Run goal ✓' : 'Run goal'}</button><button class="btn ghost small" data-act="sheet" data-s="contracts">Contracts ${n}/3</button></div>`;
+}
+function goalSheet() {
+  const M = goalOffer(meta), pay = id => { const P = GOAL_PAY[goalDef(id).tier]; return `Pays ${P.echoes} Echoes and ${P.xp} Mastery XP.`; };
+  const one = (id, name, desc) => `<button class="choice ${M.pick === id ? 'on' : ''}" data-act="set-goal" data-k="${id || ''}"><div class="sr-h"><span class="sr-name">${esc(name)}</span>${M.pick === id ? '<span class="tagn">Chosen</span>' : ''}</div><div class="sr-desc">${esc(desc)}</div></button>`;
+  return sheetWrap('[Run goal]', `<p class="sh-p">[State your intentions. The System will hold you to them.] Choose one goal for your next world. Meet it and it pays when the run ends, win or lose.</p>${M.offer.map(id => one(id, goalText(id), pay(id))).join('')}${one(null, 'No goal', 'Play the world as it comes.')}<p class="sh-p fine">A new set of three is drawn after each world. Pending World takes no run goal.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function contractsSheet() {
+  const C = contractsOf(meta), board = contractBoard(C.week), n = board.filter(id => C.done[id]).length;
+  const row = id => { const a = id.split(':')[1], pay = `Pays ${CONTRACT_ECHOES[goalDef(id).tier]} Echoes.`; return `<div class="choice flat"><div class="sr-h"><span class="sr-name">${esc(goalText(id))}</span>${C.done[id] ? '<span class="tagn">Done</span>' : ''}</div><div class="sr-desc">${C.done[id] ? 'Paid this week.' : esc(a && ARCH[a] ? `${pay} Equip 4 ${ARCH[a].name} pieces and the System names your path.` : pay)}</div></div>`; };
+  return sheetWrap('[System Contracts]', `<p class="sh-p">[This week's work orders. Every Entrant receives the same three.] Each pays Echoes the first time you do it this week. Do all three for a week on your Contract Mark.</p>${board.map(row).join('')}<p class="sh-p fine">${n} of 3 done. New Contracts each Monday. Contract Mark: ${C.weeks} week${C.weeks === 1 ? '' : 's'}. Pending World runs count; practice does not.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+}
+function goalLines() {
+  if (!run) return '';
+  const c = (run.contractsDone || []).map(x => `<p class="pg-next good">[Contract fulfilled: ${esc(goalText(x.id))}. +${x.pay} Echoes.]</p>`).join('');
+  const w = run.contractWeek ? `<p class="pg-next good">[All three Contracts done this week. Contract Mark: ${run.contractWeek} week${run.contractWeek > 1 ? 's' : ''}.]</p>` : '';
+  const g = run.goal && run.goal.paid != null ? (run.goal.met ? `<p class="pg-next good">[Run goal met: ${esc(goalText(run.goal.id))}. +${run.goal.paid} Echoes, +${run.goal.xp} Mastery XP.]</p>` : `<p class="pg-next bad">[Run goal missed: ${esc(goalText(run.goal.id))}.]</p>`) : '';
+  return g + c + w;
+}
+function goalEchoes() { return run ? (run.goal && run.goal.paid || 0) + (run.contractsDone || []).reduce((a, x) => a + x.pay, 0) : 0; }
 // Entry Clauses (Phase 5): the open ones to choose from, and the feats that open the rest
 function clausesSheet() {
   const K = sanitizeClauses(meta.clauses), open = Object.keys(CLAUSES).filter(k => K.open[k]), shut = Object.keys(CLAUSES).filter(k => !K.open[k]);
@@ -1658,7 +1682,7 @@ function marksHTML() {
   const M = Object.assign(newMarks(), meta.marks), n = Object.keys(M.arch).length + Object.keys(M.world).length + Object.keys(M.challenge).length + Object.keys(M.clause || {}).length; M.clause = M.clause || {};
   const li = (kind, key, name) => { const v = M[kind][key], T = v && markTier(v); return T ? `<li><b>${esc(name)}</b>: ${markChip(kind, key)} <small>spared at Priority ${v - 1}</small></li>` : `<li class="unk">${esc(name)}: <small>no Mark yet</small></li>`; };
   const P = sanitizePriority(meta.priority);
-  return `<h4>Marks of mastery · ${n}</h4><p class="sh-p fine">Spare a world to mark its archetype and its kind. A higher Priority gives a better Mark. Priority open: ${P.max} of ${PRIORITY.length}.${M.depth ? ` Deepest past the Undefeated: Depth ${M.depth}.` : ''}</p><ul class="msgs">${unlockedArch(meta).map(k => li('arch', k, ARCH[k].name)).join('')}${Object.keys(WORLD_TYPES).map(k => li('world', k, WORLD_TYPES[k].name)).join('')}${Object.keys(CHALLENGES).filter(k => M.challenge[k]).map(k => li('challenge', k, CHALLENGES[k].name)).join('')}${Object.keys(CLAUSES).filter(k => M.clause[k]).map(k => li('clause', k, CLAUSES[k].name)).join('')}</ul>`;
+  return `<h4>Marks of mastery · ${n}</h4><p class="sh-p fine">Spare a world to mark its archetype and its kind. A higher Priority gives a better Mark. Priority open: ${P.max} of ${PRIORITY.length}.${meta.contracts && meta.contracts.weeks ? ` Contract Mark: ${meta.contracts.weeks} week${meta.contracts.weeks > 1 ? 's' : ''} with all three Contracts done.` : ''}${M.depth ? ` Deepest past the Undefeated: Depth ${M.depth}.` : ''}</p><ul class="msgs">${unlockedArch(meta).map(k => li('arch', k, ARCH[k].name)).join('')}${Object.keys(WORLD_TYPES).map(k => li('world', k, WORLD_TYPES[k].name)).join('')}${Object.keys(CHALLENGES).filter(k => M.challenge[k]).map(k => li('challenge', k, CHALLENGES[k].name)).join('')}${Object.keys(CLAUSES).filter(k => M.clause[k]).map(k => li('clause', k, CLAUSES[k].name)).join('')}</ul>`;
 }
 // Archetype Mastery (Phase 5): a level chip in the crest frame's colour, the sheet with every track, and the end screen's rows
 function masteryChip(k) { const M = masteryOf(meta, k), f = masteryFrame(M.level); return `<span class="tag mark mst ${f ? 'mk-' + f : ''}">Lv ${M.level}</span>`; }
@@ -1733,10 +1757,10 @@ function shareBlock(s, erased) {
 // End screen: what this run moved. Round and wins, then a bar each for Entrant Rank, Echoes and Titles, and the nearest goal.
 function progressHTML(e, s) {
   const titles = run && run.titles0 != null ? Math.max(0, Object.keys(meta.titles).length - run.titles0) : null;
-  const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.backing && run.backing.paid || 0) + (run && run.ladder && e.totalEchoes != null ? run.ladder.echoes : 0), titles });
+  const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.backing && run.backing.paid || 0) + (run && run.ladder && e.totalEchoes != null ? run.ladder.echoes : 0) + goalEchoes(), titles });
   const unit = { rank: ' RP', echoes: '', titles: '' };
   const rows = masteryRowsFirst(P.bars.map(b => `<div class="pg-row pg-${b.k}" title="${esc(b.text)}"><span class="pg-l">${esc(b.label)}</span><span class="pg-bar" role="progressbar" aria-label="${esc(b.label + ': ' + b.text)}" aria-valuemin="0" aria-valuemax="${b.max}" aria-valuenow="${b.now}"><i style="width:${Math.round(100 * Math.min(1, b.now / (b.max || 1)))}%"></i></span><span class="pg-g">${b.gain ? `+${b.gain}${unit[b.k]}` : ''}</span></div>`).join(''));
-  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${designLines()}${clauseLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
+  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${goalLines()}${designLines()}${clauseLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
 }
 function backLine() {
   const B = run && run.backing && run.backing.settled && BACK_GOALS[run.backing.goal] ? run.backing : null; if (!B) return '';
@@ -1800,7 +1824,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1876,6 +1900,8 @@ function onAct(el) {
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       if (!run.daily && !run.practice && meta.steer) { delete meta.steer; saveMeta(); } // a requested world is spent once a run starts
+      if (claimGoal(run, meta)) run.log.push({ t: 'class', text: `[Run goal on file: ${goalText(run.goal.id)}.]` });
+      if (!run.daily && !run.practice) saveMeta();
       if (claimBacking(run, meta)) { saveMeta(); run.log.push({ t: 'class', text: `[Backing on file: ${BACK_GOALS[run.backing.goal].name}. ${run.backing.stake} Echoes riding on it.]` }); }
       pushMsgs(run.log.slice(), true);
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
@@ -1895,6 +1921,7 @@ function onAct(el) {
     case 'fb-type': ui.fb.type = d.k; return render();
     case 'fb-send': return sendReport();
     case 'set-clause': setClause(meta, d.k); saveMeta(); ui.sheet = null; return render();
+    case 'set-goal': setGoal(meta, d.k || null); saveMeta(); ui.sheet = null; return render();
     case 'file-design': if (fileDesign(meta, d.id)) { saveMeta(); toast(`[Filed: ${pieceDef(d.id).name}]`, 'level'); } return render();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'hint-read': { const h = HINTS.find(x => x.k === d.k); if (h) ui.sheet = { type: 'hint', k: h.k, text: h.text }; return render(); }

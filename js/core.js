@@ -296,10 +296,10 @@ function dailyScore(run) {
   return { wins, hearts, turns: t, score: 100000 * wins + 1000 * hearts + (999 - t) };
 }
 
-function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' } }; }
+function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' }, contracts: { week: null, done: {}, weeks: 0 } }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -1223,7 +1223,7 @@ function masteryLine(meta) { const top = ARCH_KEYS.map(k => masteryOf(meta, k)).
 function masteryXp(run, outcome) {
   if (run.practice) return 0;
   const spared = outcome === 'spared' || outcome === 'elite';
-  return MASTERY_PAY.win * (run.wins || 0) + (spared ? MASTERY_PAY.spared + MASTERY_PAY.priority * (run.priority || 0) : 0) + MASTERY_PAY.elite * (run.eliteWins || 0);
+  return MASTERY_PAY.win * (run.wins || 0) + (spared ? MASTERY_PAY.spared + MASTERY_PAY.priority * (run.priority || 0) : 0) + MASTERY_PAY.elite * (run.eliteWins || 0) + ((run.goal && run.goal.xp) || 0);
 }
 function masteryShares(run, total) {
   const c = {}; run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean)).forEach(p => { const d = pieceDef(baseId(p.id)) || pieceDef(p.id); (d && d.tags || []).forEach(t => { if (ARCH[t]) c[t] = (c[t] || 0) + 1; }); });
@@ -1243,6 +1243,82 @@ function settleMastery(run, meta, outcome) {
     for (let l = before.level + 1; l <= after.level; l++) opened.push({ level: l, text: masteryReward(k, l), piece: MASTERY_LEVELS[l - 1].kind === 'piece' ? masteryPiece(k, l) : null });
     return { k, gain, from: before.level, level: after.level, xp: after.xp, lo: after.lo, hi: after.hi, need: after.need, opened };
   });
+}
+
+// ---------- Goals (Phase 6; content in goals.js) ----------
+// One goal list feeds the weekly System Contracts (meta.contracts: { week, done: { id: 1 }, weeks: full boards }) and the
+// run goal picked before a world (meta.goal: { offer: [ids], pick }, then run.goal: { id, met, paid, xp }). A goal id is a
+// GOALS key, or 'as:<archetype>' for "Spare a world as a ...". Practice runs check neither; Pending World checks only Contracts.
+const isSpared = o => o === 'spared' || o === 'elite';
+const GOAL_ENDS = {
+  rich: run => run.gold >= 30,
+  final: run => run.round >= ROUNDS || !!run.elite,
+  level: run => run.level >= 6,
+  wagers: run => (run.wagersWon || 0) >= 2,
+  spare: (run, o) => isSpared(o),
+  nohosp: (run, o) => isSpared(o) && !run.infirmaryUsed,
+  flawless: (run, o) => isSpared(o) && !run.losses,
+  as: (run, o, a) => isSpared(o) && run.path === a,
+};
+function goalDef(id) { return GOALS[String(id).split(':')[0]] || null; }
+function goalText(id) {
+  const G = goalDef(id), a = String(id).split(':')[1]; if (!G) return '';
+  return a && ARCH[a] ? G.text.replace('a {arch}', (/^[AEIOU]/.test(ARCH[a].path) ? 'an ' : 'a ') + ARCH[a].path) : G.text;
+}
+function goalValid(id) { const G = goalDef(id), a = String(id).split(':')[1]; return !!G && (G.arch ? START_ARCH.includes(a) : !a); }
+function contractWeek(now) { return weekOf(dailyDate(now)); }
+// The week's board, the same for everyone: something done in a run, how a run ends, and sparing a world as one archetype
+function contractBoard(week) {
+  const r = seedRng('contracts:' + week), ks = Object.keys(GOALS);
+  return [pick(ks.filter(k => GOALS[k].board === 'fight'), r), pick(ks.filter(k => GOALS[k].board === 'run' && GOALS[k].tier < 3), r), 'as:' + pick(START_ARCH, r)];
+}
+function sanitizeContracts(C, week) {
+  const weeks = Math.max(0, Math.floor((C && C.weeks) || 0)) || 0;
+  if (!C || C.week !== week) return { week, done: {}, weeks };
+  const done = {}; contractBoard(week).forEach(id => { if (C.done && C.done[id]) done[id] = 1; });
+  return { week, done, weeks };
+}
+function contractsOf(meta, now) { meta.contracts = sanitizeContracts(meta.contracts, contractWeek(now)); return meta.contracts; }
+function noteContract(run, meta, id, msgs) {
+  const C = contractsOf(meta), board = contractBoard(C.week); if (C.done[id] || !board.includes(id)) return 0;
+  const pay = CONTRACT_ECHOES[goalDef(id).tier]; C.done[id] = 1; meta.echoes += pay;
+  (run.contractsDone = run.contractsDone || []).push({ id, pay });
+  if (msgs) msgs.push({ t: 'class', text: `[Contract fulfilled: ${goalText(id)}. +${pay} Echoes.]` });
+  if (board.every(k => C.done[k])) { C.weeks++; run.contractWeek = C.weeks; if (msgs) msgs.push({ t: 'class', text: `[All three Contracts fulfilled this week. Contract Mark: ${C.weeks} week${C.weeks > 1 ? 's' : ''}.]` }); }
+  return pay;
+}
+// Check this week's Contracts and the run goal against test(id)
+function goalCheck(run, meta, test, msgs) {
+  if (!run || run.practice || run.script) return;
+  if (meta) contractBoard(contractsOf(meta).week).forEach(id => { if (!meta.contracts.done[id] && test(id)) noteContract(run, meta, id, msgs); });
+  const g = run.goal; if (g && !g.met && g.paid == null && test(g.id)) { g.met = true; if (msgs) msgs.push({ t: 'class', text: `[Run goal met: ${goalText(g.id)}. Paid when the run ends.]` }); }
+}
+// A feat happened (questEvent passes every fight, merge, path and shop on)
+function goalEvent(run, kind, c, msgs) { goalCheck(run, META, id => { const G = goalDef(id); return !!G.feat && QUEST_AT[kind].includes(FEATS[G.feat].at) && featOk(G.feat, c, G.n); }, msgs); }
+// When the run ends: the end goals, then the run goal's pay
+function settleGoals(run, meta, outcome) {
+  goalCheck(run, meta, id => { const G = goalDef(id); return !!G.end && GOAL_ENDS[G.end](run, outcome, String(id).split(':')[1]); }, null);
+  const g = run.goal; if (!g || g.paid != null || !goalDef(g.id)) return null;
+  const P = GOAL_PAY[goalDef(g.id).tier]; g.paid = g.met ? P.echoes : 0; g.xp = g.met ? P.xp : 0; meta.echoes += g.paid;
+  return g;
+}
+// The run goal offer: one goal of each tier, drawn until a run takes it. pick: the one chosen, or null for none.
+function sanitizeGoal(M) {
+  if (!M || !Array.isArray(M.offer) || M.offer.length !== 3 || !M.offer.every(id => goalValid(id) && !goalDef(id).arch)) return null;
+  return { offer: M.offer.slice(), pick: M.offer.includes(M.pick) ? M.pick : null };
+}
+function goalOffer(meta, rng) {
+  meta.goal = sanitizeGoal(meta.goal);
+  if (!meta.goal) { const ks = Object.keys(GOALS).filter(k => !GOALS[k].arch); meta.goal = { offer: [1, 2, 3].map(t => pick(ks.filter(k => GOALS[k].tier === t), rng)), pick: null }; }
+  return meta.goal;
+}
+function setGoal(meta, id) { const M = goalOffer(meta); M.pick = M.offer.includes(id) ? id : null; return M.pick; }
+// A normal run takes the chosen goal (Pending World and practice leave the offer for the next one)
+function claimGoal(run, meta) {
+  if (run.seed || run.practice || run.script) return null;
+  const M = sanitizeGoal(meta.goal); delete meta.goal;
+  if (M && M.pick) run.goal = { id: M.pick, met: false };
+  return run.goal || null;
 }
 
 // ---------- Unfiled designs (Phase 5; content in designs.js) ----------
@@ -1779,6 +1855,7 @@ function fileIssues(run, f, meta, msgs) {
 const QUEST_AT = { fight: ['win', 'fight'], merge: ['merge'], path: ['path'], shop: ['shop'], wager: ['wager'] };
 function questEvent(run, kind, d, msgs) {
   const c = featCtx(run, d.f, d.won, d.spec);
+  goalEvent(run, kind, c, msgs);
   (run.quests || []).forEach(q => {
     if (q.done || q.failed) return;
     const Q = QUESTS[q.id], feats = [].concat(Q.feat);
@@ -3235,6 +3312,7 @@ function endRun(run, meta, outcome) {
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
   settleBacking(run, meta, outcome);
+  settleGoals(run, meta, outcome);
   const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
   run.masteryGain = settleMastery(run, meta, outcome);
   openClauses(run, meta, 'end', outcome, null);
@@ -3515,7 +3593,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, GOALS, GOAL_ENDS, GOAL_PAY, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
