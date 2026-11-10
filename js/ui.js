@@ -105,7 +105,17 @@ function clearToasts() { toastQ.length = 0; toastsEl.querySelectorAll('.toast').
 toastsEl.addEventListener('click', e => { const el = e.target.closest('.toast'); if (!el) return; dropToast(el); if (el.onTap) el.onTap(); });
 // In a fight, toasts sit below the foe panel so they never cover the enemy's name or HP
 // Long world and champion names: drop a size first, then wrap to 2 lines, so nothing is cut at 320 wide
+// A champion's short name for tight spots: the name before a title ("Oringe waan the Unbowed" -> "Oringe waan")
+function shortName(n) { const t = String(n || '').split(/\s+(?:the|of)\s+/i)[0].trim(); return t || n; }
 function fitNames() {
+  // World name in the top strip: two smaller steps before it is cut
+  app.querySelectorAll('.strip .wname').forEach(el => { for (let k = 0; k < 2 && el.scrollWidth > el.clientWidth + 1; k++) el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.88).toFixed(1) + 'px'; });
+  // Piece names in tiles: a long word drops a size or two instead of breaking between letters
+  app.querySelectorAll('.tl-n').forEach(el => {
+    el.classList.add('whole');
+    for (let k = 0; k < 3 && el.scrollWidth > el.clientWidth + 1; k++) el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.92).toFixed(1) + 'px';
+    if (el.scrollWidth > el.clientWidth + 1) { el.classList.remove('whole'); el.style.fontSize = ''; }
+  });
   app.querySelectorAll('.fo-name, .me-name').forEach(el => {
     if (el.scrollWidth <= el.clientWidth + 1) return;
     el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 0.86).toFixed(1) + 'px';
@@ -196,7 +206,7 @@ function strip() {
   const mh = maxHp(run);
   const hc = run.record ? `<button class="hcount" data-act="sheet" data-s="record" aria-label="${run.hearts} Hearts. Open the world record">♥${run.hearts}</button>` : `<span class="hcount" title="Hearts">♥${run.hearts}</span>`;
   return `<header class="strip"><div class="st-1"><span class="wname">${esc(run.world.name)}</span>${rankChip(run.world.rank)}<span class="st-sp"></span>${hc}<span class="gold" title="Gold">${run.gold}g</span><button class="icon-btn logb" data-act="sheet" data-s="syslog" aria-label="System log: every message this run">Log</button><button class="icon-btn" data-act="menu" aria-label="Menu">≡</button></div>
-    <button class="st-2" data-act="sheet" data-s="stats" aria-label="${esc(run.name)}, level ${run.level}, ${n0(run.hp)} of ${mh} HP. Open Stats">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<span class="ch-name">${esc(run.name)}</span><span class="st-lv">Lv ${run.level}<span class="xp" aria-hidden="true"><i style="width:${lvFill()}%"></i></span></span><span class="st-hp">${n0(run.hp)}/${mh} HP</span>${hpBar(run.hp, mh, 'hp')}</button>${stripProg()}</header>`;
+    <button class="st-2" data-act="sheet" data-s="stats" aria-label="${esc(run.name)}, level ${run.level}, ${n0(run.hp)} of ${mh} HP. Open Stats">${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}<span class="ch-name">${esc(shortName(run.name))}</span><span class="st-lv">Lv ${run.level}<span class="xp" aria-hidden="true"><i style="width:${lvFill()}%"></i></span></span><span class="st-hp">${n0(run.hp)}/${mh} HP</span>${hpBar(run.hp, mh, 'hp')}</button>${stripProg()}</header>`;
 }
 
 // ---------- World Record ----------
@@ -630,7 +640,7 @@ function draftHTML() {
   return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Skills')}</div><h2>[Skill selection: choose 3]</h2></div></div>
     <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.${gd.length ? ' Rerolling also redraws the gear on offer.' : ''}</p>
     <div class="sgrid">${cards}</div>
-    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-skills" ${n === 3 ? '' : 'disabled'}>${n === 3 ? next : `Skills ${n}/3`}</button></div></main>`;
+    <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-skills" ${n === 3 ? '' : 'disabled'}>${n === 3 ? next : `Pick ${3 - n} more`}</button></div></main>`;
 }
 // Pick Your Kit: 1 of 2 gear pieces, once the skills are chosen
 function gearDraftHTML(gd) {
@@ -653,7 +663,7 @@ function kitStatsHTML() {
   const gifts = [hasGift(run, 'bornlucky') && `${GIFTS.bornlucky.name} +2 LUK`, hasGift(run, 'latebloomer') && `${GIFTS.latebloomer.name} −1 to each`].filter(Boolean);
   const roll = run.rolled ? `<div class="aw-roll"><span>[Rolled: ${ROLL_PTS} points placed. The System does not do refunds.]</span><button class="btn small ghost" data-act="kit-unroll">Place 4 myself</button></div>`
     : run.rollUsed ? '' : `<div class="aw-roll"><span>Or let the System roll: <b>${ROLL_PTS} points</b> instead of 4, at random, one stat favoured. Once only.</span><button class="btn small" data-act="kit-roll">Roll</button></div>`;
-  const rows = STATS.map(k => `<div class="strow kit"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${uses[k] ? 'Powers ' + esc(uses[k].join(', ')) : STAT_INFO[k].short}</small></span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="-1" ${run.stats[k] <= fl[k] ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="1" ${pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
+  const rows = STATS.map(k => `<div class="strow kit"><span class="st-k">${k}</span><span class="st-n">${STAT_INFO[k].name}<small>${uses[k] ? 'Powers ' + esc([...new Set(uses[k])].join(', ')) : STAT_INFO[k].short}</small></span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="-1" ${run.stats[k] <= fl[k] ? 'disabled' : ''} aria-label="Remove a point">−</button>`}<span class="st-v">${s[k]}${s[k] !== run.stats[k] ? `<small title="From gear">${s[k] > run.stats[k] ? '+' : '−'}${Math.abs(s[k] - run.stats[k])}</small>` : ''}</span>${run.rolled ? '<span></span>' : `<button class="btn small add" data-act="kit-stat" data-k="${k}" data-d="1" ${pts <= 0 ? 'disabled' : ''} aria-label="Add a point">+</button>`}</div>`).join('');
   return `<main class="screen select awaken"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Stats')}</div><h2>[Calibrating your champion]</h2></div></div>
     <section class="aw-body sysw"><p class="sh-p">${pts ? `<b class="pts">${pts} point${pts > 1 ? 's' : ''} to place.</b> ` : ''}Skills draw power from the stat of their archetype. Reach 10 in a stat for a milestone perk.${gifts.length ? ` Gifts: ${esc(gifts.join(', '))}.` : ''}</p>${roll}${rows}</section>
     <div class="foot"><button class="btn primary" data-act="kit-ok" ${pts ? 'disabled' : ''}>${pts ? `Place ${pts} stat point${pts > 1 ? 's' : ''}` : 'Enter the tournament'}</button></div></main>`;
@@ -876,7 +886,7 @@ function fightHTML() {
       <div class="bar foe-bar"><i id="hbB"></i><b id="bkB"></b></div><div class="bar brk-bar" title="Break: fill it and the opponent is Broken" aria-label="Break bar"><i id="brB"></i></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
     <section class="log" id="log" aria-live="polite"></section></div><div class="col col-b">
-    <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(run.name)}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
+    <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(shortName(run.name))}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
       <div class="bar hp-bar"><i id="hbA"></i><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
     <section class="skills c${run.slots}" id="skills"></section></div></main>`;
 }
@@ -1366,8 +1376,10 @@ function hintHTML() {
   if (!h) return '';
   ui.hint = h.k;
   // Board screens show it as a strip under the top strip (moved there by render), so it never covers a choice
+  // In a fight it sits in the log's place, between the opponent and your champion, so it never covers their next move
+  if (ui.screen === 'fight') return `<div class="coach hint pos-strip pos-log" role="status"><button class="hint-read" data-act="hint-read" data-k="${h.k}" aria-label="Read the whole hint"><span class="eyebrow">[System hint]</span> ${esc(h.text)}</button><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
   if (['choose', 'shop', 'district'].includes(ui.screen)) return `<div class="coach hint pos-strip" role="status"><p><span class="eyebrow">[System hint]</span> ${esc(h.text)}</p><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
-  return `<div class="coach hint pos-${ui.screen === 'fight' ? 'mid' : 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[System hint]</span></div><p>${esc(h.text)}</p><div class="co-f"><span></span><button class="btn small primary" data-act="hint-ok">Understood</button></div></div>`;
+  return `<div class="coach hint pos-bottom" role="status"><div class="co-h"><span class="eyebrow">[System hint]</span></div><p>${esc(h.text)}</p><div class="co-f"><span></span><button class="btn small primary" data-act="hint-ok">OK</button></div></div>`;
 }
 // Hints inside events: what a % means, and how a Fate crisis resolves
 function eventHint(E, hasRoll) {
@@ -1607,7 +1619,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
@@ -1616,7 +1628,10 @@ function render() {
   if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
   ui.hint = null;
   app.innerHTML = h + sh + coachHTML() + hintHTML();
-  const hs = app.querySelector('.coach.pos-strip'), stp = app.querySelector('.strip'); if (hs && stp) stp.after(hs);
+  const hs = app.querySelector('.coach.pos-strip'), stp = app.querySelector('.strip'), lg = scr === 'fight' && document.getElementById('log');
+  if (hs && lg) lg.before(hs); else if (hs && stp) stp.after(hs);
+  // The tutorial's fight steps take the log's place too, so the thing they point at stays in view
+  const cm = scr === 'fight' && app.querySelector('.coach.pos-mid'); if (cm && lg) { cm.classList.add('pos-log'); lg.before(cm); }
   applyMoment();
   coachHighlight();
   if (scr === 'fight') updateFight();
@@ -1689,6 +1704,8 @@ function onAct(el) {
     case 'fb-type': ui.fb.type = d.k; return render();
     case 'fb-send': return sendReport();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
+    case 'hint-read': { const h = HINTS.find(x => x.k === d.k); if (h) ui.sheet = { type: 'hint', k: h.k, text: h.text }; return render(); }
+    case 'hint-done': meta.hints = meta.hints || {}; meta.hints[d.k] = true; saveMeta(); ui.sheet = null; return render();
     case 'hint-ok': if (ui.hint) { meta.hints = meta.hints || {}; meta.hints[ui.hint] = true; saveMeta(); } return render();
     case 'set': { const k = d.k, v = d.v === 'true' ? true : d.v === 'false' ? false : /^\d+$/.test(d.v) ? +d.v : d.v; SET[k] = v; saveSettings(); REDUCED = reducedMotion(); if (k === 'vol' && v) sfx('tap'); if (k === 'vib' && v) sfx('hit'); return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
@@ -1897,7 +1914,7 @@ function practiceDoneSheet() {
 // "Noticed": what the System's attention does, in its own voice
 function noticeSheet() {
   const step = Math.round(TUNE.notice * 100), max = Math.round(TUNE.notice * TUNE.noticeMax * 100);
-  return sheetWrap('[You have been Noticed]', `<div class="sysbox"><p>[Straight wins attract attention. Each one makes your opponents hit ${step}% harder, up to ${max}%.]</p><p>[Currently: +${noticePct(run)}%.]</p><p>[Lose a Heart and the System loses interest. This is not a suggestion.]</p></div>`, '<button class="btn primary" data-act="close">Understood</button>');
+  return sheetWrap('[You have been Noticed]', `<div class="sysbox"><p>[Straight wins attract attention. Each one makes your opponents hit ${step}% harder, up to ${max}%.]</p><p>[Currently: +${noticePct(run)}%.]</p><p>[Lose a Heart and the System loses interest. This is not a suggestion.]</p></div>`, '<button class="btn primary" data-act="close">OK</button>');
 }
 function firstTimeSheet() {
   return sheetWrap('[New entrant detected]', `<p class="sh-p big">First time in the tournament?</p><p class="sh-p">The practice run teaches the basics in 3 short rounds with the System guiding you. It takes about 5 minutes and you can skip it at any point.</p>`, `<button class="btn ghost" data-act="skip-practice">Skip, enter the tournament</button><button class="btn primary" data-act="practice">Practice run</button>`, 'sys');
