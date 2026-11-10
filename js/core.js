@@ -915,14 +915,15 @@ function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers
 
 // ---------- Opponents: choice of two each round ----------
 // late: extra enemy damage per round past round 4 (rounds 5 to 8 and the final; not the Elite bracket)
-// The break bar (enemies only): damage that gets past Block fills it, big hits (BREAK.big of its max HP, all hits
-// together) count BREAK.heavy times, a skill's brk adds to it directly, and STR's Finesse (STAT_FACES) adds to all of it. Full, the
-// enemy is Broken: it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns.
-// The bar drains BREAK.drain of its size at the start of each of the enemy's turns.
+// The guard bar (enemies only): it starts full and only the player wears it down. Damage that gets past Block takes it
+// down, big hits (BREAK.big of its max HP, all hits together) count BREAK.heavy times, a skill's brk takes it down
+// directly, and STR's Finesse (STAT_FACES) adds to all of it. It never recovers on its own. Empty, the enemy is Broken:
+// it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns; then the guard is
+// full again. (B.brk counts the damage done to the guard, so the bar shows breakMax - brk.)
 // Wind-ups: a big move shown as the intent can be broken. Deal share of the opponent's max HP in damage on your turn
 // (past its Block) and the move falls apart: it goes on cooldown and the opponent has to do something else instead.
 const WINDUP = { share: 0.15, cd: 2 };
-const BREAK = { share: 0.4, heavy: 2, big: 0.2, drain: 0.15 };
+const BREAK = { share: 0.4, heavy: 2, big: 0.2 };
 // The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
 // notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
 // gate: Gatekeepers (the hard pick at a GATES round) are this much tougher again, with an extra trait and a second phase.
@@ -2518,7 +2519,7 @@ function applyStatus(f, X, Y, fx, p) {
   if (fx.weaken) { Y.weaken = Math.max(Y.weaken, fx.weaken + (X.P.weakenPlus || 0)); if (X.P.weakPoison) addStatus(f, X, Y, 'poison', X.P.weakPoison); react(f, X, Y); }
   if (fx.stun) stunTarget(f, X, Y);
 }
-// The break bar fills from the player's side only; full, the enemy is Broken (a Stun with the Broken state)
+// The guard is worn down from the player's side only; empty, the enemy is Broken (a Stun with the Broken state)
 function addBreak(f, X, Y, v) {
   if (!X.isPlayer || !Y.breakMax || Y.hp <= 0 || v <= 0) return;
   Y.brk += v * (1 + STAT_FACES.STR.finesse.brk * (X.str || 0));
@@ -2939,7 +2940,6 @@ function endTurn(f, X, usedKey) {
   if (X.marked > 0) { X.marked--; if (!X.marked) X.hemo = false; }
   if (X.empower > 0) X.empower--;
   if (X.brokenT > 0) X.brokenT--;
-  if (X.breakMax && X.brk > 0) X.brk = Math.max(0, X.brk - X.breakMax * BREAK.drain);
   X.skills.forEach(s => { if (s.key !== usedKey && s.cd > 0) s.cd--; });
 }
 function checkOver(f) {
@@ -2973,6 +2973,47 @@ function playerAct(f, idx) {
   f.tally.turns = f.turn;
   if (!checkOver(f)) f.phase = 'enemy';
   return true;
+}
+// Forecast (the fight screen's tap-to-preview): what using a skill would do, played out on a copy of the fight with a
+// middling roll, so no crits and no dodges. Covers your move and their reply up to the start of your next turn
+// (a Quick skill gets no reply). The real fight and its random stream are never touched.
+function cloneFight(f) {
+  const seen = new Map();
+  const cp = v => {
+    if (!v || typeof v !== 'object') return v;
+    if (seen.has(v)) return seen.get(v);
+    const o = Array.isArray(v) ? [] : Object.create(Object.getPrototypeOf(v));
+    seen.set(v, o);
+    for (const k of Object.keys(v)) o[k] = cp(v[k]);
+    return o;
+  };
+  return cp(f);
+}
+function forecast(f, idx) {
+  if (f.phase !== 'player' || f.over) return null;
+  const s0 = f.A.skills[idx]; if (!s0 || !canUse(s0)) return null;
+  const g = cloneFight(f), A = g.A, B = g.B, mid = () => 0.5;
+  g.rng = mid; g.log = []; g.events = [];
+  const was = { aHp: A.hp, bHp: B.hp, intent: B.intent && B.intent.def.name, windups: g.tally.windups || 0, breaks: g.tally.breaks || 0 };
+  const rnd0 = Math.random; Math.random = mid; // anything that rolls without the fight's stream
+  let out;
+  try {
+    playerAct(g, idx);
+    const mine = { aHp: A.hp, bHp: B.hp };
+    const broke = (g.tally.windups || 0) > was.windups, guard = (g.tally.breaks || 0) > was.breaks;
+    const quick = s0.def.quick && !g.over;
+    if (!g.over && g.phase === 'enemy') enemyTurn(g);
+    if (!g.over && g.phase === 'stunned') { skipPlayer(g); enemyTurn(g); }
+    out = {
+      aHp: Math.max(0, Math.round(A.hp)), bHp: Math.max(0, Math.round(B.hp)), aMax: A.maxHp, bMax: B.maxHp,
+      dealt: Math.max(0, Math.round(was.bHp - mine.bHp)), taken: Math.max(0, Math.round(was.aHp - A.hp)),
+      broke: broke ? was.intent : null, guard, brk: B.breakMax ? Math.min(B.breakMax, B.brk) : 0, brkMax: B.breakMax || 0, quick, win: g.over && g.winner === 'A', lose: g.over && g.winner === 'B',
+      reflex: !g.over && B.reflexNow ? reflexMove(B, B.reflexNow).def.name : null,
+      next: !g.over && B.intent ? B.intent.def.name : null,
+    };
+  } catch (e) { out = null; }
+  Math.random = rnd0;
+  return out;
 }
 function skipPlayer(f) { f.events = []; endTurn(f, f.A, null); if (!checkOver(f)) f.phase = 'enemy'; }
 function scoreSkill(s, low) { const fx = s.def.fx; return ((fx.dmg || 0) * (fx.hits || 1) + (fx.burn || 0) + (fx.poison || 0) * 1.5 + (fx.bleed || 0) + (fx.detonate ? 10 : 0) + (fx.doom ? fx.doom * 0.5 : 0) + (fx.blockDmg ? 6 : 0)) * s.power + (low ? ((fx.heal || 0) + (fx.healMissing ? 25 : 0) + (fx.block || 0) * 0.8) * s.power * 2 : (fx.block || 0) * 0.5 * s.power) + (fx.stun ? 8 : 0) + (fx.interrupt ? 6 : 0); }
@@ -3217,7 +3258,7 @@ function describe(def, p = 1) {
   if (fx.thornsFight) r.push(`For the rest of the fight, hit back for ${n(fx.thornsFight)} when struck.`);
   if (fx.healMissing) r.push(`Heal ${fx.healMissing * 100}% of your missing HP.`);
   if (fx.drainPoison) r.push("Heal equal to the opponent's Poison.");
-  if (fx.brk) r.push(`Break ${n(fx.brk)}: fills the opponent's break bar.`);
+  if (fx.brk) r.push(`Break ${n(fx.brk)}: wears down the opponent's guard.`);
   if (fx.empower) r.push(`Deal 30% more damage for ${fx.empower} turn${fx.empower > 1 ? 's' : ''}.`);
   if (fx.evade) r.push(`Evade the next ${fx.evade > 1 ? fx.evade + ' attacks' : 'attack'}.`);
   if (fx.nextCrit) r.push('Your next hit is a critical.');
@@ -3288,7 +3329,7 @@ const REACTIONS = {
   flare: { name: 'Toxic Flare', pair: 'Burn + Poison', text: 'Applying Burn to a Poisoned target ignites the Poison for half its value as damage. Once per turn.' },
   cauterise: { name: 'Cauterise', pair: 'Burn + Bleed', text: 'Bleed is seared away and Burn doubles.' },
   hemorrhage: { name: 'Haemorrhage', pair: 'Bleed + Mark', text: 'Bleed deals double while Marked.' },
-  broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'Breaks the target, the same as a full break bar: 50% more damage for 2 turns.' },
+  broken: { name: 'Broken', pair: 'Stun + Weaken', text: 'Breaks the target, the same as an empty guard bar: 50% more damage for 2 turns.' },
   blight: { name: 'Blight', pair: 'Poison + Leech', text: 'Leech drains double, but heals only the normal amount.' },
   hastened: { name: 'Hastened Doom', pair: 'Doom + 2 other effects', text: 'Doom lands a turn sooner.' },
 };
@@ -3734,6 +3775,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
+  forecast, cloneFight,
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
