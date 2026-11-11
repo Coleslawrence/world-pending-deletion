@@ -63,5 +63,13 @@ for (const id of ['brute', 'golem', 'drake', 'ghoul', 'imp', 'hex_toad']) {
   f.B.brk = 10; f.phase = 'enemy'; G.enemyTurn(f); if (f.phase === 'enemy') G.enemyTurn(f);
   ok(f.B.brk === 10, `the guard does not recover on its own (${f.B.brk})`);
 }
+// Broken: the guard stays empty while they are Broken, then is full again
+{
+  const f = fight(); f.B.brk = f.B.breakMax - 1; G.addBreak(f, f.A, f.B, 5);
+  ok(f.B.brk === f.B.breakMax && f.B.brokenT === 2 && f.tally.breaks === 1, 'emptying the guard Breaks them');
+  G.addBreak(f, f.A, f.B, 50); ok(f.tally.breaks === 1, 'an empty guard cannot break again while they are Broken');
+  for (let k = 0; k < 6 && f.B.brokenT > 0 && !f.over; k++) { f.phase = 'enemy'; G.enemyTurn(f); if (f.B.brokenT > 0) ok(f.B.brk === f.B.breakMax, 'still empty while Broken'); }
+  ok(f.B.brokenT === 0 && f.B.brk === 0, `full again once Broken wears off (${f.B.brk})`);
+}
 console.log(fails ? `${fails} failure(s)` : 'forecast-test: all passed');
 process.exit(fails ? 1 : 0);

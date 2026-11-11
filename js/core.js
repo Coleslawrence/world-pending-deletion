@@ -919,7 +919,7 @@ function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers
 // down, big hits (BREAK.big of its max HP, all hits together) count BREAK.heavy times, a skill's brk takes it down
 // directly, and STR's Finesse (STAT_FACES) adds to all of it. It never recovers on its own. Empty, the enemy is Broken:
 // it loses its next turn, its shown move goes on cooldown, and it takes 50% more damage for 2 turns; then the guard is
-// full again. (B.brk counts the damage done to the guard, so the bar shows breakMax - brk.)
+// full again once Broken wears off. (B.brk counts the damage done to the guard, so the bar shows breakMax - brk.)
 // Wind-ups: a big move shown as the intent can be broken. Deal share of the opponent's max HP in damage on your turn
 // (past its Block) and the move falls apart: it goes on cooldown and the opponent has to do something else instead.
 const WINDUP = { share: 0.15, cd: 2 };
@@ -2557,10 +2557,10 @@ function applyStatus(f, X, Y, fx, p) {
 }
 // The guard is worn down from the player's side only; empty, the enemy is Broken (a Stun with the Broken state)
 function addBreak(f, X, Y, v) {
-  if (!X.isPlayer || !Y.breakMax || Y.hp <= 0 || v <= 0) return;
+  if (!X.isPlayer || !Y.breakMax || Y.hp <= 0 || v <= 0 || Y.brk >= Y.breakMax) return; // an empty guard stays empty while they are Broken
   Y.brk += v * (1 + STAT_FACES.STR.finesse.brk * (X.str || 0));
   if (Y.brk < Y.breakMax) return;
-  Y.brk = 0; f.tally.breaks++;
+  Y.brk = Y.breakMax; f.tally.breaks++;
   say(f, `[${Y.name}'s guard breaks. Broken!]`, 'skill'); ev(f, { k: 'break', side: Y.side });
   stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, 2);
   if (X.P.breakEmpower) { X.empower = Math.max(X.empower, X.P.breakEmpower + 1); say(f, `[Lightning Rod: Empowered for ${X.P.breakEmpower} turns.]`, 'skill'); }
@@ -2975,7 +2975,7 @@ function endTurn(f, X, usedKey) {
   if (X.weaken > 0) X.weaken--;
   if (X.marked > 0) { X.marked--; if (!X.marked) X.hemo = false; }
   if (X.empower > 0) X.empower--;
-  if (X.brokenT > 0) X.brokenT--;
+  if (X.brokenT > 0) { X.brokenT--; if (!X.brokenT && X.breakMax && X.brk >= X.breakMax) X.brk = 0; } // Broken wears off: the guard is full again
   X.skills.forEach(s => { if (s.key !== usedKey && s.cd > 0) s.cd--; });
 }
 function checkOver(f) {

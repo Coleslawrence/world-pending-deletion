@@ -1254,3 +1254,9 @@ div.bar u.up { background: repeating-linear-gradient(135deg, rgba(143,211,154,.9
 .qt small { display: block; opacity: 0.7; }
 .qt.tr { border-color: var(--gold-hi); }
 .qt.cr { border-color: var(--elite); }
+/* No double-tap zoom (two taps on a skill to preview then use it zoomed the page on phones); pinch zoom still works */
+html, body, button, [data-act] { touch-action: manipulation; }
+/* A fight hint on a short phone (320x693) takes one line, so the skills never need scrolling; tap it to read it all */
+@container app (max-height: 720px) { .coach.pos-log .hint-read { -webkit-line-clamp: 1; line-clamp: 1; } }
+/* At 320 the Quick tag squeezed long skill names onto three lines ("Hold the Line"), pushing Attack below the screen */
+@container app (max-width: 360px) { .sk-q { letter-spacing: 0; padding: 0 3px; margin-right: 2px; } }
