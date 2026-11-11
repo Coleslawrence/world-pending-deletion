@@ -191,8 +191,8 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `dbl` | 1 | Double or Nothing (4) | (works with other keys on the same skill) | yes |
 | `deepen` | 4 | Open Vein (1), Arterial Cut (1), Salted Wound (1), … | (works with other keys on the same skill) | yes |
 | `detonate` | 4 | Ignite (2), Combust (3), Wildfire (2), … | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `die` | 40 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
-| `dieMin` | 2 | Two-Headed Coin (4), Hedged Bet (3) | (works with other keys on the same skill) | yes |
+| `die` | 44 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
+| `dieMin` | 3 | Two-Headed Coin (4), Hedged Bet (3), Rigged Wheel (2) | (works with other keys on the same skill) | yes |
 | `dieStun` | 5 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
 | `dmg` | 319 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
@@ -207,6 +207,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `evade` | 18 | Smoke Bomb (1), Flurry Step (1), Blink (1), … | Evade the next attack. | yes |
 | `execMult` | 10 | Execute (2.5), Soul Harvest (2), Decapitate (3), … | (works with other keys on the same skill) | yes |
 | `execute` | 10 | Execute (0.3), Soul Harvest (0.3), Decapitate (0.3), … | (works with other keys on the same skill) | yes |
+| `faces` | 4 | Wheel of Fortune ([[2,{"shake":99,"block":8}],[4,{"dmg":12,"shake":3}],[6,{"dmg":22}]]), Fortune's Favour ([[2,{"shake":99,"block":12}],[4,{"dmg":15,"shake":4}],[6,{"dmg":28}]]), Merciful Wheel ([[2,{"shake":99,"heal":10}],[4,{"dmg":12,"shake":99}],[6,{"dmg":22,"shake":3}]]), … | (works with other keys on the same skill) | yes |
 | `fester` | 4 | Fester (1), Suppurate (1.5), Open Sore (1), … | Deal the opponent's Poison as damage. The Poison stays. | yes |
 | `flash` | 4 | Flashover (12), White Heat (18), Rollover (12), … | Double the opponent's Burn, adding up to 12. | yes |
 | `focus` | 15 | Focus (0.6), Read the Glyph (0.2), Loaded Die (0.2), … | Your next damaging skill deals 60% more. | yes |
@@ -300,6 +301,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `burnPoison` | 2 | plague_censer (2), tar_flask (1) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
 | `chanceBonus` | 3 | Loaded Dice (15), House Credit (10), The House (10) | Chance options in events +15%. | add |  |  |  |
 | `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
+| `charm` | 1 | rabbit_foot (3) | Each turn, your lowest die decides: 1 or 2, shake off 3 of each of your Burn, Poison and Bleed; 3 or 4, heal 3; 5 or 6, gain 3 Block. | add |  |  | Gambler |
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
 | `countdown` | 1 | countdown_collar (12) | You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted. | set |  |  |  |
 | `critBonus` | 8 | Swordmaster (0.15), duelist_rapier (0.1), whetstone_charm (0.08), … | +15% critical chance. | add |  |  |  |
@@ -388,7 +390,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
 | `regen` | 11 | Zealot 4 (2), Undying (3), pilgrim_mace (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
 | `relic` | 1 | reliquary (0.2) | Once per fight, dropping below 30% HP heals you 20% of your max HP. | set |  |  | Zealot |
-| `rerolls` | 8 | Gambler 4 (2), Card Counter (1), croupiers_rake (1), … | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
+| `rerolls` | 9 | Gambler 4 (2), Card Counter (1), croupiers_rake (1), … | Start each fight with 2 rerolls. Tap Reroll, then a skill, to reroll its die. | add |  |  | Gambler |
 | `savingGrace` | 1 | Saving Grace (1) | Healing from a die skill showing 6 is doubled. | set |  |  | Gambler, Zealot |
 | `sixBlock` | 1 | house_chip (5) | When a turn starts with a 6 among your dice, gain 5 Block and a reroll. | add |  |  | Gambler |
 | `sixGold` | 3 | weighted_dice (1), gilded_coin (1), house_chip (1) | +1 gold after each win where you rolled a 6. | add |  |  | Gambler |
@@ -462,7 +464,7 @@ Each archetype is a theme in one cell of a fixed grid: a stat and a Discipline (
 | Zealot | VIT | Mend | Outlasts everything: what cannot be killed cannot lose. | `heal` `healMissing` `regen` `cleanse` `fullBlock` `quench` | Bastion | light, prayer, vow, saint, tide, undying |
 | Reaper | STR | Might | Ends fights: the wounded have already lost. | `execute` `execMult` `momentum` `doom` `doomT` `lifesteal` `selfDmg` `leech` `empower` `reapHeal` `doomExec` | Bladedancer, Stormcaller | scythe, grave, harvest, end, hollow, bone |
 | Stormcaller | STR | Sway | Breaks the enemy's plan before it lands. | `stun` `stunIfWeak` `interrupt` `weaken` `empower` `bigStop` | Arcanist, Gambler, Reaper | thunder, lightning, crack, break, sky, gale |
-| Gambler | LUK | Sway | Makes its own luck, then bets all of it. | `die` `dmgPip` `blockPip` `healPip` `dieMin` `dbl` `snake` `boxcars` `bust` `bustAt` `dmgAll` `cashOut` `progressive` `reroll` `setSix` `rollTwice` `mark` `dieStun` `ride` `dmgHigh` `tapOut` | Arcanist, Stormcaller, Jinx | dice, coin, card, odds, stake, jackpot |
+| Gambler | LUK | Sway | Makes its own luck, then bets all of it. | `die` `faces` `shake` `dmgPip` `blockPip` `healPip` `dieMin` `dbl` `snake` `boxcars` `bust` `bustAt` `dmgAll` `cashOut` `progressive` `reroll` `setSix` `rollTwice` `mark` `dieStun` `ride` `dmgHigh` `tapOut` | Arcanist, Stormcaller, Jinx | dice, coin, card, odds, stake, jackpot |
 | Jinx | LUK | Bane | Everything goes wrong, for them. The rest it carries. | `misf` `misfT` `omenAtk` `omenGuard` `jinxDisc` `uncurse` `passCurse` `curseDmg` `curseKeep` `perMisf` `perCurse` `killReset` `coinStun` `calamity` `keepHalf` `augury` `portent` `misfPerBurn` `curseSelf` | Pyre, Venom, Gambler | crow, omen, mirror, curse, ladder, thirteen |
 
 ### Enemy move roles and tier numbers, from `js/content/moves.js`

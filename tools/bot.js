@@ -84,6 +84,7 @@ function choosePlayer(f) {
     if (fx.empower) sc += 8; if (fx.evade && intent.kind === 'big') sc += 15;
     if (fx.weaken && (intent.kind === 'attack' || intent.kind === 'big')) sc += 6;
     if (fx.cleanse) sc += (A.poison + A.burn) * 1.5;
+    if (fx.shake) sc += (Math.min(fx.shake, A.poison) * 2.5 + Math.min(fx.shake, A.burn) * 1.6 + Math.min(fx.shake, A.bleed) * 1.5) * (low ? 1.5 : 1);
     if (fx.momentum) sc += fx.momentum * (A.streak || 0) * p;
     if (fx.doom || fx.leech) sc += ((fx.doom || 0) * 0.6 + (fx.leech || 0) * 3) * p;
     if (fx.riposte && (intent.kind === 'attack' || intent.kind === 'big')) sc += 10;
@@ -98,7 +99,7 @@ function choosePlayer(f) {
     if (fx.regen) sc += fx.regen * p * 2;
     if (fx.mark || fx.focus || fx.haste || fx.siphon) sc += 12;
     // Dice skills arrive resolved for this turn's roll (fx.dmgPip, fx.blockPip, fx.healPip, fx.dbl, fx.snake, fx.boxcars,
-    // fx.bust, fx.bustAt, fx.dmgAll, fx.progressive, fx.cashOut and fx.dieMin become plain dmg, block, heal, stun and
+    // fx.bust, fx.bustAt, fx.faces (its row for the roll), fx.dmgAll, fx.progressive, fx.cashOut and fx.dieMin become plain dmg, block, heal, stun and
     // selfDmg; s.def.pip is the roll), so the lines above already score them. See resolveDice in core.js.
     if (s.def.pip && fx.selfDmg) sc -= fx.selfDmg;
     if (fx.reroll || fx.setSix) sc += 8 + (fx.setSix ? 6 : 0);

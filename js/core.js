@@ -2612,6 +2612,12 @@ const DIE_FACES = ['\u2680', '\u2681', '\u2682', '\u2683', '\u2684', '\u2685'];
 function hasDice(X) { return X.skills.some(s => { const fx = (s.baseDef || s.def).fx; return fx.die || fx.dmgAll || fx.reroll || fx.setSix; }); }
 function lowDie(X) { const p = X.skills.filter(s => s.pip).map(s => s.pip); return p.length ? Math.min(...p) : 0; }
 function highDie(X) { const p = X.skills.filter(s => s.pip).map(s => s.pip); return p.length ? Math.max(...p) : 0; }
+// Shake off: Burn, Poison and Bleed on X each drop by up to n (99 clears them)
+function shakeOff(f, X, n, from) {
+  const had = X.burn + X.poison + X.bleed; if (!had) return;
+  X.burn = Math.max(0, X.burn - n); X.poison = Math.max(0, X.poison - n); X.bleed = Math.max(0, X.bleed - n);
+  if (X.isPlayer) say(f, `[${from ? from + ': ' : ''}${had - X.burn - X.poison - X.bleed} Burn, Poison and Bleed shaken off.]`, 'skill');
+}
 function rollPip(f, X, s) {
   const min = Math.min(6, Math.max(1, X.P.dieMin || 0, s.baseDef.fx.dieMin || 0)), r = () => min + Math.floor(rnd(f.rng) * (7 - min));
   let v = r(); if (X.rollTwiceT > 0) v = Math.max(v, r());
@@ -2652,10 +2658,12 @@ function resolveDice(X) {
       if (X.P.sixStun && v === 6) fx.stun = 1; // Thunder Roll
       if (fx.dieStun && v >= fx.dieStun) fx.stun = 1; // Thunder Dice
     }
+    // A face table (faces: [[top pip, fx], ...]): the first row the roll fits is what the skill does this turn
+    if (fx.die && fx.faces) { const row = fx.faces.find(([top]) => v <= top) || fx.faces[fx.faces.length - 1]; Object.assign(fx, row[1]); }
     if (fx.dmgAll) fx.dmg = (fx.dmg || 0) + (fx.dmgAll + (fx.progressive ? X.jackpots || 0 : 0)) * sum;
     if (fx.cashOut) fx.lifesteal = fx.cashOut;
     const die = !!fx.die;
-    ['die', 'dmgPip', 'dmgHigh', 'blockPip', 'healPip', 'dieMin', 'dieStun', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
+    ['die', 'faces', 'dmgPip', 'dmgHigh', 'blockPip', 'healPip', 'dieMin', 'dieStun', 'dbl', 'snake', 'boxcars', 'bust', 'bustAt', 'dmgAll', 'progressive', 'cashOut'].forEach(k => delete fx[k]);
     s.jackpot = die && pips.filter(x => x === v).length >= 2;
     s.def = Object.assign({}, b, { fx, pip: die ? v : null, jackpot: s.jackpot });
   });
@@ -2863,6 +2871,7 @@ function useSkill(f, X, s, opt) {
   if (fx.hold) X.holdBlock = true; // Stand Fast: this Block is still there next turn
   if (fx.curseSelf) addCurse(f, X, fx.curseSelf); // Broken Mirror
   if (fx.bigStop) { if (!Y.isPlayer && Y.intent && !Y.interrupted && isBig(f, Y)) interrupt(f, X, Y, false); else if (Y.hp > 0) { Y.weaken = Math.max(Y.weaken, fx.bigStop + (X.P.weakenPlus || 0)); react(f, X, Y); } } // Squall Line
+  if (fx.shake) shakeOff(f, X, fx.shake); // a cleanse of sorts: Burn, Poison and Bleed each drop by up to that much
   if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); const keepPoison = Y.P && Y.P.misfNoCleanse && (X.misfortune || 0) >= Y.P.misfNoCleanse; X.burn = 0; if (!keepPoison) X.poison = 0; else say(f, '[Bad Water: the Poison stays.]'); X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
   if (ls && dealt > 0) heal(f, X, dealt * ls);
@@ -2937,6 +2946,7 @@ function startTurn(f, X, first) {
   if (X.forge) X.block += X.forge;
   if (X.jinxBlock) { gainBlock(f, X, X.jinxBlock); say(f, `[The jinxed guard is yours: +${X.jinxBlock} Block.]`, 'class'); X.jinxBlock = 0; }
   X.thorns = 0; X.riposte = 0;
+  if (P.charm && X.skills.some(s => s.pip)) { const lo = lowDie(X); if (lo <= 2) shakeOff(f, X, P.charm, "Rabbit's Foot"); else if (lo <= 4) { heal(f, X, P.charm); if (X.isPlayer) say(f, `[Rabbit's Foot: a ${lo}. +${P.charm} HP.]`, 'skill'); } else { gainBlock(f, X, P.charm); if (X.isPlayer) say(f, `[Rabbit's Foot: a ${lo}. +${P.charm} Block.]`, 'skill'); } }
   if (P.sixBlock && X.skills.some(s => s.pip === 6)) { gainBlock(f, X, P.sixBlock); X.rerolls = (X.rerolls || 0) + 1; if (X.isPlayer) say(f, `[House Chip: a six. +${P.sixBlock} Block and a reroll.]`, 'skill'); }
   if (X.fuseT > 0 && Y.hp > 0 && !first) { X.fuseT--; addStatus(f, X, Y, 'burn', X.fuseV); }
   if (P.tickDown && !first && (X.isPlayer ? f.turn : (X.turns || 0)) % 3 === 0) { X.skills.forEach(o => { if (o.cd > 0) o.cd--; }); if (X.isPlayer) say(f, '[Robe of Hours: every cooldown drops by 1.]', 'skill'); }
@@ -3237,6 +3247,7 @@ function previewSkill(f, s) {
   if (fx.evade) parts.push(`Evade ${fx.evade}`);
   if (fx.thorns) parts.push(`Thorns ${Math.round(fx.thorns * p)}`);
   if (fx.cleanse) parts.push('Cleanse');
+  if (fx.shake) parts.push(fx.shake >= 99 ? 'Shake off all' : `Shake off ${fx.shake}`);
   if (fx.lifesteal) parts.push(`Drain ${Math.round(fx.lifesteal * 100)}%`);
   if (fx.execute) parts.push(`×${fx.execMult} under ${fx.execute * 100}%`);
   if (fx.momentum) parts.push(`+${Math.round(fx.momentum * p)}/streak`);
@@ -3302,6 +3313,7 @@ function describe(def, p = 1) {
   if (fx.evade) r.push(`Evade the next ${fx.evade > 1 ? fx.evade + ' attacks' : 'attack'}.`);
   if (fx.nextCrit) r.push('Your next hit is a critical.');
   if (fx.thorns) r.push(`Until your next turn, hit back for ${n(fx.thorns)} when struck.`);
+  if (fx.shake) r.push(fx.shake >= 99 ? 'Shake off all your Burn, Poison and Bleed.' : `Shake off up to ${fx.shake} of each of your Burn, Poison and Bleed.`);
   if (fx.cleanse) r.push(fx.reflect ? 'Send your Burn, Poison and Bleed to the opponent.' : 'Remove your Burn, Poison, Bleed and Weaken.');
   if (fx.lifesteal) r.push(`Heal ${fx.lifesteal * 100}% of the damage dealt.`);
   if (fx.momentum) r.push(`+${n(fx.momentum)} damage for each turn in a row you've used a damaging skill.`);
@@ -3333,6 +3345,7 @@ function describe(def, p = 1) {
     if (fx.blockPip) r.push(`Block ${n(fx.blockPip)} per pip.`);
     if (fx.healPip) r.push(`Heal ${n(fx.healPip)} per pip.`);
     if (fx.dbl) r.push(`On ${fx.dbl}+ deal double, otherwise half.`);
+    if (fx.faces) { let lo = 1; fx.faces.forEach(([top, rowFx], k) => { const hi = k === fx.faces.length - 1 ? 6 : top; r.push(`On ${lo === hi ? 'a ' + lo : lo + (hi - lo === 1 ? ' or ' : ' to ') + hi}: ${describe({ fx: rowFx }, p)}`); lo = top + 1; }); }
     if (fx.dieMin) r.push(`This die never rolls below ${fx.dieMin}.`);
     if (fx.dieStun) r.push(fx.dieStun >= 6 ? 'On a 6, Stun.' : `On a ${fx.dieStun} or more, Stun.`);
     if (fx.bust) r.push(`On a ${fx.bustAt ? '1 or 2' : '1'}, you take ${fx.bust}.`);
