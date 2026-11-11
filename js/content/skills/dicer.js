@@ -16,7 +16,16 @@ sk('storm_chaser', 'Storm Chaser', ['dicer', 'storm'], 'C', 3, { die: 1, dmg: 5,
 // Mastery pieces (mastery: the Archetype Mastery level that opens them; see mastery.js)
 sk('let_it_ride', 'Let It Ride', ['dicer'], 'D', 2, { die: 1, dmgPip: 3, ride: 4 }, [['hot_streak', 'Hot Streak', { die: 1, dmgPip: 4, ride: 4 }], ['easy_money', 'Easy Money', { die: 1, dmgPip: 3, ride: 3 }], ['ride_or_die', 'Ride or Die', { die: 1, dmgPip: 3, blockPip: 1, ride: 4 }]], { mastery: 4 });
 sk('table_stakes', 'Table Stakes', ['dicer'], 'C', 3, { die: 1, dmgHigh: 5, tapOut: 1 }, [['high_roller_bet', "High Roller's Bet", { die: 1, dmgHigh: 7, tapOut: 1 }], ['covered_bet', 'Covered Bet', { die: 1, dmgHigh: 5, blockPip: 2, tapOut: 1 }], ['house_money', 'House Money', { die: 1, dmgHigh: 5 }]], { mastery: 6 });
+// Added 11 Nov (balance pass): a face table, and the Gambler's first cleanse of sorts (shake: 99 clears it all)
+sk('wheel_fortune', 'Wheel of Fortune', ['dicer'], 'C', 2, { die: 1, faces: [[2, { shake: 99, block: 8 }], [4, { dmg: 12, shake: 3 }], [6, { dmg: 22 }]] }, [
+  ['fortunes_favour', "Fortune's Favour", { die: 1, faces: [[2, { shake: 99, block: 12 }], [4, { dmg: 15, shake: 4 }], [6, { dmg: 28 }]] }],
+  ['merciful_wheel', 'Merciful Wheel', { die: 1, faces: [[2, { shake: 99, heal: 10 }], [4, { dmg: 12, shake: 99 }], [6, { dmg: 22, shake: 3 }]] }],
+  ['rigged_wheel', 'Rigged Wheel', { die: 1, dieMin: 2, faces: [[2, { shake: 99, block: 8 }], [4, { dmg: 14, shake: 3 }], [6, { dmg: 24 }]] }]]);
 flav({
+  wheel_fortune: '[Spin to win. The System reminds Entrants that the wheel has no memory.]',
+  fortunes_favour: 'Every slot on this wheel pays. Some pay you, some pay your doctor.',
+  merciful_wheel: 'The house is kind tonight. Do not ask why.',
+  rigged_wheel: 'The lowest slot has been painted over. Nobody painted over the others.',
   thunder_dice: "Two bones carved from a tree the lightning picked twice.",
   rolling_thunder: "The odds are bad. The storm doesn't read them.",
   storm_front: "Not every roll lands the bolt. Every roll brings the weather.",

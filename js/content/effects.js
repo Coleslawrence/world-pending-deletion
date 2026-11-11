@@ -169,6 +169,7 @@ const EFFECTS = {
   stunBlock: { say: v => `Gain ${v} Block whenever you Stun or Interrupt.`, theme: 'storm' },
   lowDieUp: { say: v => `Your lowest die each turn shows ${v} more.`, theme: 'dicer' },
   sixBlock: { say: v => `When a turn starts with a 6 among your dice, gain ${v} Block and a reroll.`, theme: 'dicer' },
+  charm: { say: v => `Each turn, your lowest die decides: 1 or 2, shake off ${v} of each of your Burn, Poison and Bleed; 3 or 4, heal ${v}; 5 or 6, gain ${v} Block.`, theme: 'dicer' },
   nailMisf: { say: v => `Every 3rd damaging skill you use applies ${v} Misfortune.`, theme: 'jinx' },
   curseWard: { say: v => `The first ${v} Curse you would take each fight is ignored.`, theme: 'jinx' },
   // Unfiled designs (designs.js)
