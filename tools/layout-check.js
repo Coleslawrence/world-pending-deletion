@@ -23,6 +23,8 @@ const SIZES = [
   { name: '820x1180', w: 820, h: 1180, top: 24, bottom: 20 }, // tablet
   { name: '1280x800', w: 1280, h: 800, top: 0, bottom: 0, desktop: true }, // Steam Deck, small laptop
   { name: '1920x1080', w: 1920, h: 1080, top: 0, bottom: 0, desktop: true },
+  { name: '1366x768', w: 1366, h: 768, top: 0, bottom: 0, desktop: true },
+  { name: '1440x900', w: 1440, h: 900, top: 0, bottom: 0, desktop: true },
 ];
 const args = process.argv.slice(2), arg = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const shotDir = arg('--shots'), only = arg('--size') && arg('--size').split(',');
