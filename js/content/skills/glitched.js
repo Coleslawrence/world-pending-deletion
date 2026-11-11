@@ -6,7 +6,7 @@
 //   unstable: [a, b]: a glitched copy of a skill with two evolutions that is a on your odd turns and b on even ones;
 //     made on demand (unstableSkill below), id 'u_<skill>'
 'use strict';
-sk('error_skill', 'Err̷or', ['arcanist'], 'B', 3, { replay: 1, selfDmg: 6 }, null, { noShop: true, glitch: true });
+sk('error_skill', 'Err̷or', ['arcanist'], 'B', 2, { replay: 1, selfDmg: 6 }, null, { noShop: true, glitch: true });
 sk('stack_overflow', 'Stack Overfl̷ow', ['reaper'], 'C', 1, { dmg: 6, stack: 0.25 }, null, { noShop: true, glitch: true });
 function unstableSkill(id) {
   if (SKILLS[id]) return SKILLS[id];
