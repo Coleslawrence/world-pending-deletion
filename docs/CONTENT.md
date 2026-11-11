@@ -228,7 +228,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `lifesteal` | 18 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | no |
 | `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
 | `mark` | 17 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
-| `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | no |
+| `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | yes |
 | `misf` | 28 | Hex Brand (3), Sour Luck (2), Crooked Odds (2), … | Misfortune 3. | yes |
 | `misfPerBurn` | 4 | Bad Wick (3), Wax and Ash (2), Ember Omen (3), … | Then Misfortune 1 for every 3 Burn on the opponent. | yes |
 | `misfT` | 2 | Rotten Luck (2), Bad Penny (2) | Then Misfortune 2 each turn for 3 turns. | yes |
@@ -276,14 +276,14 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | Key | Used | Examples (value) | Shown to players as | Combines | Grows | Enemies | Theme |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `afterQuick` | 5 | Spellblade (0.3), apprentice_staff (0.25), shadow_leathers (0.1), … | After a Quick skill, your next skill deals 30% more. | add |  |  | Arcanist |
-| `arcCd` | 1 | Arcanist 2 (8) | Your other skills: 1 turn shorter cooldown for every 8 INT (minimum 1). | set |  |  | Arcanist |
+| `arcCd` | 1 | Arcanist 2 (6) | Your other skills: 1 turn shorter cooldown for every 6 INT (minimum 1). | set |  |  | Arcanist |
 | `bleedHeal` | 2 | hooked_sickle (0.3), Butcher (0.5) | Heal 30% of the Bleed damage your opponent takes. | add |  |  | Bladedancer, Reaper |
 | `bleedMisf` | 1 | Unlucky Cut (1) | Bleed you apply +1 for every 3 Misfortune. | add |  |  | Jinx, Bladedancer |
 | `bleedMult` | 1 | Bladedancer 6 (2) | Bleed deals double damage. | set |  | rate | Bladedancer |
 | `bleedPlus` | 9 | Bladedancer 4 (2), duelist_rapier (1), bloodstone_amulet (1), … | Bleed you apply +2. | add |  | flat, scales with power | Bladedancer |
 | `bleedPoison` | 2 | serpent_dagger (1), Viper Dance (2) | Every Bleed you apply also applies 1 Poison. | add |  |  | Bladedancer, Venom |
 | `blockDmgPct` | 2 | studded_mace (1), Juggernaut (1) | Deal 1% more damage for every 2 Block you have (up to 40%). | add |  |  | Bastion, Reaper |
-| `blockKeep` | 2 | Bastion 2 (0.25), tower_shield (0.3) | Keep 25% of your Block between turns. | add |  | rate | Bastion |
+| `blockKeep` | 2 | Bastion 2 (0.4), tower_shield (0.3) | Keep 40% of your Block between turns. | add |  | rate | Bastion |
 | `blockMisf` | 2 | mirror_shard_mail (1), Bad Landing (2) | A hit your Block fully stops adds 1 Misfortune. | add |  |  | Jinx, Bastion |
 | `blockStrike` | 1 | Bastion 6 (0.5) | Gaining Block also deals 50% of it as damage. | set |  |  | Bastion |
 | `blockStun` | 1 | Thunder Wall (0.25) | When your Block absorbs a hit, 25% chance to Stun the attacker. | add |  |  | Bastion, Stormcaller |
@@ -417,7 +417,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `thornBurn` | 3 | Cinder Warden (4), Ember Wall (2), trait Cinderskin (2) | Thorns also apply 4 Burn. | add |  | flat, scales with power | Bastion, Pyre |
 | `thornMult` | 2 | Thornguard (2), Duelist (1.5) | Thorns and Riposte deal 100% more. | add |  | rate | Bastion, Bladedancer |
 | `thornPoison` | 1 | Thornbark (2) | Thorns also apply 2 Poison. | add |  | flat, scales with power | Bastion, Venom |
-| `thornsAlways` | 6 | Bastion 4 (4), chain_mail (2), crown_of_thorns (3), … | Always have 4 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
+| `thornsAlways` | 6 | Bastion 4 (6), chain_mail (2), crown_of_thorns (3), … | Always have 6 Thorns, doubled below half HP. | add | yes | flat, scales with power | Bastion |
 | `tickDown` | 1 | robe_of_hours (1) | Every 3rd turn, all your cooldowns drop by 1. | set |  |  | Arcanist |
 | `twinHit` | 1 | twin_fangs (1) | Multi-hit skills hit one more time, and each hit deals 1 less. | set |  |  | Bladedancer |
 | `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |

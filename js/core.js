@@ -242,18 +242,20 @@ function hiddenPathOf(counts) {
 // ---------- Rounds and Echo unlocks ----------
 const ROUNDS = 8;
 
+// Echo unlocks. Costs set in the balance pass (11 Nov) so a player earning about 30-40 Echoes a run owns them all
+// around runs 12 to 16, buying one every run or two, instead of all of them by run 5.
 const UNLOCKS = {
-  arch_arcanist: { name: 'Archetype: Arcanist', desc: 'Quick skills and cooldown tricks join the pool.', cost: 20 },
-  arch_storm: { name: 'Archetype: Stormcaller', desc: 'Stuns and Interrupts join the pool.', cost: 20 },
-  arch_dicer: { name: 'Archetype: Gambler', desc: 'Dice, rerolls and Jackpots join the pool.', cost: 20 },
-  arch_jinx: { name: 'Archetype: Jinx', desc: 'Omens, jinxed moves and Curse join the pool.', cost: 20 },
-  reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 15 },
-  fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 25 },
-  purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 15 },
-  gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Cheat skill: a free reroll each round and better shop odds.', cost: 25 },
-  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, a free stat point each level.', cost: 15 },
-  gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 1 less.", cost: 15 },
-  gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs 1 less.', cost: 15 },
+  arch_arcanist: { name: 'Archetype: Arcanist', desc: 'Quick skills and cooldown tricks join the pool.', cost: 50 },
+  arch_storm: { name: 'Archetype: Stormcaller', desc: 'Stuns and Interrupts join the pool.', cost: 50 },
+  arch_dicer: { name: 'Archetype: Gambler', desc: 'Dice, rerolls and Jackpots join the pool.', cost: 50 },
+  arch_jinx: { name: 'Archetype: Jinx', desc: 'Omens, jinxed moves and Curse join the pool.', cost: 50 },
+  reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 30 },
+  fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 60 },
+  purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 30 },
+  gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Cheat skill: a free reroll each round and better shop odds.', cost: 60 },
+  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, a free stat point each level.', cost: 35 },
+  gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 1 less.", cost: 35 },
+  gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs 1 less.', cost: 35 },
 };
 
 // ---------- Helpers ----------
@@ -691,7 +693,7 @@ function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id &&
 const INCOME = { base: 5, per: 4, cap: 5, golden: 8 };
 function interestCap(run) { return (hasGift(run, 'golden') ? INCOME.golden : INCOME.cap) + (hasPerk(run, 'ledger') ? 1 : 0) + (hasVoucher(run, 'interest') ? 2 : 0); }
 function interestOf(run) { return Math.min(interestCap(run), Math.floor(run.gold / INCOME.per)); }
-function income(run) { return Math.max(0, INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0) + (hasVoucher(run, 'income') ? 2 : 0) + amendOf(run).income + (clauseOf(run).income || 0)); }
+function income(run) { return Math.max(0, INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0) + (hasVoucher(run, 'income') ? 3 : 0) + amendOf(run).income + (clauseOf(run).income || 0)); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
   let i = run.bar.findIndex(p => p && p.u === u); if (i >= 0) return { p: run.bar[i], at: 'bar', i };
@@ -937,7 +939,7 @@ function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 // the final). It lifts the monster rounds and eases the rival rounds and the Gatekeepers so each round is a little harder
 // than the last instead of a wall at round 4. Not used in the Elite bracket. Retuned in the balance pass (11 Nov) for
 // auto-leveling, which makes your level equal the round: loss rises every round, about 5% in round 1 to 45% in the final.
-const CURVE = { dmg: [2.09, 1.93, 1.21, 0.935, 1.014, 0.986, 0.973, 1.109], hp: [1.65, 1.6, 1.155, 0.935, 1.014, 0.986, 0.973, 1.109] };
+const CURVE = { dmg: [2.09, 1.97, 1.23, 0.96, 1.04, 1.02, 1.01, 1.15], hp: [1.65, 1.63, 1.18, 0.96, 1.04, 1.02, 1.01, 1.15] };
 function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.round) - 1] || 1; }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }

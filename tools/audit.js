@@ -42,7 +42,7 @@ function spendEchoes(meta, log) {
 }
 const all = [], careers = [];
 for (let c = 0; c < CAREERS; c++) {
-  const meta = G.newMeta(); delete meta.rank; let earned = 0; const timeline = [];
+  const meta = G.newMeta(); delete meta.rank; if (opt.unlock === 'all') Object.keys(G.UNLOCKS).forEach(u => meta.unlocks[u] = true); let earned = 0; const timeline = [];
   for (let i = 0; i < RUNS; i++) {
     try { const off = G.goalOffer && G.goalOffer(meta); if (off && off.length && G.setGoal) G.setGoal(meta, off[Math.floor(Math.random() * off.length)]); } catch (e) { }
     R = { spent: {}, events: {}, fights: [], evGold: 0, startGold: 0 };
@@ -66,7 +66,7 @@ const cats = ['pieces', 'points', 'rerolls', 'licences']; out.spend = {}; cats.f
 out.evGold = avg(all, r => r.evGold); out.endGold = avg(all, r => r.endGold); out.level = avg(all, r => r.level); out.bought = avg(all, r => r.bought);
 // fights by round
 const fr = {}; all.forEach(r => r.fights.forEach(x => { const k = x.round; (fr[k] = fr[k] || []).push(x); }));
-out.byRound = {}; Object.keys(fr).sort().forEach(k => { const L = fr[k]; out.byRound[k] = { n: L.length, win: 100 * avg(L, x => x.won), turns: avg(L, x => x.turns), hpLeftWin: 100 * avg(L.filter(x => x.won), x => x.hpLeft), foeLeftLoss: 100 * avg(L.filter(x => !x.won), x => x.foeLeft), foeHp: avg(L, x => x.foeHp), myHp: avg(L, x => x.myHp), hard: 100 * avg(L, x => x.hard), hardWin: 100 * avg(L.filter(x => x.hard), x => x.won), easyWin: 100 * avg(L.filter(x => !x.hard), x => x.won), heartsLost: avg(L.filter(x => !x.won), x => x.heartsLost), level: avg(L, x => x.level) }; });
+out.byRound = {}; Object.keys(fr).sort().forEach(k => { const L = fr[k]; out.byRound[k] = { n: L.length, win: 100 * avg(L, x => x.won), turns: avg(L, x => x.turns), hpLeftWin: 100 * avg(L.filter(x => x.won), x => x.hpLeft), foeLeftLoss: 100 * avg(L.filter(x => !x.won), x => x.foeLeft), foeHp: avg(L, x => x.foeHp), myHp: avg(L, x => x.myHp), hard: 100 * avg(L, x => x.hard), hardWin: 100 * avg(L.filter(x => x.hard), x => x.won), easyWin: 100 * avg(L.filter(x => !x.hard), x => x.won), heartsLost: avg(L.filter(x => !x.won), x => x.heartsLost), level: avg(L, x => x.level), dpt: avg(L, x => x.dealt / Math.max(1, x.turns)) }; });
 // gold by round: at the shop door and after shopping
 const gr = {}; all.forEach(r => (r.shopIn || []).forEach(([k, g], j) => { const o = gr[k] = gr[k] || { in: [], out: [] }; o.in.push(g); const so = (r.shopOut || [])[j]; if (so) o.out.push(so[1]); }));
 out.goldByRound = {}; Object.keys(gr).forEach(k => out.goldByRound[k] = { in: avg(gr[k].in, x => x), out: avg(gr[k].out, x => x) });
@@ -84,8 +84,8 @@ out.echoByRunIdx = []; for (let i = 0; i < RUNS; i += Math.max(1, Math.floor(RUN
 console.log(`runs ${out.runs}  spared ${f1(out.spared)}%  level ${f1(out.level)}  points bought ${f1(out.bought)}`);
 console.log(`Echoes a run ${f1(out.echoPerRun)} (base ${f1(out.echoBase)}; spared ${f1(out.echoSpared)}, erased ${f1(out.echoErased)})`);
 console.log(`gold spent a run: ${cats.map(k => k + ' ' + f1(out.spend[k])).join(', ')}; events net ${f1(out.evGold)}; left at end ${f1(out.endGold)}`);
-console.log('round  n     win%  turns  hpLeft(win)  foeLeft(loss)  foeHP  myHP  hard%  hardWin  easyWin  heartsLost  level  gold in/out');
-Object.entries(out.byRound).forEach(([k, o]) => console.log(`${String(k).padEnd(6)} ${String(o.n).padEnd(5)} ${f1(o.win).padStart(5)} ${f1(o.turns).padStart(6)} ${f1(o.hpLeftWin).padStart(11)} ${f1(o.foeLeftLoss).padStart(14)} ${f1(o.foeHp).padStart(6)} ${f1(o.myHp).padStart(5)} ${f1(o.hard).padStart(6)} ${f1(o.hardWin).padStart(8)} ${f1(o.easyWin).padStart(8)} ${f1(o.heartsLost).padStart(11)} ${f1(o.level).padStart(6)}  ${out.goldByRound[k] ? f1(out.goldByRound[k].in) + '/' + f1(out.goldByRound[k].out) : ''}`));
+console.log('round  n     win%  turns  hpLeft(win)  foeLeft(loss)  foeHP  myHP  hard%  hardWin  easyWin  heartsLost  level  dmg/turn  gold in/out');
+Object.entries(out.byRound).forEach(([k, o]) => console.log(`${String(k).padEnd(6)} ${String(o.n).padEnd(5)} ${f1(o.win).padStart(5)} ${f1(o.turns).padStart(6)} ${f1(o.hpLeftWin).padStart(11)} ${f1(o.foeLeftLoss).padStart(14)} ${f1(o.foeHp).padStart(6)} ${f1(o.myHp).padStart(5)} ${f1(o.hard).padStart(6)} ${f1(o.hardWin).padStart(8)} ${f1(o.easyWin).padStart(8)} ${f1(o.heartsLost).padStart(11)} ${f1(o.level).padStart(6)} ${f1(o.dpt).padStart(9)}  ${out.goldByRound[k] ? f1(out.goldByRound[k].in) + '/' + f1(out.goldByRound[k].out) : ''}`));
 console.log('Echo career: earned by run', out.echoByRunIdx.map(x => x.join(':')).join('  '));
 console.log('first afforded at run:', Object.entries(out.unlockRun).map(([k, o]) => `${k} ${f1(o.firstAvg)} (x${o.n})`).join(', '));
 console.log('all Echo unlocks owned by run', f1(out.allUnlocksBy), ' career end:', JSON.stringify(Object.fromEntries(Object.entries(out.careerEnd).map(([k, v]) => [k, +f1(v)]))));

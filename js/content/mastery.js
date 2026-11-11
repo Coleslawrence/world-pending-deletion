@@ -8,7 +8,7 @@
 //   redraft / kit: a wider opening when the archetype is your world's home. More choice, never more power.
 //   frame / line / title: cosmetic.
 // Pending World uses every Mastery piece for everyone, so the daily board stays level; practice runs use none.
-const MASTERY_XP = [10, 25, 45, 70, 100, 135, 175, 220, 270, 330];
+const MASTERY_XP = [8, 20, 36, 56, 100, 135, 175, 220, 270, 330]; // early levels eased in the balance pass (11 Nov)
 const MASTERY_PAY = { win: 1, spared: 4, priority: 1, elite: 1 };
 const MASTERY_LEVELS = [
   { kind: 'frame', frame: 'bronze', text: 'Bronze crest frame.' },

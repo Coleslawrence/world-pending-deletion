@@ -28,7 +28,7 @@ const TOKENS = {
 const VOUCHERS = {
   rerolls: { name: 'Reroll Licence', say: 'Shop rerolls cost 1 gold less.', flavour: '[Licensed to change your mind. Within reason.]' },
   interest: { name: 'Savings Charter', say: 'Your interest cap rises by 2 gold.', flavour: '[The System approves of thrift. It is easier to count.]' },
-  income: { name: 'Broadcast Stipend', say: '+2 gold income every round.', flavour: '[Your share of the advertising. A rounding error, paid in full.]' },
+  income: { name: 'Broadcast Stipend', say: '+3 gold income every round.', flavour: '[Your share of the advertising. A rounding error, paid in full.]' },
   district: { name: 'City Pass', say: 'One more district to choose from every round.', flavour: '[Valid in all districts. Not valid as identification.]' },
   spoils: { name: 'Salvage Licence', say: 'Spoils offer 4 choices instead of 3.', flavour: '[You may now look under the other tarpaulin.]' },
   training: { name: 'Training Grant', say: 'Training a stat costs 1 gold less.', flavour: '[Subsidised by a department that no longer exists.]' },

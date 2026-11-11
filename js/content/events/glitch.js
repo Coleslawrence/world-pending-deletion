@@ -10,7 +10,7 @@ const glitchesHeld = run => run.bar.concat(Object.values(run.gear), run.bench).f
 EVENTS.item_duplication = { glitch: true, weight: 0.6, title: 'Item Duplication', theme: 'system', text: '[Warning: inventory desync. One item is about to exist twice.] A copy of your gear flickers on the floor beside you.',
   can: run => Object.values(run.gear).some(Boolean) && !run.phantom, opts: [
   { label: 'Pick up the copy', desc: 'It looks real enough.', glitch: true, then: { notice: 2 }, go: (run, h) => h.phantom(3) },
-  { label: 'Report the bug', desc: 'The System rewards honesty.', then: { gold: 6, notice: -2 }, reveal: '[Bug report received. Thank you, Entrant. +6 gold.]' },
+  { label: 'Report the bug', desc: 'The System rewards honesty.', then: { gold: 3, notice: -2 }, reveal: '[Bug report received. Thank you, Entrant. +3 gold.]' },
   { label: 'Stamp on it', desc: 'Problem solved.', then: { gold: 3 }, reveal: '[Duplicate destroyed. Scrap value: 3 gold.]' }] };
 
 EVENTS.option_not_found = { glitch: true, weight: 0.6, title: 'Option Not Found', theme: 'system', text: '[This event failed to load. Please select an option anyway.]', opts: [
