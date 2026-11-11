@@ -2,7 +2,7 @@
 'use strict';
 CHAINS.letter = { name: 'The Letter', start: 'letter_1', theme: 'reaper' };
 
-EVENTS.letter_1 = { chain: 'letter', title: 'A letter from the Erased', text: 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
+EVENTS.letter_1 = { chain: 'letter', title: 'Letter from the Erased', text: 'Under your cot you find a letter from a champion whose world no longer exists. It ends with a crude map.', opts: [
   { label: 'Read it', desc: 'Follow the map.', then: { chain: { step: 'map', after: 1 } }, reveal: '[Map acquired. Destination: the old quarter.]' },
   { check: { stat: 'INT' }, label: 'Decipher the margins', desc: 'There is a second letter under the first.', then: { chain: { step: 'map', after: 1 } }, go: (run, h) => { const who = h.pick(RIVALS.filter(r => !run.met.includes(r))) || 'lyss'; run.sabotage = who; h.say(`[The margins name who eliminated them: ${ENEMIES[who].name}. They will appear among your next rivals, Weakened for 3 turns and with 15% less HP. The map is yours too.]`); } },
   { label: 'Sell it', desc: "Someone will pay for a dead world's secrets.", then: { gold: 12, chain: 'done' }, reveal: '[Sold. +12 gold. The buyer did not read it either.]' }] };

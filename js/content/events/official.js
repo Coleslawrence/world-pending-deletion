@@ -4,7 +4,7 @@ CHAINS.official = { name: 'The Official', start: 'official_1' };
 
 EVENTS.official_1 = { chain: 'official', title: 'A quiet word', text: 'A tournament official offers to "adjust" your next match. He smiles too much.', opts: [
   { label: 'Pay 6 gold', desc: 'He will "adjust" your next match.', pay: 6, then: { next: { bribe: true }, foe: { weaken: 2 }, chain: { step: 'bribed', after: 2 } }, reveal: '[Your next opponent starts with 20% less HP, Weakened for 2 turns.]' },
-  { roll: { stat: 'INT', hard: true }, label: 'Quote the rules back at him', desc: 'Section 9, on officials.', then: { next: { bribe: true }, chain: 'done' }, reveal: '[He adjusts your match for free, and forgets your name. Your next opponent starts with 20% less HP.]',
+  { roll: { stat: 'INT', hard: true }, label: 'Quote the rules back', desc: 'Section 9, on officials.', then: { next: { bribe: true }, chain: 'done' }, reveal: '[He adjusts your match for free, and forgets your name. Your next opponent starts with 20% less HP.]',
     fail: { then: { notice: 1, chain: 'done' }, reveal: '[He quotes section 10 back at you. It is longer. The System takes an interest in your reading.]' } },
   { check: { favour: 'war' }, label: '"Adjust it, or be adjusted."', desc: 'Say it the way War would.', then: { next: { bribe: true }, chain: 'done', notice: 1, favour: { war: 1 } }, reveal: '[He adjusts it. Your next opponent starts with 20% less HP. Threats to officials are logged.]' },
   { label: 'Refuse', desc: 'Someone up there might respect that.', then: { chain: { step: 'refused', after: 2 }, favour: { war: 2 } } },

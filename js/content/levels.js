@@ -28,7 +28,7 @@ const LEVEL_PERKS = {
   bounty: { name: 'Open Bounty', then: { stakes: { win: { gold: 18 } } }, say: 'Win your next fight for 18 extra gold.', flavour: '[A price has been put on your next opponent. Collect it.]' },
   // Added 6 Nov (thin content audit): ten more, so a run of about ten battles never needs a repeat
   relief: { name: 'Relief Shipment', then: { fate: 1 }, say: "Your world's Fate eases one step.", when: (run, x) => x.fateOpen, flavour: '[Aid has been sent to your world. It was addressed to a different one. Nobody checked.]' },
-  reassessment: { name: 'Reassessment', then: { respec: true }, say: 'Every stat goes back to 1, and you place all the points again.', when: run => run.round >= 2, flavour: '[Your file has been re-graded from the beginning. Please place your points again.]' },
+  reassessment: { name: 'Reassessment', then: { respec: true }, say: 'Every stat goes back to 1, and you place all the points again.', when: run => run.round >= 4 && !run.practice, flavour: '[Your file has been re-graded from the beginning. Please place your points again.]' },
   warranty: { name: 'Extended Warranty', then: { max_hp: 0.1 }, flavour: '[Coverage extended. Terms apply. The terms are not available.]' },
   split_grant: { name: 'Split Grant', main: 1, then: { gold: 6 }, flavour: '[Half the grant in training, half in cash. The form allowed both.]' },
   hazard_pay: { name: 'Hazard Pay', then: { stakes: { win: { gold: 6, piece: 'B', got: '[Hazard pay issued: 6 gold and {item}.]' } } }, say: 'Win your next fight for 6 gold and a free B-rank piece.', flavour: '[Your next fight has been classed as hazardous. The pay reflects it.]' },
