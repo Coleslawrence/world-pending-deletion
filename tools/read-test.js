@@ -47,10 +47,10 @@ reads.forEach(d => {
   const f = fightWith(['punish']), B = f.B; show(f, 'defend'); B.block = 50; const hp = B.hp;
   G.playerAct(f, f.A.skills.indexOf(find(f, 'punish'))); ok(B.hp < hp, 'Punish ignores Block on a read');
 }
-// Call the Bluff: double power against an attack
+// Call the Bluff: triple power against an attack
 {
   const f = fightWith(['call_the_bluff']), s = find(f, 'call_the_bluff'); show(f, 'defend'); const a = G.previewSkill(f, s); show(f, 'attack'); const b = G.previewSkill(f, s);
-  const n = t => +(t.match(/(\d+) dmg/) || [])[1]; ok(n(b) >= n(a) * 2 - 1 && n(b) <= n(a) * 2 + 1, `Call the Bluff doubles on a read (${a} / ${b})`);
+  const n = t => +(t.match(/(\d+) dmg/) || [])[1]; ok(n(b) >= n(a) * 3 - 1 && n(b) <= n(a) * 3 + 1, `Call the Bluff triples on a read (${a} / ${b})`);
 }
 console.log(fails ? `read skills: ${fails} failures` : 'read skills: all checks passed');
 process.exit(fails ? 1 : 0);

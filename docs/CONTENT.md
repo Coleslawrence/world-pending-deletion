@@ -247,7 +247,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `quench` | 4 | Searing Mercy (12), Merciful Flame (18), Last Light (12), … | Remove the opponent's Burn and heal that much, up to 12. | yes |
 | `read` | 32 | Backdraft ("attack"), Seep ("defend"), Sidestep ("attack"), … | (works with other keys on the same skill) | yes |
-| `readFx` | 32 | Backdraft ({"burn":4,"detonate":1}), Seep ({"poison":7}), Sidestep ({"dmg":4,"evade":1,"mark":2}), … | (works with other keys on the same skill) | yes |
+| `readFx` | 32 | Backdraft ({"burn":8,"detonate":1}), Seep ({"poison":14}), Sidestep ({"dmg":8,"evade":1,"mark":4}), … | (works with other keys on the same skill) | yes |
 | `reapHeal` | 4 | Reap (8), Grim Harvest (10), Reap and Sow (8), … | Heal 8 if the opponent is below half HP. | yes |
 | `reflect` | 1 | Reversal (1) | (works with other keys on the same skill) | no |
 | `regen` | 18 | Hold the Line (3), Consecrate (4), Martyr's Vow (5), … | Heal 3 at the start of your next 3 turns. | yes |

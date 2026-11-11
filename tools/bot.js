@@ -35,7 +35,7 @@ const READ = +(process.env.BOT_READ != null ? process.env.BOT_READ : 1);
 function incoming(f) {
   const B = f.B, s = B.intent; if (!s || B.stun > 0) return 0;
   const fx = s.def.fx.mirror ? (f.lastPlayerSkill ? f.lastPlayerSkill.def.fx : { dmg: 8 }) : s.def.fx;
-  return ((fx.dmg || 0) * s.power + (fx.blockDmg ? B.block * fx.blockDmg : 0)) * (fx.hits || 1) * G.dmgMult(f, B, f.A);
+  return ((fx.dmg || 0) * s.power + (fx.blockDmg ? B.block * fx.blockDmg : 0)) * (fx.hits || 1) * G.dmgMult(f, B, f.A) * G.gapMul(f, B, s);
 }
 // Reading the turn the way a player reads it: the opponent's intent, its Block, its guard bar and Broken. G.forecast
 // plays the skill and the opponent's answer on a copy of the fight (what the tap-to-preview shows), so the bot sees
@@ -53,7 +53,11 @@ function readAhead(f, i, fx) {
   if (o.broke) v += 6;
   return v * W_FC;
 }
+// BOT_CNT=1: print how many skills are ready on each player turn (how much choice a turn really has).
+const CNT = process.env.BOT_CNT ? { h: {}, held: {} } : null;
+if (CNT) process.on('exit', () => console.error('ready per turn', JSON.stringify(CNT.h), 'skills held', JSON.stringify(CNT.held)));
 function choosePlayer(f) {
+  if (CNT) { const r = f.A.skills.filter(s => G.canUse(s)).length; CNT.h[r] = (CNT.h[r] || 0) + 1; CNT.held[f.A.skills.length] = (CNT.held[f.A.skills.length] || 0) + 1; }
   if (process.env.BOT_RANDOM) { const r = f.A.skills.map((s, i) => i).filter(i => G.canUse(f.A.skills[i])); return r[Math.floor(Math.random() * r.length)]; }
   const A = f.A, B = f.B, ready = A.skills.map((s, i) => ({ s, i })).filter(x => G.canUse(x.s));
   const intent = G.intentInfo(f);
@@ -143,6 +147,10 @@ function fight(run) {
   }
   return f;
 }
+// BOT_RAND=stats,prefix,merge,shop,bar: make those build choices at random, to measure what each choice is worth
+// (BOT_RANDOM does the same for skills in a fight).
+const RAND = new Set((process.env.BOT_RAND || '').split(',').filter(Boolean));
+const rpick = a => a[Math.floor(Math.random() * a.length)];
 function targets(run) {
   const c = {};
   G.allPieces(run).forEach(p => G.pieceDef(G.baseId(p.id)).tags.forEach(t => c[t] = (c[t] || 0) + p.star));
@@ -156,6 +164,12 @@ function pieceScore(run, id, star, tg) {
 }
 function arrange(run) {
   const tg = targets(run);
+  if (RAND.has('bar')) {
+    const sk = G.shuffle(G.allPieces(run).filter(p => !G.isGear(p.id)));
+    sk.slice(0, run.slots).forEach(p => { const f = G.findPiece(run, p.u); if (f.at !== 'bar') { const e = run.bar.indexOf(null); G.movePiece(run, p.u, { bar: e >= 0 ? e : Math.floor(Math.random() * run.slots) }); } });
+    G.GEAR_SLOTS.forEach(sl => { const gs = G.allPieces(run).filter(p => G.isGear(p.id) && G.GEAR[p.id].slot === sl); const g = gs.length && rpick(gs); if (g && (!run.gear[sl] || run.gear[sl].u !== g.u)) G.movePiece(run, g.u, { gear: sl }); });
+    return;
+  }
   // skills: put best on the bar
   const skills = G.allPieces(run).filter(p => !G.isGear(p.id)).sort((a, b) => pieceScore(run, b.id, b.star, tg) - pieceScore(run, a.id, a.star, tg));
   skills.slice(0, run.slots).forEach((p, i) => { const f = G.findPiece(run, p.u); if (!(f.at === 'bar')) G.movePiece(run, p.u, { bar: run.bar.indexOf(null) >= 0 ? run.bar.indexOf(null) : worstBar(run, tg) }); });
@@ -177,7 +191,7 @@ function shop(run, meta, opts) {
     if (run.bonusSlot) items.push({ it: run.bonusSlot, k: 'bonus', i: 0 });
     items.sort((a, b) => score(b.it) - score(a.it));
     // an empty gear slot is worth filling even with low-rank gear, which otherwise scores under the buy threshold
-    function score(it) { const have = G.allPieces(run).filter(p => p.id === it.id).length, open = G.isGear(it.id) && !run.gear[G.GEAR[it.id].slot] && !run.bench.some(p => G.isGear(p.id) && G.GEAR[p.id].slot === G.GEAR[it.id].slot); return pieceScore(run, it.id, 1, tg) + have * 4 + (open ? 3 : 0); }
+    function score(it) { if (RAND.has('shop')) return 5 + Math.random() * 10; const have = RAND.has('merge') ? 0 : G.allPieces(run).filter(p => p.id === it.id).length, open = G.isGear(it.id) && !run.gear[G.GEAR[it.id].slot] && !run.bench.some(p => G.isGear(p.id) && G.GEAR[p.id].slot === G.GEAR[it.id].slot); return pieceScore(run, it.id, 1, tg) + have * 4 + (open ? 3 : 0); }
     for (const x of items) {
       const sc = score(x.it), pr = G.price(run, x.it);
       if (sc < (opts.picky || 5)) continue;
@@ -199,6 +213,7 @@ function shop(run, meta, opts) {
 function pending(run, meta) {
   while (run.pending.length) {
     const p = run.pending.shift();
+    if (p.type === 'rune' && RAND.has('prefix')) { const m = rpick(p.mods), t = G.prefixTargets(run, m).filter(x => x.mods.length < 2); if (t.length) G.applyPrefix(run, rpick(t).u, m); continue; }
     if (p.type === 'rune') { for (const m of glitchLast(p.mods)) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
@@ -213,10 +228,10 @@ function pending(run, meta) {
   }
 }
 // Training: 3 points in the main archetype's stat for every 2 in VIT
-function trainPick(run) { const k = G.ARCH[targets(run)[0]].stat; run.trainN = (run.trainN || 0) + 1; return run.trainN % 5 < 3 ? k : 'VIT'; }
+function trainPick(run) { if (RAND.has('stats')) return rpick(['STR', 'AGI', 'INT', 'VIT', 'LUK']); const k = G.ARCH[targets(run)[0]].stat; run.trainN = (run.trainN || 0) + 1; return run.trainN % 5 < 3 ? k : 'VIT'; }
 function stats(run) {
   const tg = targets(run); const k = G.ARCH[tg[0]].stat;
-  while (run.statPts > 0) { run.stats[Math.random() < 0.6 ? k : 'VIT']++; run.statPts--; }
+  while (run.statPts > 0) { run.stats[RAND.has('stats') ? rpick(['STR', 'AGI', 'INT', 'VIT', 'LUK']) : Math.random() < 0.6 ? k : 'VIT']++; run.statPts--; }
 }
 function playRun(meta, verbose, opts = {}) {
   // opts.world forces a world type; opts.main makes the bot build around one archetype

@@ -925,6 +925,15 @@ function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers
 // Wind-ups: a big move shown as the intent can be broken. Deal share of the opponent's max HP in damage on your turn
 // (past its Block) and the move falls apart: it goes on cooldown and the opponent has to do something else instead.
 const WINDUP = { share: 0.15, cd: 2 };
+// Meaningful play (balance pass, 11 Nov): knobs that make reading the fight matter more. big = damage on big (telegraphed) moves,
+// steady = damage on every other enemy move, broken/brokenT = Broken damage taken and turns, guard = enemy Block, reflex = Reflex move power,
+// bigAt = share of your max HP that makes a move big (and breakable).
+const GAP = { big: 1.4, steady: 1, broken: 1.5, brokenT: 2, guard: 1, reflex: 1.4, bigAt: 0.15 };
+function gapMul(f, B, s) {
+  if (B.isPlayer) return 1;
+  const fx = s.def.fx; if (!(fx.dmg || fx.blockDmg)) return 1;
+  return (B.intent === s && isBig(f, B) ? GAP.big : GAP.steady) * (B.reflexNow && B.intent === s ? GAP.reflex : 1);
+}
 const BREAK = { share: 0.4, heavy: 2, big: 0.2 };
 // The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
 // notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
@@ -938,9 +947,9 @@ function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 // The smoothing curve: a per-round multiplier on opponents' damage (CURVE.dmg) and HP (CURVE.hp), rounds 1 to 8 (8 is
 // the final). It lifts the monster rounds and eases the rival rounds and the Gatekeepers so each round is a little harder
 // than the last instead of a wall at round 4. Not used in the Elite bracket. Retuned in the balance pass (11 Nov) for
-// auto-leveling, which makes your level equal the round, then eased (Slaw, 11 Nov) so good play spares about 85%:
-// loss rises from about 4% in round 1 to about 30% in the final.
-const CURVE = { dmg: [1.9, 1.65, 0.97, 0.75, 0.79, 0.77, 0.76, 0.86], hp: [1.5, 1.37, 0.93, 0.75, 0.79, 0.77, 0.76, 0.86] };
+// auto-leveling, which makes your level equal the round, then eased (Slaw, 11 Nov) so good play spares about 85%, and eased 4% more
+// for meaningful play (shorter cooldowns, bigger telegraphed hits): loss rises from about 4% in round 1 to about 30% in the final.
+const CURVE = { dmg: [1.82, 1.58, 0.93, 0.72, 0.76, 0.74, 0.73, 0.83], hp: [1.44, 1.32, 0.89, 0.72, 0.76, 0.74, 0.73, 0.83] };
 function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.round) - 1] || 1; }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
@@ -2124,7 +2133,8 @@ function districtUp(run, k) { return !!DISTRICT_STAT[k] && effStats(run)[DISTRIC
 
 // ---------- Fighters ----------
 function skillStat(def) { return def.basic ? null : ARCH[def.tags[0]].stat; }
-function skillPower(def, s, star) { const stat = def.basic ? Math.max(s.STR, s.AGI) : s[skillStat(def)]; return (1 + 0.07 * stat) * STAR_MULT[star || 1]; }
+const STAT_POWER = { per: 0.07 }; // each point of a skill's stat adds 7% power
+function skillPower(def, s, star) { const stat = def.basic ? Math.max(s.STR, s.AGI) : s[skillStat(def)]; return (1 + STAT_POWER.per * stat) * STAR_MULT[star || 1]; }
 function fighterSkills(barPieces, s, P) {
   const out = [];
   const atk = P.swordSaint ? Object.assign({}, SKILLS.attack, { name: "Heaven's Edge", rank: 'S', fx: { dmg: 12, pierce: 1 } }) : SKILLS.attack;
@@ -2442,7 +2452,7 @@ function dmgMult(f, X, Y) {
     if (P.vsHalf && half(Y)) m *= 1 + P.vsHalf;
     if (P.execBonus && Y.hp / Y.maxHp <= 0.3) m *= 1 + P.execBonus;
     if (Y.marked > 0) m *= 1.3;
-    if (Y.brokenT > 0) m *= 1.5;
+    if (Y.brokenT > 0) m *= GAP.broken;
     if (P.vsBigger && Y.maxHp > X.maxHp) m *= 1 + P.vsBigger;
     if (P.vsHard && Y.hard) m *= 1 + P.vsHard;
     if (P.vsHigherRank && Y.rankUp > 0) m *= 1 + P.vsHigherRank;
@@ -2548,7 +2558,7 @@ function react(f, X, Y, kind) {
     if (X.P.reactHeal) heal(f, X, X.P.reactHeal);
   }
   if (Y.bleed > 0 && Y.marked > 0 && !Y.hemo) { Y.hemo = true; reactName(f, X, Y, 'hemorrhage', 'Haemorrhage', 'Bleed deals double while Marked.'); }
-  if (Y.stun > 0 && Y.weaken > 0 && Y.brokenT <= 0) { Y.brokenT = 2; reactName(f, X, Y, 'broken', 'Broken', `${Y.isPlayer ? 'You take' : Y.name + ' takes'} 50% more damage.`); }
+  if (Y.stun > 0 && Y.weaken > 0 && Y.brokenT <= 0) { Y.brokenT = GAP.brokenT; reactName(f, X, Y, 'broken', 'Broken', `${Y.isPlayer ? 'You take' : Y.name + ' takes'} 50% more damage.`); }
   if (Y.poison > 0 && Y.leechT > 0 && !Y.blight) { Y.blight = true; reactName(f, X, Y, 'blight', 'Blight', 'Leech drains double. The extra is not healed.'); }
   if (Y.doomT > 1 && !Y.doomHastened && effectCount(Y) >= 2) { Y.doomHastened = true; Y.doomT--; reactName(f, X, Y, 'hastened', 'Hastened Doom', 'Doom lands a turn sooner.'); }
 }
@@ -2566,7 +2576,7 @@ function addBreak(f, X, Y, v) {
   if (Y.brk < Y.breakMax) return;
   Y.brk = Y.breakMax; f.tally.breaks++;
   say(f, `[${Y.name}'s guard breaks. Broken!]`, 'skill'); ev(f, { k: 'break', side: Y.side });
-  stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, 2);
+  stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, GAP.brokenT);
   if (X.P.breakEmpower) { X.empower = Math.max(X.empower, X.P.breakEmpower + 1); say(f, `[Lightning Rod: Empowered for ${X.P.breakEmpower} turns.]`, 'skill'); }
 }
 // Resistance (STAT_FACES): how much of a status's effect a fighter shrugs off, 0 for enemies
@@ -2583,7 +2593,7 @@ function stunTarget(f, X, Y) {
 function isBig(f, Y) {
   const s = Y.intent; if (!s) return false; const fx = s.def.fx;
   const T = opp(f, Y);
-  return ((fx.dmg || 0) * (fx.hits || 1) * s.power) >= T.maxHp * 0.15;
+  return ((fx.dmg || 0) * (fx.hits || 1) * s.power) >= T.maxHp * GAP.bigAt;
 }
 function interrupt(f, X, Y, stunned) {
   if (Y.isPlayer || !Y.intent || Y.interrupted) return;
@@ -2815,7 +2825,7 @@ function useSkill(f, X, s, opt) {
     if (X.hp <= 0) { checkRevive(f, X); if (X.hp <= 0) return; }
   }
   if (fx.selfDmg) { X.hp = Math.max(1, X.hp - Math.round(fx.selfDmg)); ev(f, { k: 'dot', side: X.side, amt: fx.selfDmg, kind: 'self' }); }
-  let m = dmgMult(f, X, Y);
+  let m = dmgMult(f, X, Y) * gapMul(f, X, s);
   const resist = Y.adapt && X.isPlayer && f.tally.mostUsed === s.key ? Y.adapt : 0;
   const damaging = !!(fx.dmg || fx.blockDmg || fx.malice || fx.detonate || fx.momentum || fx.perMisf || fx.calamity || fx.fester);
   if (fx.calamity && X.isPlayer) jinxMove(f, true); // Calamity: jinx the shown move for free first
@@ -2858,7 +2868,7 @@ function useSkill(f, X, s, opt) {
   if (fx.detonate) { const v = Math.max(4, Y.burn * fx.detonate) * (1 + (p - 1) * 0.5) * m; if (!fx.keep) Y.burn = 0; dealt += hit(f, X, Y, v, { pierce: 1, noDodge: true, src }); }
   if (damaging && X.P.poisonOnHit && dealt > 0) addStatus(f, X, Y, 'poison', X.P.poisonOnHit);
   if (damaging && X.P.hitMisf && dealt > 0) addMisfortune(f, Y, X.P.hitMisf); // Bent Horseshoe
-  if (fx.block) gainBlock(f, X, fx.block * p);
+  if (fx.block) gainBlock(f, X, fx.block * p * (X.isPlayer ? 1 : GAP.guard));
   if (fx.heal) { if (fx.fullBlock && X.hp >= X.maxHp) gainBlock(f, X, fx.fullBlock * p); else heal(f, X, fx.heal * p); } // Lay on Hands: Block when there is nothing to heal
   if ((fx.heal || fx.healMissing || fx.regen) && X.P.healBreak && !opt.echo) addBreak(f, X, Y, X.P.healBreak); // Flail of Penance
   if (fx.healMissing) heal(f, X, (X.maxHp - X.hp) * fx.healMissing);
@@ -3199,10 +3209,10 @@ function enemyTurn(f) {
 function intentText(f, s, B) {
   let def = s.def;
   if (def.fx.mirror) { const last = f.lastPlayerSkill; if (last) def = last.def; else def = { fx: { dmg: 8 } }; }
-  const fx = def.fx, p = s.power, m = dmgMult(f, B, f.A);
+  const fx = def.fx, p = s.power, m = dmgMult(f, B, f.A) * gapMul(f, B, s);
   const parts = []; let kind = 'other';
   if (fx.dmg || fx.blockDmg) { const v = Math.round(((fx.dmg || 0) * p + (fx.blockDmg ? B.block * fx.blockDmg : 0)) * m); parts.push(fx.hits ? `${v}×${fx.hits}` : `${v}`); kind = 'attack'; }
-  if (fx.block) { parts.push(`Block ${Math.round(fx.block * p)}`); if (kind === 'other') kind = 'defend'; }
+  if (fx.block) { parts.push(`Block ${Math.round(fx.block * p * GAP.guard)}`); if (kind === 'other') kind = 'defend'; }
   if (fx.heal) { parts.push(`Heal ${Math.round(fx.heal * p)}`); if (kind === 'other') kind = 'defend'; }
   if (fx.burn) { parts.push(`Burn ${Math.round(fx.burn * p)}`); if (kind === 'other') kind = 'debuff'; }
   if (fx.poison) { parts.push(`Poison ${Math.round(fx.poison * p)}${fx.doublePoison ? ' (×1.5)' : ''}`); if (kind === 'other') kind = 'debuff'; }
@@ -3833,7 +3843,7 @@ if (typeof module !== 'undefined') module.exports = {
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
