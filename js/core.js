@@ -938,8 +938,9 @@ function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 // The smoothing curve: a per-round multiplier on opponents' damage (CURVE.dmg) and HP (CURVE.hp), rounds 1 to 8 (8 is
 // the final). It lifts the monster rounds and eases the rival rounds and the Gatekeepers so each round is a little harder
 // than the last instead of a wall at round 4. Not used in the Elite bracket. Retuned in the balance pass (11 Nov) for
-// auto-leveling, which makes your level equal the round: loss rises every round, about 5% in round 1 to 45% in the final.
-const CURVE = { dmg: [2.09, 1.97, 1.23, 0.96, 1.04, 1.02, 1.01, 1.15], hp: [1.65, 1.63, 1.18, 0.96, 1.04, 1.02, 1.01, 1.15] };
+// auto-leveling, which makes your level equal the round, then eased (Slaw, 11 Nov) so good play spares about 85%:
+// loss rises from about 4% in round 1 to about 30% in the final.
+const CURVE = { dmg: [1.9, 1.65, 0.97, 0.75, 0.79, 0.77, 0.76, 0.86], hp: [1.5, 1.37, 0.93, 0.75, 0.79, 0.77, 0.76, 0.86] };
 function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.round) - 1] || 1; }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
