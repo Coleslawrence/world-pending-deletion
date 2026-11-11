@@ -927,10 +927,20 @@ function fightHTML() {
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><s id="lgB"></s><i id="hbB"></i><u id="gbB"></u><b id="bkB"></b></div><div class="bar brk-bar" title="Guard: wear it down to nothing and the opponent is Broken" aria-label="Guard bar"><i id="brB"></i><u id="gbR"></u></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
+    <section class="fkit" id="fkit" aria-label="Their kit"></section>
     <section class="log" id="log" aria-live="polite"></section></div><div class="col col-b">
     <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(shortName(run.name))}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
       <div class="bar hp-bar"><s id="lgA"></s><i id="hbA"></i><u id="gbA"></u><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
     <section class="skills c${run.slots}" id="skills"></section></div></main>`;
+}
+// Laptops: a side panel with the opponent's whole kit at this fight's numbers, so nothing needs a tap to read (playtest, 11 Nov)
+function fightKitHTML(f) {
+  const B = f.B, now = B.intent && B.intent.def && B.intent.def.name;
+  // each move's number as it would show if it were next: swap it in as the intent for a moment (the big-hit boost depends on it)
+  const row = s => { let t = ''; const keep = [B.intent, B.reflexNow]; try { if (s !== B.intent) { B.intent = s; B.reflexNow = null; } t = intentText(f, s, B).text; } catch (e) { t = describe(s.def, s.power); } finally { B.intent = keep[0]; B.reflexNow = keep[1]; } return `<li class="${s.def.name === now ? 'now' : ''}"><b>${esc(s.def.label || s.def.name)}</b><span>${esc(t)}</span></li>`; };
+  const T = !f.spec.snap && ENEMIES[f.spec.id];
+  const how = f.spec.snap ? 'They fight with a player\'s build.' : hasReflex(f.spec) ? 'Moves by chance, never one move three turns running.' : 'Moves in a fixed order.';
+  return `<h4 class="fk-h">Their kit</h4><ul class="fk-list">${(B.skills || []).map(row).join('')}</ul><p class="fk-how">${how}${T && T.phase ? ` Below ${Math.round(T.phase.at * 100)}% HP, they change how they fight.` : ''}</p>${traitsHTML(f.spec)}`;
 }
 function chipsHTML(X, f) {
   const c = [];
@@ -991,6 +1001,7 @@ function updateFight() {
     document.getElementById('bk' + k).style.width = Math.min(100, X.block / X.maxHp * 100) + '%';
     document.getElementById('st' + k).innerHTML = chipsHTML(X, f);
   });
+  const fk = document.getElementById('fkit'); if (fk && fk.offsetParent) fk.innerHTML = fightKitHTML(f);
   const br = document.getElementById('brB');
   if (br && f.B.breakMax) {
     const g = Math.max(0, 100 - f.B.brk / f.B.breakMax * 100), gr = document.getElementById('gbR');

@@ -171,7 +171,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bigStop` | 4 | Squall Line (2), Wall Cloud (2), Downburst (3), … | If the opponent is winding up a big attack, Interrupt it. Otherwise Weaken them for 2 turns. | yes |
 | `bleed` | 27 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
-| `block` | 122 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 127 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 10 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 9 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
@@ -191,13 +191,13 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `dbl` | 1 | Double or Nothing (4) | (works with other keys on the same skill) | yes |
 | `deepen` | 4 | Open Vein (1), Arterial Cut (1), Salted Wound (1), … | (works with other keys on the same skill) | yes |
 | `detonate` | 4 | Ignite (2), Combust (3), Wildfire (2), … | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `die` | 44 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
+| `die` | 45 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 3 | Two-Headed Coin (4), Hedged Bet (3), Rigged Wheel (2) | (works with other keys on the same skill) | yes |
 | `dieStun` | 5 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 319 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 332 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgHigh` | 4 | Table Stakes (5), High Roller's Bet (7), Covered Bet (5), … | (works with other keys on the same skill) | yes |
-| `dmgPip` | 28 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
+| `dmgPip` | 29 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 9 | Doom (26), Death Knell (18), Swift Doom (22), … | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomExec` | 4 | Death Knell (1), Final Rites (1), Swift Rites (1), … | (works with other keys on the same skill) | yes |
 | `doomT` | 5 | Death Knell (2), Swift Doom (2), Final Rites (2), … | (works with other keys on the same skill) | no |
@@ -241,8 +241,8 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perCurse` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | (works with other keys on the same skill) | yes |
 | `perHit` | 20 | Flame Wave (1), Conflagration (1), Thousand Cuts (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
-| `pierce` | 19 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | yes |
-| `poison` | 54 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `pierce` | 20 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | yes |
+| `poison` | 56 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `quench` | 4 | Searing Mercy (12), Merciful Flame (18), Last Light (12), … | Remove the opponent's Burn and heal that much, up to 12. | yes |
@@ -268,7 +268,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `thornsFight` | 4 | Shield Wall (3), Phalanx (3), Spiked Wall (5), … | For the rest of the fight, hit back for 3 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
 | `vowHeal` | 4 | Vow of Iron (0.5), Oath of Iron (0.5), Iron and Light (0.8), … | At the start of your next turn, heal 50% of the Block you still hold. | yes |
-| `weaken` | 75 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 79 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -480,10 +480,10 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 40 moves |
-| big | a big hit, the one to Block or Stun | 20 moves |
-| guard | Block and nothing else | 28 moves |
-| setup | a status, buff or trick with little damage | 30 moves |
+| strike | a plain hit | 45 moves |
+| big | a big hit, the one to Block or Stun | 22 moves |
+| guard | Block and nothing else | 33 moves |
+| setup | a status, buff or trick with little damage | 33 moves |
 | sustain | healing or draining | 8 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`

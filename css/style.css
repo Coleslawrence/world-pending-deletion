@@ -710,6 +710,25 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
   .district .inter { flex: none; } .district .minibar, .shop .col-b .bench { margin-top: 0; }
   .sgrid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 }
+/* The fight's side panel (laptops): the opponent's kit, then the log, in a third column */
+.fkit { display: none; }
+@container app (min-width: 1000px) {
+  .screen.fight { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(250px, 300px); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "s s s" "foe b side" ". b side"; row-gap: 10px; }
+  .screen.fight > header.strip { grid-area: s; }
+  .screen.fight .col-a { display: contents; }
+  .screen.fight #foe { grid-area: foe; } .screen.fight .col-b { grid-area: b; }
+  .screen.fight .fkit, .screen.fight .log { grid-column: 3; }
+  .screen.fight .fkit { display: block; grid-row: 2; align-self: start; border: 1px solid var(--line); border-radius: var(--r-s); padding: 10px 12px; background: var(--panel); max-height: 46vh; overflow: auto; }
+  .screen.fight .log { grid-row: 3; min-height: 0; max-height: none; }
+  .screen.fight .coach.pos-log { grid-column: 1; grid-row: 3; align-self: start; }
+  .fk-h { margin: 0 0 6px; font-size: var(--fs-2); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .fk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .fk-list li { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-2); padding: 3px 6px; border-radius: 4px; }
+  .fk-list li span { color: var(--muted); text-align: right; }
+  .fk-list li.now { background: rgba(255,255,255,.07); box-shadow: inset 2px 0 0 var(--sys); }
+  .fk-how { margin: 8px 0 0; font-size: var(--fs-1); color: var(--muted); }
+  .fkit .nx-traits { margin-top: 8px; font-size: var(--fs-1); }
+}
 @container app (min-width: 700px) and (min-height: 600px) { .foe .crest { width: 72px; height: 72px; font-size: var(--fs-5); } .fo-name { font-size: var(--fs-4); } }
 @media (min-width: 700px) and (min-height: 480px) {
   .sheet-bg { align-items: center; padding: 24px; }
