@@ -106,7 +106,7 @@ for (let k = 0; k < 80; k++) {
 // --- Cursed doors
 Object.keys(G.CURSES).forEach(c => G.DOOR_PAYS.forEach((pay, pi) => {
   const { run, meta } = newRun(); clear(run);
-  run.round = 3; G.enterChoose(run, meta, undefined, []);
+  run.doorRounds = [3, 5]; run.round = 3; G.enterChoose(run, meta, undefined, []);
   const P = run.pending.find(p => p.type === 'door');
   ok(P && G.CURSES[P.curse] && P.pay, 'door: offered in round 3');
   run.pending = run.pending.filter(p => p.type === 'door'); P.curse = c; P.pay = pay; run.gold = 40;
@@ -119,8 +119,14 @@ Object.keys(G.CURSES).forEach(c => G.DOOR_PAYS.forEach((pay, pi) => {
   if (C.income) ok(G.income(run) === Math.max(0, b.inc + C.income), `${c}: income down`);
   if (C.priceUp) ok(G.price(run, it) === b.pr + 1, `${c}: prices up`);
   if (C.hpCut) ok(G.maxHp(run) < b.hp && run.hp <= G.maxHp(run), `${c}: max HP down`);
+  if (C.healCut) ok(n.healCut >= C.healCut, `${c}: smaller heal`);
+  if (C.rerollUp) ok(n.rerollUp >= C.rerollUp, `${c}: rerolls cost more`);
+  if (C.traitUp) ok(n.traitUp >= C.traitUp, `${c}: more traits`);
   run.round = 5; G.enterChoose(run, meta, undefined, []); ok(!run.pending.some(p => p.type === 'door'), 'door: none while cursed');
 }));
+// Door rounds vary by run: each run picks one of DOOR_SETS at round 1, and every set turns up
+{ const seen = new Set(); for (let k = 1; k <= 40; k++) { const { run, meta } = newRun(k); clear(run); run.round = 1; G.enterChoose(run, meta, undefined, []); ok(run.doorRounds && G.DOOR_SETS.some(S => S.join() === run.doorRounds.join()), 'door rounds: from DOOR_SETS'); seen.add(run.doorRounds.join()); }
+  ok(seen.size === G.DOOR_SETS.length, `door rounds: all ${G.DOOR_SETS.length} sets turn up (${[...seen].join(' | ')})`); }
 { const { run, meta } = newRun(); clear(run); run.curse = { id: 'heavy', left: G.CURSE_FIGHTS, pay: { gold: 16 } }; const g = run.gold, msgs = [];
   G.tickCurse(run, meta, msgs); ok(run.curse && run.curse.left === 1 && run.gold === g, 'door: still cursed after 1 fight');
   G.tickCurse(run, meta, msgs); ok(!run.curse && run.gold === g + 16 && msgs.length, 'door: lifts after 2 fights and pays'); }
