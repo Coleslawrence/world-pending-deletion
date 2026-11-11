@@ -58,7 +58,7 @@ EVENTS.seating_error = { title: 'Seating Error', theme: 'system', can: run => ru
 EVENTS.locker_zero = { title: 'Locker 0', theme: 'system', text: '[Locker 0. Access: denied. Access: granted. Access: denied.] The name plate has been scratched off. It belongs to the Undefeated.', opts: [
   { roll: { stat: 'LUK', hard: true }, label: 'Wait for granted', desc: 'Then open it. Quickly.', then: { piece: 'A', notice: 2, got: '[Access: granted. Item removed from Locker 0: {item}. Owner: ████████.]' }, go: (run, h) => { run.undefeatedTraits = h.shuffle(Object.keys(TRAIT_POOL)).slice(0, 1); h.say('[Something is missing from Locker 0. The Undefeated has been informed.]', 'loss'); },
     fail: { then: { notice: 2 }, go: (run, h) => h.lose(0.1, 'Access: denied. The door closes on your hand.') } },
-  { label: 'Close it', desc: 'Some lockers are not yours.', then: { notice: -5 }, reveal: '[Compliance logged. Your record is very clean today.]' },
+  { label: 'Close it', desc: 'Some lockers are not yours.', then: { notice: -2 }, reveal: '[Compliance logged. Your record is very clean today.]' },
   { check: { stat: 'INT', hard: true }, label: 'Read the name inside', desc: 'Someone wrote it on the inside too.', then: { notice: 1 }, go: (run, h) => {
     if (h.meta) { h.meta.found = h.meta.found || {}; h.meta.found.locker0 = true; }
     h.say('[Name inside Locker 0: ████████. Entrant number: ███. Record sealed. Your access has been noted.]', 'class');

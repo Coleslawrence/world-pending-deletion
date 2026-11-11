@@ -78,7 +78,7 @@ Object.keys(G.VOUCHERS).forEach(v => {
   ok(!G.voucherPool(run).includes(v), `licence ${v}: not stocked again`);
   if (v === 'rerolls') ok(G.rerollCost(run) === Math.max(1, b.rc - 1), 'licence: rerolls 1 cheaper');
   if (v === 'interest') ok(G.interestCap(run) === b.cap + 2, 'licence: interest cap +2');
-  if (v === 'income') { run.gold = 30; ok(G.income(run) === b.inc + 2, 'licence: income +2'); }
+  if (v === 'income') { run.gold = 30; ok(G.income(run) === b.inc + 3, 'licence: income +3'); }
   if (v === 'training') ok(G.pointPrice(run) === b.tp - 1, 'licence: training 1 cheaper');
   if (v === 'spoils') ok(G.spoilsOffers(run, 'skill', Math.random).length === 4 && G.spoilsOffers(run, 'stat', Math.random).length === 4, 'licence: 4 Spoils');
   if (v === 'district') { run.hp = 1; run.hearts = 5; run.stage = 'choose'; G.chooseOpponent(run, 0, false); const n = run.districts.length; run.vouchers = []; G.toDistrict(run); ok(n === run.districts.length + 1, 'licence: one more district'); }

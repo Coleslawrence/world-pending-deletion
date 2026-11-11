@@ -49,7 +49,7 @@ const ENEMIES = {
   // The Rank Trial examiner. Its rank letter is the grade it tests for, and it fights at that grade's world rank (see trialMul).
   proctor: { name: 'Proctor', style: "The System's examiner. Pass the condition to be promoted", tier: 2, hp: 70, skills: [{ n: 'Marked Strike', fx: { dmg: 9 } }, { n: 'Assessment', fx: { block: 8 } }, { n: 'Pop Quiz', fx: { dmg: 5, weaken: 2 } }, { n: 'Final Exam', fx: { dmg: 7, hits: 2 }, label: 'Preparing the final exam' }], script: [0, 1, 2, 3] },
   legend: { name: 'Varn the Unbowed', style: 'A legend from the System archive', tier: 4, rank: 'A', hp: 150, skills: [{ n: 'Unbowed Strike', fx: { dmg: 13 } }, { n: 'Ancient Guard', fx: { block: 14, cleanse: 1 } }, { n: 'Sundering Blow', fx: { dmg: 9, weaken: 2 } }], script: [0, 1, 2, 0] },
-  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 14 } }, { n: 'Perfect Guard', fx: { block: 16, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 6, hits: 3 } }, { n: 'Verdict', fx: { dmg: 24 } }], script: [0, 1, 2, 0, 3] },
+  undefeated: { name: 'The Undefeated', style: 'Has never lost', tier: 4, rank: 'S', hp: 200, skills: [{ n: 'Flawless Strike', fx: { dmg: 28 } }, { n: 'Perfect Guard', fx: { block: 32, cleanse: 1 } }, { n: 'Endless Form', fx: { dmg: 12, hits: 3 } }, { n: 'Verdict', fx: { dmg: 48 } }], script: [0, 1, 2, 0, 3] },
 };
 // Reflexes: each opponent's one if-then rule, shown on its card. on is what you did on your turn (REFLEX_ON); when it
 // fires, the opponent's next move is the Reflex's instead of the next in its script: move (a move of its own, written

@@ -23,7 +23,7 @@ G.ARCH_KEYS.forEach(k => {
 });
 ok(G.MASTERY_LEVELS.length === G.MASTERY_XP.length, 'a reward for every level');
 // --- levels
-ok(G.masteryLevel(0) === 0 && G.masteryLevel(9) === 0 && G.masteryLevel(10) === 1 && G.masteryLevel(330) === 10 && G.masteryLevel(9999) === 10, 'levels follow MASTERY_XP');
+ok(G.masteryLevel(0) === 0 && G.masteryLevel(G.MASTERY_XP[0] - 1) === 0 && G.masteryLevel(G.MASTERY_XP[0]) === 1 && G.masteryLevel(330) === 10 && G.masteryLevel(9999) === 10, 'levels follow MASTERY_XP');
 ok(G.masteryFrame(0) === null && G.masteryFrame(1) === 'bronze' && G.masteryFrame(7) === 'silver' && G.masteryFrame(10) === 'gold', 'crest frames at 1, 7 and 10');
 // --- the pool: closed at first, open from the level, per archetype
 {

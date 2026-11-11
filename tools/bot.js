@@ -30,10 +30,36 @@ function windupGain(f, fx, p) {
   const d = ((fx.dmg || 0) * (fx.hits || 1) + (fx.blockDmg ? f.A.block * fx.blockDmg : 0)) * p * G.dmgMult(f, f.A, B) - (fx.pierce ? 0 : B.block);
   return d >= W.need - W.got ? W_WIND : 0;
 }
+const READ = +(process.env.BOT_READ != null ? process.env.BOT_READ : 1);
+// The damage the opponent's shown move would do to you, before your Block
+function incoming(f) {
+  const B = f.B, s = B.intent; if (!s || B.stun > 0) return 0;
+  const fx = s.def.fx.mirror ? (f.lastPlayerSkill ? f.lastPlayerSkill.def.fx : { dmg: 8 }) : s.def.fx;
+  return ((fx.dmg || 0) * s.power + (fx.blockDmg ? B.block * fx.blockDmg : 0)) * (fx.hits || 1) * G.dmgMult(f, B, f.A);
+}
+// Reading the turn the way a player reads it: the opponent's intent, its Block, its guard bar and Broken. G.forecast
+// plays the skill and the opponent's answer on a copy of the fight (what the tap-to-preview shows), so the bot sees
+// damage after Block, a guard it would break, a wind-up it would stop, damage it would take and a fight it would win
+// or lose. The heuristic score above still carries what plays out later (Poison, Burn, buffs, Regen).
+// BOT_FC=0 turns this off, to measure what it is worth.
+const W_FC = +(process.env.BOT_FC != null ? process.env.BOT_FC : 1), FC_D = +(process.env.FC_D || 0), FC_T = +(process.env.FC_T || 0), FC_WIN = +(process.env.FC_WIN != null ? process.env.FC_WIN : 500);
+function readAhead(f, i, fx) {
+  if (!W_FC) return 0;
+  const o = G.forecast(f, i); if (!o) return 0;
+  if (o.win) return FC_WIN; if (o.lose) return -FC_WIN;
+  const direct = (fx.dmg || 0) * (fx.hits || 1) * f.A.skills[i].power; // what the heuristic already counted as damage
+  let v = (o.dealt - direct) * FC_D - o.taken * FC_T;
+  if (o.guard) v += 10 + (f.B.intent && G.intentInfo(f).kind === 'big' ? 12 : 4); // a Broken opponent loses its turn and takes 50% more
+  if (o.broke) v += 6;
+  return v * W_FC;
+}
 function choosePlayer(f) {
+  if (process.env.BOT_RANDOM) { const r = f.A.skills.map((s, i) => i).filter(i => G.canUse(f.A.skills[i])); return r[Math.floor(Math.random() * r.length)]; }
   const A = f.A, B = f.B, ready = A.skills.map((s, i) => ({ s, i })).filter(x => G.canUse(x.s));
   const intent = G.intentInfo(f);
   const low = A.hp / A.maxHp < 0.4;
+  // What the intent says is coming: the hit after your Block, so Block past it is worth little (READ=0 turns this off)
+  const inc = READ ? incoming(f) : 0, attackNext = intent.kind === 'attack' || intent.kind === 'big';
   let best = ready[0], bs = -1;
   ready.forEach(({ s, i }) => {
     // A Read skill (fx.read, fx.readFx) is scored as what it will do this turn: its readFx version when the shown move matches
@@ -44,7 +70,13 @@ function choosePlayer(f) {
     if (B.breakMax && ((fx.dmg || 0) * (fx.hits || 1) + (fx.brk || 0)) * p >= B.breakMax - B.brk) sc += 12;
     if (fx.execute && B.hp / B.maxHp <= fx.execute) sc *= fx.execMult;
     if (fx.cruel) sc *= 1.3;
-    if (fx.block) sc += fx.block * p * ((intent.kind === 'attack' || intent.kind === 'big') ? 1 : 0.25);
+    if (READ) {
+      // Their Block soaks direct hits (not pierce); a Broken opponent takes 50% more; a stunned one is not about to hit you
+      const direct = (fx.dmg || 0) * (fx.hits || 1) * p;
+      if (direct && !fx.pierce) sc -= Math.min(direct, B.block) * 0.8;
+      if (B.brokenT > 0) sc += direct * 0.5;
+      if (fx.block) { const need = Math.max(0, inc - A.block), b = fx.block * p; sc += attackNext ? Math.min(b, need) + Math.max(0, b - need) * 0.2 : b * (intent.kind === 'stunned' ? 0.05 : 0.2); }
+    } else if (fx.block) sc += fx.block * p * ((intent.kind === 'attack' || intent.kind === 'big') ? 1 : 0.25);
     if (fx.heal) sc += low ? fx.heal * p * 1.5 : 0;
     if (fx.healMissing) sc += low ? (A.maxHp - A.hp) * fx.healMissing * 1.2 : 0;
     if ((fx.stun || fx.interrupt || (fx.stunIfWeak && B.weaken)) && intent.kind === 'big') sc += 25;
@@ -83,6 +115,7 @@ function choosePlayer(f) {
     if (fx.rollTwice) sc += 10;
     // Reflexes and wind-ups (BOT_NAIVE=1 turns this off, to measure what reading them is worth)
     if (!NAIVE) sc += reflexCost(f, fx, p) + windupGain(f, fx, p);
+    if (!NAIVE && !s.def.quick) sc += readAhead(f, i, fx);
     if (s.def.quick) sc += 1000;
     if (sc > bs) { bs = sc; best = { s, i }; }
   });
