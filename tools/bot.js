@@ -225,7 +225,7 @@ function pending(run, meta) {
     if (p.type === 'rune' && process.env.BOT_PFX !== '0') { // the prefix and bar skill that add the most per turn
       let best = null;
       run.bar.forEach(b => { if (!b || !G.SKILLS[b.id] || b.corrupt) return; const was = turnValue(G.moddedDef(b.id, b.mods));
-        p.mods.forEach(m => { if (!G.prefixTargets(run, m).some(x => x.u === b.u)) return; const keep = b.mods.length >= G.MAX_MODS ? b.mods.slice(1) : b.mods; const g = turnValue(G.moddedDef(b.id, keep.concat(m))) - was + (G.PREFIXES[m].glitch ? -1 : 0); if (!best || g > best.g) best = { g, u: b.u, m }; }); });
+        p.mods.forEach(m => { if (!G.prefixTargets(run, m).some(x => x.u === b.u)) return; const keep = b.mods.length >= G.modCap(run) ? b.mods.slice(b.mods.length - G.modCap(run) + 1) : b.mods; const g = turnValue(G.moddedDef(b.id, keep.concat(m))) - was + (G.PREFIXES[m].glitch ? -1 : 0); if (!best || g > best.g) best = { g, u: b.u, m }; }); });
       if (best && best.g > 0) G.applyPrefix(run, best.u, best.m);
       continue;
     }

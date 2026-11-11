@@ -297,9 +297,9 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `burnHeal` | 4 | Cinder Warden (0.2), cinder_robe (0.3), bellows (0.15), … | Heal 20% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
 | `burnLowDie` | 1 | Wildfire Bet (1) | Burn you apply is raised by your lowest die. | set |  |  | Gambler, Pyre |
 | `burnMisf` | 1 | Black Candle (1) | Burning opponents gain 1 Misfortune each turn. | add |  |  | Jinx, Pyre |
-| `burnPlus` | 11 | Pyre 4 (4), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +4. | add |  | flat, scales with power | Pyre |
+| `burnPlus` | 11 | Pyre 4 (6), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +6. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 2 | plague_censer (2), tar_flask (1) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
-| `chanceBonus` | 3 | Loaded Dice (15), House Credit (10), The House (10) | Chance options in events +15%. | add |  |  |  |
+| `chanceBonus` | 3 | Loaded Dice (25), House Credit (10), The House (10) | Chance options in events +25%. | add |  |  |  |
 | `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
 | `charm` | 1 | rabbit_foot (3) | Each turn, your lowest die decides: 1 or 2, shake off 3 of each of your Burn, Poison and Bleed; 3 or 4, heal 3; 5 or 6, gain 3 Block. | add |  |  | Gambler |
 | `copycat` | 1 | Copycat (1) | Once per fight, use the opponent's last move as your own. | set |  |  |  |
@@ -349,7 +349,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `jinxHeal` | 1 | Small Mercies (0.05) | Jinxing a move heals you 5% of your max HP. | add |  |  | Jinx, Zealot |
 | `jinxReroll` | 1 | Rigged Game (1) | When you jinx a move, reroll all your dice. | set |  |  | Jinx, Gambler |
 | `lastWords` | 3 | templar_plate (0.15), bastion_plate (0.15), Last Words (0.25) | Once per fight, dropping below 25% HP gives you Block equal to 15% of your max HP. | set |  |  |  |
-| `lifesteal` | 6 | Reaper 4 (0.3), Undying (0.15), Vampirism (0.08), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
+| `lifesteal` | 7 | Reaper 4 (0.3), Gambler 2 (0.25), Undying (0.15), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lowDieUp` | 1 | tampered_dice (1) | Your lowest die each turn shows 1 more. | add |  |  | Gambler |
 | `lowDR` | 3 | soul_lantern (0.15), gravecloth (0.15), Comeback Kid (0.2) | Below 25% HP, take 15% less damage. | set |  | rate |  |
 | `lowHpDmg` | 3 | Berserker's Blood (0.3), Last Ember (0.2), The Goddess of Ruin (0.3) | Below half HP, deal 30% more damage. | add |  | rate |  |
@@ -398,8 +398,8 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `sixStun` | 1 | Thunder Roll (1) | A die skill showing 6 also Stuns. | set |  |  | Gambler, Stormcaller |
 | `sleeveFix` | 1 | sharps_sleeve (1) | Once per fight, a die that rolls 1 becomes a 6. | set |  |  | Gambler |
 | `sluggish` | 1 | Sluggish (1) | Start every fight Weakened. | set |  |  |  |
-| `startBlock` | 9 | spiked_buckler (6), chain_mail (8), studded_mace (4), … | Start each fight with 6 Block. | add | yes | flat, scales with power | Bastion |
-| `startBlockPct` | 2 | Iron Body (0.1), trait Braced (0.15) | Start each fight with Block equal to 10% of your max HP. | add |  | rate | Bastion |
+| `startBlock` | 8 | spiked_buckler (6), chain_mail (8), studded_mace (4), … | Start each fight with 6 Block. | add | yes | flat, scales with power | Bastion |
+| `startBlockPct` | 3 | Legion Deserter (0.15), Iron Body (0.1), trait Braced (0.15) | Start each fight with Block equal to 15% of your max HP. | add |  | rate | Bastion |
 | `startBurn` | 1 | soot_wraps (4) | Your opponent starts each fight with 4 Burn. | add |  |  | Pyre |
 | `startCurse` | 1 | Ill-Starred (3) | Start each fight with 3 Curse. | add |  |  |  |
 | `startMisf` | 4 | bent_horseshoe (2), black_cat_collar (3), Black Cat (2), … | Opponents start each fight with 2 Misfortune. | add |  |  | Jinx |
@@ -408,7 +408,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `struckPoison` | 1 | adder_hide (1) | When you are hit, the attacker takes 1 Poison. | add |  |  | Venom |
 | `stunBlock` | 1 | stormbreak_plate (10) | Gain 10 Block whenever you Stun or Interrupt. | add |  |  | Stormcaller |
 | `stunBurn` | 1 | Wildstorm (5) | Your Stuns and Interrupts also apply 5 Burn. | add |  |  | Stormcaller, Pyre |
-| `stunDmg` | 10 | Stormcaller 2 (16), Tempest (10), thunder_maul (6), … | Your Stuns and Interrupts deal 16 damage. | add | yes |  | Stormcaller |
+| `stunDmg` | 10 | Stormcaller 2 (10), Tempest (10), thunder_maul (6), … | Your Stuns and Interrupts deal 10 damage. | add | yes |  | Stormcaller |
 | `stunEmpower` | 5 | Tempest (2), conductive_mail (1), storm_ring (1), … | Whenever you Stun or Interrupt, you are Empowered for 2 turns. | add |  |  | Stormcaller |
 | `stunHeal` | 1 | Inquisitor (8) | Your Stuns and Interrupts heal you 8. | add |  |  | Stormcaller, Zealot |
 | `stunMisf` | 2 | crow_feather (2), Ill Wind (3) | Stunned opponents gain 2 Misfortune. | add |  |  | Jinx, Stormcaller |
