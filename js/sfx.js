@@ -62,6 +62,9 @@ const SOUNDS = {
   win: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.18, 'triangle', 0.14, i * 0.09)),
   loss: () => { tone(330, 220, 0.35, 'sawtooth', 0.06); tone(165, 110, 0.45, 'sine', 0.2, 0.05); },
   heart: () => { tone(95, 55, 0.3, 'sine', 0.5); noise(0.18, 400, 0.25); },
+  // Entrances: a broadcast sting. Two drum hits, a rising stab, then a held chord (Gatekeepers and the Final get the long one)
+  entrance: () => { [0, 0.22, 0.44].forEach(d => { tone(110, 50, 0.22, 'sine', 0.5, d); noise(0.1, 1600, 0.25, d); }); tone(220, 440, 0.4, 'sawtooth', 0.05, 0.62); [261.6, 329.6, 392, 523.3].forEach((f, i) => tone(f, f, 1.6, 'triangle', 0.09, 1.0 + i * 0.03)); tone(130.8, 130.8, 1.8, 'sine', 0.25, 1.0); },
+  entrance2: () => { [0, 0.18].forEach(d => { tone(110, 55, 0.2, 'sine', 0.45, d); noise(0.08, 1600, 0.22, d); }); [293.7, 370, 440].forEach((f, i) => tone(f, f, 0.9, 'triangle', 0.08, 0.4 + i * 0.03)); },
   erase: () => { noise(0.9, 4000, 0.3, 0, 120); tone(440, 55, 0.9, 'sawtooth', 0.05); },
 };
 const HAPTICS = { tap: 6, hit: 12, crit: [0, 22], break: [0, 40, 40, 60], heart: [0, 80, 60, 80], loss: [0, 120], erase: [0, 60, 50, 60, 50, 200], win: [0, 15, 40, 15] };

@@ -826,7 +826,7 @@ html, body { overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust:
 #app[data-moment~="broadcast"] .screen.fight .crest { border-color: var(--h-k); color: var(--h-k); background: var(--h-y); }
 /* The VS card */
 .bc-splash { position: absolute; inset: 0; z-index: 40; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 16px; overflow: hidden; color: var(--h-k);
-  background: linear-gradient(162deg, var(--h-m) 0 48%, var(--h-y) 48% 100%); animation: bcin .16s steps(2, end), bcout .2s ease-in .9s forwards; cursor: pointer; }
+  background: linear-gradient(162deg, var(--h-m) 0 48%, var(--h-y) 48% 100%); animation: bcin .16s steps(2, end); cursor: pointer; }
 .bc-splash .bc-tick { font-family: var(--f-m); font-size: var(--fs-1); font-weight: 500; letter-spacing: .06em; background: var(--h-k); color: var(--h-y); padding: 5px 8px; white-space: nowrap; overflow: hidden; text-overflow: clip; margin: 0 -16px; }
 .bc-splash .bc-tick.b { color: var(--h-m); align-self: flex-end; margin-top: 8px; }
 .bc-splash .bc-foe, .bc-splash .bc-me { font-family: var(--f-h); text-transform: uppercase; line-height: .92; overflow-wrap: anywhere; }
@@ -1260,3 +1260,8 @@ html, body, button, [data-act] { touch-action: manipulation; }
 @container app (max-height: 720px) { .coach.pos-log .hint-read { -webkit-line-clamp: 1; line-clamp: 1; } }
 /* At 320 the Quick tag squeezed long skill names onto three lines ("Hold the Line"), pushing Attack below the screen */
 @container app (max-width: 360px) { .sk-q { letter-spacing: 0; padding: 0 3px; margin-right: 2px; } }
+/* Entrances wait for a tap: a prompt appears once the card has landed */
+.bc-splash { cursor: pointer; transition: opacity .2s; }
+.bc-splash.out { opacity: 0; }
+.bc-splash .bc-go { align-self: center; margin-top: 18px; font-family: var(--f-m); font-size: var(--fs-2); letter-spacing: .06em; color: var(--h-k); background: var(--h-y); border: 2px solid var(--h-k); box-shadow: 3px 3px 0 var(--h-m); padding: 6px 12px; animation: fadein .3s ease-out .7s both, gopulse 1.4s ease-in-out 1s infinite; }
+@keyframes gopulse { 50% { scale: 1.05; } }

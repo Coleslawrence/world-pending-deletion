@@ -846,8 +846,14 @@ function broadcastSplash(f) {
   const bot = fin ? '[The other is not.]' : f.spec.gate ? '[Passage is a privilege.]' : k === 'erased' ? '[They remember.]' : '[The System is watching this one.]';
   const el = document.createElement('div'); el.className = 'bc-splash'; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = `<div class="bc-tick">${esc(top)}</div><div class="bc-foe">${specCrest(f.spec)}<span>${esc(f.B.name)}</span></div><div class="bc-vs">VS</div><div class="bc-me"><span>${esc(shortName(run.name))}</span>${crest(run.name, 'me', false, { sigil: run.sigil, color: run.color })}</div><div class="bc-tick b">${esc(bot)}</div>`;
-  const done = () => el.remove();
-  el.addEventListener('pointerdown', done); if (!big) el.classList.add('minor'); app.appendChild(el); setTimeout(done, big ? 1100 : 900);
+  // Tap to enter: the card stays up, with its sting playing, until the player taps (or presses Enter, Space or Escape).
+  // Taps in the first moment are ignored so a fast double tap on Face them or Fight doesn't skip it unseen.
+  el.insertAdjacentHTML('beforeend', '<div class="bc-go">Tap to enter the arena ›</div>');
+  const t0 = performance.now();
+  const done = () => { if (performance.now() - t0 < 650 || !el.isConnected) return; el.classList.add('out'); document.removeEventListener('keydown', key, true); setTimeout(() => el.remove(), 220); };
+  const key = e => { if (!el.isConnected) return document.removeEventListener('keydown', key, true); e.preventDefault(); e.stopImmediatePropagation(); if (['Enter', ' ', 'Escape'].includes(e.key)) done(); };
+  el.addEventListener('pointerdown', done); document.addEventListener('keydown', key, true);
+  if (!big) el.classList.add('minor'); app.appendChild(el); sfx(big ? 'entrance' : 'entrance2');
 }
 function logLine(l, isNew) {
   return `<p class="t-${l.t} ${isNew ? 'new' : ''}">${esc(l.text)}</p>`;
