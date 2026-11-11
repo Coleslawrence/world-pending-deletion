@@ -1295,6 +1295,23 @@ function evResultSheet() {
   }
   return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p>${meter}<div class="sysbox ev-out${wait}">${lines}</div>${chips ? `<div class="${wait.trim()}">${chips}</div>` : ''}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
 }
+// ---------- Between rounds (Slaw, 11 Nov) ----------
+// Everything that waits after a fight (spoils, level-up, Rules review, the Unlisted door, runes, events, Gifts...) shows as
+// ONE page: a list of the round's steps, the ones settled with what you chose, the current one open, the rest to come.
+// Each step keeps its own choices and handlers; the page is the frame around them.
+const PEND_LABEL = { gift: 'Additional Gift', intake: 'Intake Interview', augment: 'Rules review', door: 'Unlisted door', spoils: 'Spoils', levelup: 'Level up', perk: 'Class advancement', rune: 'Rune', adv: 'Path evolution', evo: 'Evolution' };
+function pendLabel(p) { return p.type === 'event' ? (EVENTS[p.key] ? EVENTS[p.key].title : 'Event') : PEND_LABEL[p.type] || 'Notice'; }
+function betweenDone(p, choice) { if (!run) return; run.between = run.between || { done: [] }; run.between.done.push({ label: pendLabel(p), choice: (choice || 'Done').slice(0, 60) }); }
+function betweenPage(sh) {
+  if (!sh) return sh;
+  const done = (run.between && run.between.done) || [], all = done.length + run.pending.length;
+  if (all < 2) return sh; // a lone step stays a plain sheet
+  const cur = done.length + 1;
+  const steps = done.map(x => `<li class="bt-done"><span class="bt-k">✓ ${esc(x.label)}</span><span class="bt-c">${esc(x.choice)}</span></li>`).join('')
+    + run.pending.map((p, i) => `<li class="${i ? 'bt-next' : 'bt-cur'}"><span class="bt-k">${i ? '' : '▸ '}${esc(pendLabel(p))}</span></li>`).join('');
+  const strip = `<ol class="bt-steps" aria-label="Between rounds">${steps}</ol>`;
+  return sh.replace('<section class="sheet ', '<section class="sheet between ').replace(/<header class="sh-h"><h3>/, `<header class="sh-h"><div class="bt-eb">[Between rounds · ${cur} of ${all}]</div><h3>`).replace('<div class="sh-b">', `<div class="sh-b">${strip}`);
+}
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
   if (p.type === 'event') {
@@ -1924,7 +1941,8 @@ function render() {
     const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, pages: pagesSheet, notes: notesSheet, quarters: quartersSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
-  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
+  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = betweenPage(pendingSheet()); statLinesNotice(); }
+  if (run && !run.pending.length && !(ui.sheet && ui.sheet.type === 'evresult')) delete run.between;
   if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
@@ -2273,7 +2291,10 @@ onAct = function (el) {
   if (a === 'practice-tournament') { endPractice(true); return _onAct({ dataset: { act: 'new' } }); }
   if (a === 'new' && !meta.tutorialDone && !ui.practiceAsked) { ui.practiceAsked = true; ui.sheet = { type: 'firsttime' }; return render(); }
   const st = coachStep();
+  // The between-rounds page remembers what each step was settled with, so the page can show it as done
+  const p0 = run && run.pending && run.pending[0], lbl = p0 && el.innerText ? el.innerText.split('\n').map(x => x.trim()).filter(Boolean)[0] : '';
   _onAct(el);
+  if (p0 && run && run.pending && run.pending[0] !== p0 && !run.pending.includes(p0)) { betweenDone(p0, lbl); saveRun(); render(); }
   if (st && coachStep() === st && st.wait === a) { coachAdvance(); render(); }
 };
 
@@ -2699,7 +2720,7 @@ app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled || flying) return;
   if (!['use', 'buy', 'quick-buy'].includes(el.dataset.act)) sfx('tap');
   if (!REDUCED && el.classList.contains('choice') && FLY_ACTS.includes(el.dataset.act) && el.closest('.sheet')) {
-    flying = true; const act = { dataset: Object.assign({}, el.dataset) };
+    flying = true; const act = { dataset: Object.assign({}, el.dataset), innerText: el.innerText };
     el.closest('.sheet').querySelectorAll('.choice').forEach(c => c.classList.add(c === el ? 'chosen' : 'unchosen'));
     setTimeout(() => { flying = false; onAct(act); }, 330);
     return;

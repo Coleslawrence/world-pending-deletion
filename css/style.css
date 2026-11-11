@@ -1276,3 +1276,14 @@ html, body, button, [data-act] { touch-action: manipulation; }
 .foe .chips, .me .chips { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); padding-right: 14px; }
 /* A fresh save's title at 360x640: the second System line goes, so Sign in fits on the screen (playtest, 11 Nov) */
 @container app (max-height: 680px) { .title:not(.end) .sysbox p + p { display: none; } }
+/* Between rounds: one page for everything that waits after a fight (Slaw, 11 Nov) */
+.sheet.between { min-height: min(92%, 640px); }
+.sheet.between .sh-h { flex-wrap: wrap; }
+.bt-eb { flex-basis: 100%; font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .06em; color: inherit; opacity: .75; }
+.bt-steps { list-style: none; margin: 0 0 10px; padding: 0 0 8px; border-bottom: 1px solid var(--line); display: grid; gap: 3px; font-size: var(--fs-1); }
+.bt-steps li { display: flex; gap: 8px; justify-content: space-between; min-width: 0; }
+.bt-steps .bt-k { flex: none; }
+.bt-steps .bt-c { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bt-done .bt-k { color: var(--good); }
+.bt-cur .bt-k { color: var(--text); font-weight: 600; }
+.bt-next .bt-k { color: var(--muted); padding-left: 1em; }
