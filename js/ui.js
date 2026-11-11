@@ -18,13 +18,16 @@ function screenInfo() {
   const vh = Math.min(innerHeight, document.documentElement.clientHeight);
   return { top, bottom, sh, vh, standalone: !!navigator.standalone || matchMedia('(display-mode: standalone)').matches };
 }
+function isPC() { return matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth >= 1000 && innerHeight >= 640; }
 function fitScreen() {
   const root = document.documentElement; root.style.removeProperty('--app-h');
   const s = screenInfo(), short = s.sh - s.vh;
   if (navigator.standalone && s.top > 0 && short > 0 && Math.abs(short - s.top) <= 2) root.style.setProperty('--app-h', s.sh + 'px');
   // On a computer the game scales up with the window instead of staying phone-sized
-  const pc = matchMedia('(hover: hover) and (pointer: fine)').matches && innerWidth >= 1000 && innerHeight >= 640;
-  const z = pc ? Math.max(1, Math.min(1.8, innerHeight / 720, innerWidth / 1100)) : 1;
+  const pc = isPC();
+  let z = pc ? Math.max(1, Math.min(1.8, innerHeight / 720, innerWidth / 1100)) : 1;
+  // Settings > Bigger text (PC only): scale up about 12% more, but keep room for the desk layout (1000 x 600 inside)
+  if (pc && typeof SET !== 'undefined' && SET.big) z = Math.max(z, Math.min(z * 1.12, innerHeight / 610, innerWidth / 1010));
   root.style.setProperty('--z', z.toFixed(3)); root.style.removeProperty('--app-zh');
   // Engines that scale percentage heights with zoom would push the bottom off screen: undo that
   if (z > 1 && app.getBoundingClientRect().height > innerHeight + 1) root.style.setProperty('--app-zh', (100 / z).toFixed(3) + '%');
@@ -725,7 +728,7 @@ function shopIds() { ensureShop(run); const ids = new Set(); SHOP_KINDS.forEach(
 function pieceTile(p, act, extra, inShop) {
   const d = pieceDef(p.id), g = isGear(p.id);
   const marker = inShop && inShop.has(p.id) && p.star < 3 ? '<span class="inshop" title="A copy is in the shop">in shop</span>' : '';
-  return `<button class="tile ${mainTag(p.id)} ${g ? 'gear' : ''} ${extra || ''} ${marker ? 'hasdup' : ''}" data-act="${act}" data-u="${p.u}">
+  return `<button class="tile ${mainTag(p.id)} ${g ? 'gear' : ''} ${extra || ''} ${marker ? 'hasdup' : ''}" data-act="${act}" data-u="${p.u}" title="${esc(g ? d.name + ': ' + gearText(p.id, p.star) : skillTip(moddedDef(p.id, p.mods)))}">
     <span class="tl-h">${rk(effRank(p.id, p.mods))}${stars(p.star)}</span><span class="tl-n">${esc(d.name)}</span>${pfxLine(p.mods)}<span class="tl-f">${tagDots(p.id)}</span>${marker}</button>`;
 }
 // Prefixes on a tile: one small line that gives way before the skill's name does
@@ -944,7 +947,7 @@ function fightKitHTML(f) {
 }
 function chipsHTML(X, f) {
   const c = [];
-  if (!X.isPlayer && X.reflexes) X.reflexes.forEach((R, k) => c.push(`<span class="chip trait reflex" title="${esc(reflexText(X.id, k))}">Reflex: ${esc(REFLEX_ON[R.on].chip)}</span>`));
+  if (!X.isPlayer && X.reflexes) X.reflexes.forEach((R, k) => c.push(`<span class="chip trait reflex" title="Reflex: ${esc(reflexText(X.id, k))}">Reflex: ${esc(REFLEX_ON[R.on].chip)}</span>`));
   if (!X.isPlayer && f.spec && f.spec.traits) f.spec.traits.forEach(k => TRAIT_POOL[k] && c.push(`<span class="chip trait${TRAIT_POOL[k].glitch ? ' glitch' : ''}">${esc(TRAIT_POOL[k].name)}</span>`));
   if (X.isPlayer && f.goal) { const st = goalState(f), g = SIDE_GOALS[f.goal.key]; c.push(`<span class="chip goal ${st}" title="${esc(g.text)}">${st === 'met' ? '✓ ' : st === 'lost' ? '✗ ' : ''}${esc(g.name)} +${f.goal.gold}g</span>`); }
   if (X.block > 0) c.push(`<span class="chip block">Block ${n0(X.block)}</span>`);
@@ -1571,6 +1574,7 @@ function settingsSheet() {
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
+    + (isPC() ? row('Bigger screen', 'On a laptop or PC: the whole game a size larger.', seg('big', [[false, 'Off'], [true, 'On']])) : '')
     + backupsHTML()
     + '<p class="sh-p fine">On a keyboard: number keys pick choices and skills, Enter presses the main button, Escape closes, S opens Stats and L the System log.</p>';
   return sheetWrap('Settings', body, '<button class="btn primary" data-act="close">Done</button>', 'settings');
@@ -2068,7 +2072,7 @@ function onAct(el) {
     case 'hint-read': { const h = HINTS.find(x => x.k === d.k); if (h) ui.sheet = { type: 'hint', k: h.k, text: h.text }; return render(); }
     case 'hint-done': meta.hints = meta.hints || {}; meta.hints[d.k] = true; saveMeta(); ui.sheet = null; return render();
     case 'hint-ok': if (ui.hint) { meta.hints = meta.hints || {}; meta.hints[ui.hint] = true; saveMeta(); } return render();
-    case 'set': { const k = d.k, v = d.v === 'true' ? true : d.v === 'false' ? false : /^\d+$/.test(d.v) ? +d.v : d.v; SET[k] = v; saveSettings(); REDUCED = reducedMotion(); if (k === 'vol' && v) sfx('tap'); if (k === 'vib' && v) sfx('hit'); return render(); }
+    case 'set': { const k = d.k, v = d.v === 'true' ? true : d.v === 'false' ? false : /^\d+$/.test(d.v) ? +d.v : d.v; SET[k] = v; saveSettings(); REDUCED = reducedMotion(); if (k === 'big') fitScreen(); if (k === 'vol' && v) sfx('tap'); if (k === 'vib' && v) sfx('hit'); return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
     case 'speed-cycle': ui.speed = ui.speed >= 3 ? 1 : ui.speed + 1; lsSet('wpd-speed', ui.speed); return render();
     case 'signin': { const C = window.WPD_CLOUD; if (!C) return; C.signIn(d.k).catch(e => toast(`[Sign-in failed: ${(e && e.message) || 'unknown error'}]`, 'loss')); return; }
@@ -2781,6 +2785,40 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'l' || e.key === 'L') { ui.sheet = { type: 'syslog' }; render(); }
   }
 });
+// Hover cards (mouse only): pointing at a status chip, Reflex, trait, piece or skill shows its full text in a small card,
+// the same words a tap or a sheet gives on a phone. Native title tooltips are taken over so they don't double up.
+const GLOSS = {
+  Block: 'Absorbs damage. It resets at the start of its owner\'s turn.', Burn: 'Deals its number in damage at the start of each turn, then fades by about a third.',
+  Poison: 'Deals its number in damage at the start of each turn. It doesn\'t fade.', Bleed: 'Deals its number in damage each time they act, then drops by 1.',
+  Weak: 'Deals 30% less damage. Counts down each turn.', Marked: 'Takes 30% more damage. Counts down each turn.', Power: 'Deals 30% more damage. Counts down each turn.',
+  Evade: 'Dodges the next hits: one per point.', Thorns: 'Hits back for that much whenever they are struck.', Doom: 'That much damage lands when the count reaches 0.',
+  Leech: 'Drains HP to the other side at the start of each turn, for that many turns.', Regen: 'Heals at the start of each turn, for that many turns.',
+  Broken: 'Their guard is gone: they lose a turn and take 50% more damage for 2 turns.'
+};
+const HOVER = matchMedia('(hover: hover) and (pointer: fine)');
+let hovEl = null, hovCard = null;
+function tipOf(el) {
+  if (el.title) { el.dataset.tip = el.title; el.removeAttribute('title'); }
+  if (el.dataset.tip) return el.dataset.tip;
+  if (el.classList.contains('chip')) { const w = el.textContent.trim().split(/\s+/)[0]; if (GLOSS[w]) return `${w}: ${GLOSS[w]}`; }
+  return '';
+}
+function hideHover() { if (hovCard) hovCard.remove(); hovCard = null; hovEl = null; }
+document.addEventListener('pointerover', e => {
+  if (!HOVER.matches || e.pointerType !== 'mouse') return;
+  const el = e.target.closest && e.target.closest('[title], [data-tip], .chip');
+  if (el === hovEl) return; hideHover(); if (!el || !app.contains(el)) return;
+  const t = tipOf(el); if (!t) return;
+  hovEl = el; hovCard = document.createElement('div'); hovCard.className = 'hovcard'; hovCard.setAttribute('role', 'tooltip');
+  const i = t.indexOf(': '); hovCard.innerHTML = i > 0 && i < 40 ? `<b>${esc(t.slice(0, i))}</b>${esc(t.slice(i + 2))}` : esc(t);
+  document.body.appendChild(hovCard);
+  const r = el.getBoundingClientRect(), c = hovCard.getBoundingClientRect();
+  let x = Math.min(Math.max(8, r.left + r.width / 2 - c.width / 2), innerWidth - c.width - 8), y = r.top - c.height - 8;
+  if (y < 8) y = r.bottom + 8;
+  hovCard.style.left = x + 'px'; hovCard.style.top = y + 'px';
+});
+['pointerdown', 'scroll', 'keydown'].forEach(k => addEventListener(k, hideHover, true));
+document.addEventListener('pointerout', e => { if (hovEl && !hovEl.contains(e.relatedTarget)) hideHover(); });
 render();
 maybeShowNews();
 cloudInit();

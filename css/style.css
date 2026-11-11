@@ -1399,3 +1399,6 @@ html, body, button, [data-act] { touch-action: manipulation; }
 .bt-done .bt-k { color: inherit; opacity: .8; }
 .bt-cur .bt-k { color: inherit; font-weight: 700; }
 .bt-next .bt-k { color: inherit; opacity: .6; padding-left: 1em; }
+/* Hover cards (mouse only): the full text of a chip, Reflex, piece or skill */
+.hovcard { position: fixed; z-index: 60; max-width: 280px; pointer-events: none; background: var(--h-k, #0b0b0d); color: var(--text); border: 1px solid var(--line2); border-left: 3px solid var(--h-y, var(--sys)); border-radius: var(--r-s); padding: calc(7px * var(--z, 1)) calc(10px * var(--z, 1)); max-width: calc(280px * var(--z, 1)); font: calc(14px * var(--z, 1))/1.35 var(--f-b); box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+.hovcard b { display: block; font-size: calc(12px * var(--z, 1)); letter-spacing: .06em; text-transform: uppercase; color: var(--h-y, var(--sys)); margin-bottom: 2px; }
