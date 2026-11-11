@@ -591,7 +591,7 @@ function worldsHTML() {
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
-    <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.${!meta.runs ? ' <span class="sysl">[First tournament? The buttons under the worlds are optional extras. Ignore them until you have a run behind you.]</span>' : ''}</p>
+    <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.${!meta.runs ? ' <span class="sysl">[First tournament? The buttons under the worlds are optional extras. Ignore them until you have a run behind you.]</span>' : meta.runs === 1 ? ' <span class="sysl">[Guide: the extras are open now. Run goal pays Echoes for a target you pick. Contracts are this week\'s three jobs. Back yourself bets Echoes on how far you get.]</span>' : ''}</p>
     <div class="picks">${cards}</div>${ladderRow()}${goalRow()}${worldExtras()}
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
 }
@@ -1315,9 +1315,10 @@ function evResultSheet() {
 // Each step keeps its own choices and handlers; the page is the frame around them.
 const PEND_LABEL = { gift: 'Additional Gift', intake: 'Intake Interview', augment: 'Rules review', door: 'Unlisted door', spoils: 'Spoils', levelup: 'Level up', perk: 'Class advancement', rune: 'Rune', adv: 'Path evolution', evo: 'Evolution' };
 function pendLabel(p) { return p.type === 'event' ? (EVENTS[p.key] ? EVENTS[p.key].title : 'Event') : PEND_LABEL[p.type] || 'Notice'; }
-function betweenDone(p, choice) { if (!run) return; run.between = run.between || { done: [] }; run.between.done.push({ label: pendLabel(p), choice: (choice || 'Done').slice(0, 60) }); }
+function betweenDone(p, choice) { if (!run) return; if (run.guide && p) (run.guideSeen = run.guideSeen || {})[p.type] = 1; run.between = run.between || { done: [] }; run.between.done.push({ label: pendLabel(p), choice: (choice || 'Done').slice(0, 60) }); }
 function betweenPage(sh) {
   if (!sh) return sh;
+  const gl = guideSheetLine(run.pending[0]); if (gl) sh = sh.replace('<div class="sh-b">', `<div class="sh-b">${gl}`);
   const done = (run.between && run.between.done) || [], all = done.length + run.pending.length;
   if (all < 2) return sh; // a lone step stays a plain sheet
   const cur = done.length + 1;
@@ -1529,7 +1530,16 @@ function menuSheet() {
 }
 // One-time System hints (#18): the first time a system shows up in a real run, the System explains it once.
 // Never in the practice run (the tutorial covers it there). Seen hints are kept in meta.hints.
+// The first real run's guide (playtest, 11 Nov): the practice run skips many screens, so the first real run explains
+// each new one once, in the System's voice. On when meta.runs is 0, or after Settings > "Guide my next run".
+const guideOn = () => !!(run && run.guide && !run.practice);
 const HINTS = [
+  { k: 'g-awaken', guide: 1, scr: 'awaken', when: guideOn, text: '[Your first real tournament. The System will explain each new screen once. Patron: the god who backs you and offers wagers. Gifts: starting perks, paid in Gift Points.]' },
+  { k: 'g-kitstats', guide: 1, scr: 'kitstats', when: guideOn, text: '[Place your stat points. Each stat powers the skills listed under it, so put them where your skills are. You get more with each level.]' },
+  { k: 'g-choose', guide: 1, scr: 'choose', when: guideOn, text: '[Your world has Hearts. Losing a fight costs some, more in later rounds and more against a Hard opponent. At 0 Hearts the world is erased. Hard opponents pay better.]' },
+  { k: 'g-district', guide: 1, scr: 'district', when: guideOn, text: '[One district visit before each shop: Infirmary heals, Sanctum restores Hearts, the Scout reads your opponent, the Enchanter adds a prefix, the Undercity is an event.]' },
+  { k: 'g-shop', guide: 1, scr: 'shop', when: guideOn, text: '[The shop. Three copies of a piece merge into a stronger one. Gold you keep earns interest. Skills beyond your bar wait on the bench.]' },
+  { k: 'g-fight', guide: 1, scr: 'fight', when: () => guideOn() && ui.fight && !ui.busy && !ui.fight.over, text: "[Their next move is always shown above. Read it, then answer it: Block a big hit, or break it before it lands.]" },
   { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
   { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into extra stat points, on top of the one each level gives.]' },
   { k: 'draftgear', scr: 'draft', when: () => run.draft && (run.draftPicked || []).length >= 3, text: '[Standard issue: one piece of gear to start with. Gear gives stats and a passive, and counts toward archetypes like skills do.]' },
@@ -1540,16 +1550,38 @@ const HINTS = [
   { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
 ];
 function hintHTML() {
-  if (!run || run.practice || ui.coach || ui.sheet || (run.pending && run.pending.length && ui.screen !== 'fight')) return '';
+  // The awaken screen comes before the run exists: the guide's first step reads meta instead
+  if (ui.screen === 'awaken' && ui.aw && !ui.aw.practice && !ui.noGuide && !ui.coach && !ui.sheet && (!meta.runs || meta.guideAgain) && !(meta.hints || {})['g-awaken']) { const h = HINTS.find(x => x.k === 'g-awaken'); ui.hint = h.k; return guideHintHTML(h); }
+  if (!run || run.practice || ui.coach || ui.sheet || (run.pending && run.pending.length && ['choose', 'shop', 'district'].includes(ui.screen))) return '';
   meta.hints = meta.hints || {};
   const h = HINTS.find(x => x.scr === ui.screen && !meta.hints[x.k] && x.when());
   if (!h) return '';
   ui.hint = h.k;
+  if (h.guide) return guideHintHTML(h);
   // Board screens show it as a strip under the top strip (moved there by render), so it never covers a choice
   // In a fight it sits in the log's place, between the opponent and your champion, so it never covers their next move
   if (ui.screen === 'fight') return `<div class="coach hint pos-strip pos-log" role="status"><button class="hint-read" data-act="hint-read" data-k="${h.k}" aria-label="Read the whole hint"><span class="eyebrow">[System hint]</span> ${esc(h.text)}</button><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
   if (['choose', 'shop', 'district'].includes(ui.screen)) return `<div class="coach hint pos-strip" role="status"><p><span class="eyebrow">[System hint]</span> ${esc(h.text)}</p><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
   return `<div class="coach hint pos-bottom" role="status"><div class="co-h"><span class="eyebrow">[System hint]</span></div><p>${esc(h.text)}</p><div class="co-f"><span></span><button class="btn small primary" data-act="hint-ok">OK</button></div></div>`;
+}
+function guideHintHTML(h) {
+  const eb = `<span class="eyebrow">[First-run guide]</span>`, off = `<button class="link guide-off" data-act="guide-off">Stop the guide</button>`;
+  if (ui.screen === 'fight') return `<div class="coach hint guide pos-strip pos-log" role="status"><button class="hint-read" data-act="hint-read" data-k="${h.k}" aria-label="Read the whole hint"><span class="eyebrow">[Guide]</span> ${esc(h.text)}</button><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
+  if (['choose', 'shop', 'district'].includes(ui.screen)) return `<div class="coach hint guide pos-strip" role="status"><p>${eb} ${esc(h.text)}</p><button class="btn small primary" data-act="hint-ok">OK</button></div>`;
+  return `<div class="coach hint guide pos-bottom" role="status"><div class="co-h">${eb}</div><p>${esc(h.text)}</p><div class="co-f">${off}<button class="btn small primary" data-act="hint-ok">OK</button></div></div>`;
+}
+// The guide's line on the between-rounds sheets, shown until that kind of step is done once this run
+const GUIDE_SHEET = {
+  spoils: 'Spoils: a reward for the win. Pick one; nothing here costs anything.',
+  levelup: 'Taking the level is the safe pick. A perk is a one-off trade for that level.',
+  augment: 'Amendments last the whole run, and most trade a gain for a cost. Read both halves. Passing none is allowed.',
+  door: 'The door is optional. Open it and a curse lasts 2 fights; when it lifts, it pays more than a normal reward.',
+  rune: 'A rune is a prefix for one of your skills: it changes how that skill works for the rest of the run.',
+  gift: 'A free extra Gift. It works like the ones you chose at the start.',
+};
+function guideSheetLine(p) {
+  if (!guideOn() || !p || !GUIDE_SHEET[p.type] || (run.guideSeen || {})[p.type]) return '';
+  return `<p class="sh-p fine sysl guide-line">[Guide] ${esc(GUIDE_SHEET[p.type])}</p>`;
 }
 // Hints inside events: what a % means, and how a Fate crisis resolves
 function eventHint(E, hasRoll) {
@@ -1574,6 +1606,7 @@ function settingsSheet() {
     + row('Screen shake', '', seg('shake', [[true, 'On'], [false, 'Off']]))
     + row('Motion', OS_REDUCED ? 'Your device asks for reduced motion.' : 'Fewer animations and screen effects, such as erosion.', seg('motion', [['system', 'Device'], ['reduce', 'Reduced']]))
     + row('Text size', 'For reading text: events, sheets, the fight log.', seg('text', [['normal', 'Normal'], ['l', 'Large'], ['xl', 'Larger']]))
+    + row('First-run guide', 'The System explains each screen once, in your next real run.', `<button class="btn small ${meta.guideAgain ? 'primary' : 'ghost'}" data-act="guide-again" aria-pressed="${!!meta.guideAgain}">${meta.guideAgain ? 'On for next run' : 'Guide my next run'}</button>`)
     + (isPC() ? row('Bigger screen', 'On a laptop or PC: the whole game a size larger.', seg('big', [[false, 'Off'], [true, 'On']])) : '')
     + backupsHTML()
     + '<p class="sh-p fine">On a keyboard: number keys pick choices and skills, Enter presses the main button, Escape closes, S opens Stats and L the System log.</p>';
@@ -2039,6 +2072,9 @@ function onAct(el) {
     case 'aw-ok': {
       const A = ui.aw;
       run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, startPts: 4, rollSeed: 'aw:' + ui.seed + ':' + ui.world + ':roll', gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record, challenge: ui.daily ? null : ui.challenge }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
+      // The first real run (or one asked for in Settings) is guided: each new screen explained once
+      if (!A.practice && !ui.noGuide && (!meta.runs || meta.guideAgain)) { run.guide = true; meta.guideAgain = false; meta.hints = meta.hints || {}; Object.keys(meta.hints).forEach(k => { if (k.startsWith('g-') && k !== 'g-awaken') delete meta.hints[k]; }); }
+      ui.noGuide = false;
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       if (!run.daily && !run.practice && meta.steer) { delete meta.steer; saveMeta(); } // a requested world is spent once a run starts
@@ -2071,6 +2107,8 @@ function onAct(el) {
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'hint-read': { const h = HINTS.find(x => x.k === d.k); if (h) ui.sheet = { type: 'hint', k: h.k, text: h.text }; return render(); }
     case 'hint-done': meta.hints = meta.hints || {}; meta.hints[d.k] = true; saveMeta(); ui.sheet = null; return render();
+    case 'guide-off': if (run && ui.screen !== 'awaken') { run.guide = false; saveRun(); } else { ui.noGuide = true; meta.guideAgain = false; saveMeta(); } return render();
+    case 'guide-again': meta.guideAgain = !meta.guideAgain; meta.hints = meta.hints || {}; if (meta.guideAgain) delete meta.hints['g-awaken']; saveMeta(); return render();
     case 'hint-ok': if (ui.hint) { meta.hints = meta.hints || {}; meta.hints[ui.hint] = true; saveMeta(); } return render();
     case 'set': { const k = d.k, v = d.v === 'true' ? true : d.v === 'false' ? false : /^\d+$/.test(d.v) ? +d.v : d.v; SET[k] = v; saveSettings(); REDUCED = reducedMotion(); if (k === 'big') fitScreen(); if (k === 'vol' && v) sfx('tap'); if (k === 'vib' && v) sfx('hit'); return render(); }
     case 'speed': ui.speed = +d.v; lsSet('wpd-speed', ui.speed); return render();
