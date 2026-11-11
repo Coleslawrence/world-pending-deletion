@@ -1299,10 +1299,11 @@ html, body, button, [data-act] { touch-action: manipulation; }
 .sheet.between { min-height: min(92%, 640px); }
 .sheet.between .sh-h { flex-wrap: wrap; }
 .bt-eb { flex-basis: 100%; font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .06em; color: inherit; opacity: .75; }
-.bt-steps { list-style: none; margin: 0 0 10px; padding: 0 0 8px; border-bottom: 1px solid var(--line); display: grid; gap: 3px; font-size: var(--fs-1); }
+.bt-steps { list-style: none; margin: 0 0 10px; padding: 0 0 8px; border-bottom: 1px solid color-mix(in srgb, currentColor 22%, transparent); display: grid; gap: 3px; font-size: var(--fs-1); }
 .bt-steps li { display: flex; gap: 8px; justify-content: space-between; min-width: 0; }
 .bt-steps .bt-k { flex: none; }
-.bt-steps .bt-c { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.bt-done .bt-k { color: var(--good); }
-.bt-cur .bt-k { color: var(--text); font-weight: 600; }
-.bt-next .bt-k { color: var(--muted); padding-left: 1em; }
+/* colours inherit from the sheet, so the steps read on dark sheets and on paper ones (the Rules review) alike */
+.bt-steps { color: inherit; } .bt-steps .bt-c { color: inherit; opacity: .7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bt-done .bt-k { color: inherit; opacity: .8; }
+.bt-cur .bt-k { color: inherit; font-weight: 700; }
+.bt-next .bt-k { color: inherit; opacity: .6; padding-left: 1em; }
