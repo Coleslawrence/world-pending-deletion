@@ -45,7 +45,11 @@ ensureRecord(run);
 const ui = { screen: 'title', worlds: null, seed: '', world: null, aw: null, draftSel: [], sheet: null, fight: null, busy: false, info: false, speed: [1, 2, 3].includes(lsGet('wpd-speed')) ? lsGet('wpd-speed') : 1, end: null, result: null, enchantSel: null, enchantMods: null, confirmAbandon: false, pick: null, distDone: null };
 if (run) ui.screen = stageScreen();
 if (hot && hot.snapshot) hot.snapshot(() => ({ run }));
-function saveRun() { if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
+// The practice run keeps its own save on this device (never the cloud), with the tutorial's step and its practice meta,
+// so closing the app mid-tutorial picks up where it was (Slaw, 11 Nov)
+const PRACTICE_KEY = 'le-practice-1';
+function savePractice() { if (run && run.practice && !run.ended && typeof META !== 'undefined') lsSet(PRACTICE_KEY, { v: VERSION, run, coach: ui.coach, meta: META }); }
+function saveRun() { if (run && run.practice) return savePractice(); if (run && !run.ended && !run.practice) { run.savedAt = Date.now(); lsSet(RUN_KEY, run); if (typeof schedulePush === 'function') schedulePush(); } }
 function saveMeta() { if (typeof realMeta !== 'undefined' && realMeta) return; meta.savedAt = Date.now(); lsSet(META_KEY, meta); if (typeof schedulePush === 'function') schedulePush(); }
 function stageScreen() { if (run.startPts != null && run.stage === 'choose') return 'kitstats'; return { draft: 'draft', choose: 'choose', district: 'district', shop: 'shop', ready: 'shop' }[run.stage] || 'choose'; }
 
@@ -73,7 +77,7 @@ const isStay = x => ui.screen !== 'fight' && bigToast(x.text, x.t);
 function pumpToasts() {
   if (!pumpToasts.gap) {
     const under = toastsEl.classList.contains('under'), live = [...toastsEl.querySelectorAll('.toast:not(.out)')];
-    const stays = live.filter(x => x.classList.contains('stay')).length, cap = ui.screen === 'fight' ? 2 : 3;
+    const stays = live.filter(x => x.classList.contains('stay')).length, cap = ui.screen === 'fight' ? 2 : ['draft', 'kitstats', 'awaken'].includes(ui.screen) ? 1 : 3; // one at a time over the opening choices, so they never cover the cards
     const i = toastQ.findIndex(x => !isStay(x) || (!under && stays < STAY_MAX));
     if (i >= 0 && live.length < cap) { showToast(toastQ.splice(i, 1)[0]); pumpToasts.gap = setTimeout(() => { pumpToasts.gap = null; pumpToasts(); }, 280); }
   }
@@ -563,7 +567,7 @@ function titleHTML() {
       ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${saved.daily ? 'Pending World: ' : ''}${esc(saved.world.name)}, ${saved.stage === 'draft' || saved.startPts != null ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
       ${dailyButton(canResume && saved)}
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
-      <button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>
+      ${practiceSave() ? `<button class="btn" data-act="practice-resume">Continue the practice run</button>` : `<button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>`}
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
       <div class="row3"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button><button class="btn ghost small" data-act="report">Report</button></div>
       ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · ${window.WPD_PREVIEW ? 'dev preview, not saved to cloud' : 'cloud save on'} · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
@@ -584,7 +588,7 @@ function worldsHTML() {
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
-    <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.</p>
+    <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.${!meta.runs ? ' <span class="sysl">[First tournament? The buttons under the worlds are optional extras. Ignore them until you have a run behind you.]</span>' : ''}</p>
     <div class="picks">${cards}</div>${ladderRow()}${goalRow()}${worldExtras()}
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
 }
@@ -643,7 +647,7 @@ function awakenHTML() {
   }
   const ready = a.name.trim() && a.patron && chk.ok;
   const why = !a.name.trim() ? 'Name your champion' : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
-  return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="${ui.daily ? 'back-title' : 'back-worlds'}" aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : 'Step 2 of 3'} · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
+  return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="${ui.daily ? 'back-title' : 'back-worlds'}" aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : ui.aw && ui.aw.practice ? 'Practice run' : 'Step 2 of 3'} · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
     <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${a.tab === k ? 'on' : ''}" data-act="aw-tab" data-t="${k}" role="tab">${l}</button>`).join('')}</div>
     <section class="aw-body sysw">${body}</section>
     <div class="foot"><button class="btn primary" data-act="aw-ok" ${ready ? '' : 'disabled'}>${why}</button></div></main>`;
@@ -651,7 +655,7 @@ function awakenHTML() {
 
 // ---------- Draft ----------
 // The opening draft is three steps: 3 of 6 skills, then 1 of 2 gear, then the opening stat points (kitStatsHTML)
-function draftEyebrow(step) { return `${run.daily ? 'Pending World' : 'Step 3 of 3'} · ${step}`; }
+function draftEyebrow(step) { return `${run.daily ? 'Pending World' : run.practice ? 'Practice run' : 'Step 3 of 3'} · ${step}`; }
 function draftHTML() {
   const gd = run.gearDraft || [];
   if (run.draftPicked && gd.length) return gearDraftHTML(gd);
@@ -660,7 +664,7 @@ function draftHTML() {
     return `<button class="scard ${on ? 'on' : ''} ${mainTag(id)}" data-act="draft-pick" data-id="${id}">
       <div class="sc-h"><span class="sc-name">${esc(d.name)}</span>${rk(d.rank)}</div>
       <div class="sc-meta">${tagNames(id)}${d.quick ? '<span class="tagn q">Quick</span>' : ''}</div>
-      <div class="sc-desc">${esc(describe(d))}</div></button>`;
+      <div class="sc-desc ${describe(d).length > 110 ? 'long' : ''}">${esc(describe(d))}</div></button>`;
   }).join('');
   const n = ui.draftSel.length, next = gd.length ? 'Next: gear' : 'Confirm';
   return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Skills')}</div><h2>[Skill selection: choose 3]</h2></div></div>
@@ -1376,7 +1380,10 @@ function lastTurnsHTML() {
   const f = ui.fight; if (!f) return '';
   const lines = f.log.filter(l => ['me', 'foe', 'react', 'loss'].includes(l.t)).slice(-5);
   if (!lines.length) return '';
-  return `<h4>The last turns</h4><ol class="lastturns">${lines.map((l, i) => `<li class="t-${l.t} ${i === lines.length - 1 ? 'kb' : ''}">${esc(l.text)}${i === lines.length - 1 ? ' <b>(killing blow)</b>' : ''}</li>`).join('')}</ol>`;
+  // A last line with no damage in it (Second Spit: Poison only) didn't land the blow itself: name what did
+  const dots = ['Poison', 'Burn', 'Bleed'].filter(k => f.A[k.toLowerCase()] > 0), last = lines[lines.length - 1];
+  const kb = /\d+ damage/.test(last.text) || !dots.length ? ' <b>(killing blow)</b>' : ` <b>(then ${dots.join(' and ')} finished it)</b>`;
+  return `<h4>The last turns</h4><ol class="lastturns">${lines.map((l, i) => `<li class="t-${l.t} ${i === lines.length - 1 ? 'kb' : ''}">${esc(l.text)}${i === lines.length - 1 ? kb : ''}</li>`).join('')}</ol>`;
 }
 function runCard(s, opts) {
   opts = opts || {};
@@ -1455,11 +1462,16 @@ function archetypesSheet() {
   const hp = run.hiddenPath ? `<div class="archrow hidden"><div class="ar-h"><b>Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}</b></div><div class="ar-b on">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</div></div>` : '<p class="sh-p fine">Reach 4 pieces in two archetypes at once to unlock a Hidden Path.</p>';
   return sheetWrap('Archetypes this run', `<p class="sh-p fine">Equipped pieces (skill bar and gear) count. Each different piece counts once; pieces with two tags count for both. At 4, the System names your path.</p>${body}${hp}<h4>Reactions</h4><ul class="msgs">${Object.values(REACTIONS).map(R => `<li><b>${R.name}</b> (${R.pair}): ${esc(R.text)}</li>`).join('')}</ul>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
+// The Scout's numbers at this fight's strength (round, rank, curve and the big-hit boost), as the fight will show them
+function scoutPower(spec, fx) {
+  let p = 1; try { p = buildEnemy(run, spec).movePower || 1; } catch (e) { return 1; }
+  return (fx.dmg || 0) * (fx.hits || 1) * p >= maxHp(run) * GAP.bigAt ? p * GAP.big : p;
+}
 function scoutSheet() {
   const spec = currentSpec(run);
   let body = '';
   if (spec.snap) body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(specStyle(spec))}. Level ${spec.snap.level}.</p>` + spec.snap.bar.map(s => pieceBody(s.id, s.star, s.mods, 1)).join('') + spec.snap.gear.map(g => pieceBody(g.id, g.star)).join('');
-  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }))}</li>`).join('')}</ul><p class="sh-p fine">${hasReflex(spec) ? `They pick their moves by chance, favouring some, but never the same move three turns running or a big move twice running.${t.rival || t.final ? ' They also read the fight: they go around a big Block, clean off what you put on them, patch up when low and go for the kill when you are.' : ''}` : 'They use their skills in a fixed order, which you can learn.'} In the fight you'll also see their move after next.</p>${hasReflex(spec) ? reflexRules(spec.id).map(R => `<p class="sh-p fine">[Reflex. ${esc(REFLEX_ON[R.on].if)}, their next move is <b>${esc(R.move ? R.move.n : t.skills[R.use].n)}</b>${R.move ? ': ' + esc(describe({ fx: R.move.fx })) : '.'}]</p>`).join('') + '<p class="sh-p fine">[A Reflex never fires two turns running.]</p>' : ''}${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}${traitsHTML(spec)}`; }
+  else { const t = ENEMIES[spec.id]; body = `<p class="sh-p big">${esc(specName(spec))}</p><p class="sh-p">${esc(t.style)}.</p><ul class="msgs">${t.skills.map(s => `<li><b>${esc(s.n)}</b>: ${esc(describe({ fx: s.fx }, scoutPower(spec, s.fx)))}</li>`).join('')}</ul><p class="sh-p fine">${hasReflex(spec) ? `They pick their moves by chance, favouring some, but never the same move three turns running or a big move twice running.${t.rival || t.final ? ' They also read the fight: they go around a big Block, clean off what you put on them, patch up when low and go for the kill when you are.' : ''}` : 'They use their skills in a fixed order, which you can learn.'} In the fight you'll also see their move after next.</p>${hasReflex(spec) ? reflexRules(spec.id).map(R => `<p class="sh-p fine">[Reflex. ${esc(REFLEX_ON[R.on].if)}, their next move is <b>${esc(R.move ? R.move.n : t.skills[R.use].n)}</b>${R.move ? ': ' + esc(describe({ fx: R.move.fx })) : '.'}]</p>`).join('') + '<p class="sh-p fine">[A Reflex never fires two turns running.]</p>' : ''}${t.phase ? `<p class="sh-p fine">[Below ${Math.round(t.phase.at * 100)}% HP, they change how they fight.]</p>` : ''}${traitsHTML(spec)}`; }
   if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }
@@ -1477,10 +1489,11 @@ function menuSheet() {
 const HINTS = [
   { k: 'gear', scr: 'shop', when: () => run.round >= 2 && !GEAR_SLOTS.some(g => run.gear[g]), text: '[Skills alone will not carry you. Open the Gear shop: gear adds stats and a passive, and counts toward archetypes.]' },
   { k: 'train', scr: 'shop', when: () => run.round >= 2 && run.gold >= pointPrice(run), text: '[You have gold to spare. Train turns it into extra stat points, on top of the one each level gives.]' },
-  { k: 'preview', scr: 'fight', when: () => ui.fight && SET.preview !== false && !ui.busy && !ui.fight.over, text: '[Tap a skill to see what it would do: the striped part of each bar is what this turn takes. Tap it again to use it.]' },
+  { k: 'draftgear', scr: 'draft', when: () => run.draft && (run.draftPicked || []).length >= 3, text: '[Standard issue: one piece of gear to start with. Gear gives stats and a passive, and counts toward archetypes like skills do.]' },
   { k: 'windup', scr: 'fight', when: () => ui.fight && ui.fight.B.windup && !ui.busy, text: "[A big move takes a turn to wind up. Deal the damage shown under it this turn and it falls apart: they must do something else.]" },
   { k: 'reflex', scr: 'fight', when: () => ui.fight && ui.fight.B.reflex && !ui.busy, text: "[Every opponent has a Reflex: one thing you do that changes their next move. It is on their card, and you always see the move before it lands.]" },
   { k: 'break', scr: 'fight', when: () => ui.fight && ui.fight.B.breakMax && !ui.busy, text: "[The gold bar under their HP is their guard. It starts full and only you wear it down: damage past Block. Empty, they are Broken: a lost turn and 50% more damage.]" },
+  { k: 'preview', scr: 'fight', when: () => ui.fight && SET.preview !== false && !ui.busy && !ui.fight.over, text: '[Tap a skill to see what it would do: the striped part of each bar is what this turn takes. Tap it again to use it.]' },
   { k: 'notice', scr: 'choose', when: () => noticeOf(run) > 0, text: '[You have been Noticed. Every straight win makes opponents stronger. Losing a Heart resets it. Tap Noticed for details.]' },
 ];
 function hintHTML() {
@@ -1805,7 +1818,7 @@ function designsSheet() {
 function designLines() { const L = (run && run.designFound) || []; return L.map(id => `<p class="pg-next good">[Unfiled design recovered: ${esc(pieceDef(id).name)}. File it in the Archive.]</p>`).join(''); }
 function ladderLines() {
   const L = run && run.ladder; if (!L) return '';
-  const name = m => m.kind === 'arch' ? ARCH[m.key].name : m.kind === 'world' ? WORLD_TYPES[m.key].name : m.kind === 'clause' ? CLAUSES[m.key].name : CHALLENGES[m.key].name;
+  const name = m => m.kind === 'arch' ? `${ARCH[m.key].name} (${run.world.name}'s archetype)` : m.kind === 'world' ? WORLD_TYPES[m.key].name : m.kind === 'clause' ? CLAUSES[m.key].name : CHALLENGES[m.key].name;
   return (L.marks.length ? `<p class="pg-next good">[Mark${L.marks.length > 1 ? 's' : ''} of mastery: ${L.marks.map(m => `${esc(name(m))} · ${m.tier}`).join(', ')}.]</p>` : '') + (L.opened ? `<p class="pg-next good">[Priority ${L.opened} is open: ${esc(PRIORITY[L.opened - 1].name)}.]</p>` : '') + (L.echoes ? `<p class="pg-next good">[Challenge world cleared for the first time. +${L.echoes} Echoes.]</p>` : '');
 }
 function backingSheet() {
@@ -1988,7 +2001,7 @@ function onAct(el) {
       if (!run.daily && !run.practice) saveMeta();
       if (claimBacking(run, meta)) { saveMeta(); run.log.push({ t: 'class', text: `[Backing on file: ${BACK_GOALS[run.backing.goal].name}. ${run.backing.stake} Echoes riding on it.]` }); }
       pushMsgs(run.log.slice(), true);
-      ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'class'); return go('draft');
+      ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'sys'); return go('draft');
     }
     case 'news': openNews(); return render();
     case 'news-page': ui.sheet = { type: 'news', p: Math.max(0, +d.p) }; return render();
@@ -2170,7 +2183,7 @@ const COACH = [
   { scr: 'shop', pos: 'bottom', hl: '.shopgrid', text: 'Buy the Ember Gauntlets: Burn you apply +2, and another Pyre piece.', until: () => allPieces(run).some(p => p.id === 'ember_gauntlets') },
   { scr: 'shop', pos: 'bottom', hl: '.shoptabs .btn, .xptile', text: 'Rerolling costs 2 gold. Train spends gold on extra stat points. Levels come from battles. Gold you keep earns interest: +1 for every 4, up to 5.', wait: 'next' },
   { scr: 'shop', pos: 'bottom', hl: '.barrow, .gearrow', text: 'Your skill bar and gear. Tap any piece to see it, swap it with your bench, or sell it. When you are ready, tap Fight.', wait: 'shop-done' },
-  { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here. Red means a big hit is coming.", wait: 'next' },
+  { scr: 'fight', pos: 'mid', hl: '#intent', text: "The opponent's next move is always shown here, with its damage on the right. A pulsing border means a big hit. Deal the Break damage shown under it this turn and the move falls apart.", wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '.brk-bar', text: 'The gold bar is their guard. It starts full: damage past their Block wears it down, and big hits twice as fast. Empty, they are Broken: they lose a turn and take 50% more damage.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Tap a skill to use it. Numbers include your stats and stars. Used skills go on cooldown for a few turns; Attack never does.', wait: 'next' },
   { scr: 'fight', pos: 'mid', hl: '#skills', text: 'Use Venom Blade first, then Firebolt: Burn landing on a Poisoned target triggers the reaction Toxic Flare.', until: () => ui.fight && (ui.fight.tally.reactions > 0 || ui.fight.over), skippable: true },
@@ -2194,6 +2207,7 @@ function startPractice() {
 }
 function practiceMeta() { return META || meta; }
 function endPractice(done) {
+  lsDel(PRACTICE_KEY);
   ui.coach = null; ui.fight = null; ui.sheet = null;
   bindMeta(realMeta || meta); realMeta = null;
   const first = !meta.tutorialDone;
@@ -2204,7 +2218,14 @@ function endPractice(done) {
   if (cloud.on && !cloud.pulled && !cloud.syncOff) pullProgress(); // the practice run held back the account's save
 }
 function coachStep() { return ui.coach && COACH[ui.coach.i]; }
-function coachAdvance() { if (!ui.coach) return; ui.coach.i++; if (ui.coach.i >= COACH.length) ui.coach.done = true; }
+function coachAdvance() { if (!ui.coach) return; ui.coach.i++; if (ui.coach.i >= COACH.length) ui.coach.done = true; savePractice(); }
+function practiceSave() { const p = lsGet(PRACTICE_KEY); return p && p.v === VERSION && p.run && !p.run.ended ? p : null; }
+function resumePractice() {
+  const p = practiceSave(); if (!p) return startPractice();
+  ui.daily = null; realMeta = meta; bindMeta(Object.assign(newMeta(), p.meta));
+  run = p.run; registerGlitchGear(run); ui.coach = p.coach || { i: 0, done: true }; ui.end = null; ui.sheet = null; ui.fight = null; ui.pick = null; ui.wagerOn = false;
+  go(stageScreen());
+}
 function coachHTML() {
   if (!ui.coach) return '';
   let st = coachStep();
@@ -2216,7 +2237,7 @@ function coachHTML() {
   const skipBtn = ui.coach.confirmSkip ? `<button class="link danger-t" data-act="coach-skip-yes">Yes, end the practice run</button>` : `<button class="link" data-act="coach-skip">Skip tutorial</button>`;
   if (!st || st.scr !== ui.screen || (ui.sheet && ui.sheet.type !== 'menu') || (run && run.pending.length && ['choose', 'shop', 'district'].includes(ui.screen))) return ui.coach.confirmSkip ? `<div class="coach pos-bottom"><p>End the practice run?</p><div class="co-f">${skipBtn}<button class="link" data-act="coach-skip-no">Keep going</button></div></div>` : '';
   if (ui.coach.min) return `<button class="coach-pill" data-act="coach-max">[Tutorial] ▴</button>`;
-  return `<div class="coach pos-${st.pos || 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[Tutorial]</span><button class="link" data-act="coach-min" aria-label="Minimise the tutorial">Hide ▾</button></div><p>${esc(st.text)}</p><div class="co-f">${skipBtn}${st.wait === 'next' || st.skippable ? `<button class="btn small primary" data-act="coach-next">${st.wait === 'next' ? 'Next' : 'Got it'}</button>` : ''}</div></div>`;
+  return `<div class="coach pos-${st.pos || 'bottom'}" role="status"><div class="co-h"><span class="eyebrow">[Tutorial]</span><button class="link co-hide" data-act="coach-min" aria-label="Minimise the tutorial">Hide ▾</button></div><p>${esc(st.text)}</p><div class="co-f">${skipBtn}${st.wait === 'next' || st.skippable ? `<button class="btn small primary" data-act="coach-next">${st.wait === 'next' ? 'Next' : 'Got it'}</button>` : ''}</div></div>`;
 }
 function coachHighlight() {
   document.querySelectorAll('.coach-hl').forEach(e => e.classList.remove('coach-hl'));
@@ -2245,7 +2266,8 @@ onAct = function (el) {
   if (a === 'coach-max') { ui.coach.min = false; return render(); }
   if (a === 'coach-skip-no') { ui.coach.confirmSkip = false; return render(); }
   if (a === 'coach-skip-yes') return endPractice(false);
-  if (a === 'practice') { ui.sheet = null; return startPractice(); }
+  if (a === 'practice') { ui.sheet = null; lsDel(PRACTICE_KEY); return startPractice(); }
+  if (a === 'practice-resume') { ui.sheet = null; return resumePractice(); }
   if (a === 'skip-practice') { meta.tutorialDone = true; saveMeta(); ui.sheet = null; return _onAct({ dataset: { act: 'new' } }); }
   if (a === 'practice-end') return endPractice(true);
   if (a === 'practice-tournament') { endPractice(true); return _onAct({ dataset: { act: 'new' } }); }

@@ -508,13 +508,14 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .tile.merge { border-color: var(--stun); box-shadow: inset 0 0 0 1px var(--stun), 0 0 14px rgba(255,210,90,.35); animation: glow 1.6s ease-in-out infinite; }
 @keyframes glow { 50% { box-shadow: inset 0 0 0 1px var(--stun), 0 0 4px rgba(255,210,90,.15); } }
 @keyframes pulse { 50% { opacity: .65; } }
-.mergetag, .owntag { position: absolute; left: 6px; top: -9px; font-family: var(--f-m); font-size: var(--fs-1); border-radius: var(--r-s); padding: 0 4px; letter-spacing: .04em; }
+.mergetag, .owntag { position: absolute; left: 6px; top: -12px; line-height: 1.25; font-family: var(--f-m); font-size: var(--fs-1); border-radius: var(--r-s); padding: 0 4px; letter-spacing: .04em; }
 .mergetag { color: var(--ink); background: var(--stun); font-weight: 500; }
 .owntag { color: var(--good); background: #10241a; border: 1px solid #3d6b47; }
 .owntag.off { color: var(--gold-hi); background: #241d10; border-color: #6b5a3d; }
 .tw { position: relative; display: grid; min-width: 0; } .tw > .tile { height: 100%; }
 .qbuy { position: absolute; z-index: 1; right: 3px; top: 3px; min-width: 52px; min-height: 28px; padding: 0 8px; font-family: var(--f-m); font-size: var(--fs-1); color: var(--ink); background: var(--good); border: 0; border-radius: var(--r-s); cursor: pointer; }
 .tw:has(.merge) .qbuy { background: var(--stun); }
+.tw:has(.coach-hl) .qbuy { z-index: 6; } /* the tutorial lifts a highlighted tile to z-index 5; its Buy button stays on top of it */
 .tile.bonus .mergetag, .tile.bonus .owntag { left: 6px; right: auto; }
 .pips { display: inline-flex; gap: 2px; margin-left: auto; } .pips i { display: block; flex: none; box-sizing: border-box; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--good); }
 .pips i.on { background: var(--good); } .pips i.nx { border-color: var(--stun); background: rgba(255,210,90,.35); }
@@ -1266,3 +1267,12 @@ html, body, button, [data-act] { touch-action: manipulation; }
 .bc-splash.out { opacity: 0; }
 .bc-splash .bc-go { align-self: center; margin-top: 18px; font-family: var(--f-m); font-size: var(--fs-2); letter-spacing: .06em; color: var(--h-k); background: var(--h-y); border: 2px solid var(--h-k); box-shadow: 3px 3px 0 var(--h-m); padding: 6px 12px; animation: fadein .3s ease-out .7s both, gopulse 1.4s ease-in-out 1s infinite; }
 @keyframes gopulse { 50% { scale: 1.05; } }
+
+/* Playtest 11 Nov: the tutorial's Hide link gets a finger-sized tap area without growing its look */
+.co-hide { position: relative; } .co-hide::after { content: ''; position: absolute; inset: -12px -10px; }
+/* A long skill text (Sidestep) set smaller, so its draft card doesn't push the third row under the buttons at 320 */
+.sc-desc.long { font-size: 12px; line-height: 1.3; }
+/* The status chips scroll sideways when there are many: a soft fade at the right edge says there is more (playtest, 11 Nov) */
+.foe .chips, .me .chips { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent); padding-right: 14px; }
+/* A fresh save's title at 360x640: the second System line goes, so Sign in fits on the screen (playtest, 11 Nov) */
+@container app (max-height: 680px) { .title:not(.end) .sysbox p + p { display: none; } }

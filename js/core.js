@@ -1611,11 +1611,15 @@ function addFavour(run, god, n, meta, msgs, rng) {
   // The Silence: the gods don't answer in this world until its Fate is lifted. Favour earned meanwhile is held, not lost
   if (silent(run)) { run.heldFavour = run.heldFavour || {}; run.heldFavour[god] = (run.heldFavour[god] || 0) + n; msgs && msgs.push({ t: 'sys', text: `[${run.world.name} is silent. ${GODS[god].name} did not hear. Favour held: +${n}.]` }); return; }
   run.favour[god] = (run.favour[god] || 0) + n;
-  msgs && msgs.push({ t: 'favour', text: `[${GODS[god].name} is pleased. Favour +${n}.]` });
+  // A Chosen Gift's god still answers in a Silent world, once, at the Awakening: say so, so it doesn't read as a contradiction
+  const once = run.chosenNow && run.world.fate === 'silence' && !run.practice;
+  msgs && msgs.push({ t: 'favour', text: once ? `[${GODS[god].name} answers the Silence, just this once. Favour +${n}.]` : `[${GODS[god].name} is pleased. Favour +${n}.]` });
   if (run.favour[god] >= 4 && !(run.gifted[god] >= 1)) {
     run.gifted[god] = 1;
-    const pool = poolIds(run).filter(id => pieceDef(id).rank === 'B' && pieceDef(id).tags.some(t => GODS[god].arch.includes(t)));
-    const id = pick(pool.length ? pool : poolIds(run).filter(x => pieceDef(x).rank === 'B'), rng);
+    // Prefer a piece you don't already hold, so two gods' gifts at the Awakening don't hand over the same one twice
+    const owned = new Set(allPieces(run).map(p => p.id)), fresh = list => list.filter(x => !owned.has(x)).length ? list.filter(x => !owned.has(x)) : list;
+    const pool = fresh(poolIds(run).filter(id => pieceDef(id).rank === 'B' && pieceDef(id).tags.some(t => GODS[god].arch.includes(t))));
+    const id = pick(pool.length ? pool : fresh(poolIds(run).filter(x => pieceDef(x).rank === 'B')), rng);
     if (id) { msgs && msgs.push({ t: 'favour', text: `[Gift from ${GODS[god].name}: ${pieceDef(id).name}.]` }); addPiece(run, id, [], msgs); }
   }
   if (run.favour[god] >= 8 && !(run.gifted[god] >= 2)) { run.gifted[god] = 2; msgs && msgs.push({ t: 'favour', text: `[Blessing of ${GODS[god].name}: ${GODS[god].blessing}]` }); }
@@ -1857,7 +1861,7 @@ const OUTCOME_APPLY = {
 function addMark(c, kind, lines) { if (!c.from || !lines.length) return; (c.run.marks = c.run.marks || []).push({ kind, from: c.from, text: lines.join(', ') }); }
 function markNext(v) {
   const w = { weaken: n => `you start Weakened ${n} turns`, empower: n => `you start Empowered ${n} turns`, poison: n => `you start with ${n} Poison`, burn: n => `you start with ${n} Burn`, bleed: n => `you start with ${n} Bleed`,
-    bribe: () => 'your opponent starts with less HP', jinxFirst: () => "your opponent's first move goes wrong", heartCut: n => `a loss costs ${n} more Heart${n > 1 ? 's' : ''}`, noWinGold: () => 'a win pays no gold', foePoison: n => `your opponent starts with ${n} Poison` };
+    bribe: () => 'your opponent starts with less HP', jinxFirst: () => "your opponent's first move goes wrong", heartCut: n => n < 0 ? `a loss costs ${-n} more Heart${n < -1 ? 's' : ''}` : `a loss costs ${n} Heart${n > 1 ? 's' : ''} fewer`, noWinGold: () => 'a win pays no gold', foePoison: n => `your opponent starts with ${n} Poison` };
   return Object.entries(v).filter(([k]) => w[k]).map(([k, n]) => w[k](n));
 }
 function markFoe(v) {
@@ -2193,8 +2197,11 @@ function amendOf(run) {
   if (run.curse && CURSES[run.curse.id] && !run.elite && !run.practice) add(CURSES[run.curse.id]);
   return o;
 }
-function enemyPower(run) { return roundPower(curRound(run)) * curveOf(run, 'dmg') * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalDmg : 1) * depthMul(run); }
-function enemyHpMul(run) { return roundHp(curRound(run)) * curveOf(run, 'hp') * rankMul(run) * (amendOf(run).foeHp || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalHp : 1) * depthMul(run); }
+// The practice run's rounds 2 and 3 are gentler, so a new player's first fights teach rather than punish (playtest, 11 Nov).
+// Round 1 keeps its full strength: the Goblin's Shiv is the tutorial's example of a big hit to break.
+const PRACTICE_EASE = 0.8;
+function enemyPower(run) { return (run.practice && run.round >= 2 ? PRACTICE_EASE : 1) * roundPower(curRound(run)) * curveOf(run, 'dmg') * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalDmg : 1) * depthMul(run); }
+function enemyHpMul(run) { return (run.practice && run.round >= 2 ? PRACTICE_EASE : 1) * roundHp(curRound(run)) * curveOf(run, 'hp') * rankMul(run) * (amendOf(run).foeHp || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalHp : 1) * depthMul(run); }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
