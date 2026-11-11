@@ -664,7 +664,7 @@ function draftHTML() {
   }).join('');
   const n = ui.draftSel.length, next = gd.length ? 'Next: gear' : 'Confirm';
   return `<main class="screen select"><div class="sel-h"><div><div class="eyebrow">${draftEyebrow('Skills')}</div><h2>[Skill selection: choose 3]</h2></div></div>
-    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Only their pieces appear in the shop.${gd.length ? ' Rerolling also redraws the gear on offer.' : ''}</p>
+    <p class="hint">This run's archetypes: ${run.arch.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join(' ')}. Their pieces fill the shop, plus one off-plan piece in each shop: a chance to pivot.${gd.length ? ' Rerolling also redraws the gear on offer.' : ''}</p>
     <div class="sgrid">${cards}</div>
     <div class="foot row2"><button class="btn" data-act="draft-reroll" ${run.rerolls > 0 ? '' : 'disabled'}>Reroll · ${run.rerolls} left</button><button class="btn primary" data-act="draft-skills" ${n === 3 ? '' : 'disabled'}>${n === 3 ? next : `Pick ${3 - n} more`}</button></div></main>`;
 }
@@ -738,7 +738,7 @@ function shopItemTile(it, kind, i) {
   if (!it) return `<div class="tile empty">Sold</div>`;
   const d = pieceDef(it.id), D = dupInfo(it.id);
   const locked = kind !== 'bonus' && run.locks[kind][i];
-  const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : '';
+  const tag = D.merge ? `<span class="mergetag">Merge ★2</span>` : D.have ? `<span class="owntag">Owned ×${D.have}</span>` : D.star2 ? `<span class="owntag">★2 owned</span>` : it.off ? `<span class="owntag off">Off-plan</span>` : '';
   // Copies of pieces you own need no reading: they get a one-tap Buy over the price. Everything else opens its details first.
   const quick = D.owned && canBuy(run, it) ? `<button class="qbuy" data-act="quick-buy" data-k="${kind}" data-i="${i}" aria-label="Buy ${esc(d.name)} for ${price(run, it)} gold">Buy ${price(run, it)}g</button>` : '';
   // Archetype shapes sit beside the rank, so the tile only needs a footer row for owned pips, a lock or a gear slot

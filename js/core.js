@@ -8,7 +8,10 @@ if (typeof module !== 'undefined' && typeof ARCH === 'undefined') {
   for (const [, f] of html.matchAll(/<script src="(js\/content\/[^"]+)"><\/script>/g)) vm.runInThisContext(fs.readFileSync(path.join(root, f), 'utf8'), { filename: path.join(root, f) });
 }
 const VERSION = 5;
-const PRICE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
+// Price by rank (balance pass, Slaw 11 Nov): rank is power now (RANK_POWER), so a higher rank costs more and gold runs
+// out before the shop does. Selling still pays by SELL_VALUE (the old prices).
+const PRICE = { E: 1, D: 3, C: 5, B: 7, A: 9 };
+const SELL_VALUE = { E: 1, D: 2, C: 3, B: 4, A: 5 };
 
 // ---------- Archetypes ----------
 function alliesOf(k) { return themeAllies(k); }
@@ -48,9 +51,12 @@ function glitchMul(run) { return run && run.world && run.world.mod === 'corrupte
 // With run, only prefixes at least one of its skills can take, so every offered rune is pickable. Glitched prefixes need
 // a run where glitches are on; [REDACTED] stand-ins and Corrupt results are never offered.
 function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).filter(k => PREFIXES[k].w > 0 && (!PREFIXES[k].glitch || glitchesOn(run)) && (!forId || prefixOk(forId, k, [])) && (!run || prefixTargets(run, k).length)); if (!keys.length) return []; const out = [], m = glitchMul(run); let g = 0; while (out.length < n && g++ < 100) { const k = wpick(keys, keys.map(x => PREFIXES[x].w * (PREFIXES[x].glitch ? m : 1)), rng); if (!out.includes(k)) out.push(k); } return out; }
+// Power by rank (balance pass, Slaw 11 Nov): a higher-rank skill hits harder. An evolution keeps its base skill's rank
+// here, and prefixes raise the shown rank but not this.
+const RANK_POWER = { E: 0.8, D: 0.9, C: 1.05, B: 1.2, A: 1.4, S: 1.4 };
 function moddedDef(id, mods) {
   const base = SKILLS[id];
-  const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: 1 });
+  const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: RANK_POWER[(SKILLS[base.base] || base).rank] || 1 });
   d.mods.forEach(m => PREFIXES[m].apply(d));
   return d;
 }
@@ -595,13 +601,14 @@ function takeLevel(run, choice, msgs) {
 // ---------- Pool and shop ----------
 const ODDS = [[70, 25, 5, 0, 0], [45, 35, 17, 3, 0], [25, 35, 28, 10, 2], [15, 25, 32, 20, 8]];
 function oddsFor(run) { const l = run.level + (hasGift(run, 'lucky') ? 1 : 0) + (hasGift(run, 'gacha') ? 1 : 0); return ODDS[l >= 7 ? 3 : l >= 5 ? 2 : l >= 3 ? 1 : 0]; }
-function poolIds(run) {
+// off: the off-plan pool, pieces of archetypes outside this run's (OFF_PLAN shop slots draw from it)
+function poolIds(run, off) {
   const maxed = new Set(allPieces(run).filter(p => p.star >= 3).map(p => baseId(p.id)));
   const ids = SHOP_SKILLS.concat(Object.keys(GEAR).filter(k => !GEAR[k].glitch));
-  return ids.filter(id => pieceDef(id).tags.some(t => run.arch.includes(t)) && !maxed.has(id) && masteryOpen(run, id));
+  return ids.filter(id => pieceDef(id).tags.some(t => run.arch.includes(t)) !== !!off && !maxed.has(id) && masteryOpen(run, id));
 }
 function rollPiece(run, rng, opts = {}) {
-  let pool = poolIds(run);
+  let pool = poolIds(run, opts.off);
   if (opts.kind === 'skill') pool = pool.filter(id => !isGear(id));
   if (opts.kind === 'gear') pool = pool.filter(id => isGear(id));
   if (!pool.length) return null;
@@ -653,6 +660,7 @@ function registerGlitchGear(run) {
   if (!run) return;
   const ids = allPieces(run).map(p => p.id).concat(run.shop ? SHOP_KINDS.flatMap(k => (run.shop[k] || []).filter(Boolean).map(x => x.id)) : [], run.bonusSlot ? [run.bonusSlot.id] : []);
   if (run.phantom) ids.push(run.phantom.id);
+  (run.pending || []).forEach(p => (p.offers || []).forEach(o => o && o.id && ids.push(o.id))); // Spoils cards waiting on a reload
   ids.forEach(id => { if (typeof id === 'string' && id.startsWith('x_')) spliceGear(id); if (typeof id === 'string' && id.startsWith('u_')) unstableSkill(id); });
 }
 // MissingNo.: its passive is another (unglitched) gear piece's, rolled when it arrives and after every fight
@@ -666,9 +674,12 @@ function price(run, item) {
   if (run.haggle) v = Math.max(0, v - 1);
   return v;
 }
-function sellValue(p) { return (PRICE[pieceDef(baseId(p.id)).rank] || 1) * [0, 1, 3, 9][p.star] + (p.mods ? p.mods.length : 0); }
+function sellValue(p) { return (SELL_VALUE[pieceDef(baseId(p.id)).rank] || 1) * [0, 1, 3, 9][p.star] + (p.mods ? p.mods.length : 0); }
 // Two shops: skills and gear, 5 slots each, each with its own reroll and locks.
 const SHOP_KINDS = ['skill', 'gear'];
+// Off-plan offers (Slaw 11 Nov): the last OFF_PLAN slots of each shop show pieces of archetypes outside this run's. They
+// count toward their own archetype's tiers and use its stat, so taking one is a pivot, not a free upgrade.
+const OFF_PLAN = 1;
 function ensureShop(run) {
   if (!run.shop || Array.isArray(run.shop)) run.shop = { skill: [null, null, null, null, null], gear: [null, null, null, null, null] };
   if (!run.locks || Array.isArray(run.locks)) run.locks = { skill: [false, false, false, false, false], gear: [false, false, false, false, false] };
@@ -679,7 +690,9 @@ function refreshShop(run, rng, kind) {
   (kind ? [kind] : SHOP_KINDS).forEach(k => {
     for (let i = 0; i < 5; i++) if (!run.locks[k][i] || !run.shop[k][i]) {
       const sid = script && !kind && script[k] && script[k][i];
-      run.shop[k][i] = sid ? { id: sid, mods: [] } : rollPiece(run, rng, { kind: k }); run.locks[k][i] = false;
+      const off = !sid && i >= 5 - OFF_PLAN, it = sid ? { id: sid, mods: [] } : off && rollPiece(run, rng, { kind: k, off }) || rollPiece(run, rng, { kind: k });
+      if (it && off && !pieceDef(baseId(it.id)).tags.some(t => run.arch.includes(t))) it.off = true;
+      run.shop[k][i] = it; run.locks[k][i] = false;
     }
   });
 }
@@ -948,8 +961,8 @@ function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 // the final). It lifts the monster rounds and eases the rival rounds and the Gatekeepers so each round is a little harder
 // than the last instead of a wall at round 4. Not used in the Elite bracket. Retuned in the balance pass (11 Nov) for
 // auto-leveling, which makes your level equal the round, then eased (Slaw, 11 Nov) so good play spares about 85%, and eased 4% more
-// for meaningful play (shorter cooldowns, bigger telegraphed hits): loss rises from about 4% in round 1 to about 30% in the final.
-const CURVE = { dmg: [1.82, 1.58, 0.93, 0.72, 0.76, 0.74, 0.73, 0.83], hp: [1.44, 1.32, 0.89, 0.72, 0.76, 0.74, 0.73, 0.83] };
+// for meaningful play (shorter cooldowns, bigger telegraphed hits), then 3% more for rank prices: loss rises from about 4% in round 1 to about 30% in the final.
+const CURVE = { dmg: [1.77, 1.53, 0.9, 0.7, 0.74, 0.72, 0.71, 0.81], hp: [1.4, 1.28, 0.86, 0.7, 0.74, 0.72, 0.71, 0.81] };
 function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.round) - 1] || 1; }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
@@ -3843,7 +3856,7 @@ if (typeof module !== 'undefined') module.exports = {
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
   PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,

@@ -13,14 +13,17 @@
 //     the skill's first use in a fight.
 //   corrupt: only the Enchanter's Corrupt gives it; never offered.
 'use strict';
+// Riders scale with the skill they sit on (Slaw, 11 Nov): so much per turn of its cooldown, at least 1 turn. A slow,
+// heavy skill makes a better home for them than a quick jab, so where a prefix goes is a choice.
+const perCd = (d, n) => n * Math.max(1, d.cd);
 const isDmg = d => !!(d.fx.dmg || d.fx.detonate || d.fx.malice || d.fx.blockDmg || d.fx.momentum);
 const PREFIXES = {
   swift: { name: 'Swift', desc: '1 turn shorter cooldown.', w: 3, ok: d => d.cd >= 2, apply: d => { d.cd = Math.max(1, d.cd - 1); } },
   heavy: { name: 'Heavy', desc: '+40% power, 1 turn longer cooldown.', w: 3, ok: isDmg, apply: d => { d.powerMult *= 1.4; d.cd += 1; } },
   vampiric: { name: 'Vampiric', desc: 'Heal 25% of the damage dealt.', w: 2, ok: isDmg, apply: d => { d.fx.lifesteal = (d.fx.lifesteal || 0) + 0.25; } },
-  searing: { name: 'Searing', desc: 'Also apply 3 Burn.', w: 3, apply: d => { d.fx.xburn = (d.fx.xburn || 0) + 3; } },
-  toxic: { name: 'Toxic', desc: 'Also apply 3 Poison.', w: 3, apply: d => { d.fx.xpoison = (d.fx.xpoison || 0) + 3; } },
-  serrated: { name: 'Serrated', desc: 'Also apply 3 Bleed.', w: 3, apply: d => { d.fx.xbleed = (d.fx.xbleed || 0) + 3; } },
+  searing: { name: 'Searing', desc: 'Also apply 3 Burn per turn of cooldown.', w: 3, apply: d => { d.fx.xburn = (d.fx.xburn || 0) + perCd(d, 3); } },
+  toxic: { name: 'Toxic', desc: 'Also apply 3 Poison per turn of cooldown.', w: 3, apply: d => { d.fx.xpoison = (d.fx.xpoison || 0) + perCd(d, 3); } },
+  serrated: { name: 'Serrated', desc: 'Also apply 3 Bleed per turn of cooldown.', w: 3, apply: d => { d.fx.xbleed = (d.fx.xbleed || 0) + perCd(d, 3); } },
   piercing: { name: 'Piercing', desc: 'Ignores Block.', w: 2, ok: d => isDmg(d) && !d.fx.pierce, apply: d => { d.fx.pierce = 1; } },
   twin: { name: 'Twin', desc: 'One extra hit.', w: 2, ok: isDmg, apply: d => { if (d.fx.dmg) d.fx.hits = (d.fx.hits || 1) + 1; else d.powerMult *= 1.3; } },
   echoing: { name: 'Echoing', desc: '30% chance to cast twice.', w: 1, ok: d => !d.quick, apply: d => { d.fx.echo = Math.max(d.fx.echo || 0, 0.3); } },
@@ -40,12 +43,12 @@ const PREFIXES = {
   // Only the Enchanter's Corrupt gives this
   overclocked: { name: 'Overcl̷ocked', desc: '+30% power.', w: 0, corrupt: true, apply: d => { d.powerMult *= 1.3; } },
   // Gap prefixes: one for each effect that had none
-  guarded: { name: 'Guarded', desc: 'Also gain 5 Block.', w: 2, ok: d => !d.fx.block, apply: d => { d.fx.block = 5; } },
+  guarded: { name: 'Guarded', desc: 'Also gain 6 Block per turn of cooldown.', w: 2, ok: d => !d.fx.block, apply: d => { d.fx.block = perCd(d, 6); } },
   crippling: { name: 'Crippling', desc: 'Weaken the opponent for 1 turn.', w: 2, ok: d => !isDmg(d) && !d.fx.weaken, apply: d => { d.fx.weaken = 1; } },
   marking: { name: 'Marking', desc: 'Mark the opponent for 2 turns.', w: 2, ok: d => !d.fx.mark, apply: d => { d.fx.mark = 2; } },
-  shattering: { name: 'Shattering', desc: 'Also Break 6.', w: 2, ok: isDmg, apply: d => { d.fx.brk = (d.fx.brk || 0) + 6; } },
-  mending: { name: 'Mending', desc: 'Heal 2 at the start of your next 3 turns.', w: 2, ok: d => !d.fx.regen, apply: d => { d.fx.regen = 2; } },
-  hexing: { name: 'Hexing', desc: 'Also apply 2 Misfortune.', w: 2, apply: d => { d.fx.misf = (d.fx.misf || 0) + 2; } },
+  shattering: { name: 'Shattering', desc: 'Also Break 6 per turn of cooldown.', w: 2, ok: isDmg, apply: d => { d.fx.brk = (d.fx.brk || 0) + perCd(d, 6); } },
+  mending: { name: 'Mending', desc: 'Heal 2 per turn of cooldown at the start of your next 3 turns.', w: 2, ok: d => !d.fx.regen, apply: d => { d.fx.regen = perCd(d, 2); } },
+  hexing: { name: 'Hexing', desc: 'Also apply 2 Misfortune per turn of cooldown.', w: 2, apply: d => { d.fx.misf = (d.fx.misf || 0) + perCd(d, 2); } },
   purifying: { name: 'Purifying', desc: 'Remove your Burn, Poison, Bleed and Weaken.', w: 2, ok: d => !d.fx.cleanse, apply: d => { d.fx.cleanse = 1; } },
   evasive: { name: 'Evasive', desc: 'Dodge the next hit.', w: 2, ok: d => !d.fx.evade, apply: d => { d.fx.evade = 1; } },
   // Class prefixes: only skills of that class can take them
@@ -58,7 +61,7 @@ const PREFIXES = {
   reaping: { name: 'Reaping', desc: '50% more damage to an opponent below 30% HP.', w: 2, ok: d => (d.tags || []).includes('reaper') && !!d.fx.dmg && !d.fx.execute, apply: d => { d.fx.execute = 0.3; d.fx.execMult = 1.5; } },
   jolting: { name: 'Jolting', desc: 'If the opponent is Weakened, Stun them.', w: 2, ok: d => (d.tags || []).includes('storm') && isDmg(d) && !d.fx.stunIfWeak, apply: d => { d.fx.stunIfWeak = 1; } },
   loaded: { name: 'Loaded', desc: 'Its die never rolls below 3.', w: 2, ok: d => (d.tags || []).includes('dicer') && !!d.fx.die && !d.fx.dieMin, apply: d => { d.fx.dieMin = 3; } },
-  ominous: { name: 'Ominous', desc: 'Also leave an Omen: 8 damage when they next attack.', w: 2, ok: d => (d.tags || []).includes('jinx') && !d.fx.omenAtk, apply: d => { d.fx.omenAtk = 8; } },
+  ominous: { name: 'Ominous', desc: 'Also leave an Omen: 6 damage per turn of cooldown when they next attack.', w: 2, ok: d => (d.tags || []).includes('jinx') && !d.fx.omenAtk, apply: d => { d.fx.omenAtk = perCd(d, 6); } },
   // Trade-off prefixes: stronger, with a cost
   reckless: { name: 'Reckless', desc: '+50% power. Costs 4 HP.', w: 1.5, ok: isDmg, apply: d => { d.powerMult *= 1.5; d.fx.selfDmg = (d.fx.selfDmg || 0) + 4; } },
   hasty: { name: 'Hasty', desc: '2 turns shorter cooldown, 30% less power.', w: 1.5, ok: d => d.cd >= 3, apply: d => { d.cd = Math.max(1, d.cd - 2); d.powerMult *= 0.7; } },
@@ -67,7 +70,7 @@ const PREFIXES = {
   thirsting: { name: 'Thirsting', desc: 'Heal 50% of the damage dealt, 25% less power.', w: 1.5, ok: isDmg, apply: d => { d.fx.lifesteal = (d.fx.lifesteal || 0) + 0.5; d.powerMult *= 0.75; } },
   bloodbound: { name: 'Bloodbound', desc: 'Ignores Block. Costs 6 HP.', w: 1.5, ok: d => isDmg(d) && !d.fx.pierce, apply: d => { d.fx.pierce = 1; d.fx.selfDmg = (d.fx.selfDmg || 0) + 6; } },
   hollow: { name: 'Hollow', desc: "Doesn't end your turn, 40% less power.", w: 1.5, ok: d => !d.quick && !d.basic, apply: d => { d.quick = true; d.powerMult *= 0.6; } },
-  weighty: { name: 'Weighty', desc: 'Also Break 12, 1 turn longer cooldown.', w: 1.5, ok: isDmg, apply: d => { d.fx.brk = (d.fx.brk || 0) + 12; d.cd += 1; } },
+  weighty: { name: 'Weighty', desc: '1 turn longer cooldown. Also Break 8 per turn of cooldown.', w: 1.5, ok: isDmg, apply: d => { d.cd += 1; d.fx.brk = (d.fx.brk || 0) + perCd(d, 8); } },
 };
 // The [REDACTED] stand-ins: r_<glitch> works as that glitch and reads as [REDACTED] until it is disclosed
 Object.keys(PREFIXES).filter(k => PREFIXES[k].glitch && k !== 'redacted').forEach(k => {

@@ -34,9 +34,9 @@ offered.forEach(k => {
 // Numbers
 { const d = G.moddedDef('scorch', ['kindled']); ok(d.fx.burn === Math.round(S.scorch.fx.burn * 1.5), 'Kindled: 50% more Burn'); }
 { const d = G.moddedDef('iron_guard', ['stalwart']); ok(d.fx.block === Math.round(S.iron_guard.fx.block * 1.5), 'Stalwart: 50% more Block'); }
-{ const d = G.moddedDef('scorch', ['reckless']); ok(d.powerMult === 1.5 && d.fx.selfDmg === 4, 'Reckless: +50% power, costs 4 HP'); }
-{ const d = G.moddedDef('inferno', ['hasty']); ok(d.cd === S.inferno.cd - 2 && Math.abs(d.powerMult - 0.7) < 1e-9, 'Hasty: 2 shorter, 30% less'); }
-{ const d = G.moddedDef('scorch', ['hollow']); ok(d.quick && Math.abs(d.powerMult - 0.6) < 1e-9, 'Hollow: Quick, 40% less'); }
+{ const d = G.moddedDef('scorch', ['reckless']); ok(Math.abs(d.powerMult / G.moddedDef('scorch', []).powerMult - 1.5) < 1e-9 && d.fx.selfDmg === 4, 'Reckless: +50% power, costs 4 HP'); }
+{ const d = G.moddedDef('inferno', ['hasty']); ok(d.cd === Math.max(1, S.inferno.cd - 2) && Math.abs(d.powerMult / G.moddedDef('inferno', []).powerMult - 0.7) < 1e-9, 'Hasty: 2 shorter, 30% less'); }
+{ const d = G.moddedDef('scorch', ['hollow']); ok(d.quick && Math.abs(d.powerMult / G.moddedDef('scorch', []).powerMult - 0.6) < 1e-9, 'Hollow: Quick, 40% less'); }
 ok(!G.prefixOk('iron_guard', 'crippling', []) === !!S.iron_guard.fx.weaken, 'Crippling fits a non-damage skill without Weaken');
 ok(!G.prefixOk('scorch', 'crippling', []), 'Crippling never fits a damage skill (so it cannot stack with Jolting)');
 console.log(fails ? `prefix-test: ${fails} failed` : `prefix-test: ok (${offered.length} prefixes)`);

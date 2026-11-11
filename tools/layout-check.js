@@ -206,7 +206,7 @@ function inspect() {
       await page.evaluate(([rk, mk, r, m]) => { localStorage.clear(); localStorage.setItem(rk, JSON.stringify(r)); localStorage.setItem(mk, JSON.stringify(m)); localStorage.setItem('wpd-news-seen', '99'); }, ['le-run-1', 'le-meta-1', run, meta]);
       await page.goto(url); await page.addStyleTag({ content: insets });
       await page.evaluate(([stage, sheet, pending, result]) => {
-        ui.sheet = null; run.pending = pending || []; if (result) ui.result = result;
+        ui.sheet = null; run.pending = pending || []; registerGlitchGear(run); if (result) ui.result = result;
         if (stage === 'fight') startFightUI();
         else if (stage === 'worlds') { if (sheet) { meta.priority = { max: 10, set: 4 }; meta.marks.challenge = { glass: 3 }; meta.wins = Math.max(1, meta.wins); ui.challenge = 'sudden'; } onAct({ dataset: { act: 'new' } }); if (sheet) { ui.challenge = 'sudden'; ui.sheet = sheet; render(); } }
         else if (stage.startsWith('end-')) { const kind = stage.slice(4), out = endRun(run, meta, kind); ui.end = { kind, echoes: out.echoes, snap: out.snap, rp: out.rp, opened: out.trial }; run.ended = true; ui.screen = 'end'; render(); }
