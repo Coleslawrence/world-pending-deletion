@@ -151,6 +151,13 @@ function fight(run) {
 // (BOT_RANDOM does the same for skills in a fight).
 const RAND = new Set((process.env.BOT_RAND || '').split(',').filter(Boolean));
 const rpick = a => a[Math.floor(Math.random() * a.length)];
+// A skill's rough worth per turn, for placing prefixes: what it does, divided by how often it can be used
+function turnValue(d) {
+  const fx = d.fx, pm = d.powerMult || 1, dmg = (fx.dmg || 0) * (fx.hits || 1) * pm;
+  let v = dmg * (1 + (fx.lifesteal || 0) * 0.5 + (fx.pierce ? 0.15 : 0) + (fx.echo || 0)) + ((fx.burn || 0) + (fx.xburn || 0) + (fx.bleed || 0) + (fx.xbleed || 0)) * pm + ((fx.poison || 0) + (fx.xpoison || 0)) * 1.5 * pm;
+  v += (fx.block || 0) * 0.6 * pm + (fx.brk || 0) * 0.4 + (fx.regen || 0) * 2 + (fx.heal || 0) * 0.5 * pm + (fx.misf || 0) * 1.5 + (fx.mark ? 4 : 0) + (fx.weaken ? 4 : 0) + (fx.evade ? 5 : 0) + (fx.omenAtk || 0) * 0.6 + (fx.critBonus || 0) * dmg + (fx.cleanse ? 3 : 0) - (fx.selfDmg || 0) * 0.5;
+  return v / ((d.cd || 0) + 1) * (d.quick ? 1.4 : 1);
+}
 function targets(run) {
   const c = {};
   G.allPieces(run).forEach(p => G.pieceDef(G.baseId(p.id)).tags.forEach(t => c[t] = (c[t] || 0) + p.star));
@@ -183,7 +190,7 @@ function shop(run, meta, opts) {
   const tg = targets(run);
   let guard = 0;
   const reserve = run.round >= 3 && run.round < 7 ? 10 : 0;
-  while (guard++ < 30) {
+  while (!RAND.has('noshop') && guard++ < 30) {
     let bought = false;
     G.ensureShop(run);
     const items = [];
@@ -213,7 +220,15 @@ function shop(run, meta, opts) {
 function pending(run, meta) {
   while (run.pending.length) {
     const p = run.pending.shift();
+    if (p.type === 'rune' && RAND.has('noprefix')) continue;
     if (p.type === 'rune' && RAND.has('prefix')) { const m = rpick(p.mods), t = G.prefixTargets(run, m).filter(x => x.mods.length < 2); if (t.length) G.applyPrefix(run, rpick(t).u, m); continue; }
+    if (p.type === 'rune' && process.env.BOT_PFX !== '0') { // the prefix and bar skill that add the most per turn
+      let best = null;
+      run.bar.forEach(b => { if (!b || !G.SKILLS[b.id] || b.corrupt) return; const was = turnValue(G.moddedDef(b.id, b.mods));
+        p.mods.forEach(m => { if (!G.prefixTargets(run, m).some(x => x.u === b.u)) return; const keep = b.mods.length >= G.MAX_MODS ? b.mods.slice(1) : b.mods; const g = turnValue(G.moddedDef(b.id, keep.concat(m))) - was + (G.PREFIXES[m].glitch ? -1 : 0); if (!best || g > best.g) best = { g, u: b.u, m }; }); });
+      if (best && best.g > 0) G.applyPrefix(run, best.u, best.m);
+      continue;
+    }
     if (p.type === 'rune') { for (const m of glitchLast(p.mods)) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
