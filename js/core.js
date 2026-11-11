@@ -54,9 +54,11 @@ function rollPrefixes(n, rng, forId, run) { const keys = Object.keys(PREFIXES).f
 // Power by rank (balance pass, Slaw 11 Nov): a higher-rank skill hits harder. An evolution keeps its base skill's rank
 // here, and prefixes raise the shown rank but not this.
 const RANK_POWER = { E: 0.8, D: 0.9, C: 1.05, B: 1.2, A: 1.4, S: 1.4 };
+// Power by archetype (playtest N2, 11 Nov): evens out how often each main spares its world with good play
+const ARCH_POWER = { dicer: 1.4, arcanist: 1.27, bastion: 1.15, blade: 0.93, zealot: 0.78, storm: 0.9, pyre: 1.04 };
 function moddedDef(id, mods) {
   const base = SKILLS[id];
-  const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: RANK_POWER[(SKILLS[base.base] || base).rank] || 1 });
+  const d = Object.assign({}, base, { fx: Object.assign({}, base.fx), mods: (mods || []).slice(), powerMult: (RANK_POWER[(SKILLS[base.base] || base).rank] || 1) * (ARCH_POWER[(base.tags || [])[0]] || 1) });
   d.mods.forEach(m => PREFIXES[m].apply(d));
   return d;
 }
@@ -398,11 +400,12 @@ function worldBounty(worlds, rng) {
 function bountyOf(run, k) { return !!(run && run.world && run.world.bounty === k && !run.seed && !run.practice); }
 // Back yourself (an Echo sink): before a run, stake Echoes on how far it gets. Paid at the goal's odds when the run ends,
 // lost otherwise. Kept in meta.backing until a normal run starts (never Pending World or practice), then on run.backing.
+// Payouts set so good play about breaks even (playtest report N1, 11 Nov: at 2x/3x/4x it printed Echoes)
 const BACK_STAKES = [5, 10, 25];
 const BACK_GOALS = {
-  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 2 },
-  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 3 },
-  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 4 },
+  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 1.25 },
+  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 2 },
+  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 1.5 },
 };
 function placeBacking(meta, goal, stake) {
   if (meta.backing || !BACK_GOALS[goal] || !BACK_STAKES.includes(stake) || meta.echoes < stake) return false;
@@ -414,7 +417,7 @@ function settleBacking(run, meta, outcome) {
   const B = run.backing; if (!B || B.settled) return null;
   const G = BACK_GOALS[B.goal]; B.settled = true;
   B.met = G ? (B.goal === 'spared' ? outcome !== 'erased' : run.round >= G.round) : false;
-  B.paid = B.met ? B.stake * G.mul : 0; meta.echoes += B.paid;
+  B.paid = B.met ? Math.round(B.stake * G.mul) : 0; meta.echoes += B.paid;
   return B;
 }
 // Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built
@@ -940,18 +943,22 @@ function runP(run) { return buildP(run.bar, runGear(run), run.gifts, favourTiers
 const WINDUP = { share: 0.15, cd: 2 };
 // Meaningful play (balance pass, 11 Nov): knobs that make reading the fight matter more. big = damage on big (telegraphed) moves,
 // steady = damage on every other enemy move, broken/brokenT = Broken damage taken and turns, guard = enemy Block, reflex = Reflex move power,
-// bigAt = share of your max HP that makes a move big (and breakable).
-const GAP = { big: 1.4, steady: 1, broken: 1.5, brokenT: 2, guard: 1, reflex: 1.4, bigAt: 0.15 };
+// bigAt = share of your max HP that makes a move big (and breakable), cap = most of your max HP the boost takes one move to.
+const GAP = { big: 1.4, steady: 1, broken: 1.5, brokenT: 2, guard: 1, reflex: 1.4, bigAt: 0.15, cap: 0.35 };
 function gapMul(f, B, s) {
   if (B.isPlayer) return 1;
   const fx = s.def.fx; if (!(fx.dmg || fx.blockDmg)) return 1;
-  return (B.intent === s && isBig(f, B) ? GAP.big : GAP.steady) * (B.reflexNow && B.intent === s ? GAP.reflex : 1);
+  const m = (B.intent === s && isBig(f, B) ? GAP.big : GAP.steady) * (B.reflexNow && B.intent === s ? GAP.reflex : 1);
+  if (m <= 1) return m;
+  // The boost never takes one move past GAP.cap of your max HP (playtest N4: a boosted big hit was near a one-shot)
+  const T = opp(f, B), base = ((fx.dmg || 0) * s.power + (fx.blockDmg ? B.block * fx.blockDmg : 0)) * (fx.hits || 1) * dmgMult(f, B, T);
+  return base * m > T.maxHp * GAP.cap ? Math.max(1, T.maxHp * GAP.cap / base) : m;
 }
 const BREAK = { share: 0.4, heavy: 2, big: 0.2 };
 // The curve: every round's opponents hit dmgSlope harder and last hpSlope longer than round 1's, plus late a round after round 4.
 // notice: the System takes notice of a win streak (+notice enemy power per straight win, up to noticeMax; losing a Heart resets it).
 // gate: Gatekeepers (the hard pick at a GATES round) are this much tougher again, with an extra trait and a second phase.
-const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 0.9, poolDmg: 1, poolHp: 1, poolFragment: 1 };
+const TUNE = { late: 0.05, hp0: 1.6, hpSlope: 0.65, dmgSlope: 0.5, hard: 1.25, hardHp: 1.3, hardEarly: 0.4, finalHp: 0.85, finalDmg: 0.95, alpha: 1.1, monsterRamp: 0.08, notice: 0.06, noticeMax: 5, gate: 0.9, poolDmg: 1, poolHp: 1, poolFragment: 1 };
 // poolDmg, poolHp: multipliers on Entrant pool builds, which otherwise fight at their own strength; poolFragment: Hearts a
 // win over a filed record takes back (all left at 1 until the balance pass)
 const GATES = [4, 7];
@@ -962,7 +969,7 @@ function roundHp(round) { return TUNE.hp0 * (1 + TUNE.hpSlope * (round - 1)); }
 // than the last instead of a wall at round 4. Not used in the Elite bracket. Retuned in the balance pass (11 Nov) for
 // auto-leveling, which makes your level equal the round, then eased (Slaw, 11 Nov) so good play spares about 85%, and eased 4% more
 // for meaningful play (shorter cooldowns, bigger telegraphed hits), then 3% more for rank prices: loss rises from about 4% in round 1 to about 30% in the final.
-const CURVE = { dmg: [1.77, 1.53, 0.9, 0.7, 0.74, 0.72, 0.71, 0.81], hp: [1.4, 1.28, 0.86, 0.7, 0.74, 0.72, 0.71, 0.81] };
+const CURVE = { dmg: [1.77, 1.5, 0.95, 0.84, 0.88, 0.82, 0.82, 0.88], hp: [1.4, 1.26, 0.9, 0.82, 0.86, 0.8, 0.8, 0.88] };
 function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.round) - 1] || 1; }
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
@@ -1929,10 +1936,13 @@ function applyOutcomes(T, ctx, late) { const c = T.got || T.gotRune ? Object.ass
 function prefixTargets(run, m) { return allPieces(run).filter(p => SKILLS[p.id] && !p.corrupt && prefixOk(p.id, m, p.mods)).map(p => ({ u: p.u, id: p.id, mods: p.mods })); }
 // Carve prefix m into piece u. [REDACTED] becomes a hidden glitch that fits the skill; a glitch raises the System's notice.
 // got: where the prefix came from, kept on the piece (p.mgot, by prefix) for its details
+// Before round MODS_FROM a skill holds one prefix (playtest N8: four runes before the first fight made one skill S rank)
+const MODS_FROM = 3;
+function modCap(run) { return run && run.round < MODS_FROM ? 1 : MAX_MODS; }
 function applyPrefix(run, u, m, msgs, rng, got) {
   const f = findPiece(run, u); if (!f || f.p.corrupt || !prefixOk(f.p.id, m, f.p.mods)) return false;
   if (m === 'redacted') { const have = f.p.mods.map(bareMod), ks = GLITCH_PREFIXES.filter(k => !have.includes(k) && prefixOk(f.p.id, k, f.p.mods)); m = 'r_' + pick(ks, stream(run, 'loot', rng)); }
-  if (f.p.mods.length >= MAX_MODS) f.p.mods.shift();
+  while (f.p.mods.length >= modCap(run)) f.p.mods.shift();
   f.p.mods.push(m);
   if (got) { f.p.mgot = f.p.mgot || {}; f.p.mgot[m] = got; }
   if (PREFIXES[m].glitch) OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] });
@@ -2202,11 +2212,13 @@ function amendOf(run) {
 const PRACTICE_EASE = 0.8;
 function enemyPower(run) { return (run.practice && run.round >= 2 ? PRACTICE_EASE : 1) * roundPower(curRound(run)) * curveOf(run, 'dmg') * rankMul(run) * lateRamp(run) * noticeMul(run) * (amendOf(run).foeDmg || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalDmg : 1) * depthMul(run); }
 function enemyHpMul(run) { return (run.practice && run.round >= 2 ? PRACTICE_EASE : 1) * roundHp(curRound(run)) * curveOf(run, 'hp') * rankMul(run) * (amendOf(run).foeHp || 1) * (!run.elite && run.round >= ROUNDS ? amendOf(run).finalHp : 1) * depthMul(run); }
+// Hard picks in rounds 1 and 2 carry only TUNE.hardEarly of the Hard bonus (playtest N6: early Hard fights were harsh)
+function hardOf(run, k) { return run.round <= 2 ? 1 + (TUNE[k] - 1) * TUNE.hardEarly : TUNE[k]; }
 function buildEnemy(run, spec) {
   const alpha = spec.kind === 'monster' ? (spec.hard ? TUNE.alpha : 1) * (1 + TUNE.monsterRamp * (run.round - 1)) : 1;
   const at = spec.kind === 'trial' ? trialMul(run, spec) : 1;
   const gate = spec.gate ? TUNE.gate : 1;
-  const p = enemyPower(run) * at * (spec.hard ? TUNE.hard : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? TUNE.hardHp : 1) * alpha * gate;
+  const p = enemyPower(run) * at * (spec.hard ? hardOf(run, 'hard') : 1) * alpha * gate, hm = enemyHpMul(run) * at * (spec.hard ? hardOf(run, 'hardHp') : 1) * alpha * gate;
   if (spec.kind === 'erased' || spec.kind === 'champion' || spec.kind === 'entrant') { const e = buildSnapEnemy(spec.snap, p, hm, run, spec.kind === 'entrant'); e.weaken += run.nextFlags.foeWeaken || 0; e.poison += run.nextFlags.foePoison || 0; e.burn += run.nextFlags.foeBurn || 0; if (run.nextFlags.foeHp) e.hp = Math.max(1, Math.round(e.hp * run.nextFlags.foeHp)); return e; }
   if (spec.kind === 'final' && spec.snap) return buildFinalist(run, spec, p, hm);
   const t = ENEMIES[spec.id];
@@ -3862,8 +3874,8 @@ if (typeof module !== 'undefined') module.exports = {
   forecast, cloneFight,
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
-  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, ARCH_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,

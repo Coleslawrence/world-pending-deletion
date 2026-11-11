@@ -17,7 +17,7 @@ function mk(seed) {
 for (const [goal, round, outcome, met] of [['main', 4, 'erased', true], ['main', 3, 'erased', false], ['final', 8, 'erased', true], ['final', 7, 'erased', false], ['spared', 8, 'spared', true], ['spared', 8, 'erased', false]]) {
   const { meta, run } = mk(); G.placeBacking(meta, goal, 10); ok(G.claimBacking(run, meta) && !meta.backing, 'normal run claims it');
   run.round = round; const before = meta.echoes; G.settleBacking(run, meta, outcome);
-  ok(run.backing.met === met && meta.echoes - before === (met ? 10 * G.BACK_GOALS[goal].mul : 0), `${goal} at round ${round} ${outcome}: ${met ? 'paid' : 'lost'}`);
+  ok(run.backing.met === met && meta.echoes - before === (met ? Math.round(10 * G.BACK_GOALS[goal].mul) : 0), `${goal} at round ${round} ${outcome}: ${met ? 'paid' : 'lost'}`);
   ok(G.settleBacking(run, meta, outcome) === null, 'settles once');
 }
 console.log(fails ? `${fails} failed` : 'backing test: all passed');

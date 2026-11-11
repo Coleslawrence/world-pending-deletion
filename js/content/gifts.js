@@ -6,13 +6,13 @@
 // have no p yet and are read in core.js.
 const GIFTS = {
   tidecaller: { name: 'Tidecaller', cat: 'world', cost: 1, desc: 'Heal 2 at the start of each of your turns.', p: { regen: 2 }, flavour: "The sea still answers you, even this far from it." },
-  deserter: { name: 'Legion Deserter', cat: 'world', cost: 1, desc: 'Start each fight with 15 Block.', p: { startBlock: 15 }, flavour: "You left the legion. The legion's habits never left you." },
+  deserter: { name: 'Legion Deserter', cat: 'world', cost: 1, desc: 'Start each fight with Block equal to 15% of your max HP.', p: { startBlockPct: 0.15 }, flavour: "You left the legion. The legion's habits never left you." },
   warden: { name: 'Grave Warden', cat: 'world', cost: 1, desc: 'Heal 30% of Poison damage dealt (max 30% from all sources).', p: { poisonHeal: 0.3 }, flavour: "You kept the graves. Now the graves keep you." },
   hedgewitch: { name: 'Hedge Witch', cat: 'world', cost: 1, desc: 'Bleed you apply +1, and heal 1 whenever you apply Bleed.', p: { bleedPlus: 1, healOnBleed: 1 }, flavour: "Taught by a witch who lived where the forest bites." },
   prodigy: { name: 'Arcane Prodigy', cat: 'world', cost: 1, desc: 'A 5th skill slot, but 10% less max HP.', flavour: "The Sky Reaches gave you a sharper mind and a frailer body." },
   runesmith: { name: 'Runesmith', cat: 'world', cost: 1, desc: 'Your gear merges at 2 copies instead of 3.', flavour: "Raised at the forge. You know how metal wants to join." },
   nearmiss: { name: 'Near Miss', cat: 'world', cost: 1, desc: 'Evade the first attack each fight.', p: { firstEvade: 1 }, flavour: "In the Fens, things nearly happen to you all the time." },
-  loadeddice: { name: 'Loaded Dice', cat: 'world', cost: 1, desc: 'Chance options in events +15%.', p: { chanceBonus: 15 }, flavour: "Every child in the Marches gets a pair at birth. Most are heavy on one side." },
+  loadeddice: { name: 'Loaded Dice', cat: 'world', cost: 1, desc: 'Chance options in events +25%.', p: { chanceBonus: 25 }, flavour: "Every child in the Marches gets a pair at birth. Most are heavy on one side." },
   lightningrod: { name: 'Lightning Rod', cat: 'world', cost: 1, desc: 'Breaking an opponent Empowers you for 2 turns.', p: { breakEmpower: 2 }, flavour: "Struck as a child. The storm has known your name ever since." },
   appraisal: { name: 'Absolute Appraisal', cat: 'cheat', cost: 4, desc: "See every opponent's full kit and their next 2 moves.", flavour: "[Full Entrant data granted. This is irregular. Do not mention it.]" },
   monarch: { name: "Monarch's Domain", cat: 'cheat', cost: 6, desc: 'Every archetype you have counts 1 extra piece.', flavour: "[Authority recognised. Your pieces answer to you first.]" },

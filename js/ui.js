@@ -1363,11 +1363,11 @@ function enchantSheet(mods, from) {
   if (sel == null) {
     const corruptBtn = from !== 'rune' && corruptTargets(run).length ? `<button class="choice glitch" data-act="ench-mod" data-i="corrupt"><div class="sr-h"><span class="sr-name"><em class="pfx">Corr\u0337upt a skill</em></span></div><div class="sr-desc">Two results are rolled and you keep one: a star, a prefix or a glitch. The skill then takes no more prefixes.</div></button>` : '';
     const runeGot = from === 'rune' && run.pending[0] && run.pending[0].got;
-    const body = `${runeGot ? `<p class="sh-p sysl">${esc(runeGot)}</p>` : ''}<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${MAX_MODS}; a third replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
+    const body = `${runeGot ? `<p class="sh-p sysl">${esc(runeGot)}</p>` : ''}<p class="sh-p">${from === 'rune' ? 'The System offers a rune. ' : ''}Pick a prefix, then the skill to carve it into. A skill holds up to ${modCap(run)}${modCap(run) < MAX_MODS ? ` until round ${MODS_FROM}` : ''}; one more replaces its oldest. Each prefix raises the skill's rank.</p>` + mods.map((m, i) => prefixTargets(run, m).length ? `<button class="choice${PREFIXES[m].glitch ? ' glitch' : ''}" data-act="ench-mod" data-i="${i}"><div class="sr-h"><span class="sr-name"><em class="pfx">${esc(PREFIXES[m].name)}</em></span></div><div class="sr-desc">${esc(PREFIXES[m].desc)}</div></button>` : '').join('') + corruptBtn;
     return sheetWrap(from === 'rune' ? '[Rune · Choose a prefix]' : 'Enchanter', body, `<button class="btn ghost" data-act="ench-skip">${from === 'rune' ? 'Discard the rune' : 'Leave'}</button>`, 'sys', true);
   }
   const m = mods[sel];
-  const list = prefixTargets(run, m).map(t => { const f = findPiece(run, t.u); return `<button class="choice ${mainTag(t.id)}" data-act="ench-apply" data-u="${t.u}">${pieceBody(t.id, f.p.star, t.mods.concat(m).slice(-MAX_MODS))}<div class="sr-next">${f.at === 'bench' ? 'On your bench' : 'On your bar'}${t.mods.length >= MAX_MODS ? ' · replaces ' + PREFIXES[t.mods[0]].name : ''}</div></button>`; }).join('');
+  const list = prefixTargets(run, m).map(t => { const f = findPiece(run, t.u); return `<button class="choice ${mainTag(t.id)}" data-act="ench-apply" data-u="${t.u}">${pieceBody(t.id, f.p.star, t.mods.concat(m).slice(-modCap(run)))}<div class="sr-next">${f.at === 'bench' ? 'On your bench' : 'On your bar'}${t.mods.length >= modCap(run) ? ' · replaces ' + PREFIXES[t.mods[0]].name : ''}</div></button>`; }).join('');
   return sheetWrap(`Carve ${PREFIXES[m].name} into…`, list, `<button class="btn ghost" data-act="ench-back">Back</button>`, 'sys', true);
 }
 function recapHTML(r) {
@@ -1825,11 +1825,11 @@ function backingSheet() {
   const B = meta.backing;
   if (B && BACK_GOALS[B.goal]) {
     const G = BACK_GOALS[B.goal];
-    return sheetWrap('[Backing placed]', `<p class="sh-p">[You have backed yourself: ${esc(G.name)}. Stake ${B.stake} Echoes. Pays ${B.stake * G.mul} if you make it.]</p><p class="sh-p fine">It rides on your next world. Pending World and practice don't count.</p>`, `<div class="row2 even"><button class="btn" data-act="back-withdraw">Withdraw (${B.stake} back)</button><button class="btn primary" data-act="close">Keep it</button></div>`);
+    return sheetWrap('[Backing placed]', `<p class="sh-p">[You have backed yourself: ${esc(G.name)}. Stake ${B.stake} Echoes. Pays ${Math.round(B.stake * G.mul)} if you make it.]</p><p class="sh-p fine">It rides on your next world. Pending World and practice don't count.</p>`, `<div class="row2 even"><button class="btn" data-act="back-withdraw">Withdraw (${B.stake} back)</button><button class="btn primary" data-act="close">Keep it</button></div>`);
   }
   const stakes = BACK_STAKES.filter(n => n <= meta.echoes), st = stakes.includes(ui.backStake) ? ui.backStake : stakes[stakes.length > 1 ? 1 : 0];
   const head = `<div class="row3">${stakes.map(n => `<button class="btn small ${n === st ? 'primary' : 'ghost'}" data-act="back-stake" data-n="${n}">${n} Echoes</button>`).join('')}</div>`;
-  const list = Object.entries(BACK_GOALS).map(([k, G]) => `<button class="choice" data-act="back-place" data-k="${k}" data-n="${st}"><div class="sr-h"><span class="sr-name">${esc(G.name)}</span><span class="price">Pays ${st * G.mul}</span></div><div class="sr-desc">${esc(G.desc)} Odds ×${G.mul}.</div></button>`).join('');
+  const list = Object.entries(BACK_GOALS).map(([k, G]) => `<button class="choice" data-act="back-place" data-k="${k}" data-n="${st}"><div class="sr-h"><span class="sr-name">${esc(G.name)}</span><span class="price">Pays ${Math.round(st * G.mul)}</span></div><div class="sr-desc">${esc(G.desc)} Odds ×${G.mul}.</div></button>`).join('');
   return sheetWrap('[Back yourself]', `<p class="sh-p">[The House takes bets on Entrants. Including from the Entrant. Stake Echoes on how far your next world gets.] You have <b>${meta.echoes}</b> Echoes.</p>${head}${list}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function canSteer() { return !ui.daily && meta.echoes >= STEER_COST && ui.worlds && ui.worlds.length > 0; }
@@ -2170,7 +2170,7 @@ const ownsStar = (id, st) => run && allPieces(run).some(p => p.id === id && p.st
 const COACH = [
   { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, a Patron god and Gifts. For practice I've filled it in.", wait: 'next' },
   { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks and cheat skills, bought with Gift Points. Weaker worlds give more points. Open the Gifts tab.', wait: 'aw-tab' },
-  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (15 Block at the start of every fight) and Catalyst (stronger reactions). Tap Awaken.", wait: 'aw-ok' },
+  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (Block at the start of every fight) and Catalyst (stronger reactions). Tap Awaken.", wait: 'aw-ok' },
   { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-skills' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
