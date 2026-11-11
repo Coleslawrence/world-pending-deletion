@@ -398,11 +398,12 @@ function worldBounty(worlds, rng) {
 function bountyOf(run, k) { return !!(run && run.world && run.world.bounty === k && !run.seed && !run.practice); }
 // Back yourself (an Echo sink): before a run, stake Echoes on how far it gets. Paid at the goal's odds when the run ends,
 // lost otherwise. Kept in meta.backing until a normal run starts (never Pending World or practice), then on run.backing.
+// Payouts set so good play about breaks even (playtest report N1, 11 Nov: at 2x/3x/4x it printed Echoes)
 const BACK_STAKES = [5, 10, 25];
 const BACK_GOALS = {
-  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 2 },
-  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 3 },
-  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 4 },
+  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 1.25 },
+  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 2 },
+  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 1.5 },
 };
 function placeBacking(meta, goal, stake) {
   if (meta.backing || !BACK_GOALS[goal] || !BACK_STAKES.includes(stake) || meta.echoes < stake) return false;
@@ -414,7 +415,7 @@ function settleBacking(run, meta, outcome) {
   const B = run.backing; if (!B || B.settled) return null;
   const G = BACK_GOALS[B.goal]; B.settled = true;
   B.met = G ? (B.goal === 'spared' ? outcome !== 'erased' : run.round >= G.round) : false;
-  B.paid = B.met ? B.stake * G.mul : 0; meta.echoes += B.paid;
+  B.paid = B.met ? Math.round(B.stake * G.mul) : 0; meta.echoes += B.paid;
   return B;
 }
 // Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built

@@ -1812,11 +1812,11 @@ function backingSheet() {
   const B = meta.backing;
   if (B && BACK_GOALS[B.goal]) {
     const G = BACK_GOALS[B.goal];
-    return sheetWrap('[Backing placed]', `<p class="sh-p">[You have backed yourself: ${esc(G.name)}. Stake ${B.stake} Echoes. Pays ${B.stake * G.mul} if you make it.]</p><p class="sh-p fine">It rides on your next world. Pending World and practice don't count.</p>`, `<div class="row2 even"><button class="btn" data-act="back-withdraw">Withdraw (${B.stake} back)</button><button class="btn primary" data-act="close">Keep it</button></div>`);
+    return sheetWrap('[Backing placed]', `<p class="sh-p">[You have backed yourself: ${esc(G.name)}. Stake ${B.stake} Echoes. Pays ${Math.round(B.stake * G.mul)} if you make it.]</p><p class="sh-p fine">It rides on your next world. Pending World and practice don't count.</p>`, `<div class="row2 even"><button class="btn" data-act="back-withdraw">Withdraw (${B.stake} back)</button><button class="btn primary" data-act="close">Keep it</button></div>`);
   }
   const stakes = BACK_STAKES.filter(n => n <= meta.echoes), st = stakes.includes(ui.backStake) ? ui.backStake : stakes[stakes.length > 1 ? 1 : 0];
   const head = `<div class="row3">${stakes.map(n => `<button class="btn small ${n === st ? 'primary' : 'ghost'}" data-act="back-stake" data-n="${n}">${n} Echoes</button>`).join('')}</div>`;
-  const list = Object.entries(BACK_GOALS).map(([k, G]) => `<button class="choice" data-act="back-place" data-k="${k}" data-n="${st}"><div class="sr-h"><span class="sr-name">${esc(G.name)}</span><span class="price">Pays ${st * G.mul}</span></div><div class="sr-desc">${esc(G.desc)} Odds ×${G.mul}.</div></button>`).join('');
+  const list = Object.entries(BACK_GOALS).map(([k, G]) => `<button class="choice" data-act="back-place" data-k="${k}" data-n="${st}"><div class="sr-h"><span class="sr-name">${esc(G.name)}</span><span class="price">Pays ${Math.round(st * G.mul)}</span></div><div class="sr-desc">${esc(G.desc)} Odds ×${G.mul}.</div></button>`).join('');
   return sheetWrap('[Back yourself]', `<p class="sh-p">[The House takes bets on Entrants. Including from the Entrant. Stake Echoes on how far your next world gets.] You have <b>${meta.echoes}</b> Echoes.</p>${head}${list}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function canSteer() { return !ui.daily && meta.echoes >= STEER_COST && ui.worlds && ui.worlds.length > 0; }
