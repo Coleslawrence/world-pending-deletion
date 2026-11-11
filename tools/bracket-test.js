@@ -41,7 +41,8 @@ for (let k = 0; k < 40; k++) {
   ok(B.rows.every(x => x.fights.every(f => typeof f.name === 'string' && typeof f.won === 'boolean')), 'fights carry a name and a result');
   ok(B.rows.filter(x => x.fights.length).every(x => x.state === 'done' || x.round === run.round), 'fought rounds are done');
   if (r.result === 'spared') ok(B.rows[7].fights.some(f => f.won), 'a spared run won its Final');
-  ok(B.rows.reduce((n, x) => n + x.fights.reduce((a, f) => a + f.hearts, 0), 0) <= 10 + 8, 'Hearts lost add up');
+  // A harder curve means more losses and more Hearts restored along the way (Sanctum, Spare Parts), so allow for those
+  ok(B.rows.reduce((n, x) => n + x.fights.reduce((a, f) => a + f.hearts, 0), 0) <= run.maxHearts + 16, 'Hearts lost add up');
 }
 // The Elite bracket follows the Final
 { let seen = 0; for (let k = 0; k < 40 && !seen; k++) { const meta = G.newMeta(); bot.playRun(meta, false, { snap: (at, run) => { if (run.elite && !seen) { seen = 1; const B = G.bracketMap(run); ok(B.elite.length === run.eliteBracket.length && B.elite[run.eliteIdx].state === 'now', 'Elite rows listed, the current one marked'); ok(B.rows.every(x => x.state === 'done'), 'all 8 rounds done in the Elite bracket'); } } }); } ok(seen, 'a bot reached the Elite bracket'); }

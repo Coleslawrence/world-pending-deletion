@@ -478,8 +478,8 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 42 moves |
-| big | a big hit, the one to Block or Stun | 18 moves |
+| strike | a plain hit | 40 moves |
+| big | a big hit, the one to Block or Stun | 20 moves |
 | guard | Block and nothing else | 28 moves |
 | setup | a status, buff or trick with little damage | 30 moves |
 | sustain | healing or draining | 8 moves |
