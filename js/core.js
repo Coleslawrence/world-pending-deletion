@@ -660,6 +660,7 @@ function registerGlitchGear(run) {
   if (!run) return;
   const ids = allPieces(run).map(p => p.id).concat(run.shop ? SHOP_KINDS.flatMap(k => (run.shop[k] || []).filter(Boolean).map(x => x.id)) : [], run.bonusSlot ? [run.bonusSlot.id] : []);
   if (run.phantom) ids.push(run.phantom.id);
+  (run.pending || []).forEach(p => (p.offers || []).forEach(o => o && o.id && ids.push(o.id))); // Spoils cards waiting on a reload
   ids.forEach(id => { if (typeof id === 'string' && id.startsWith('x_')) spliceGear(id); if (typeof id === 'string' && id.startsWith('u_')) unstableSkill(id); });
 }
 // MissingNo.: its passive is another (unglitched) gear piece's, rolled when it arrives and after every fight
