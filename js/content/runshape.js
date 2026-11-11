@@ -42,6 +42,11 @@ const CURSES = {
   garnished: { name: 'Garnished', say: 'your income is 4 gold lower', income: -4 },
   markup: { name: 'Marked Up', say: 'everything in the shop costs 1 gold more', priceUp: 1 },
   thin: { name: 'Thin Blood', say: 'your max HP is 20% lower', hpCut: 0.2 },
+  dim: { name: 'Dim Lamps', say: 'you heal 15% less after a win', healCut: 0.15 },
+  sticky: { name: 'Sticky Dice', say: 'shop rerolls cost 2 gold more', rerollUp: 2 },
+  loud: { name: 'Loud Crowd', say: 'monsters and rivals carry one more trait', traitUp: 1 },
 };
+// Which rounds the Unlisted Door can appear on: one pair per run between rounds 2 and 5, so it is not always rounds 3 and 5 (playtest, 11 Nov)
+const DOOR_SETS = [[2, 4], [3, 5], [2, 5]];
 // What a door pays when its curse lifts: sets of outcomes, each bigger than a normal reward
 const DOOR_PAYS = [{ piece: 'A' }, { heart: 1 }, { gold: 16 }, { experimental: 1 }, { rune: 2 }, { points: 2 }];

@@ -19,6 +19,13 @@ const ENEMIES = {
   grave_hound: { name: 'Grave Hound', style: 'Feeds on every bite, then goes for the throat', tier: 1, theme: 'reaper', rank: 'E', hp: 54, skills: [{ n: 'Bite', fx: { dmg: 7 } }, { n: 'Feed', fx: { dmg: 5, lifesteal: 1 } }, { n: 'Go for the Throat', fx: { dmg: 18 } }], script: [0, 1, 2] },
   thunder_ram: { name: 'Thunder Ram', style: 'Paws the ground, then charges', tier: 1, theme: 'storm', rank: 'E', hp: 58, skills: [{ n: 'Paw the Ground', fx: { block: 8 }, label: 'Lowering its head' }, { n: 'Thunder Charge', fx: { dmg: 21 } }, { n: 'Headbutt', fx: { dmg: 7 } }], script: [2, 0, 1] },
   sunken_knight: { name: 'Sunken Knight', style: 'Shells up, then drags you under', tier: 1, theme: ['zealot', 'bastion'], rank: 'E', hp: 56, skills: [{ n: 'Rusted Blade', fx: { dmg: 10 } }, { n: 'Barnacle Guard', fx: { block: 9 } }, { n: 'Drag Under', fx: { dmg: 5, blockDmg: 0.5 } }], script: [1, 0, 2, 0] },
+  // Qualifier monsters added 11 Nov (playtest): two more for each qualifier round, each teaching one thing
+  dust_jackal: { name: 'Dust Jackal', style: 'Circles you, then snaps when you stop to mend', tier: 1, theme: 'blade', rank: 'E', hp: 40, skills: [{ n: 'Snap', fx: { dmg: 7 } }, { n: 'Circle', fx: { block: 5 } }], script: [0, 1, 0] },
+  tin_squire: { name: 'Tin Squire', style: 'Practises its guard, then lunges', tier: 1, theme: 'bastion', rank: 'E', hp: 44, skills: [{ n: 'Raise Guard', fx: { block: 8 } }, { n: 'Lunge', fx: { dmg: 10 } }], script: [0, 1] },
+  mire_leech: { name: 'Mire Leech', style: 'Latches on with poison, then sinks out of reach', tier: 1, theme: 'venom', rank: 'E', hp: 46, skills: [{ n: 'Latch', fx: { dmg: 6, poison: 2 } }, { n: 'Sink', fx: { block: 7 } }], script: [0, 0, 1] },
+  storm_kite: { name: 'Storm Kite', style: 'Climbs high, then dives', tier: 1, theme: ['storm', 'arcanist'], rank: 'E', hp: 44, skills: [{ n: 'Climb', fx: { block: 6 }, label: 'Climbing' }, { n: 'Stoop', fx: { dmg: 18 } }, { n: 'Gust', fx: { dmg: 4, weaken: 1 } }], script: [2, 0, 1] },
+  bell_ringer: { name: 'The Bell Ringer', style: 'Rings once for a warning, twice for a hit', tier: 1, theme: 'jinx', rank: 'E', hp: 56, skills: [{ n: 'Toll', fx: { dmg: 9 } }, { n: 'Muffle', fx: { block: 9 } }, { n: 'Death Knell', fx: { dmg: 20 } }], script: [1, 0, 2] },
+  sharp_crow: { name: 'Card-Sharp Crow', style: 'Pecks, pilfers, then bets it all on a dive', tier: 1, theme: ['dicer', 'storm'], rank: 'E', hp: 54, skills: [{ n: 'Peck', fx: { dmg: 8 } }, { n: 'Pilfer', fx: { dmg: 4, weaken: 1 } }, { n: 'Lucky Dive', fx: { die: 1, dmg: 3, dmgPip: 2 } }], script: [0, 1, 2] },
   seraphine: { name: 'Seraphine Vale', style: 'Holy knight: Block, then Judgement', tier: 2, theme: ['zealot', 'bastion'], rank: 'B', rival: true, hp: 80, passives: { regen: 2 }, skills: [{ n: 'Shield of Faith', fx: { block: 14 } }, { n: 'Judgement', fx: { dmg: 19, blockDmg: 1 } }, { n: 'Mend', fx: { heal: 14 } }], script: [0, 1, 0, 1, 2] },
   grukk: { name: 'Grukk the Unbroken', style: 'Berserker: stronger below half HP', tier: 2, theme: 'reaper', rank: 'D', rival: true, hp: 62, enrage: 0.5, enrageMult: 1.5, skills: [{ n: 'Axe Swing', fx: { dmg: 9 } }, { n: 'Roar', fx: { empower: 2 } }, { n: 'Rampage', fx: { dmg: 6, hits: 3 } }], script: [0, 1, 0, 2] },
   lyss: { name: 'Lyss of the Thorn', style: 'Duelist: Poison and dodges', tier: 2, theme: 'venom', rank: 'B', rival: true, hp: 52, dodge: 0.05, skills: [{ n: 'Needle', fx: { dmg: 5, poison: 1 } }, { n: 'Thousand Needles', fx: { poison: 3, doublePoison: 1 } }, { n: 'Sidestep', fx: { evade: 1 } }], script: [0, 2, 0, 1] },
@@ -81,6 +88,12 @@ const REFLEXES = {
   grave_hound: { on: 'heal', use: 2, say: '[The Hound smells fresh blood. It goes for the throat early.]' },
   thunder_ram: { on: 'passive', use: 1, say: '[You stood still. The Ram takes that as a target.]' },
   sunken_knight: { on: 'block', use: 2, say: '[The Knight sees you shell up. It knows that trick.]' },
+  dust_jackal: { on: 'heal', move: { n: 'Hamstring', fx: { dmg: 5, weaken: 1 } }, say: '[You stopped to mend. The Jackal was waiting for that.]' },
+  tin_squire: { on: 'flurry', move: { n: 'Shield Bash', fx: { dmg: 6, weaken: 1 } }, say: '[The Squire has read about flurries. It bashes back.]' },
+  mire_leech: { on: 'status', move: { n: 'Bloat', fx: { poison: 5 } }, say: '[The Leech has taken in what you gave it. It gives it back.]' },
+  storm_kite: { on: 'block', move: { n: 'Crosswind', fx: { dmg: 5, pierce: 1 } }, say: '[Your guard is up. The wind goes round it.]' },
+  bell_ringer: { on: 'passive', use: 2, say: '[You went quiet. The Bell Ringer fills the silence.]' },
+  sharp_crow: { on: 'block', use: 2, say: '[The Crow sees your guard. It bets on the dive anyway.]' },
   seraphine: { on: 'status', move: { n: 'Lay on Hands', fx: { cleanse: 1, heal: 8 } }, say: '[Seraphine notices the stain. She prays it off.]' , also: { on: 'hurt', use: 2, say: '[Seraphine kneels. A prayer, mid-fight.]' } },
   grukk: { on: 'flurry', use: 1, say: '[Grukk felt every one of those. Grukk is delighted.]' , also: { on: 'hurt', use: 2, say: '[Grukk is bleeding. Grukk is happy.]' } },
   lyss: { on: 'block', use: 1, say: '[Lyss notes your guard. Poison does not mind it.]' , also: { on: 'hurt', use: 2, say: '[Lyss stops playing. She slips out of reach.]' } },
@@ -114,14 +127,14 @@ const SIDE_GOALS = {
   guard: { name: 'Crack the guard', text: 'Break its guard (the gold bar) once', can: (f, B) => !!B.breakMax, done: f => f.tally.breaks > 0 },
 };
 const SIDE_GOAL_GOLD = { 1: 3, 2: 4 };
-const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute', 'wisp', 'lucky_rat', 'hex_toad', 'acolyte', 'glyph_moth', 'briar_cub', 'grave_hound', 'thunder_ram', 'sunken_knight'];
+const MONSTERS = ['goblin', 'golem', 'drake', 'ghoul', 'imp', 'brute', 'wisp', 'lucky_rat', 'hex_toad', 'acolyte', 'glyph_moth', 'briar_cub', 'grave_hound', 'thunder_ram', 'sunken_knight', 'dust_jackal', 'tin_squire', 'mire_leech', 'storm_kite', 'bell_ringer', 'sharp_crow'];
 // The qualifier ladder: each qualifier round draws its two monsters from its own list, so each round has its own feel.
 // Round 1 the light ones, round 2 the ones that put a status on you, round 3 the heavy hitters. Every monster in MONSTERS
 // is in exactly one round.
 const MONSTER_ROUNDS = [
-  ['goblin', 'imp', 'wisp', 'lucky_rat', 'hex_toad'],
-  ['drake', 'ghoul', 'acolyte', 'glyph_moth', 'briar_cub'],
-  ['golem', 'brute', 'grave_hound', 'thunder_ram', 'sunken_knight'],
+  ['goblin', 'imp', 'wisp', 'lucky_rat', 'hex_toad', 'dust_jackal', 'tin_squire'],
+  ['drake', 'ghoul', 'acolyte', 'glyph_moth', 'briar_cub', 'mire_leech', 'storm_kite'],
+  ['golem', 'brute', 'grave_hound', 'thunder_ram', 'sunken_knight', 'bell_ringer', 'sharp_crow'],
 ];
 const RIVALS = ['seraphine', 'grukk', 'lyss', 'masked', 'kaito', 'calder', 'delphine', 'mott', 'ossian', 'wren', 'bram', 'sable', 'vey_twins', 'brook_pair'];
 // below: you're below them; level; above: you outrank them; grudge: you've beaten them before

@@ -927,10 +927,20 @@ function fightHTML() {
     <div class="col col-a"><section class="foe" id="foe">${crest(f.B.name, f.spec.hard && f.spec.kind !== 'erased' ? f.spec.kind + ' hard' : f.spec.kind, false, sig)}<div class="fo-r"><div class="fo-h"><span class="fo-name">${esc(f.B.name)}</span><span class="fo-hp" id="hpB"></span></div>
       <div class="bar foe-bar"><s id="lgB"></s><i id="hbB"></i><u id="gbB"></u><b id="bkB"></b></div><div class="bar brk-bar" title="Guard: wear it down to nothing and the opponent is Broken" aria-label="Guard bar"><i id="brB"></i><u id="gbR"></u></div><div class="chips" id="stB"></div></div>
       <div class="intent" id="intent"></div><div class="floats" id="flB"></div></section>
+    <section class="fkit" id="fkit" aria-label="Their kit"></section>
     <section class="log" id="log" aria-live="polite"></section></div><div class="col col-b">
     <section class="me" id="me"><div class="me-h"><span class="me-name">${crest(run.name, 'me tiny', false, { sigil: run.sigil, color: run.color })}${esc(shortName(run.name))}${run.path ? ' · ' + esc(ARCH[run.path].path) : ''}</span><span class="me-hp" id="hpA"></span></div>
       <div class="bar hp-bar"><s id="lgA"></s><i id="hbA"></i><u id="gbA"></u><b id="bkA"></b></div><div class="chips" id="stA"></div><div class="floats" id="flA"></div></section>
     <section class="skills c${run.slots}" id="skills"></section></div></main>`;
+}
+// Laptops: a side panel with the opponent's whole kit at this fight's numbers, so nothing needs a tap to read (playtest, 11 Nov)
+function fightKitHTML(f) {
+  const B = f.B, now = B.intent && B.intent.def && B.intent.def.name;
+  // each move's number as it would show if it were next: swap it in as the intent for a moment (the big-hit boost depends on it)
+  const row = s => { let t = ''; const keep = [B.intent, B.reflexNow]; try { if (s !== B.intent) { B.intent = s; B.reflexNow = null; } t = intentText(f, s, B).text; } catch (e) { t = describe(s.def, s.power); } finally { B.intent = keep[0]; B.reflexNow = keep[1]; } return `<li class="${s.def.name === now ? 'now' : ''}"><b>${esc(s.def.label || s.def.name)}</b><span>${esc(t)}</span></li>`; };
+  const T = !f.spec.snap && ENEMIES[f.spec.id];
+  const how = f.spec.snap ? 'They fight with a player\'s build.' : hasReflex(f.spec) ? 'Moves by chance, never one move three turns running.' : 'Moves in a fixed order.';
+  return `<h4 class="fk-h">Their kit</h4><ul class="fk-list">${(B.skills || []).map(row).join('')}</ul><p class="fk-how">${how}${T && T.phase ? ` Below ${Math.round(T.phase.at * 100)}% HP, they change how they fight.` : ''}</p>${traitsHTML(f.spec)}`;
 }
 function chipsHTML(X, f) {
   const c = [];
@@ -991,6 +1001,7 @@ function updateFight() {
     document.getElementById('bk' + k).style.width = Math.min(100, X.block / X.maxHp * 100) + '%';
     document.getElementById('st' + k).innerHTML = chipsHTML(X, f);
   });
+  const fk = document.getElementById('fkit'); if (fk && fk.offsetParent) fk.innerHTML = fightKitHTML(f);
   const br = document.getElementById('brB');
   if (br && f.B.breakMax) {
     const g = Math.max(0, 100 - f.B.brk / f.B.breakMax * 100), gr = document.getElementById('gbR');
@@ -1294,6 +1305,23 @@ function evResultSheet() {
     meter = `<div class="rollm${fresh ? ' go' : ''} ${R.roll.won ? 'won' : 'lost'}" style="--ch:${R.roll.ch}%;--land:${R.roll.land}%" role="img" aria-label="${R.roll.stat} check, ${R.roll.ch}% chance: ${R.roll.won ? 'success' : 'failed'}"><span class="rm-z"></span><span class="rm-n"></span><span class="rm-l">${R.roll.stat} ${R.roll.ch}%</span><span class="rm-s">${R.roll.won ? 'Success' : 'Failed'}</span></div>`;
   }
   return sheetWrap(R.title, `<p class="sh-p fine ev-you">You chose: ${esc(R.label)}</p>${meter}<div class="sysbox ev-out${wait}">${lines}</div>${chips ? `<div class="${wait.trim()}">${chips}</div>` : ''}`, '<button class="btn primary" data-act="close">Continue</button>', 'ev-res', true);
+}
+// ---------- Between rounds (Slaw, 11 Nov) ----------
+// Everything that waits after a fight (spoils, level-up, Rules review, the Unlisted door, runes, events, Gifts...) shows as
+// ONE page: a list of the round's steps, the ones settled with what you chose, the current one open, the rest to come.
+// Each step keeps its own choices and handlers; the page is the frame around them.
+const PEND_LABEL = { gift: 'Additional Gift', intake: 'Intake Interview', augment: 'Rules review', door: 'Unlisted door', spoils: 'Spoils', levelup: 'Level up', perk: 'Class advancement', rune: 'Rune', adv: 'Path evolution', evo: 'Evolution' };
+function pendLabel(p) { return p.type === 'event' ? (EVENTS[p.key] ? EVENTS[p.key].title : 'Event') : PEND_LABEL[p.type] || 'Notice'; }
+function betweenDone(p, choice) { if (!run) return; run.between = run.between || { done: [] }; run.between.done.push({ label: pendLabel(p), choice: (choice || 'Done').slice(0, 60) }); }
+function betweenPage(sh) {
+  if (!sh) return sh;
+  const done = (run.between && run.between.done) || [], all = done.length + run.pending.length;
+  if (all < 2) return sh; // a lone step stays a plain sheet
+  const cur = done.length + 1;
+  const steps = done.map(x => `<li class="bt-done"><span class="bt-k">✓ ${esc(x.label)}</span><span class="bt-c">${esc(x.choice)}</span></li>`).join('')
+    + run.pending.map((p, i) => `<li class="${i ? 'bt-next' : 'bt-cur'}"><span class="bt-k">${i ? '' : '▸ '}${esc(pendLabel(p))}</span></li>`).join('');
+  const strip = `<ol class="bt-steps" aria-label="Between rounds">${steps}</ol>`;
+  return sh.replace('<section class="sheet ', '<section class="sheet between ').replace(/<header class="sh-h"><h3>/, `<header class="sh-h"><div class="bt-eb">[Between rounds · ${cur} of ${all}]</div><h3>`).replace('<div class="sh-b">', `<div class="sh-b">${strip}`);
 }
 function pendingSheet() {
   const p = run.pending[0]; if (!p) return '';
@@ -1924,7 +1952,8 @@ function render() {
     const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, pages: pagesSheet, notes: notesSheet, quarters: quartersSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
-  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = pendingSheet(); statLinesNotice(); }
+  if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = betweenPage(pendingSheet()); statLinesNotice(); }
+  if (run && !run.pending.length && !(ui.sheet && ui.sheet.type === 'evresult')) delete run.between;
   if (!sh && ui.sheet && ui.sheet.type === 'practicedone') sh = practiceDoneSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'firsttime') sh = firstTimeSheet();
   if (!sh && ui.sheet && ui.sheet.type === 'notice') sh = noticeSheet();
@@ -2273,7 +2302,10 @@ onAct = function (el) {
   if (a === 'practice-tournament') { endPractice(true); return _onAct({ dataset: { act: 'new' } }); }
   if (a === 'new' && !meta.tutorialDone && !ui.practiceAsked) { ui.practiceAsked = true; ui.sheet = { type: 'firsttime' }; return render(); }
   const st = coachStep();
+  // The between-rounds page remembers what each step was settled with, so the page can show it as done
+  const p0 = run && run.pending && run.pending[0], lbl = p0 && el.innerText ? el.innerText.split('\n').map(x => x.trim()).filter(Boolean)[0] : '';
   _onAct(el);
+  if (p0 && run && run.pending && run.pending[0] !== p0 && !run.pending.includes(p0)) { betweenDone(p0, lbl); saveRun(); render(); }
   if (st && coachStep() === st && st.wait === a) { coachAdvance(); render(); }
 };
 
@@ -2699,7 +2731,7 @@ app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled || flying) return;
   if (!['use', 'buy', 'quick-buy'].includes(el.dataset.act)) sfx('tap');
   if (!REDUCED && el.classList.contains('choice') && FLY_ACTS.includes(el.dataset.act) && el.closest('.sheet')) {
-    flying = true; const act = { dataset: Object.assign({}, el.dataset) };
+    flying = true; const act = { dataset: Object.assign({}, el.dataset), innerText: el.innerText };
     el.closest('.sheet').querySelectorAll('.choice').forEach(c => c.classList.add(c === el ? 'chosen' : 'unchosen'));
     setTimeout(() => { flying = false; onAct(act); }, 330);
     return;
