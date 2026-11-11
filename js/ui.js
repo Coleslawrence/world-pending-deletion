@@ -714,7 +714,7 @@ function chooseHTML() {
   const fin = run.choices.length === 1;
   const q = run.quests.find(q => !QUESTS[q.id].hidden && !q.done && !q.failed), Q = q && QUESTS[q.id];
   const quest = Q ? `<button class="sr-q" data-act="sheet" data-s="stats"><span class="eyebrow">Quest</span><span class="sr-qt">${esc(Q.text)}</span>${Q.goal > 1 ? `<b>${q.prog}/${Q.goal}</b>` : ''}</button>` : '<span class="sr-q"></span>';
-  return `<main class="screen choose">${strip()}<div class="col col-a"><div class="status-row">${quest}${deskBtn()}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
+  return `<main class="screen choose">${strip()}${youRail()}<div class="col col-a"><div class="status-row">${quest}${deskBtn()}${noticeOf(run) ? `<button class="link bad ntc" data-act="sheet" data-s="notice" aria-label="Noticed: opponents ${noticePct(run)}% stronger. Tap for details">Noticed +${noticePct(run)}%</button>` : ''}<span class="st-inc">+${run.lastIncome || 0}g</span></div>${marksBtn()}</div><div class="col col-b">
    ${fin ? '<div class="sec-h"><span>[The Final Champion awaits]</span></div>' : ''}
     <div class="opps">${cards}</div>${wager}</div>
     <footer class="foot2"><button class="btn ${run.statPts ? 'glow' : ''}" data-act="sheet" data-s="stats">Stats${run.statPts ? ` <span class="badge">${run.statPts}</span>` : ''}</button><span class="foot-hint">${fin ? 'The Final Champion awaits' : ui.pick != null ? 'Face them, or tap another' : 'Tap an opponent to see them'}</span></footer></main>`;
@@ -775,7 +775,7 @@ function shopHTML() {
   // Loot can overfill the bench. It then squeezes into two rows so Fight stays on screen, and Fight waits until it's back to 8.
   const over = benchOver(), cols = over ? Math.ceil(run.bench.length / 2) : 4;
   const rc = rerollCost(run);
-  return `<main class="screen shop">${strip()}
+  return `<main class="screen shop">${strip()}${youRail()}
     <div class="col col-a">${archChips(counts)}
     <div class="shoptabs" role="tablist"><button class="stab ${tab === 'skill' ? 'on' : ''}" data-act="shop-tab" data-k="skill" role="tab">Skills ${tabBadge('skill')}</button><button class="stab ${tab === 'gear' ? 'on' : ''}" data-act="shop-tab" data-k="gear" role="tab">Gear ${tabBadge('gear')}</button><button class="btn small" data-act="reroll" ${run.gold < rc ? 'disabled' : ''}>Reroll ${tab === 'skill' ? 'skills' : 'gear'} · ${rc ? rc + 'g' : 'free'}</button></div>
     <div class="shopgrid">${items}</div>
@@ -803,7 +803,7 @@ function districtDesc(k) {
 function districtHTML() {
   const spec = currentSpec(run), done = run.stage !== 'district';
   const opts = (done ? (ui.distDone ? [ui.distDone] : []) : run.districts.filter(k => !distFull(k))).map(k => `<button class="opt ${done ? 'used' : ''}" data-act="district" data-k="${k}" ${done ? 'disabled' : ''}><span class="og">${DIST_GLYPH[k]}</span><span class="ot"><b>${DISTRICTS[k].name}</b><small>${done ? 'Done' : esc(districtDesc(k))}${k === 'infirmary' && !done ? ` (${n0(run.hp)}/${maxHp(run)} HP)` : ''}${k === 'sanctum' && !done ? ` (${run.hearts}/${run.maxHearts})` : ''}</small></span></button>`).join('');
-  return `<main class="screen district">${strip()}<div class="col col-a">
+  return `<main class="screen district">${strip()}${youRail()}<div class="col col-a">
     <section class="next">${specCrest(spec)}<div class="nx-r"><div class="nx-k">${run.elite ? 'Elite bracket' : 'Next match'} · ${KIND_LABEL[spec.kind]}${spec.grudge ? ' · Grudge' : ''}${spec.gate ? ' · Gatekeeper' : spec.hard ? ' · Hard' : ''}${rankTag(spec)}</div><div class="nx-name">${esc(specName(spec))}</div><div class="nx-style">${esc(styleOf(spec))}</div>${run.scouted || hasGift(run, 'appraisal') ? scoutLine(spec) : ''}${run.wagerOn && run.wager ? `<div class="nx-wager">Wager: ${esc(WAGERS[run.wager.key].text)}</div>` : ''}</div></section>
     </div><div class="col col-b"><div class="sec-h"><span>${done ? '[District visited]' : '[Visit one district]'}</span></div>
     <section class="inter">${opts}</section>
@@ -1458,6 +1458,18 @@ function resultSheet() {
 // A stat's Finesse and Resistance at n points, in short: "Break +12% · resists Weaken 12%"
 function faceTag(k, n) { const F = STAT_FACES[k]; return `${F.finesse.tag(n)} · resists ${RESIST_NAME[F.resist]} ${Math.round(Math.min(RESIST.max, RESIST.per * n) * 100)}%`; }
 // Progress through the levels: one is offered after every battle, up to LEVEL_MAX
+// Laptop and PC "desk" (app width 1000+): your file stays open on the left on the choose, district and shop screens,
+// so stats, skills, gear and Gifts are read without opening Stats. Hidden on phones by CSS.
+function youRail() {
+  const s = effStats(run), P = buildPlayer(run), shop = ui.screen === 'shop';
+  const stats = STATS.map(k => `<div class="yr-s"><span>${k}</span><b>${s[k]}</b></div>`).join('');
+  const skills = shop ? '' : `<div class="yr-h">Skill bar</div><ul class="yr-l">${run.bar.map((p, i) => p ? `<li class="${mainTag(p.id)}"><button data-act="own" data-u="${p.u}"><b>${esc(modName(p.id, p.mods))}${p.star > 1 ? ' ' + '★'.repeat(p.star) : ''}</b><small>${esc(shortFx(p.id, p.mods))}</small></button></li>` : `<li class="empty"><small>Skill ${i + 1}: empty</small></li>`).join('')}</ul>`;
+  const gear = GEAR_SLOTS.map(sl => { const g = run.gear[sl]; return g ? `<li class="${mainTag(g.id)}"><button data-act="own" data-u="${g.u}"><b>${esc(pieceDef(g.id).name)}${g.star > 1 ? ' ' + '★'.repeat(g.star) : ''}</b><small>${esc(gearText(g.id, g.star))}</small></button></li>` : `<li class="empty"><small>${sl}: empty</small></li>`; }).join('');
+  const gifts = run.gifts.length ? `<div class="yr-h">Gifts</div><ul class="yr-g">${run.gifts.map(k => `<li title="${esc(GIFTS[k].desc)}">${esc(GIFTS[k].name)}</li>`).join('')}</ul>` : '';
+  return `<aside class="you" aria-label="Your file"><button class="yr-top" data-act="sheet" data-s="stats"><span class="eyebrow">[Your file]</span>${run.statPts ? `<span class="badge">${run.statPts}</span>` : '<span class="fine">Stats ›</span>'}</button>
+    <div class="yr-stats">${stats}</div><dl class="yr-d"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(P.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(P.dodge * 100)}%</dd></div></dl>
+    ${skills}<div class="yr-h">Gear</div><ul class="yr-l">${gear}</ul>${gifts}</aside>`;
+}
 function lvFill() { return Math.round((run.level - 1) / (LEVEL_MAX - 1) * 100); }
 // A collapsed section of a sheet: the heading is the tap target
 function sec(title, html, open) { return `<details class="ssec"${open ? ' open' : ''}><summary>${title}</summary><div class="ssec-b">${html}</div></details>`; }
@@ -2750,6 +2762,8 @@ document.addEventListener('keydown', e => {
   const tgt = e.target, typing = tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable);
   if (e.key === 'Escape' && ui.sheet && !['result', 'evresult', 'note', 'savepick'].includes(ui.sheet.type)) { ui.sheet = null; render(); return; }
   if (typing) return;
+  // Tab stays inside an open sheet, as in any dialog
+  if (e.key === 'Tab') { const sh = app.querySelector('.sheet'); if (sh) { const f = [...sh.querySelectorAll('button:not(:disabled), [tabindex="0"], summary, input, textarea, a[href]')].filter(x => x.offsetParent); if (f.length && (!sh.contains(tgt) || tgt === f[e.shiftKey ? 0 : f.length - 1])) { e.preventDefault(); f[e.shiftKey ? f.length - 1 : 0].focus(); } } return; }
   if ((e.key === 'Enter' || e.key === ' ') && tgt && tgt.matches && tgt.matches('div[role="button"][data-act]')) { e.preventDefault(); tgt.click(); return; }
   const sheet = app.querySelector('.sheet');
   if (ui.screen === 'fight' && !sheet) { if (/^[1-6]$/.test(e.key)) { const n = +e.key; const i = n === run.slots + 1 ? 0 : n; onUse(i); } return; }
