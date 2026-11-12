@@ -614,10 +614,16 @@ function awFlaw(A) { return A.gifts.find(k => GIFTS[k] && GIFTS[k].cat === 'flaw
 function awShown(A, w) { const shown = sigShown(w, A.patron, !!awFlaw(A), Array.isArray(A.offer) ? A.offer : []); return shown.concat(A.gifts.filter(k => isSignature(k) && !shown.includes(k) && !Array.isArray(A.offer))); }
 // A Signature Gift that is no longer on show (the Flaw or Patron changed) is dropped
 function awTidy(A, w) { const shown = awShown(A, w); const gone = A.gifts.find(k => isSignature(k) && !shown.includes(k)); if (gone) { A.gifts = A.gifts.filter(k => k !== gone); toast(`[${GIFTS[gone].name} is no longer on offer. Choose again.]`, 'loss'); } }
+// "Works with": what a Gift combos with (GIFT_SYN). has(x) lights the ones the run already holds.
+function synHTML(k, has) {
+  const L = GIFT_SYN[k]; if (!L) return '';
+  return `<span class="gf-syn">Works with ${L.map(x => `<i class="${has && has(x) ? 'on' : ''}">${esc(ARCH[x] ? ARCH[x].name : GIFTS[x] ? GIFTS[x].name : x)}</i>`).join(' · ')}</span>`;
+}
+function runHas(run) { const c = runCounts(run); return x => ARCH[x] ? (c[x] || 0) > 0 || run.arch.includes(x) : hasGift(run, x); }
 function giftRow(k, a, fixed) {
   const g = GIFTS[k], on = a.gifts.includes(k);
   const tag = fixed ? '<span class="tagn">World</span>' : g.cat === 'flaw' ? `<span class="gcost neg">+${FLAW_GOLD} gold</span>` : `<span class="tagn">${GIFT_CATS[g.cat]}</span>`;
-  return `<${fixed ? 'div' : 'button'} class="gift ${on ? 'on' : ''}" ${fixed ? '' : `data-act="aw-gift" data-k="${k}"`}><span class="gf-h"><b>${esc(g.name)}</b>${tag}</span><span class="gf-d">${esc(g.desc)}${flavHTML(g.flavour)}</span></${fixed ? 'div' : 'button'}>`;
+  return `<${fixed ? 'div' : 'button'} class="gift ${on ? 'on' : ''}" ${fixed ? '' : `data-act="aw-gift" data-k="${k}"`}><span class="gf-h"><b>${esc(g.name)}</b>${tag}</span><span class="gf-d">${esc(g.desc)}${flavHTML(g.flavour)}</span>${g.cat === 'flaw' ? '' : synHTML(k, x => a.gifts.includes(x) || (ui.worlds && ui.worlds[ui.world] && WORLD_TYPES[ui.worlds[ui.world].type].home === x))}</${fixed ? 'div' : 'button'}>`;
 }
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
@@ -1338,7 +1344,7 @@ function pendingSheet() {
     return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, (E.crisis ? 'sys crisis' : E.chain ? 'sys' : '') + ' k-event');
   }
   if (p.type === 'gift') {
-    return sheetWrap(p.pick ? '[Gift issued]' : '[Additional Gift]', `<p class="sh-p">${p.pick ? '[The System issues Gifts as you earn them. Choose 1 for the rest of this run.]' : p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys k-gift');
+    return sheetWrap(p.pick ? '[Gift issued]' : '[Additional Gift]', `<p class="sh-p">${p.pick ? '[The System issues Gifts as you earn them. Choose 1 for the rest of this run.]' : p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div>${synHTML(k, runHas(run))}</button>`).join(''), false, 'sys k-gift');
   }
   if (p.type === 'rule') {
     const T = p.kind === 'precedent' ? PRECEDENTS : HOUSE_RULES;
@@ -1491,7 +1497,7 @@ function statsSheet() {
     <dl class="dl"><div><dt>Max HP</dt><dd>${maxHp(run)}</dd></div><div><dt>Crit</dt><dd>${Math.round(p.crit * 100)}%</dd></div><div><dt>Dodge</dt><dd>${Math.round(p.dodge * 100)}%</dd></div><div><dt>Level</dt><dd>${run.level}</dd></div></dl>
     ${sec('Stat milestones', `<ul class="msgs">${STATS.map(k => `<li class="${run.milestones[k] ? '' : 'unk'}"><b>${k} 10 · ${esc(MILESTONES[k].name)}</b>: ${esc(MILESTONES[k].desc)}${run.milestones[k] ? '' : ` <small>(${s[k]}/10)</small>`}</li>`).join('')}</ul>`)}${sec('Title', titleList())}${sec('System quests', questList(), true)}
     ${run.hiddenPath ? sec(`Hidden Path · ${esc(HIDDEN_PATHS[run.hiddenPath].name)}`, `<p class="sh-p">${esc(HIDDEN_PATHS[run.hiddenPath].desc)}</p>`) : ''}
-    ${sec('Gifts', `<ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>`)}
+    ${sec('Gifts', `<ul class="msgs">${run.gifts.map(k => `<li><b>${esc(GIFTS[k].name)}</b>: ${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}${synHTML(k, runHas(run))}${(k === 'rewind' && run.usedRewind) || (k === 'breath' && run.usedBreath) ? ' <small>(spent)</small>' : ''}</li>`).join('') || '<li class="unk">None</li>'}</ul>`)}
     ${sec(`World · ${esc(run.world.name)}`, `<p class="sh-p">${esc(WORLD_TYPES[run.world.type].name)}, rank ${WORLD_RANKS[run.world.rank]}.${layerSentences(run.world)} ${esc(MODIFIERS[run.world.mod].name)}: ${esc(MODIFIERS[run.world.mod].desc)}${FATES[run.world.fate] && (run.fateTrack || Object.values(FATES).some(F => F.crises)) ? ` Fate: ${fateState(run)}.` : ''}${run.ward ? ` Warded: ${run.ward} loss${run.ward > 1 ? 'es' : ''}.` : ''}</p>`)}
     ${sec('Sponsors', gods)}`;
   return sheetWrap(`${run.name} · Status`, body, `<button class="btn primary" data-act="close">Done</button>`);

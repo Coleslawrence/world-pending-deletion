@@ -2202,7 +2202,7 @@ function fighterSkills(barPieces, s0, P) {
   const out = [];
   // Unregistered: every stat counts as your highest for skill power (s0 stays for cooldown rules)
   const top = Math.max(...STATS.map(k => s0[k] || 0)) + (P.unregistered ? 2 : 0), s = P.unregistered ? Object.assign({}, s0, { STR: top, AGI: top, INT: top, VIT: top, LUK: top }) : s0;
-  const atk = P.swordSaint ? Object.assign({}, SKILLS.attack, { name: "Heaven's Edge", rank: 'S', fx: { dmg: 24, pierce: 1 } }) : SKILLS.attack;
+  const atk = P.swordSaint ? Object.assign({}, SKILLS.attack, { name: "Heaven's Edge", rank: 'S', fx: { dmg: 24, pierce: 1, bleed: 3 } }) : SKILLS.attack;
   out.push({ key: 'attack', def: atk, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
   barPieces.forEach((p, i) => {
     if (!p || !SKILLS[p.id]) return;
@@ -2477,7 +2477,7 @@ function newFight(run, rng) {
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'adminrights') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && (run.finalTip || (run.chains && run.chains.official === 'tip'))),
   };
   f.rule = run.chatRule || null; f.prec = [].concat(run.precedent || []); // Poll the Crowd, Standing Precedent (old runs hold a single id)
-  if (run.enforcer) { run.enforcer = false; B.maxHp = Math.round(B.maxHp * 1.25); B.hp = Math.round(B.hp * 1.25); B.P = Object.assign({}, B.P, { dmgPct: (B.P.dmgPct || 0) + 0.25 }); say(f, `[Open Tab: ${B.name} has come to collect. 25% stronger.]`, 'loss'); }
+  if (run.enforcer) { run.enforcer = false; f.collector = true; B.maxHp = Math.round(B.maxHp * 1.25); B.hp = Math.round(B.hp * 1.25); B.P = Object.assign({}, B.P, { dmgPct: (B.P.dmgPct || 0) + 0.25 }); say(f, `[Open Tab: ${B.name} has come to collect. 25% stronger.]`, 'loss'); }
   if (run.spirit && A.P.spiritGuide) f.spirit = run.spirit;
   if (A.P.insideJob) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power; B.rigged = B.skills.slice().sort((a, b) => mv(b) - mv(a))[0] || null; if (B.rigged) say(f, `[Rigged Bout: ${B.rigged.def.name} has been rigged, twice.]`, 'skill'); }
   [A, B].forEach(X => {
@@ -2563,12 +2563,12 @@ function hit(f, X, Y, raw, o = {}) {
   // Delay Engine (experimental): the hit is stored, to strike all at once later (startTurn)
   if (X.P.suspend && !o.released && !o.isThorns) { X.bank = (X.bank || 0) + d; ev(f, { k: 'miss', side: Y.side, text: 'Stored' }); return 0; }
   // Blast Plate (powerarmour): soaks hits before Block; when it breaks it blasts the attacker
-  if (Y.armour > 0 && !o.pierce && d > 0) { const a = Math.min(Y.armour, d); Y.armour -= a; d -= a; if (Y.armour <= 0) { say(f, `[Blast Plate breaks and blasts ${X.isPlayer ? 'you' : X.name} for ${Y.armourMax}.]`, Y.isPlayer ? 'skill' : 'loss'); hit(f, Y, X, Y.armourMax, { noDodge: 1, noCrit: 1, isThorns: true, src: 'Blast Plate' }); } }
+  if (Y.armour > 0 && !o.pierce && d > 0) { const a = Math.min(Y.armour, d); Y.armour -= a; d -= a; if (Y.armour <= 0) { const bl = Math.round((Y.armourMax + (Y.thorns || 0)) * (Y.P.thornMult || 1)); say(f, `[Blast Plate breaks and blasts ${X.isPlayer ? 'you' : X.name} for ${bl}.]`, Y.isPlayer ? 'skill' : 'loss'); hit(f, Y, X, bl, { noDodge: 1, noCrit: 1, isThorns: true, src: 'Blast Plate' }); } }
   let absorbed = 0;
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   let rest = d - absorbed;
   // Hometown Crowd: once per fight, someone from your world takes a big hit for you
-  if (Y.P.hometown && (Y.htUsed || 0) < 2 && !o.isThorns && rest >= Y.maxHp * Y.P.hometown) { Y.htUsed = (Y.htUsed || 0) + 1; say(f, `[Hometown Crowd: someone from your world takes the hit. ${rest} damage, gone.]`, 'class'); rest = 0; }
+  if (Y.P.hometown && (Y.htUsed || 0) < 2 && !o.isThorns && rest >= Y.maxHp * Y.P.hometown) { Y.htUsed = (Y.htUsed || 0) + 1; const hb = Math.round(rest / 2); say(f, `[Hometown Crowd: someone from your world takes the hit. ${rest} damage, gone. +${hb} Block.]`, 'class'); rest = 0; gainBlock(f, Y, hb); }
   if (absorbed > 0 && rest === 0 && Y.P.blockMisf && !o.isThorns) addMisfortune(f, X, Y.P.blockMisf); // Bad Landing
   if (absorbed > 0 && rest === 0 && Y.P.blockWeaken && !o.isThorns && X.hp > 0) X.weaken = Math.max(X.weaken, Y.P.blockWeaken); // Grounding Mail
   // Pain Link (experimental): every hit is split evenly between both fighters
@@ -2596,7 +2596,7 @@ function hit(f, X, Y, raw, o = {}) {
   return rest;
 }
 function checkRevive(f, X) {
-  if (X.hp <= 0 && X.double && !X.breath) { X.hp = Math.round(X.maxHp * 0.5); X.double = false; f.usedDouble = true; say(f, '[Second Self! Your other self steps in.]', 'class'); }
+  if (X.hp <= 0 && X.double && !X.breath) { X.hp = Math.round(X.maxHp * 0.5); X.double = false; f.usedDouble = true; X.empower = Math.max(X.empower || 0, 2); say(f, '[Second Self! Your other self steps in, Empowered.]', 'class'); }
   if (X.hp <= 0 && X.revive) { X.hp = Math.round(X.maxHp * X.revive); X.revive = 0; say(f, `[${X.name} rises again.]`, 'loss'); if (X.id && FOE_LINES[X.id] && FOE_LINES[X.id].rise) say(f, `"${FOE_LINES[X.id].rise}"`, 'foe'); ev(f, { k: 'revive', side: X.side }); }
   if (X.hp <= 0 && X.breath) { X.hp = 1; X.breath = false; f.usedBreath = true; say(f, '[Second Breath! You cling to life with 1 HP.]', 'class'); }
 }
@@ -2879,12 +2879,12 @@ function useSkill(f, X, s, opt) {
     if (!nx || !B.intent || nx === B.intent) { say(f, '[Swap: nothing to swap.]', 'skill'); return; }
     const cur = B.intent; B.intent = nx; if (B.hist && B.next != null) B.next = B.skills.indexOf(cur); B.interrupted = null;
     B.windup = !(B.stun > 0) && isBig(f, B) ? { need: Math.max(1, Math.round(B.maxHp * WINDUP.share)), got: 0 } : null;
-    say(f, `[Running Order: ${nx.def.name} now, ${cur.def.name} after.]`, 'class'); return;
+    B.weaken = Math.max(B.weaken, 1); say(f, `[Running Order: ${nx.def.name} now, ${cur.def.name} after. ${B.name} is Weakened.]`, 'class'); return;
   }
   if (def.fx.bait) { // Trash Talk
     const B = f.B; if (!B.intent || B.stun > 0) { say(f, '[Trash Talk: they are not listening.]', 'skill'); return; }
     B.intent = { key: 'baited', def: { id: 'baited', name: 'Baited Guard', fx: { block: 8 }, tags: [], cd: 0 }, power: B.intent.power, cd: 0 }; B.windup = null; B.interrupted = null;
-    say(f, `[Trash Talk lands. ${B.name} drops into a guard.]`, 'class'); return;
+    f.A.critNext = true; say(f, `[Trash Talk lands. ${B.name} drops into a guard. Your next hit is critical.]`, 'class'); return;
   }
   if (def.fx.copy) {
     const last = f.lastEnemySkill;
@@ -3227,7 +3227,7 @@ function planIntent(f, B, turnEnd) {
   planMove(f, B, turnEnd);
   B.windup = B.intent && !(B.stun > 0) && isBig(f, B) ? { need: Math.max(1, Math.round(B.maxHp * WINDUP.share)), got: 0 } : null;
   // Light Fingers: the first big hit they show, you steal a one-use copy of
-  const A = f.A; if (A && A.P.lightFingers && (f.stolen || 0) < 3 && B === f.B && B.intent && isBig(f, B)) { f.stolen = (f.stolen || 0) + 1; const d = B.intent.def; A.skills.push({ key: 'stolen' + f.stolen, def: Object.assign({}, d, { id: 'stolen', name: 'Stolen ' + (d.label || d.name), tags: [], cd: 0, cheat: true, oneUse: true, desc: 'One use: ' + describe(d, B.intent.power) }), power: B.intent.power, cd: 0, star: 1 }); say(f, `[Light Fingers: you lift ${d.label || d.name}. One use.]`, 'class'); }
+  const A = f.A; if (A && A.P.lightFingers && (f.stolen || 0) < 3 && B === f.B && B.intent && isBig(f, B)) { f.stolen = (f.stolen || 0) + 1; const d = B.intent.def; A.skills.push({ key: 'stolen' + f.stolen, def: Object.assign({}, d, { id: 'stolen', name: 'Stolen ' + (d.label || d.name), tags: [], cd: 0, quick: true, cheat: true, oneUse: true, desc: 'Quick. One use: ' + describe(d, B.intent.power) }), power: B.intent.power, cd: 0, star: 1 }); say(f, `[Light Fingers: you lift ${d.label || d.name}. One use.]`, 'class'); }
 }
 // Damage you deal on your own turn counts against a wind-up; enough of it and the move is wasted
 function hitWindup(f, X, Y, v) {
@@ -3525,7 +3525,7 @@ function resolveFight(run, f, meta, rng) {
   run.hp = Math.max(0, Math.min(f.A.hp, maxHp(run)));
   if (f.usedDouble) run.usedDouble = (+run.usedDouble || 0) + 1; // Second Self: twice per run
   run.chatRule = null;
-  if (won && f.B.skills && f.B.skills.length && !spec.snap) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power, best = f.B.skills.slice().sort((a, b) => mv(b) - mv(a))[0]; if (mv(best) > 0) run.spirit = { name: f.B.name, def: best.def, power: best.power }; }
+  if (won && f.B.skills && f.B.skills.length && !spec.snap) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power, best = f.B.skills.slice().sort((a, b) => mv(b) - mv(a))[0]; if (mv(best) > 0) run.spirit = { name: f.B.name, def: best.def, power: best.power * (spec.hard || spec.gate ? 1.5 : 1) }; } // Haunted: hard opponents haunt harder
   if (f.usedBreath) run.usedBreath = true;
   // Glitches settled by the fight: Overflow carries into the next one only after a win; [REDACTED] prefixes used are disclosed
   run.overflow = won && f.overflowOut ? f.overflowOut : 0;
@@ -3584,7 +3584,7 @@ function resolveFight(run, f, meta, rng) {
   if (spec.kind === 'trial') res.trial = settleTrial(run, f, won, meta, msgs, lr);
   if (won) {
     run.wins++;
-    res.gold = noWinGold ? 0 : 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 8 : 0); if (f.terms) res.gold = Math.ceil(res.gold / 2); run.gold += res.gold;
+    res.gold = noWinGold ? 0 : 2 + (spec.kind === 'final' ? 0 : 3) + (spec.hard && hasGift(run, 'treasure') ? 8 : 0) + (f.collector ? 10 : 0); // Open Tab: beat the collector, keep their purse if (f.terms) res.gold = Math.ceil(res.gold / 2); run.gold += res.gold;
     if (f.goal && SIDE_GOALS[f.goal.key].done(f)) { run.gold += f.goal.gold; res.gold += f.goal.gold; res.goal = f.goal.key; run.goalsMet = (run.goalsMet || 0) + 1; msgs.push({ t: 'favour', text: `[Side goal met: ${SIDE_GOALS[f.goal.key].text}. +${f.goal.gold} gold.]` }); }
     const healF = Math.max(0.05, (run.world.mod === 'famine' ? 0.15 : 0.3) - amendOf(run).healCut);
     run.hp = Math.min(maxHp(run), run.hp + Math.round(maxHp(run) * healF) + (hasPerk(run, 'dressing') ? 6 : 0));
@@ -3966,7 +3966,7 @@ if (typeof module !== 'undefined') module.exports = {
   forecast, cloneFight,
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, SIG_CATS, SMALL_CATS, SIG_BASE, SIG_MAX, FLAW_SIGS, FLAW_GOLD, SYS_GOLD, isSignature, sigCount, sigShown, flawsAllowed, giftGold, giftsAllowed, giftCheck, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, GIFT_SYN, SIGILS, SIGIL_COLS, SIG_CATS, SMALL_CATS, SIG_BASE, SIG_MAX, FLAW_SIGS, FLAW_GOLD, SYS_GOLD, isSignature, sigCount, sigShown, flawsAllowed, giftGold, giftsAllowed, giftCheck, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, ARCH_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,

@@ -21,24 +21,24 @@ const GIFTS = {
   monarch: { name: "Monarch's Domain", cat: 'cheat', cost: 6, desc: 'Every archetype you have counts 2 extra pieces.', flavour: "[Authority recognised. Your pieces answer to you first.]" },
   rewind: { name: 'Return by Death', cat: 'retired', cost: 6, desc: 'Once per run, a loss rewinds to the start of that fight.', flavour: "[Death recorded. Death reversed. Record amended.]" },
   copycat: { name: 'Copycat', cat: 'retired', cost: 5, desc: "Once per fight, use the opponent's last move as your own.", p: { copycat: 1 }, flavour: "You learn every trick by watching it once." },
-  swordsaint: { name: 'Sword Saint', cat: 'cheat', cost: 5, desc: "Your basic Attack becomes Heaven's Edge: S-rank, 24 damage, and it ignores Block.", lock: 'giant_slayer', p: { swordSaint: 1 }, flavour: "One swing, practised until it stopped being a swing." },
+  swordsaint: { name: 'Sword Saint', cat: 'cheat', cost: 5, desc: "Your basic Attack becomes Heaven's Edge: S-rank, 24 damage, 3 Bleed, and it ignores Block.", lock: 'giant_slayer', p: { swordSaint: 1 }, flavour: "One swing, practised until it stopped being a swing." },
   // Signature Gifts from the class ideas (12 Nov). Light Fingers, Running Order (adminrights) and Second Self (bodydouble) replace Copycat,
   // Absolute Appraisal and Return by Death.
-  lightfingers: { name: 'Light Fingers', cat: 'cheat', cost: 5, lock: 'mirror_breaker', desc: 'Each big hit an opponent shows, you steal: a one-use copy joins your skills. Up to 3 each fight.', p: { lightFingers: 1 }, flavour: "You learn every trick by watching it once. Then you take it." },
-  fivefinger: { name: 'Open Tab', cat: 'cheat', cost: 4, desc: 'The first 2 pieces you buy each round are free. Every fourth free piece, your next opponent is 25% stronger.', flavour: '[Tab opened. Settlement: later. Collection: also later.]' },
-  hometown: { name: 'Hometown Crowd', cat: 'cheat', cost: 4, desc: 'Twice per fight, a hit that would take 20% of your max HP or more is taken by someone from your world instead.', p: { hometown: 0.2 }, flavour: "Your world sent a crowd. Some of them came to fight." },
-  spiritguide: { name: 'Haunted', cat: 'cheat', cost: 4, desc: 'Every third turn, the last opponent you beat uses its strongest move for you.', p: { spiritGuide: 1 }, flavour: "[Defeated Entrants are archived. Some refuse to stay filed.]" },
-  adminrights: { name: 'Running Order', cat: 'cheat', cost: 5, desc: "See the opponent's next 2 moves. Every 3 turns, swap them (Quick).", p: { adminSwap: 1 }, flavour: '[Running order amended. The broadcast will proceed as listed.]' },
+  lightfingers: { name: 'Light Fingers', cat: 'cheat', cost: 5, lock: 'mirror_breaker', desc: 'Each big hit an opponent shows, you steal: a one-use Quick copy joins your skills. Up to 3 each fight.', p: { lightFingers: 1 }, flavour: "You learn every trick by watching it once. Then you take it." },
+  fivefinger: { name: 'Open Tab', cat: 'cheat', cost: 4, desc: 'The first 2 pieces you buy each round are free. Every fourth free piece, your next opponent is a collector, 25% stronger: beat them for +10 gold.', flavour: '[Tab opened. Settlement: later. Collection: also later.]' },
+  hometown: { name: 'Hometown Crowd', cat: 'cheat', cost: 4, desc: 'Twice per fight, a hit that would take 20% of your max HP or more is taken by someone from your world instead. You gain half of it as Block.', p: { hometown: 0.2 }, flavour: "Your world sent a crowd. Some of them came to fight." },
+  spiritguide: { name: 'Haunted', cat: 'cheat', cost: 4, desc: 'Every third turn, the last opponent you beat uses its strongest move for you, 50% stronger if it was a hard opponent.', p: { spiritGuide: 1 }, flavour: "[Defeated Entrants are archived. Some refuse to stay filed.]" },
+  adminrights: { name: 'Running Order', cat: 'cheat', cost: 5, desc: "See the opponent's next 2 moves. Every 3 turns, swap them (Quick) and Weaken the opponent.", p: { adminSwap: 1 }, flavour: '[Running order amended. The broadcast will proceed as listed.]' },
   unregistered: { name: 'Unregistered', cat: 'cheat', cost: 6, desc: 'Every skill draws power from your highest stat +2, whatever its archetype.', p: { unregistered: 1 }, flavour: "[Entrant not found in the registry. Rules applied: none.]" },
   encore: { name: 'Encore', cat: 'cheat', cost: 4, desc: 'After two different skills in a row, your next skill plays twice.', p: { encore: 1 }, flavour: "The crowd wants it again. Give it to them." },
   chatdecides: { name: 'Poll the Crowd', cat: 'cheat', cost: 3, desc: 'Before each fight, choose 1 of 3 house rules that only help you, such as Bloodbath (+30% damage).', flavour: "[Audience participation enabled. The System regrets this already.]" },
-  powerarmour: { name: 'Blast Plate', cat: 'cheat', cost: 4, desc: 'Start each fight with armour worth 40% of your max HP. When it breaks, it blasts the opponent for that much.', p: { powerArmour: 0.4 }, flavour: 'Plate packed with something that hates being hit.' },
+  powerarmour: { name: 'Blast Plate', cat: 'cheat', cost: 4, desc: 'Start each fight with armour worth 40% of your max HP. When it breaks, it blasts the opponent like Thorns: your Thorns add to it.', p: { powerArmour: 0.4 }, flavour: 'Plate packed with something that hates being hit.' },
   growthspurt: { name: 'Growth Spurt', cat: 'cheat', cost: 4, desc: 'Each turn of a fight, gain 6 max HP and 6% damage, up to 8 times.', p: { growth: 6 }, flavour: "Every fight, you get a little bigger. Nobody can say how." },
   silvertongue: { name: 'Silver Tongue', cat: 'cheat', cost: 4, desc: 'Break an opponent below 60% HP and they yield: you win. Not against Final Champions.', p: { silverTongue: 1 }, flavour: "Every fight is a negotiation. Most end early." },
   precedent: { name: 'Standing Precedent', cat: 'cheat', cost: 4, desc: 'After your opening draft, file 2 of 3 rules that bind every opponent this run, such as No Healing.', flavour: "[Motion filed. Motion granted. The System is not sure how.]" },
-  bodydouble: { name: 'Second Self', cat: 'cheat', cost: 5, desc: 'Twice per run, when you would lose a fight, your other self steps in at 50% HP and the fight goes on.', flavour: "[Two entrants share one record. Clerical error. Unresolved.]" },
+  bodydouble: { name: 'Second Self', cat: 'cheat', cost: 5, desc: 'Twice per run, when you would lose a fight, your other self steps in at 50% HP, Empowered for 2 turns.', flavour: "[Two entrants share one record. Clerical error. Unresolved.]" },
   dejavu: { name: 'Instant Replay', cat: 'cheat', cost: 4, desc: 'Each turn, the skill you used two turns ago plays again at 50% power.', p: { dejaVu: 0.5 }, flavour: '[Replay requested. Replay granted. Replay granted.]' },
-  trashtalk: { name: 'Trash Talk', cat: 'cheat', cost: 3, desc: 'Every 3 turns (Quick), bait the opponent: its shown move becomes a guard.', p: { trashTalk: 1 }, flavour: "Say the right thing and they forget to swing." },
+  trashtalk: { name: 'Trash Talk', cat: 'cheat', cost: 3, desc: 'Every 3 turns (Quick), bait the opponent: its shown move becomes a guard, and your next hit is critical.', p: { trashTalk: 1 }, flavour: "Say the right thing and they forget to swing." },
   insidejob: { name: 'Rigged Bout', cat: 'cheat', cost: 4, desc: "Each opponent's strongest move is rigged: the first 2 times they use it, it fails and they are Weakened.", p: { insideJob: 1 }, flavour: 'Someone in the arena crew owes you a favour. Two, actually.' },
   gacha: { name: 'Lucky Draw', cat: 'fortune', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo', flavour: "[Random allocation adjusted in your favour. The System denies this.]" },
   fastlearner: { name: 'Fast Learner', cat: 'growth', cost: 3, desc: 'Stat points cost half (rounded up).', flavour: "You learn in a week what takes others a season." },
@@ -83,4 +83,24 @@ const GIFTS = {
 };
 // Affinity Gifts are only offered as the Additional Gift: +1 piece to one archetype.
 Object.keys(ARCH).forEach(k => { GIFTS['aff_' + k] = { name: `${ARCH[k].name} Affinity`, cat: 'extra', cost: 0, desc: `Your ${ARCH[k].name} bonuses count 1 extra piece.`, flavour: ARCH[k].line, arch: k }; });
+// What each Gift works with (12 Nov, Slaw: "mtg / Oaken Tower" synergies). Each entry is an archetype or another Gift.
+// Shown as "Works with" on every Gift; the ones your run already has are lit, so a pick can build on what you hold.
+const GIFT_SYN = {
+  tidecaller: ['zealot', 'vampire', 'growthspurt'], deserter: ['bastion', 'hometown', 'lastwords'], warden: ['venom', 'dejavu', 'chatdecides'],
+  hedgewitch: ['blade', 'swordsaint', 'elf'], prodigy: ['arcanist', 'encore', 'monarch'], runesmith: ['bastion', 'fivefinger', 'merger'],
+  nearmiss: ['blade', 'elf', 'glass'], loadeddice: ['dicer', 'bornlucky', 'bond_house'], lightningrod: ['storm', 'silvertongue', 'bond_war'],
+  monarch: ['unregistered', 'fivefinger', 'prodigy'], swordsaint: ['blade', 'hedgewitch', 'firststrike'], lightfingers: ['arcanist', 'encore', 'manaaffinity'],
+  fivefinger: ['merger', 'runesmith', 'treasure', 'golden'], hometown: ['bastion', 'deserter', 'glass', 'lastwords'], spiritguide: ['reaper', 'treasure', 'fivefinger'],
+  adminrights: ['storm', 'venom', 'insidejob', 'trashtalk'], unregistered: ['monarch', 'fastlearner', 'bornlucky'], encore: ['arcanist', 'prodigy', 'lightfingers', 'firststrike'],
+  chatdecides: ['pyre', 'venom', 'blade', 'bastion'], powerarmour: ['bastion', 'dragon', 'thickskin'], growthspurt: ['zealot', 'bastion', 'chatdecides'],
+  silvertongue: ['storm', 'lightningrod', 'bond_war'], precedent: ['zealot', 'venom', 'pyre'], bodydouble: ['reaper', 'berserker', 'bond_ruin', 'lastwords'],
+  dejavu: ['pyre', 'venom', 'jinx', 'encore'], trashtalk: ['blade', 'lucky', 'bond_crow', 'adminrights'], insidejob: ['storm', 'venom', 'adminrights'],
+  gacha: ['fivefinger', 'merger', 'haggler'], fastlearner: ['unregistered', 'bornlucky'], merger: ['fivefinger', 'runesmith', 'monarch'], affinity: ['haggler', 'merger'],
+  catalyst: ['pyre', 'venom', 'dragon'], berserker: ['reaper', 'bodydouble', 'bond_ruin'], glass: ['hometown', 'nearmiss', 'vampire'], firststrike: ['encore', 'swordsaint', 'storm'],
+  thickskin: ['bastion', 'deserter', 'powerarmour'], vampire: ['reaper', 'zealot', 'tidecaller'], manaaffinity: ['arcanist', 'lightfingers', 'adminrights', 'trashtalk'],
+  bornlucky: ['dicer', 'jinx', 'loadeddice'], lucky: ['blade', 'trashtalk', 'bond_crow'], golden: ['fivefinger', 'treasure', 'gambler'], breath: ['berserker', 'bodydouble', 'lastwords'],
+  gambler: ['bond_house', 'golden'], haggler: ['affinity', 'gacha'], treasure: ['spiritguide', 'fivefinger', 'golden'],
+  ironwill: ['glass', 'bodydouble'], dragon: ['catalyst', 'pyre', 'powerarmour'], elf: ['blade', 'nearmiss', 'hedgewitch'], demon: ['reaper', 'berserker'], lastwords: ['bastion', 'hometown', 'bodydouble'],
+  bond_war: ['storm', 'silvertongue', 'lightningrod'], bond_trick: ['pyre', 'venom', 'blade'], bond_ruin: ['pyre', 'berserker', 'bodydouble'], bond_house: ['dicer', 'gambler', 'golden'], bond_crow: ['blade', 'lucky', 'trashtalk'],
+};
 const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw', retired: 'Retired' };
