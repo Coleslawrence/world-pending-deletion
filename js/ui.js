@@ -1314,7 +1314,7 @@ function evResultSheet() {
 // Everything that waits after a fight (spoils, level-up, Rules review, the Unlisted door, runes, events, Gifts...) shows as
 // ONE page: a list of the round's steps, the ones settled with what you chose, the current one open, the rest to come.
 // Each step keeps its own choices and handlers; the page is the frame around them.
-const PEND_LABEL = { gift: 'Additional Gift', intake: 'Intake Interview', augment: 'Rules review', door: 'Unlisted door', spoils: 'Spoils', levelup: 'Level up', perk: 'Class advancement', rune: 'Rune', adv: 'Path evolution', evo: 'Evolution' };
+const PEND_LABEL = { rule: 'House rule', gift: 'Additional Gift', intake: 'Intake Interview', augment: 'Rules review', door: 'Unlisted door', spoils: 'Spoils', levelup: 'Level up', perk: 'Class advancement', rune: 'Rune', adv: 'Path evolution', evo: 'Evolution' };
 function pendLabel(p) { return p.type === 'event' ? (EVENTS[p.key] ? EVENTS[p.key].title : 'Event') : p.type === 'gift' && p.pick ? 'Gift' : PEND_LABEL[p.type] || 'Notice'; }
 function betweenDone(p, choice) { if (!run) return; if (run.guide && p) (run.guideSeen = run.guideSeen || {})[p.type] = 1; run.between = run.between || { done: [] }; run.between.done.push({ label: pendLabel(p), choice: (choice || 'Done').slice(0, 60) }); }
 function betweenPage(sh) {
@@ -1339,6 +1339,11 @@ function pendingSheet() {
   }
   if (p.type === 'gift') {
     return sheetWrap(p.pick ? '[Gift issued]' : '[Additional Gift]', `<p class="sh-p">${p.pick ? '[The System issues Gifts as you earn them. Choose 1 for the rest of this run.]' : p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys k-gift');
+  }
+  if (p.type === 'rule') {
+    const T = p.kind === 'precedent' ? PRECEDENTS : HOUSE_RULES;
+    const lead = p.kind === 'precedent' ? '[Standing Precedent. File 1 rule. It binds every opponent for the rest of this run.]' : '[Chat Decides. The audience has nominated two house rules for your next fight. Choose 1. It binds both fighters.]';
+    return sheetWrap(p.kind === 'precedent' ? '[Standing Precedent]' : '[Chat Decides]', `<p class="sh-p">${lead}</p>` + p.offers.map((k, i) => `<button class="choice" data-act="take-rule" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(T[k].name)}</span></div><div class="sr-desc">${esc(T[k].say)}</div></button>`).join(''), false, 'sys', true);
   }
   if (p.type === 'intake') {
     const body = p.offers.map((k, i) => { const D = INTAKE[k]; return D ? `<button class="choice ${D.cost ? 'chk' : ''}" data-act="take-intake" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(D.name)}</span><span class="tagn">${D.cost ? 'At a price' : 'Plain'}</span></div><div class="sr-desc">${esc(D.say)}${flavHTML(D.flavour)}</div></button>` : ''; }).join('');
@@ -1520,7 +1525,7 @@ function scoutSheet() {
   if (districtUp(run, 'scout')) body += `<p class="sh-p sysl">[AGI ${STAT_EASY}] [While you were looking, you loosened a strap on their armour. They start the fight Weakened.]</p>`;
   return sheetWrap('Scout report', body, `<button class="btn primary" data-act="close">Done</button>`);
 }
-function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
+function skillInfoSheet() { const s = ui.fight.A.skills[ui.sheet.i]; if (s.def.cheat && s.def.desc) return sheetWrap(s.def.name, `<p class="sh-p">${esc(s.def.desc)}</p>`, `<button class="btn primary" data-act="close">Close</button>`); if (s.key === 'copycat') return sheetWrap('Copycat', `<p class="sh-p">${esc(GIFTS.copycat.desc)}</p><p class="sh-p fine">${ui.fight.lastEnemySkill ? 'Next copy: ' + esc(ui.fight.lastEnemySkill.def.name) : 'The opponent has not acted yet.'}</p>`, `<button class="btn primary" data-act="close">Close</button>`); return sheetWrap(s.def.name, (s.def.basic ? `<div class="srow"><div class="sr-desc">${esc(describe(s.def, s.power))}</div></div>` : pieceBody(run.bar.find(p => p && p.u === s.u).id, s.star, s.mods, s.power)) + '<p class="sh-p fine">Numbers include your stats and stars. Turn off ? to use skills.</p>', `<button class="btn primary" data-act="close">Close</button>`); }
 // Shown in the Menu so a layout report can include what the device told the game
 function screenLine() { const s = screenInfo(); return `[Display: ${innerWidth}×${s.vh} of ${s.sh} · insets ${Math.round(s.top)}/${Math.round(s.bottom)}${s.standalone ? ' · app' : ''}${document.documentElement.style.getPropertyValue('--app-h') ? ' · stretched' : ''}]`; }
 function menuSheet() {
@@ -2181,6 +2186,7 @@ function onAct(el) {
     }
     case 'take-perk': { choosePerk(run, meta, d.k, msgs); saveMeta(); pushMsgs(msgs, false, `Perk: ${PERKS[d.k].name}`); saveRun(); return render(); }
     case 'take-level': { takeLevel(run, d.k, msgs); pushMsgs(msgs, false, d.k === 'perk' ? 'Perk instead of a level' : `Level ${run.level}`); saveRun(); return render(); }
+    case 'take-rule': { if (!takeRule(run, d.i, msgs)) return render(); pushMsgs(msgs, false, 'Rule filed'); saveRun(); return render(); }
     case 'take-intake': { const P = run.pending.find(x => x.type === 'intake'), D = P && INTAKE[P.offers[+d.i]]; if (!takeIntake(run, d.i, msgs)) return render(); pushMsgs(msgs, false, `Intake: ${D.name}`); saveRun(); return render(); }
     case 'take-augment': { if (!takeAugment(run, d.i, msgs)) return render(); pushMsgs(msgs, false, 'Rules review'); saveRun(); return render(); }
     case 'take-door': { if (!takeDoor(run, d.i === 'open', msgs)) return render(); pushMsgs(msgs, false, d.i === 'open' ? 'Opened the door' : 'Walked past the door'); saveRun(); return render(); }
@@ -2780,7 +2786,7 @@ function climbFx(from, to) {
   setTimeout(done, 1900); document.addEventListener('pointerdown', done, true);
 }
 // G3: a reward you pick grows and flies up to the top bar while the others shrink away, then the choice happens
-const FLY_ACTS = ['take-spoils', 'take-level', 'take-intake', 'take-perk', 'take-augment', 'take-door', 'take-gift', 'evolve', 'event'];
+const FLY_ACTS = ['take-spoils', 'take-level', 'take-intake', 'take-rule', 'take-perk', 'take-augment', 'take-door', 'take-gift', 'evolve', 'event'];
 let flying = false;
 app.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled || flying) return;

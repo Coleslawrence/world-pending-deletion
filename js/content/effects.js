@@ -181,9 +181,29 @@ const EFFECTS = {
   reactMult: { how: 'mul', say: v => `Reactions are ${pct(v - 1)} stronger.` },
   reactHeal: { how: 'set', say: v => `Toxic Flare and Cauterise heal you ${v}.` },
   // One-off rules
-  sluggish: { how: 'set', say: () => 'Start every fight Weakened.' },
+  sluggish: { how: 'set', say: v => v > 1 ? `Start every fight Weakened for ${v} turns.` : 'Start every fight Weakened.' },
   swordSaint: { how: 'set', say: () => 'Your basic Attack becomes S-rank: far stronger, and it ignores Block.' },
   copycat: { how: 'set', say: () => "Once per fight, use the opponent's last move as your own." },
+  // Signature Gifts (12 Nov): rule-breaking cheats, one chosen at the Awakening
+  lightFingers: { how: 'set', say: () => "The first big hit an opponent shows each fight, you steal: a one-use copy of it joins your skills." },
+  hometown: { how: 'set', say: v => `Once per fight, a hit that would take ${pct(v)} of your max HP or more is taken by someone from your world instead.` },
+  spiritGuide: { how: 'set', say: () => 'On your third turn of each fight, the last opponent you beat uses its strongest move for you.' },
+  adminSwap: { how: 'set', say: () => "See the opponent's next 2 moves. Once per fight, swap them (Quick)." },
+  unregistered: { how: 'set', say: () => 'Every skill draws power from your highest stat, whatever its archetype.' },
+  encore: { how: 'set', say: () => 'After three different skills in a row, your next skill plays twice.' },
+  powerArmour: { how: 'set', say: v => `Start each fight with armour worth ${pct(v)} of your max HP. When it breaks, it blasts the opponent for that much.` },
+  growth: { how: 'set', say: v => `Each turn of a fight, gain ${v} max HP and ${v}% damage, up to 6 times.` },
+  silverTongue: { how: 'set', say: () => 'Break an opponent below half HP and they yield: you win, for half the gold.' },
+  dejaVu: { how: 'set', say: v => `Each turn, the skill you used two turns ago plays again at ${pct(v)} power.` },
+  trashTalk: { how: 'set', say: () => "Once per fight (Quick), bait the opponent: its shown move becomes a guard." },
+  insideJob: { how: 'set', say: () => "Each opponent's strongest move is rigged: the first time they use it, it fails and they are Weakened." },
+  // Reworked Gifts (12 Nov)
+  lowHpCrit: { say: v => `Below half HP, +${pct(v)} critical chance.` },
+  noBlock: { how: 'set', say: () => 'You can never gain Block.' },
+  firstTwice: { how: 'set', say: () => 'Your first skill each fight plays twice.' },
+  critEmpower: { how: 'set', say: () => 'Critical hits Empower you for 1 turn.' },
+  dodgeBleed: { say: v => `Each attack you dodge or evade gives the attacker ${v} Bleed.`, theme: 'blade' },
+  brkPlus: { say: v => `Your hits fill the opponent's guard bar ${pct(v)} faster.`, theme: 'storm' },
 };
 // Adds one source's effects to P. lm is the level multiplier, for sources that grow with level (gear, archetype bonuses).
 function addEffects(P, p, lm) {
