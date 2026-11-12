@@ -1,0 +1,26 @@
+// The Remnant (remnant.js): entries open by runs, memories can be changed, objects reach the Quarters, recognition lines.
+'use strict';
+const C = require('../js/core.js');
+let bad = 0; const ok = (c, m) => { if (!c) { bad++; console.log('FAIL', m); } };
+const m = C.newMeta(); m.runs = 0;
+const R = C.remnantOf(m);
+ok(/^\d{4}$/.test(R.no), 'Remnant number is 4 digits');
+ok(C.remnantOpened(m) === 0 && C.remnantRecoverable(m) === 0, 'nothing opens before the first run');
+ok(!C.remember(m, 'fell', 0), 'a closed entry cannot be remembered');
+m.runs = 1; ok(C.remnantRecoverable(m) === 1, 'first run opens how it fell');
+ok(C.remember(m, 'fell', 0) && C.remnantRecoverable(m) === 0, 'remembering fills it');
+ok(C.remember(m, 'fell', 2) && C.remnantMem(m, 'fell').obj.name === "A Gatekeeper's Token", 'a memory can be changed');
+ok(!C.remember(m, 'fell', 3), 'only 3 options');
+ok(!C.remember(m, 'was', 0), 'next entry waits for 2 runs');
+m.runs = 99; REMNANT_ENTRIES.forEach(E => { ok(C.remnantOpts(m, E).length === 3, E.k + ' has 3 options'); ok(C.remember(m, E.k, 1), E.k + ' remembered'); });
+ok(C.quartersOf(m).memories.length === REMNANT_ENTRIES.length, 'every memory places an object');
+ok(JSON.stringify(C.remnantOf(m)) === JSON.stringify(R), 'the file is drawn once and kept');
+const T = C.remnantMem(m, 'type').key, F = C.remnantMem(m, 'fate').key;
+ok(C.remnantLines({ round: 1, world: { type: T } }, m, {}).length === 1, 'same kind of world is recognised');
+ok(C.remnantLines({ round: 1, world: { type: 'none', fate: F } }, m, {})[0].includes(FATES[F].name), 'same Fate is recognised');
+ok(C.remnantLines({ round: 1, practice: true, world: { type: T } }, m, {}).length === 0, 'never in practice');
+const r1 = { round: 1, world: { type: T } }; C.remnantLines(r1, m, {}); ok(C.remnantLines(r1, m, {}).length === 0, 'once per run');
+ok(C.remnantLines({ round: 8, world: { type: 'x' } }, m, { kind: 'final', id: WORLD_TYPES[T].final }).length === 1, 'your type\'s Final Champion knows you');
+const all = JSON.stringify(REMNANT_ENTRIES.map(E => C.remnantOpts(m, E)));
+ok(!/—/.test(all), 'no em-dashes');
+console.log(bad ? `remnant: ${bad} failed` : 'remnant: all passed'); process.exit(bad ? 1 : 0);

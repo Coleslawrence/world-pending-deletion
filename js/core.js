@@ -1335,8 +1335,8 @@ function buyDecor(meta, k) { if (!DECOR[k] || DECOR[k].shared || (meta.decor && 
 // Entries open by finished runs (REMNANT_AT), last day first. A memory can be changed any time (Slaw, 12 Nov). Story only.
 function remnantOf(meta) {
   if (!meta.remnant || !meta.remnant.no || !meta.remnant.draw) {
-    const three = keys => shuffle(keys, Math.random).slice(0, 3);
-    meta.remnant = { no: String(1000 + Math.floor(Math.random() * 9000)), draw: { arch: three(ARCH_KEYS), fate: three(Object.keys(FATES)), people: three(Object.keys(PEOPLES)), type: three(Object.keys(WORLD_TYPES)) }, mem: (meta.remnant && meta.remnant.mem) || {} };
+    const r = mulberry32(Date.now() ^ ((meta.runs || 0) * 7919)), three = keys => shuffle(keys, r).slice(0, 3); // own stream: never moves the game's dice
+    meta.remnant = { no: String(1000 + Math.floor(r() * 9000)), draw: { arch: three(ARCH_KEYS), fate: three(Object.keys(FATES)), people: three(Object.keys(PEOPLES)), type: three(Object.keys(WORLD_TYPES)) }, mem: (meta.remnant && meta.remnant.mem) || {} };
   }
   return meta.remnant;
 }
@@ -1353,7 +1353,7 @@ function remnantMem(meta, k) {
   if (!E || !R || !R.mem || R.mem[k] == null) return null;
   return remnantOpts(meta, E)[R.mem[k]] || null;
 }
-function remnantRecoverable(meta) { const R = remnantOf(meta); return REMNANT_ENTRIES.slice(0, remnantOpened(meta)).filter(E => R.mem[E.k] == null).length; }
+function remnantRecoverable(meta) { const mem = (meta.remnant && meta.remnant.mem) || {}; return REMNANT_ENTRIES.slice(0, remnantOpened(meta)).filter(E => mem[E.k] == null).length; }
 function remember(meta, k, i) {
   const at = REMNANT_ENTRIES.findIndex(x => x.k === k), R = remnantOf(meta);
   if (at < 0 || at >= remnantOpened(meta) || !(i >= 0 && i < remnantOpts(meta, REMNANT_ENTRIES[at]).length)) return false;

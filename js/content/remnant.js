@@ -62,6 +62,6 @@ const DECOR_USE = {
   lantern: { lore: 'It burns without oil. The System has filed a complaint about it.', use: ['Read by it', 'sheet', 'pages'] },
   shelf: { lore: 'One handbook is open on its own, at a page about you.', use: ['Read the notes', 'sheet', 'notes'] },
   window: { lore: "Today it shows a world everyone is fighting for. Tomorrow, another.", use: ["Look at today's world", 'sheet', 'daily'] },
-  screen: { lore: 'The System recorded every match you called. It wants you to watch.', use: ['Watch the log', 'sheet', 'syslog'] },
+  screen: { lore: 'The System recorded every match you called. It wants you to watch.', use: ['See your record', 'sheet', 'mastery'] },
   banner: { lore: 'Your sigil. It meant a world once. Now it means you.', use: ['Look at your rank', 'sheet', 'halls'] },
 };
