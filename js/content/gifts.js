@@ -17,6 +17,7 @@ const GIFTS = {
   nearmiss: { name: 'Near Miss', cat: 'world', cost: 1, desc: 'Evade the first attack each fight.', p: { firstEvade: 1 }, flavour: "In the Fens, things nearly happen to you all the time." },
   loadeddice: { name: 'Loaded Dice', cat: 'world', cost: 1, desc: 'Your dice never roll below 2, and chance options in events +15%.', p: { dieMin: 2, chanceBonus: 15 }, flavour: "Every child in the Marches gets a pair at birth. Most are heavy on one side." },
   lightningrod: { name: 'Lightning Rod', cat: 'world', cost: 1, desc: "Your hits fill the opponent's guard bar 25% faster, and breaking an opponent Empowers you for 2 turns.", p: { brkPlus: 0.25, breakEmpower: 2 }, flavour: "Struck as a child. The storm has known your name ever since." },
+  lastsheaf: { name: 'Last Sheaf', cat: 'world', cost: 1, desc: 'Opponents below half HP take 20% more damage from you, and the first hit on one heals you 10% of your max HP.', p: { vsHalf: 0.2, reapBlood: 0.1 }, flavour: "In the Vales, the last sheaf is the one that pays for the winter." },
   appraisal: { name: 'Absolute Appraisal', cat: 'retired', cost: 4, desc: "See every opponent's full kit and their next 2 moves.", flavour: "[Full Entrant data granted. This is irregular. Do not mention it.]" },
   monarch: { name: "Monarch's Domain", cat: 'cheat', cost: 6, desc: 'Every archetype you have counts 2 extra pieces.', flavour: "[Authority recognised. Your pieces answer to you first.]" },
   rewind: { name: 'Return by Death', cat: 'retired', cost: 6, desc: 'Once per run, a loss rewinds to the start of that fight.', flavour: "[Death recorded. Death reversed. Record amended.]" },
@@ -118,7 +119,7 @@ Object.keys(ARCH).forEach(k => { GIFTS['aff_' + k] = { name: `${ARCH[k].name} Af
 const GIFT_SYN = {
   tidecaller: ['zealot', 'vampire', 'growthspurt'], deserter: ['bastion', 'hometown', 'lastwords'], warden: ['venom', 'dejavu', 'chatdecides'],
   hedgewitch: ['blade', 'swordsaint', 'elf'], prodigy: ['arcanist', 'encore', 'monarch'], runesmith: ['bastion', 'fivefinger', 'merger'],
-  nearmiss: ['blade', 'elf', 'glass'], loadeddice: ['dicer', 'bornlucky', 'bond_house'], lightningrod: ['storm', 'silvertongue', 'bond_war'],
+  nearmiss: ['blade', 'elf', 'glass'], loadeddice: ['dicer', 'bornlucky', 'bond_house'], lightningrod: ['storm', 'silvertongue', 'bond_war'], lastsheaf: ['reaper', 'berserker', 'demon'],
   monarch: ['unregistered', 'fivefinger', 'prodigy'], swordsaint: ['blade', 'hedgewitch', 'firststrike'], lightfingers: ['arcanist', 'encore', 'manaaffinity'],
   fivefinger: ['merger', 'runesmith', 'treasure', 'golden'], hometown: ['bastion', 'deserter', 'glass', 'lastwords'], spiritguide: ['reaper', 'treasure', 'fivefinger'],
   adminrights: ['storm', 'venom', 'insidejob', 'trashtalk'], unregistered: ['monarch', 'fastlearner', 'bornlucky'], encore: ['arcanist', 'prodigy', 'lightfingers', 'firststrike'],

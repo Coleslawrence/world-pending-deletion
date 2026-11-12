@@ -101,10 +101,13 @@ const loreIds = o => Object.keys(o).map(Number);
 // suits, and without a list it suits them all. A world only draws layers and entries that suit its type.
 const settingOf = type => (WORLD_TYPES[type] && WORLD_TYPES[type].setting) || 'fantasy';
 const suits = (x, type) => !x || !x.settings || x.settings.includes(settingOf(type));
+// Content added after Pending World began (added: key, ADDED_FROM in worlds.js) sits out Pending World days before its date.
+// Without a date (every run but Pending World) everything is in.
+const addedBy = (x, date) => !date || !x || !x.added || date >= (ADDED_FROM[x.added] || '9999');
 // layers: the world's layers, if any. Each layer present files LAYER_TAKE entries (a Confluence type's never its home
 // ones, which belong to someone else's home); the type files the rest.
-function buildRecord(type, rng, layers) {
-  const Ls = layersOf(layers), W = recLore(Ls, type), E = W.entries, all = loreIds(E), own = all.filter(i => i < 100);
+function buildRecord(type, rng, layers, date) {
+  const Ls = layersOf(layers), W = recLore(Ls, type), E = W.entries, all = loreIds(E).filter(i => addedBy(E[i], date)), own = all.filter(i => i < 100);
   const of = (k, tier) => own.filter(i => E[i].k === k && E[i].tier === tier);
   const home = pick(of('place', 'home'), rng), person = pick(of('person', 'home'), rng);
   const ids = [home, person], need = { place: 3, person: 2, custom: 2 };
@@ -297,9 +300,9 @@ function dailySeed(date) { return 'wpd:' + date; }
 // Pending World days before WORLD_GEN.from keep the world the old generator made, so shipping layered worlds never
 // changes a day already under way. SHIP STEP: set from to the game day after the release that ships layered worlds.
 const WORLD_GEN = { from: '2026-11-02' };
-function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'), w = date >= WORLD_GEN.from ? genWorld(rng) : genWorldV1(rng); if (glitchDay(date)) w.mod = 'corrupted'; return w; }
+function dailyWorld(date) { const rng = seedRng(dailySeed(date) + ':world'), w = date >= WORLD_GEN.from ? genWorld(rng, undefined, null, date) : genWorldV1(rng, undefined, date); if (glitchDay(date)) w.mod = 'corrupted'; return w; }
 // w: the day's world (or just its type, for a world without layers)
-function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w); }
+function dailyRecord(date, w) { return buildRecord(typeof w === 'string' ? w : w.type, seedRng(dailySeed(date) + ':record'), typeof w === 'string' ? null : w, date); }
 // Pending World is a level field: no Echo unlocks (purse, reroll, fourth world, archetypes, Echo Gifts)
 function levelMeta(meta) { return Object.assign({}, meta, { unlocks: {}, bonds: {} }); }
 // Leaderboard score: round reached, then Hearts left, then fewest turns, in one sortable number
@@ -325,7 +328,7 @@ const modKeys = () => Object.keys(MODIFIERS).filter(k => !MODIFIERS[k].glitch);
 // A world offer is sometimes a Corrupted Save (never in Pending World, which gets it on Glitch Day)
 const CORRUPT_WORLD = 0.05;
 const worldRank = (rng, cap) => cap == null ? wpick([0, 1, 2, 3, 4, 5], RANK_W, rng) : wpick([0, 1, 2, 3, 4, 5].slice(0, cap + 1), RANK_W.slice(0, cap + 1), rng);
-const pickKey = (o, rng, type) => { const k = Object.keys(o).filter(x => suits(o[x], type)); return k.length ? pick(k, rng) : null; };
+const pickKey = (o, rng, type, date) => { const k = Object.keys(o).filter(x => suits(o[x], type) && addedBy(o[x], date)); return k.length ? pick(k, rng) : null; };
 // Syllables join cleanly: two vowels meeting lose the second, and no letter appears three times running
 function joinName(parts) {
   const n = parts.reduce((a, b) => /[aeiouy]$/i.test(a) && /^[aeiou]/i.test(b) ? a + b.slice(1) : a + b, '').replace(/(.)\1\1/g, '$1$1');
@@ -339,19 +342,19 @@ function worldName(T, C, rng) {
 // A world (v 2): type, name, rank, its layers, the modifier its Fate brings, and a champion name for the Awakening.
 // cap: the highest world rank on offer (Entrant Rank gating). Without one, every rank can come up.
 // types: the world types it may pick from (default: all)
-function genWorld(rng, cap, only) {
-  const types = Object.keys(WORLD_TYPES), type = pick(only || types, rng), T = WORLD_TYPES[type];
+function genWorld(rng, cap, only, date) {
+  const types = Object.keys(WORLD_TYPES).filter(k => addedBy(WORLD_TYPES[k], date)), type = pick(only || types, rng), T = WORLD_TYPES[type];
   const mix = CONFLUENCE.chance && rnd(rng) < CONFLUENCE.chance ? pick(types.filter(k => k !== type && settingOf(k) === settingOf(type)), rng) || null : null;
   const name = worldName(T, mix && WORLD_TYPES[mix], rng), rank = worldRank(rng, cap);
-  const fate = pickKey(FATES, rng, type), people = pickKey(PEOPLES, rng, type), M = fate && FATES[fate].mods;
+  const fate = pickKey(FATES, rng, type, date), people = pickKey(PEOPLES, rng, type, date), M = fate && FATES[fate].mods;
   const mod = M ? wpick(Object.keys(M), Object.values(M), rng) : wpick(modKeys(), MOD_W, rng);
   const w = { v: 2, type, name, rank, mod, champ: pick(T.champs, rng) };
   if (fate) w.fate = fate; if (people) w.people = people; if (mix) w.mix = mix;
   return w;
 }
 // The generator before layers, kept for Pending World days before WORLD_GEN.from: the first 6 syllables and names only
-function genWorldV1(rng, cap) {
-  const type = pick(Object.keys(WORLD_TYPES), rng), T = WORLD_TYPES[type];
+function genWorldV1(rng, cap, date) {
+  const type = pick(Object.keys(WORLD_TYPES).filter(k => addedBy(WORLD_TYPES[k], date)), rng), T = WORLD_TYPES[type];
   const name = pick(T.names[0].slice(0, 6), rng) + pick(T.names[1].slice(0, 6), rng);
   const rank = worldRank(rng, cap), mod = wpick(modKeys(), MOD_W, rng);
   return { type, name: name.charAt(0).toUpperCase() + name.slice(1), rank, mod, champ: pick(T.champs.slice(0, 6), rng) };
@@ -3980,7 +3983,7 @@ if (typeof module !== 'undefined') module.exports = {
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, ARCH_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
-  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, ADDED_FROM, addedBy, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, SHARED_MILESTONES, sanitizeTogether, sharedReached, sharedNext, DECOR, quartersOf, sanitizeDecor, buyDecor, NOTE_LEVELS, noteFoes, sanitizeNotes, noteLevel, noteFoe, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, GOAL_STAKES, goalOdds, setStake, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, DOOR_SETS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,

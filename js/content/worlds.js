@@ -8,6 +8,10 @@
 // champs: champion names offered at the Awakening (the first 6 are the originals).
 // Its Final Champion fights in enemies.js, its World Gift is in gifts.js and its world-first Title in titles.js.
 const WORLD_TYPES = {};
+// added: content added after Pending World began carries an added key (world types, Fates, Peoples, Record entries). Pending
+// World days before ADDED_FROM[key] are drawn as if it did not exist, so a day already played never changes. Set the date
+// at ship to the first game day after the release (like WORLD_GEN.from); until then Pending World never draws it.
+const ADDED_FROM = { x3: '2099-01-01' };
 // Each run files 10 entries about its world, one per Heart, plus a bio for the champion. Losing Hearts erases entries.
 // Runs and snapshots store pool indexes, never text, so pool order is fixed once shipped: add new entries at the end, never reorder or delete.
 // k: place | person | custom. tier sets deletion order: far, then city, then home. near is the bio phrase for a home place; rel is a person's relation.

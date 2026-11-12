@@ -29,6 +29,7 @@ const TRAIT_POOL = {
   ironclad: { name: 'Ironclad', desc: 'Its Block never fades, and grows each turn.', world: 'iron', traits: { forge: 2 } },
   galedriven: { name: 'Gale-Driven', desc: 'Below 75% HP, deals 25% more damage.', world: 'steppes', traits: { enrage: 0.75, enrageMult: 1.25 } },
   tellreader: { name: 'Tell-Reader', desc: 'Resists the skill you use most, by 25%.', world: 'marches', traits: { adapt: 0.75 } },
+  gleaner: { name: 'Gleaner', desc: 'Hits you 30% harder below half HP.', world: 'vales', passives: { vsHalf: 0.3 } },
   omenread: { name: 'Omen-Read', desc: 'Hard to jinx, hits harder; shows two moves.', world: 'fens', traits: { showNext: 1, jinxTax: 2 }, passives: { dmgPct: 0.15 } },
   // Glitched traits
   replicated: { name: 'Repl̷icated', desc: 'Comes back once at 30% HP.', glitch: true, traits: { revive: 0.3 } },

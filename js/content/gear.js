@@ -86,6 +86,8 @@ const GEAR = {
   countdown_collar: { name: 'Countdown Collar', slot: 'accessory', tags: [], rank: 'B', experimental: true, stats: { VIT: 1, AGI: 1 }, pas: {}, fix: { countdown: 12 }, text: () => 'You deal 20% less damage. If a fight reaches turn 12, your opponent is deleted and you win.', flavour: '[Ticking is a normal part of operation.]' },
   pain_link: { name: 'Pain Link', slot: 'accessory', tags: [], rank: 'B', experimental: true, stats: { VIT: 2 }, pas: {}, fix: { painLink: 0.5 }, text: () => 'Every hit, yours or theirs, is split evenly between you and your opponent.', flavour: '[Fair for both parties. Comfortable for neither.]' },
   unsigned_patch: { name: 'Unsigned Patch', slot: 'accessory', tags: [], rank: 'S', experimental: true, consumable: true, stats: {}, pas: {}, text: () => 'Single use, outside fights. Choose one of three rules to remove for the rest of the run. Then it deletes itself.', flavour: '[Publisher: unknown. Install anyway?]' },
+  // World expansion (12 Nov): the Reaper had no E-rank gear outside Mastery, so its opening kit never offered a Reaper piece
+  harvest_sickle: { name: 'Harvest Sickle', slot: 'weapon', tags: ['reaper'], rank: 'E', stats: { STR: 2 }, pas: { lifesteal: 0.08 }, top: { execBonus: 0.15 }, text: v => `Heal ${pct(v.lifesteal)} of the damage you deal.`, flavour: "Borrowed from the Vales for one harvest. Nobody has asked for it back." },
   missingno: { name: 'Missin\u0337gNo.', slot: 'accessory', tags: [], rank: 'B', glitch: true, rolling: true, stats: { LUK: 2 }, pas: {}, text: () => "Works as another gear piece's passive, re-rolled after every fight.", flavour: '[Known issue: item data unreadable. Please do not equip.]' },
 };
 const GEAR_SLOTS = ['weapon', 'armour', 'accessory'];
