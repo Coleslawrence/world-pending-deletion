@@ -20,6 +20,13 @@ LORE.hollow = {
     { k: 'place', tier: 'home', name: 'The chapel of St. Ves', text: 'Small, cold and always full. Not all the congregation breathes.', near: 'in the bell tower of St. Ves' },
     { k: 'person', tier: 'home', name: 'Your grandmother Ada', text: 'Died when you were six. Still tucks you in when you visit.', rel: 'grandmother' },
     { k: 'person', tier: 'home', name: 'Your friend Tobin', text: "A gravedigger's son who dared you into every crypt in the kingdom.", rel: 'friend' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Bone Orchard', text: 'Apple trees grow from an old battlefield. The apples are very red.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'Speaking to the Lanterns', text: 'Everyone tells the grave lanterns their news, so the dead are never out of date.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'Undertaker Moss', text: 'Has buried half the town, twice. Is very patient with repeat customers.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The house with salt on the sills', text: 'Your family lays a fresh line every night. You have never once forgotten.', near: 'in a house with salt on every sill', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The family vault', text: 'The door is locked from the inside. Your family has agreed not to talk about it.', near: 'beside the family vault', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your uncle Wendel', text: 'Came back from the dead once, briefly. Says the food was better there.', rel: 'uncle', added: 'x3' },
   ],
 };
 FINAL_GREET.bone_saint = '{champ}. I have prayed for you. Lie down, and let me finish the prayer.';

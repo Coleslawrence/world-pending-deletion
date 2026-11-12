@@ -104,6 +104,10 @@ const suits = (x, type) => !x || !x.settings || x.settings.includes(settingOf(ty
 // Content added after Pending World began (added: key, ADDED_FROM in worlds.js) sits out Pending World days before its date.
 // Without a date (every run but Pending World) everything is in.
 const addedBy = (x, date) => !date || !x || !x.added || date >= (ADDED_FROM[x.added] || '9999');
+// The same for content met during a run: a Pending World run (run.daily is its date) only meets what its day has
+const addedIn = (run, x) => addedBy(x, run && run.daily);
+// Is this world, or the world it is joined to in a Confluence, of type t
+const worldIs = (run, t) => !!run && !!run.world && t != null && [].concat(t).some(x => x === run.world.type || x === run.world.mix);
 // layers: the world's layers, if any. Each layer present files LAYER_TAKE entries (a Confluence type's never its home
 // ones, which belong to someone else's home); the type files the rest.
 function buildRecord(type, rng, layers, date) {
@@ -489,9 +493,9 @@ function newRun(world, setup, meta, rng) {
   // System quests: two visible, every hidden one quietly active. In a world with a Fate or People that has a quest
   // (quests.js, fate: / people:), those quests are shown too, on top of one general quest
   const fair = k => [].concat(QUESTS[k].feat).every(f => featFair(run, f));
-  const local = Object.keys(QUESTS).filter(k => (QUESTS[k].fate && QUESTS[k].fate === world.fate) || (QUESTS[k].people && QUESTS[k].people === world.people)).filter(fair);
+  const local = Object.keys(QUESTS).filter(k => (QUESTS[k].fate && QUESTS[k].fate === world.fate) || (QUESTS[k].people && QUESTS[k].people === world.people) || (QUESTS[k].world && QUESTS[k].world === world.type)).filter(k => fair(k) && addedBy(QUESTS[k], setup.daily));
   const taken = local.map(k => [].concat(QUESTS[k].feat).join('+'));
-  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && !QUESTS[k].fate && !QUESTS[k].people && fair(k) && !taken.includes([].concat(QUESTS[k].feat).join('+'))), rs).slice(0, local.length ? 1 : 2).concat(local);
+  const vis = shuffle(Object.keys(QUESTS).filter(k => !QUESTS[k].hidden && !QUESTS[k].fate && !QUESTS[k].people && !QUESTS[k].world && fair(k) && !taken.includes([].concat(QUESTS[k].feat).join('+'))), rs).slice(0, local.length ? 1 : 2).concat(local);
   run.quests = vis.concat(Object.keys(QUESTS).filter(k => QUESTS[k].hidden)).map(id => ({ id, prog: 0, done: false, failed: false }));
   run.bar = new Array(run.slots).fill(null);
   if (setup.script) { run.quests = []; run.script = setup.script; run.practice = true; run.practiceRounds = setup.script.rounds || 3; run.gold += setup.script.gold || 0; }
@@ -997,6 +1001,7 @@ function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
 const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
+const LOCAL_MONSTER = 0.5;
 function heartCost(run, spec) { if (run.elite) return 0; const c = Math.max(1, HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0) - amendOf(run).heartCut); const c2 = hasGift(run, 'g_leak') ? c + 1 : c; return hasGift(run, 'ironwill') ? Math.max(1, c2 - 1) : c2; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
@@ -1007,6 +1012,8 @@ function makeChoices(run, meta, rng) {
   if (!early && grudgeOn(run, meta)) { const left = pool.filter(id => !grudgeOf(meta, id).retired); if (left.length >= 2) pool = left; }
   // Rivals come in rank order: D-rank around round 4 up to A-rank around round 7. The Masked Entrant fits any round.
   if (!early) { const want = RANKS.indexOf('D') + run.round - 4, gap = id => ENEMIES[id].rank ? Math.abs(RANKS.indexOf(ENEMIES[id].rank) - want) : 0.5; pool = pool.map(id => ({ id, k: gap(id) + rnd(rng) * 1.5 })).sort((x, y) => x.k - y.k).map(x => x.id); }
+  // A world type's own monster (enemies.js, world: and round:) takes one of the two places in its round, LOCAL_MONSTER of the time
+  if (early && !run.script) { const loc = Object.keys(ENEMIES).find(id => ENEMIES[id].world === run.world.type && ENEMIES[id].round === run.round && addedIn(run, ENEMIES[id]) && !run.met.includes(id)); if (loc && rnd(rng) < LOCAL_MONSTER) pool.splice(rnd(rng) < 0.5 ? 0 : 1, 0, loc); }
   const easy = { kind: early ? 'monster' : 'rival', id: pool[0] };
   if (!early && run.sabotage && !run.met.includes(run.sabotage)) { easy.id = run.sabotage; easy.sabotaged = true; if (pool[1] === run.sabotage) pool[1] = pool[0]; }
   let hard = { kind: early ? 'monster' : 'rival', id: pool[1] || pool[0], hard: true };
@@ -1813,15 +1820,16 @@ function eventText(run, key) { const t = EVENTS[key].text; return typeof t === '
 const CHAIN_STARTERS = {}; Object.entries(CHAINS).forEach(([c, C]) => CHAIN_STARTERS[c] = C.start);
 function undercityEvent(run, rng) {
   // Stand-alone events don't repeat in a run until every one has been seen
-  const open = k => !EVENTS[k].chain && !EVENTS[k].crisis && !EVENTS[k].visit && (!EVENTS[k].glitch || glitchesOn(run)) && (!EVENTS[k].can || EVENTS[k].can(run));
+  const open = k => !EVENTS[k].chain && !EVENTS[k].crisis && !EVENTS[k].visit && (!EVENTS[k].glitch || glitchesOn(run)) && (!EVENTS[k].world || worldIs(run, EVENTS[k].world)) && addedIn(run, EVENTS[k]) && (!EVENTS[k].can || EVENTS[k].can(run));
   const fresh = Object.keys(EVENTS).filter(k => open(k) && !(run.seen || []).includes(k));
   const keys = (fresh.length ? fresh : Object.keys(EVENTS).filter(open)).concat(Object.keys(CHAIN_STARTERS).filter(c => !run.chains[c]).map(c => CHAIN_STARTERS[c]));
   const w = keys.map(k => (EVENTS[k].weight != null ? EVENTS[k].weight : EVENTS[k].chain ? 3 : 1) * (worldTagged(run, EVENTS[k]) ? WORLD_LEAN : 1) * (EVENTS[k].glitch ? glitchMul(run) : 1));
   return wpick(keys, w, rng);
 }
-// An event tagged with a Fate or People (fate: id, people: id, or lists of them) turns up WORLD_LEAN times as often in a world that has it
+// An event tagged with a Fate or People (fate: id, people: id, or lists of them) turns up WORLD_LEAN times as often in a world that has it.
+// A world type's own event (world: type) only comes up in a world of that type (or joined to it), and leans the same way.
 const WORLD_LEAN = 3;
-function worldTagged(run, E) { const has = (x, v) => x != null && [].concat(x).includes(v); return has(E.fate, run.world.fate) || has(E.people, run.world.people); }
+function worldTagged(run, E) { const has = (x, v) => x != null && [].concat(x).includes(v); return has(E.fate, run.world.fate) || has(E.people, run.world.people) || worldIs(run, E.world); }
 function dueChainEvents(run) {
   const out = [];
   Object.entries(run.chains || {}).forEach(([c, st]) => { if (st && typeof st === 'object' && st.due <= run.round) out.push(c + '_' + st.step); });
@@ -1837,9 +1845,10 @@ function checkMet(run, key, c) {
   if (c.favour) return run.favour[c.favour] >= FAVOUR_LINE - (customOf(run, 'temple') ? 1 : 0);
   if (c.fate) return run.world.fate === c.fate;
   if (c.people) return run.world.people === c.people;
+  if (c.world) return worldIs(run, c.world);
   return !!(c.luck && run.luck && run.luck[key]);
 }
-function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : c.fate ? `[${FATES[c.fate].name}]` : c.people ? `[${PEOPLES[c.people].name}]` : '[LUK]'; }
+function checkTag(c) { return c.stat ? `[${c.stat} ${checkNeed(c)}]` : c.favour ? `[${GODS[c.favour].short}]` : c.fate ? `[${FATES[c.fate].name}]` : c.people ? `[${PEOPLES[c.people].name}]` : c.world ? `[${WORLD_TYPES[c.world].name}]` : '[LUK]'; }
 // Chance options ({ roll: { stat, hard? } }): always shown, with the odds on the button. ROLL_BASE (ROLL_HARD if hard) + ROLL_PER per
 // point of the stat + ROLL_LUK per point of LUK, kept between ROLL_MIN and ROLL_MAX. The roll is made when the event appears and kept
 // with the run, so reloading never changes it; a failed roll takes the option's fail branch, which always does something.
@@ -4029,7 +4038,7 @@ if (typeof module !== 'undefined') module.exports = {
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, ARCH_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
-  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, ADDED_FROM, addedBy, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
+  LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, ADDED_FROM, addedBy, addedIn, worldIs, LOCAL_MONSTER, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
   pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, SHARED_MILESTONES, sanitizeTogether, sharedReached, sharedNext, DECOR, quartersOf, sanitizeDecor, buyDecor, NOTE_LEVELS, noteFoes, sanitizeNotes, noteLevel, noteFoe, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, GOAL_STAKES, goalOdds, setStake, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, DOOR_SETS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,

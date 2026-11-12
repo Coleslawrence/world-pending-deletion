@@ -20,6 +20,13 @@ LORE.sky = {
     { k: 'place', tier: 'home', name: 'The lower ring', text: 'The poorest part of the city, closest to the edge. You could always see the clouds.', near: 'on the lower ring, near the edge' },
     { k: 'person', tier: 'home', name: 'Your father Oren', text: "A spell-mechanic who keeps the city's oldest engine running with his bare hands.", rel: 'father' },
     { k: 'person', tier: 'home', name: 'Your rival Selis', text: 'Beat you at every exam. You still owe each other a duel.', rel: 'rival' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Drifting Isle', text: 'A city that slipped its chains in a storm. People still wave from it as it passes.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'The Feather Test', text: 'Children drop a feather from the edge. Where it lands decides their school.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'Wing-Captain Ithra', text: 'Flies the mail between cities. Has fallen off twice and caught herself both times.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The house on the chain', text: 'Built onto an anchor chain, halfway down. Your family calls it the middle floor.', near: 'on an anchor chain between two cities', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The cloud window', text: 'A round window where the clouds pass under the floor. You did your homework there.', near: 'by a window that looks down on clouds', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your tutor Caelan', text: 'Taught you every spell you know and one you were told never to use.', rel: 'tutor', added: 'x3' },
   ],
 };
 FINAL_GREET.archmage = "{champ}. Ah. You're the first thing I've had to look up at in centuries.";

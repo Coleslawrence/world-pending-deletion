@@ -170,18 +170,18 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `alwaysCrit` | 1 | Vital Strike (1) | Always a critical hit. | no |
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bigStop` | 4 | Squall Line (2), Wall Cloud (2), Downburst (3), … | If the opponent is winding up a big attack, Interrupt it. Otherwise Weaken them for 2 turns. | yes |
-| `bleed` | 27 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
-| `block` | 128 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `bleed` | 29 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
+| `block` | 140 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 10 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 9 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
 | `brk` | 39 | Penance (6), Holy Light (6), Purify (4), … | Break 6: wears down the opponent's guard. | yes |
-| `burn` | 60 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
+| `burn` | 62 | Firebolt (4), Ember Ward (4), Flame Wave (2), … | Apply 4 Burn. | yes |
 | `bust` | 4 | Double Down (6), All In (8), Press Your Luck (6), … | (works with other keys on the same skill) | yes |
 | `bustAt` | 1 | All In (2) | (works with other keys on the same skill) | yes |
 | `calamity` | 4 | Calamity (4), Catastrophe (5), Aftermath (4), … | Jinx the shown move for free, then deal 0 + 4 per Misfortune and clear it. You take 3 Curse. | yes |
 | `cashOut` | 1 | Cash Out (0.5) | Heal 50% of the damage dealt. | yes |
-| `cleanse` | 31 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
+| `cleanse` | 32 | Unbreakable (1), Purify (1), Miracle (1), … | Remove your Burn, Poison, Bleed and Weaken. | yes |
 | `coinStun` | 4 | Cursed Coin (1), Bad Penny (1), Heads I Win (1), … | A move you jinx this turn also Stuns its user next turn. | yes |
 | `critBonus` | 3 | Precise Strike (0.5), Exposing Strike (0.5), Homing Missiles (0.25) | +50% critical chance. | yes |
 | `cruel` | 4 | Assassinate (2), Death Blossom (2), Coup de Grace (2.5), … | ×2 damage if the opponent has 2 or more effects. | yes |
@@ -191,13 +191,13 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `dbl` | 1 | Double or Nothing (4) | (works with other keys on the same skill) | yes |
 | `deepen` | 4 | Open Vein (1), Arterial Cut (1), Salted Wound (1), … | (works with other keys on the same skill) | yes |
 | `detonate` | 4 | Ignite (2), Combust (3), Wildfire (2), … | Deal 2× the opponent's Burn as damage, then remove it. Ignores Block. | yes |
-| `die` | 45 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
+| `die` | 46 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 3 | Two-Headed Coin (4), Hedged Bet (3), Rigged Wheel (2) | (works with other keys on the same skill) | yes |
 | `dieStun` | 5 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 337 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 362 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgHigh` | 4 | Table Stakes (5), High Roller's Bet (7), Covered Bet (5), … | (works with other keys on the same skill) | yes |
-| `dmgPip` | 29 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
+| `dmgPip` | 30 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
 | `doom` | 9 | Doom (26), Death Knell (18), Swift Doom (22), … | Doom: after 3 of the opponent's turns, they take 26 damage. | yes |
 | `doomExec` | 4 | Death Knell (1), Final Rites (1), Swift Rites (1), … | (works with other keys on the same skill) | yes |
 | `doomT` | 5 | Death Knell (2), Swift Doom (2), Final Rites (2), … | (works with other keys on the same skill) | no |
@@ -226,7 +226,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `keepHalf` | 1 | Aftermath (1) | (works with other keys on the same skill) | no |
 | `killReset` | 3 | Silent Kill (1), Mercy Kill (1), Last Hour (1) | No cooldown if it kills. | no |
 | `leech` | 4 | Leech (3), Blood Leech (6), Parasite (3), … | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
-| `lifesteal` | 20 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | yes |
+| `lifesteal` | 21 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | yes |
 | `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
 | `mark` | 17 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | yes |
@@ -241,8 +241,8 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perCurse` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | (works with other keys on the same skill) | yes |
 | `perHit` | 20 | Flame Wave (1), Conflagration (1), Thousand Cuts (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
-| `pierce` | 21 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | yes |
-| `poison` | 56 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
+| `pierce` | 24 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | yes |
+| `poison` | 57 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
 | `quench` | 4 | Searing Mercy (12), Merciful Flame (18), Last Light (12), … | Remove the opponent's Burn and heal that much, up to 12. | yes |
@@ -268,7 +268,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `thornsFight` | 4 | Shield Wall (3), Phalanx (3), Spiked Wall (5), … | For the rest of the fight, hit back for 3 when struck. | yes |
 | `uncurse` | 1 | Ward Off (1) | Remove 1 Curse. | no |
 | `vowHeal` | 4 | Vow of Iron (0.5), Oath of Iron (0.5), Iron and Light (0.8), … | At the start of your next turn, heal 50% of the Block you still hold. | yes |
-| `weaken` | 79 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
+| `weaken` | 84 | Hex (2), Frost Lance (2), Static Jab (1), … | Weaken the opponent for 2 turns. | yes |
 
 ### Passive effects (`p`), from `js/content/effects.js`
 
@@ -451,7 +451,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `vsBigger` | 2 | Giant's Bane (0.25), Giant Slayer (0.15) | +25% damage to opponents with more max HP than you. | add |  |  |  |
 | `vsBleed` | 2 | bloodletter (0.15), Serrated Edge (0.15) | +15% damage to bleeding opponents. | add |  |  | Bladedancer, Reaper |
 | `vsDisabled` | 4 | verdict_hammer (0.2), shock_gauntlet (0.15), lodestone (0.1), … | +20% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
-| `vsHalf` | 7 | Reaper 2 (0.35), whetstone_charm (0.1), notched_cleaver (0.12), … | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
+| `vsHalf` | 8 | Reaper 2 (0.35), whetstone_charm (0.1), notched_cleaver (0.12), … | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
 | `vsHard` | 2 | Giant's Bane (0.15), Underdog (0.1) | +15% damage to hard opponents. | add |  |  |  |
 | `vsHigherRank` | 1 | Rank Is Just a Letter (0.1) | +10% damage to opponents of a higher rank than you. | add |  |  |  |
 | `weakenPlus` | 1 | lodestone (1) | Weaken you apply lasts 1 turn longer. | add |  |  | Stormcaller |
@@ -472,7 +472,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `forge` | 2 | The Forge King (3), trait Ironclad (2) |
 | `hexer` | 1 | Mott the Unlucky (1) |
 | `jinxTax` | 2 | The Hanged Augur (2), trait Omen-Read (2) |
-| `revive` | 3 | The Bone Saint (0.3), trait Unquiet (0.15), trait Repl̷icated (0.3) |
+| `revive` | 4 | The Bone Saint (0.3), Restless Bones (0.2), trait Unquiet (0.15), … |
 | `showNext` | 2 | The Hanged Augur (1), trait Omen-Read (1) |
 | `twincast` | 3 | The Archmage Who Fell Upward (3), trait Spellbound (4), trait Desy̷nced (3) |
 
@@ -506,10 +506,10 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 46 moves |
-| big | a big hit, the one to Block or Stun | 23 moves |
-| guard | Block and nothing else | 34 moves |
-| setup | a status, buff or trick with little damage | 33 moves |
+| strike | a plain hit | 56 moves |
+| big | a big hit, the one to Block or Stun | 26 moves |
+| guard | Block and nothing else | 43 moves |
+| setup | a status, buff or trick with little damage | 40 moves |
 | sustain | healing or draining | 9 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
@@ -518,28 +518,28 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 65 (quests, levels, events) |
-| `stats` | {"VIT":2} | VIT +2 |  | 22 (events) |
+| `gold` | 8 | 8 gold |  | 85 (quests, levels, events) |
+| `stats` | {"VIT":2} | VIT +2 |  | 32 (quests, events) |
 | `points` | 2 | 2 stat points to place |  | 0 () |
 | `heart` | 1 | +1 max Heart |  | 15 (quests, levels, events) |
-| `rune` | 1 | a rune |  | 19 (quests, levels, events) |
-| `piece` | "B" | a free B-rank piece |  | 46 (quests, levels, events) |
+| `rune` | 1 | a rune |  | 26 (quests, levels, events) |
+| `piece` | "B" | a free B-rank piece |  | 58 (quests, levels, events) |
 | `experimental` | 1 | an Experimental item |  | 2 (levels, events) |
-| `next` | {"bribe":true} | a mark on your next fight |  | 33 (events) |
-| `foe` | {"weaken":2} | a mark on your next opponent |  | 22 (levels, events) |
+| `next` | {"bribe":true} | a mark on your next fight |  | 48 (events) |
+| `foe` | {"weaken":2} | a mark on your next opponent |  | 24 (levels, events) |
 | `heal` | 0.5 | 50% of max HP healed |  | 2 (levels) |
-| `max_hp` | -0.1 | −10% max HP |  | 9 (levels, events) |
-| `restore` | 1 | 1 Heart restored |  | 20 (quests, levels, events) |
+| `max_hp` | -0.1 | −10% max HP |  | 11 (levels, events) |
+| `restore` | 1 | 1 Heart restored |  | 24 (quests, levels, events) |
 | `erase` | 1 | 1 Heart erased |  | 8 (events) |
 | `stakes` | {"win":{"gold":10}} | stakes on your next fight |  | 12 (levels, events) |
 | `respec` | true | your stat points to place again |  | 2 (levels, events) |
 | `summon` | {"who":"copy"} | a visitor in your bracket |  | 7 (events) |
 | `amend` | "sudden" | the Amendment Sudden Death |  | 4 (events) |
-| `ward` | 1 | a ward on your next loss |  | 17 (levels, events) |
+| `ward` | 1 | a ward on your next loss |  | 20 (levels, events) |
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 6 (levels, events) |
 | `fate` | 1 | your world's Fate eased | yes | 99 (quests, levels, events) |
-| `notice` | 1 | the System's notice | yes | 88 (levels, events) |
+| `notice` | 1 | the System's notice | yes | 103 (levels, events) |
 | `chain` | "done" | the story goes on | yes | 70 (events) |
 | `favour` | {"war":2} | 2 Favour with the God of War | yes | 14 (quests, events) |
 
@@ -551,30 +551,30 @@ What wagers, Rank Trial conditions, Titles and quests can ask for. Measured: whe
 | --- | --- | --- | --- | --- | --- | --- |
 | `bankrupt` | shop | Leave the shop with 0 gold |  |  |  | quest h_bankrupt, quest w_hunger |
 | `bighit` | fight | Land a single hit of 60 or more | 60 |  |  | Title Executioner, quest w_exiles |
-| `blocked` | fight | Block 25 damage in a single fight | 25 |  |  | wager |
+| `blocked` | fight | Block 25 damage in a single fight | 25 |  |  | wager, quest w_iron |
 | `breaker` | fight | Break the opponent's guard | 1 |  |  | wager |
-| `chances` | chance | Win 3 chance rolls in one run | 3 |  |  | Title Lucky Seven |
-| `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch |
+| `chances` | chance | Win 3 chance rolls in one run | 3 |  |  | Title Lucky Seven, quest w_marches |
+| `clutch` | win | Win with 10% HP or less |  |  |  | Title Comeback Kid, quest h_clutch, quest w_hollow |
 | `collector` | merge | Own three ★2 pieces at once | 3 |  |  | quest h_collector, quest w_league |
 | `fast` | win | Win within 6 turns | 6 |  |  | wager, Title First Blood, quest fast3, quest w_longnight, quest w_sundering |
 | `fatelifted` | win | Beat the Final Champion with your world's Fate lifted |  |  |  | Title Fatebreaker |
 | `giant` | win | Beat an opponent with at least twice your max HP |  |  |  | Title Giant Slayer |
-| `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2, quest w_clans |
+| `hard` | win | Beat a hard opponent |  |  |  | Title Underdog, quest hard2, quest w_clans, quest w_verdant |
 | `healed` | fight | Heal 60 HP in a single fight | 60 |  |  | Title Bloodthirsty, quest w_council |
-| `healthy` | win | Win with more than half your HP |  |  |  | wager, quest w_lastgen |
-| `jinxes` | fight | Jinx 3 moves in a single fight | 3 |  |  | Title Black Cat |
+| `healthy` | win | Win with more than half your HP |  |  |  | wager, quest w_lastgen, quest w_drowned |
+| `jinxes` | fight | Jinx 3 moves in a single fight | 3 |  |  | Title Black Cat, quest w_fens |
 | `masked` | win | Defeat the Masked Entrant |  |  |  | Title Mirror Breaker |
 | `merge` | merge | Merge pieces |  |  |  | quest merge4, quest w_goldenage |
 | `noheal` | win | Win without healing |  |  | Zealot | wager, quest rival_noheal, quest w_silence |
 | `outranked` | win | Beat an opponent 2 rank letters above your Entrant Rank | 2 |  |  | Title Rank Is Just a Letter, quest w_crown |
-| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | wager, quest h_overkill, quest w_temple |
+| `overkill` | win | Finish an opponent with 30 more damage than needed | 30 |  |  | wager, quest h_overkill, quest w_temple, quest w_burning |
 | `path` | path | Have the System recognise your path by round 5 | 5 |  |  | quest path5, quest w_archive |
-| `quick` | fight | Use 3 Quick skills in a single turn | 3 |  |  | Title Spellweaver |
+| `quick` | fight | Use 3 Quick skills in a single turn | 3 |  |  | Title Spellweaver, quest w_sky |
 | `react` | fight | Trigger 2 reactions | 2 | yes |  | wager, Title Alchemist, quest react6, quest w_pilgrims |
 | `rival` | win | Defeat a rival |  |  |  | quest rival_noheal, quest w_civilwar |
 | `stop` | win | Stun or Interrupt the opponent's big move |  |  |  | wager |
-| `stuns` | fight | Stun or Interrupt one opponent 3 times | 3 |  |  | quest h_stun3 |
+| `stuns` | fight | Stun or Interrupt one opponent 3 times | 3 |  |  | quest h_stun3, quest w_steppes |
 | `untouched` | win | Win without losing any HP |  |  |  | wager, Title Untouched, quest w_plague |
 | `wagers` | wager | Win 3 wagers in one run | 3 |  |  | Title High Roller |
-| `wounded` | win | Win with half your HP or less |  |  |  | wager |
+| `wounded` | win | Win with half your HP or less |  |  |  | wager, quest w_vales |
 <!-- effects:end -->

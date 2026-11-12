@@ -655,6 +655,16 @@
   "augur",
   "herald",
   "reaping_lord",
+  "restless_bones",
+  "loose_page",
+  "strongbox",
+  "tide_crab",
+  "thorn_sprite",
+  "storm_colt",
+  "ash_hound",
+  "siege_beetle",
+  "marsh_lurker",
+  "scarecrow",
   "proctor",
   "legend",
   "undefeated"
@@ -831,7 +841,17 @@
   "w_council",
   "w_crown",
   "w_exiles",
-  "w_pilgrims"
+  "w_pilgrims",
+  "w_drowned",
+  "w_burning",
+  "w_hollow",
+  "w_verdant",
+  "w_sky",
+  "w_iron",
+  "w_steppes",
+  "w_marches",
+  "w_fens",
+  "w_vales"
  ],
  "feats": [
   "fast",
@@ -971,6 +991,26 @@
   "festival",
   "debt_collector",
   "night_watch",
+  "message_bottle",
+  "salvage_diver",
+  "deserters_fire",
+  "ember_forge",
+  "grave_lantern",
+  "bone_setter",
+  "fey_bargain",
+  "antler_stall",
+  "fallen_satchel",
+  "chain_walker",
+  "tunnel_map",
+  "hearth_oath",
+  "herd_rider",
+  "thunder_count",
+  "knucklebones",
+  "debt_note",
+  "black_water",
+  "ferry_cat",
+  "tithe_cart",
+  "gleaners",
   "clerical_error",
   "amendment",
   "audit",
@@ -1092,6 +1132,26 @@
   "festival": 4,
   "debt_collector": 5,
   "night_watch": 4,
+  "message_bottle": 3,
+  "salvage_diver": 3,
+  "deserters_fire": 3,
+  "ember_forge": 3,
+  "grave_lantern": 3,
+  "bone_setter": 3,
+  "fey_bargain": 3,
+  "antler_stall": 3,
+  "fallen_satchel": 3,
+  "chain_walker": 3,
+  "tunnel_map": 3,
+  "hearth_oath": 3,
+  "herd_rider": 3,
+  "thunder_count": 3,
+  "knucklebones": 3,
+  "debt_note": 3,
+  "black_water": 3,
+  "ferry_cat": 3,
+  "tithe_cart": 3,
+  "gleaners": 3,
   "clerical_error": 4,
   "amendment": 4,
   "audit": 4,
@@ -1170,7 +1230,13 @@
     "The Drowned Lighthouse",
     "The stilt house on Marrow Reef",
     "Your sister Ilsa",
-    "Old Corwen"
+    "Old Corwen",
+    "The Sunken Road",
+    "Reading the Waterline",
+    "Pearl-Mother Ysolde",
+    "The boat that is also a house",
+    "The roof garden",
+    "Your cousin Maren"
    ]
   },
   "burning": {
@@ -1200,7 +1266,13 @@
     "The barracks on Kiln Street",
     "The forge where you were born",
     "Your brother Cass",
-    "Sergeant Halla"
+    "Sergeant Halla",
+    "The Iron Road",
+    "The Burning of Letters",
+    "Tribune Aurel",
+    "The bathhouse on Ash Lane",
+    "The roof over the armoury",
+    "Your father Galen"
    ]
   },
   "hollow": {
@@ -1230,7 +1302,13 @@
     "The cottage by the yew",
     "The chapel of St. Ves",
     "Your grandmother Ada",
-    "Your friend Tobin"
+    "Your friend Tobin",
+    "The Bone Orchard",
+    "Speaking to the Lanterns",
+    "Undertaker Moss",
+    "The house with salt on the sills",
+    "The family vault",
+    "Your uncle Wendel"
    ]
   },
   "verdant": {
@@ -1260,7 +1338,13 @@
     "The house in the great oak",
     "The mill at Wyn Ford",
     "Your sister Briar",
-    "Old Hob"
+    "Old Hob",
+    "The Path That Moves",
+    "Leaving the Bread",
+    "The Hedge-Mother",
+    "The cottage with the iron gate",
+    "The fairy ring in the meadow",
+    "Your brother Rowan"
    ]
   },
   "sky": {
@@ -1290,7 +1374,13 @@
     "The rooftop garden",
     "The lower ring",
     "Your father Oren",
-    "Your rival Selis"
+    "Your rival Selis",
+    "The Drifting Isle",
+    "The Feather Test",
+    "Wing-Captain Ithra",
+    "The house on the chain",
+    "The cloud window",
+    "Your tutor Caelan"
    ]
   },
   "iron": {
@@ -1320,7 +1410,13 @@
     "The forge on the third deep",
     "The vent-house",
     "Your mother Hild",
-    "Your friend Pell"
+    "Your friend Pell",
+    "The Echoing Hall",
+    "The Count of Hammers",
+    "Delver Ruska",
+    "The house with the lucky beam",
+    "The mushroom cellar",
+    "Your sister Dagny"
    ]
   },
   "steppes": {
@@ -1350,7 +1446,13 @@
     "The family tent",
     "The windbreak wall",
     "Your mother Ilse",
-    "Your rival Brun"
+    "Your rival Brun",
+    "The Bone Circle",
+    "Counting the Thunder",
+    "The Herd-Speaker",
+    "The painted wagon",
+    "The lightning tree",
+    "Your uncle Ostrak"
    ]
   },
   "marches": {
@@ -1380,7 +1482,13 @@
     "The family counting room",
     "The corner card table",
     "Your father Belmar",
-    "Your rival Pen"
+    "Your rival Pen",
+    "The House of Even Odds",
+    "Losing Gracefully",
+    "The Card Widow",
+    "The gaming room over the bakery",
+    "The lucky step",
+    "Your grandmother Lotta"
    ]
   },
   "fens": {
@@ -1410,7 +1518,13 @@
     "The house on stilts",
     "The horseshoe door",
     "Your aunt Hester",
-    "Your rival Fitch"
+    "Your rival Fitch",
+    "The Bog Bell",
+    "Spitting on Coins",
+    "The Ferryman Pike",
+    "The willow over the well",
+    "The cracked mirror",
+    "Your little brother Wat"
    ]
   },
   "vales": {
@@ -1440,7 +1554,13 @@
     "The farmhouse by the mill",
     "The hayloft",
     "Your grandmother Hattie",
-    "Your friend Rook"
+    "Your friend Rook",
+    "The Black Furrow",
+    "The Harvest Wake",
+    "The Seed Keeper",
+    "The orchard wall",
+    "The cart shed",
+    "Your father Colm"
    ]
   },
   "fate longnight": {

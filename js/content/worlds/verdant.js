@@ -20,6 +20,13 @@ LORE.verdant = {
     { k: 'place', tier: 'home', name: 'The mill at Wyn Ford', text: "Its wheel turns even when the river doesn't.", near: 'by the mill at Wyn Ford' },
     { k: 'person', tier: 'home', name: 'Your sister Briar', text: 'Was taken by the fey for a year and came back speaking only in riddles.', rel: 'sister' },
     { k: 'person', tier: 'home', name: 'Old Hob', text: 'A hedge-wizard who taught you which mushrooms to eat and which to apologise to.', rel: 'teacher' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Path That Moves', text: 'A footpath through the Wilds. It is never in the same place two days running.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'Leaving the Bread', text: 'A loaf is left on every doorstep at dusk. In the morning it is gone, and the doors are still there.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'The Hedge-Mother', text: 'Sells cures from a hollow tree. Payment is a secret, a lock of hair or a favour later.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The cottage with the iron gate', text: 'The only iron in the village. Your father says it keeps the right things out.', near: 'behind an iron gate at the forest edge', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The fairy ring in the meadow', text: 'You were told never to step inside. You stepped inside. You came back.', near: 'near a fairy ring in the meadow', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your brother Rowan', text: 'Wandered into the woods for a day. Came back seven years later, still nine years old.', rel: 'brother', added: 'x3' },
   ],
 };
 FINAL_GREET.thorn_mother = '{champ}. The forest has been saving a place for you.';

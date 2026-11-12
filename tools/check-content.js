@@ -80,15 +80,15 @@ const SCHEMA = {
   fates: [C.FATES, ['name', 'line'], ['entries', 'roles', 'promises', 'mods', 'settings', 'stages', 'crises', 'ends', 'lineBy', 'crisisIfUsed', 'added']],
   peoples: [C.PEOPLES, ['name', 'line'], ['entries', 'roles', 'promises', 'epithets', 'settings', 'custom', 'visit', 'clash', 'added']],
   modifiers: [C.MODIFIERS, ['name', 'desc'], ['glitch']],
-  enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks'].concat(MECHANICS)],
+  enemies: [C.ENEMIES, ['name', 'style', 'tier', 'hp', 'skills', 'script'], ['rank', 'rival', 'final', 'phase', 'passives', 'theme', 'breaks', 'world', 'round', 'added'].concat(MECHANICS)],
   gifts: [C.GIFTS, ['name', 'cat', 'cost', 'desc', 'flavour'], ['lock', 'arch', 'p', 'theme', 'bond']],
   titles: [C.TITLES, ['name', 'cond', 'desc', 'flavour'], ['first', 'p', 'feat', 'n', 'theme']],
   effects: [C.EFFECTS, ['say'], ['how', 'lvl', 'enemy', 'theme', 'must']],
   feats: [C.FEATS, ['at', 'say', 'hit'], ['n', 'measure', 'must', 'unfairFor', 'needs', 'theme']],
-  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme', 'fate', 'people']],
+  quests: [C.QUESTS, ['text', 'reward', 'goal', 'feat'], ['hidden', 'by', 'count', 'n', 'theme', 'fate', 'people', 'world', 'added']],
   outcomes: [C.OUTCOMES, ['say'], ['late']],
   paths: [C.HIDDEN_PATHS, ['name', 'desc', 'fx'], []],
-  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit', 'glitch']],
+  events: [C.EVENTS, ['title', 'text', 'opts'], ['chain', 'weight', 'theme', 'can', 'fate', 'people', 'crisis', 'visit', 'glitch', 'world', 'added']],
   chains: [C.CHAINS, ['name', 'start'], ['theme']],
   traitPool: [C.TRAIT_POOL, ['name', 'desc'], ['passives', 'traits', 'glitch', 'world']],
 };
@@ -188,7 +188,7 @@ Object.entries(C.LEVEL_PERKS).forEach(([k, L]) => {
   if (L.when != null) ref(w, typeof L.when === 'function', 'when is a function of the run');
 });
 Object.keys(C.OUTCOMES).forEach(k => { if (typeof C.OUTCOMES[k].say !== 'function') err('outcomes ' + k, 'say(v) gives the words players read for it'); });
-const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.fate ? !!C.FATES[c.fate] : c.people ? !!C.PEOPLES[c.people] : c.luck === true);
+const checkOk = c => c && (c.stat ? C.STATS.includes(c.stat) : c.favour ? !!C.GODS[c.favour] : c.fate ? !!C.FATES[c.fate] : c.people ? !!C.PEOPLES[c.people] : c.world ? !!C.WORLD_TYPES[c.world] : c.luck === true);
 Object.entries(C.CHAINS).forEach(([c, ch]) => ref('chains ' + c, C.EVENTS[ch.start] && C.EVENTS[ch.start].chain === c, `start ${ch.start} is not an event in this chain`));
 Object.entries(C.EVENTS).forEach(([k, E]) => {
   if (E.chain) ref('event ' + k, C.CHAINS[E.chain], `chain ${E.chain} is not in CHAINS`);
@@ -308,6 +308,12 @@ Object.entries(C.REFLEXES).forEach(([k, R0]) => [R0].concat(R0.also ? [R0.also] 
   ref(w, typeof R.say === 'string' && /^\[.*\]$/.test(R.say), 'say must be a [System line]');
 }));
 C.MONSTERS.concat(C.RIVALS, Object.keys(C.ENEMIES).filter(k => C.ENEMIES[k].final)).forEach(k => ref('reflexes', C.REFLEXES[k], `${k} has no Reflex`));
+// A world type's own monster: world and round (1 to 3) together, never also in MONSTERS, at most one per world and round, with a Reflex
+Object.entries(C.ENEMIES).filter(([k, e]) => e.world || e.round).forEach(([k, e]) => { const w = 'enemies ' + k;
+  ref(w, !!C.WORLD_TYPES[e.world] && [1, 2, 3].includes(e.round), 'a local monster needs a world type and a round from 1 to 3');
+  ref(w, !C.MONSTERS.includes(k) && !e.rival && !e.final, 'a local monster is not also in MONSTERS, a rival or a Final Champion');
+  ref(w, Object.entries(C.ENEMIES).filter(([j, o]) => o.world === e.world && o.round === e.round).length === 1, `only one local monster for ${e.world} in round ${e.round}`);
+  ref(w, !!C.REFLEXES[k], `${k} has no Reflex`); });
 C.MONSTERS.forEach(k => ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.filter(r => r.includes(k)).length === 1, `${k} must be in exactly one qualifier round`));
 ref('enemies MONSTER_ROUNDS', C.MONSTER_ROUNDS.length === 3 && C.MONSTER_ROUNDS.every(r => r.length >= 2 && r.every(k => C.MONSTERS.includes(k))), 'three qualifier rounds of at least 2 monsters each, all from MONSTERS');
 C.RIVALS.forEach(k => ref('enemies ' + k, C.ENEMIES[k] && C.ENEMIES[k].rival, 'is in RIVALS but not marked rival: true'));

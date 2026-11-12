@@ -22,6 +22,13 @@ LORE.steppes = {
     { k: 'place', tier: 'home', name: 'The windbreak wall', text: "A low stone wall your grandfather built, the only stone for a day's ride.", near: 'behind a windbreak wall on the steppe' },
     { k: 'person', tier: 'home', name: 'Your mother Ilse', text: "Reads the storm better than anyone in the clan, and won't say how.", rel: 'mother' },
     { k: 'person', tier: 'home', name: 'Your rival Brun', text: 'Raced you to the Rod Field every morning for ten years. You are still one race ahead.', rel: 'rival' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Bone Circle', text: 'Standing stones shaped like horse skulls. Lightning never strikes inside it.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'Counting the Thunder', text: 'Children count between flash and thunder. Nobody has ever counted past three.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'The Herd-Speaker', text: 'Talks to horses. The horses mostly listen.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The painted wagon', text: 'Your family travels in it. The paint tells where you have been.', near: 'in a painted wagon on the plains', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The lightning tree', text: 'A tree struck so often it glows at night. You tied your first knot under it.', near: 'under the lightning tree', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your uncle Ostrak', text: 'Rode into the storm to see the Eye. Rode back out and would not say a word.', rel: 'uncle', added: 'x3' },
   ],
 };
 FINAL_GREET.herald = '{champ}. Stand still. Lightning finds the tallest thing first.';

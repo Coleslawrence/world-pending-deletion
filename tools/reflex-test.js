@@ -26,8 +26,8 @@ function fightWith(id, skill) {
   return f;
 }
 const use = (f, id) => { f.A.stun = 0; if (f.phase === 'stunned') f.phase = 'player'; const i = f.A.skills.findIndex(s => (s.baseDef || s.def).id === id); f.A.skills[i].cd = 0; ok(G.playerAct(f, i), `can use ${id}`); f.B.stun = 0; G.enemyTurn(f); };
-const expected = G.MONSTERS.concat(G.RIVALS, Object.keys(G.ENEMIES).filter(k => G.ENEMIES[k].final));
-ok(expected.every(k => G.REFLEXES[k]), 'every monster, rival and Final Champion has a Reflex');
+const expected = G.MONSTERS.concat(G.RIVALS, Object.keys(G.ENEMIES).filter(k => G.ENEMIES[k].final || G.ENEMIES[k].world));
+ok(expected.every(k => G.REFLEXES[k]), 'every monster (local ones too), rival and Final Champion has a Reflex');
 ok(Object.keys(G.REFLEXES).length === expected.length, 'nobody else has one');
 Object.entries(G.REFLEXES).forEach(([id, R]) => {
   const skill = pick(R.on); if (!skill) return ok(false, `${id}: no test skill for ${R.on}`);
