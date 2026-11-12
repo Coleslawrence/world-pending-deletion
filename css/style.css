@@ -461,6 +461,9 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .gf-h { display: flex; justify-content: space-between; gap: 8px; } .gf-h b { font-size: var(--fs-3); }
 .gcost { font-family: var(--f-m); font-size: var(--fs-2); color: var(--bronze); border: 1px solid var(--bronze-d); border-radius: var(--r-s); padding: 0 6px; } .gcost.neg { color: var(--good); border-color: #3d6b47; }
 .gf-d { font-size: var(--fs-2); color: var(--muted); }
+.gf-syn { display: block; font-size: var(--fs-1); color: var(--dim); margin-top: var(--sp-1); }
+.gf-syn i { font-style: normal; }
+.gf-syn i.on { color: var(--bronze); font-weight: 700; }
 /* sheets */
 .acts { display: flex; flex-wrap: wrap; gap: 6px; } .acts .btn { flex: 1 1 auto; }
 .sr-meta { display: flex; flex-wrap: wrap; gap: 3px; text-transform: none; letter-spacing: 0; }

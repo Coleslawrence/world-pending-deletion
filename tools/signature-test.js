@@ -35,8 +35,8 @@ function fightWith(gifts, opts = {}) {
 { const { f } = fightWith(['trashtalk']); const t = f.A.skills.find(s => s.key === 'bait'); G.playerAct(f, f.A.skills.indexOf(t)); ok(f.B.intent && f.B.intent.def.id === 'baited', 'Trash Talk turns the shown move into a guard'); ok(t.def.cd === 3, 'Trash Talk comes back every 3 turns'); }
 { const { f } = fightWith(['powerarmour']); ok(f.A.armour > 0 && f.A.armour === Math.round(0.4 * f.A.maxHp), 'Blast Plate starts at 40% of max HP');
   const bh = f.B.hp; G.hit(f, f.B, f.A, f.A.armour + 5, { noDodge: 1, noCrit: 1 }); ok(f.A.armour === 0 && f.B.hp < bh, 'broken armour blasts the attacker'); }
-{ const { f } = fightWith(['hometown']); f.A.block = 0; const hp = f.A.hp; G.hit(f, f.B, f.A, Math.round(f.A.maxHp * 0.3), { noDodge: 1, noCrit: 1 }); ok(f.A.hp === hp, 'Hometown Crowd takes the first big hit');
-  G.hit(f, f.B, f.A, Math.round(f.A.maxHp * 0.3), { noDodge: 1, noCrit: 1 }); ok(f.A.hp === hp, 'and the second');
+{ const { f } = fightWith(['hometown']); f.A.block = 0; const hp = f.A.hp; G.hit(f, f.B, f.A, Math.round(f.A.maxHp * 0.3), { noDodge: 1, noCrit: 1 }); ok(f.A.hp === hp, 'Hometown Crowd takes the first big hit'); ok(f.A.block > 0, 'and turns half of it into Block'); f.A.block = 0;
+  G.hit(f, f.B, f.A, Math.round(f.A.maxHp * 0.3), { noDodge: 1, noCrit: 1 }); ok(f.A.hp === hp, 'and the second'); f.A.block = 0;
   G.hit(f, f.B, f.A, Math.round(f.A.maxHp * 0.3), { noDodge: 1, noCrit: 1 }); ok(f.A.hp < hp, 'only twice per fight'); }
 { const { f } = fightWith(['bodydouble']); f.A.block = 0; G.hit(f, f.B, f.A, f.A.hp + 50, { noDodge: 1, noCrit: 1, pierce: 1 }); ok(f.A.hp === Math.round(f.A.maxHp * 0.5) && f.usedDouble, 'Second Self steps in at 50% HP'); }
 { const { f } = fightWith(['insidejob']); ok(f.B.rigged, 'Rigged Bout rigs a move'); }
@@ -48,6 +48,10 @@ function fightWith(gifts, opts = {}) {
 { const { f } = fightWith(['glass']); f.A.block = 0; G.gainBlock(f, f.A, 20); ok(f.A.block === 0, 'Glass Cannon: no Block'); }
 { const opts = { precedent: true }; const { run } = fightWith(['precedent'], opts); ok(opts.second && opts.second.offers.length === 2, 'a second Precedent is offered from the other two'); }
 { const { run } = fightWith([]); const c0 = G.runCounts(run), r2 = Object.assign({}, run, { gifts: run.gifts.concat('monarch') }), c2 = G.runCounts(r2); ok(Object.keys(c0).every(k => c2[k] === c0[k] + 2), "Monarch's Domain counts 2 extra pieces"); }
+// Synergies: every live Gift lists what it works with, and every entry is an archetype or a Gift
+Object.keys(G.GIFTS).filter(k => !['retired', 'extra', 'flaw'].includes(G.GIFTS[k].cat)).forEach(k => { const L = G.GIFT_SYN[k]; ok(L && L.length >= 2 && L.every(x => G.ARCH[x] || G.GIFTS[x]), `${k} lists what it works with`); });
+{ const { f } = fightWith(['trashtalk']); const t = f.A.skills.find(s => s.key === 'bait'); G.playerAct(f, f.A.skills.indexOf(t)); ok(f.A.critNext, 'Trash Talk makes your next hit critical'); }
+{ const { f } = fightWith(['adminrights']); const sw = f.A.skills.find(s => s.key === 'swap'), nx = G.peekNext(f); if (nx && nx !== f.B.intent) { G.playerAct(f, f.A.skills.indexOf(sw)); ok(f.B.weaken > 0, 'Running Order Weakens on a swap'); } }
 // Sponsorship Offer replaces the Chosen Gifts
 ok(G.EVENTS.sponsorship && G.GIFTS.chosen_war.cat === 'retired', 'the Chosen Gifts are now the Sponsorship Offer event');
 console.log(fails ? `${fails} failed` : 'signature gifts: all passed');
