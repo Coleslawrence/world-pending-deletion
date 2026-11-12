@@ -150,11 +150,20 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
   const run = G.newRun(w, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, meta, seeded(8));
   ok(JSON.stringify(run.arch) === JSON.stringify(G.worldArch(w, meta.unlocks)), 'a new run uses its world\'s class pool');
   // Before WORLD_GEN.from, Pending World is the world the old generator made
-  const old = date => { const rng = G.seedRng(G.dailySeed(date) + ':world'), T0 = Object.keys(G.WORLD_TYPES), type = G.pick(T0, rng), T = G.WORLD_TYPES[type];
+  const old = date => { const rng = G.seedRng(G.dailySeed(date) + ':world'), T0 = Object.keys(G.WORLD_TYPES).filter(k => G.addedBy(G.WORLD_TYPES[k], date)), type = G.pick(T0, rng), T = G.WORLD_TYPES[type];
     const name = G.pick(T.names[0].slice(0, 6), rng) + G.pick(T.names[1].slice(0, 6), rng); rng(); rng(); return { type, name: name[0].toUpperCase() + name.slice(1), champ: G.pick(T.champs.slice(0, 6), rng) }; };
   const was = G.WORLD_GEN.from; G.WORLD_GEN.from = '2099-01-01';
   ['2026-11-01', '2026-11-02', '2026-12-25'].forEach(d => { const a = G.dailyWorld(d), b = old(d); ok(!a.v && a.type === b.type && a.name === b.name && a.champ === b.champ, `Pending World ${d} unchanged`); });
   G.WORLD_GEN.from = '2026-11-02';
+  // Content added later (added: key) sits out Pending World days before ADDED_FROM[key], and joins from that day
+  { const keys = Object.keys(G.ADDED_FROM), saved = Object.assign({}, G.ADDED_FROM), days = Array.from({ length: 120 }, (_, i) => new Date(Date.parse('2026-12-01') + i * 864e5).toISOString().slice(0, 10));
+    const isNew = w => [G.WORLD_TYPES[w.type], G.FATES[w.fate], G.PEOPLES[w.people], G.WORLD_TYPES[w.mix]].some(x => x && x.added);
+    keys.forEach(k => { G.ADDED_FROM[k] = '2099-01-01'; });
+    ok(days.every(d => !isNew(G.dailyWorld(d))), 'Pending World never draws content added after its day');
+    ok(days.every(d => { const w = G.dailyWorld(d), R = G.dailyRecord(d, w), E = G.recLore(R, w.type).entries; return R.ids.every(i => !E[i].added); }), 'Pending World records never file entries added after their day');
+    keys.forEach(k => { G.ADDED_FROM[k] = '2026-12-01'; });
+    ok(days.some(d => isNew(G.dailyWorld(d))), 'from its day, Pending World can draw added content');
+    Object.assign(G.ADDED_FROM, saved); }
   ok(!G.dailyWorld('2026-11-01').v && G.dailyWorld('2026-11-02').v === 2 && JSON.stringify(G.dailyWorld('2026-11-03')) === JSON.stringify(G.dailyWorld('2026-11-03')), 'from the cut-off, Pending World is layered and the same for everyone');
   G.WORLD_GEN.from = was;
 }

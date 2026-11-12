@@ -171,7 +171,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `augury` | 1 | The Hanged Augur: Augury (1) | (works with other keys on the same skill) | yes |
 | `bigStop` | 4 | Squall Line (2), Wall Cloud (2), Downburst (3), … | If the opponent is winding up a big attack, Interrupt it. Otherwise Weaken them for 2 turns. | yes |
 | `bleed` | 27 | Lacerate (5), Thousand Cuts (1), Open Vein (3), … | Apply 5 Bleed. | yes |
-| `block` | 127 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
+| `block` | 128 | Ember Ward (8), Iron Guard (9), Shield Bash (6), … | Gain 8 Block. | yes |
 | `blockDmg` | 10 | Smite (0.5), Bulwark Slam (1.2), Judgement (1), … | Plus damage equal to 50% of your Block. | yes |
 | `blockPip` | 9 | Hedge Your Bet (3), Insurance (3), Side Bet (2), … | (works with other keys on the same skill) | yes |
 | `boxcars` | 1 | Boxcars (1) | (works with other keys on the same skill) | yes |
@@ -194,7 +194,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `die` | 45 | Coin Toss (1), Hedge Your Bet (1), Double Down (1), … | Rolls a die each turn, shown before you pick. | no |
 | `dieMin` | 3 | Two-Headed Coin (4), Hedged Bet (3), Rigged Wheel (2) | (works with other keys on the same skill) | yes |
 | `dieStun` | 5 | Thunder Dice (6), Rolling Thunder (5), Storm Front (6), … | (works with other keys on the same skill) | yes |
-| `dmg` | 332 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
+| `dmg` | 337 | Firebolt (7), Flame Wave (4), Scorch (5), … | Deal 7 damage. | yes |
 | `dmgAll` | 4 | Jackpot (3), Progressive Jackpot (3), Cash Out (3), … | Deal 3 per pip across all your shown dice. | yes |
 | `dmgHigh` | 4 | Table Stakes (5), High Roller's Bet (7), Covered Bet (5), … | (works with other keys on the same skill) | yes |
 | `dmgPip` | 29 | Coin Toss (2), Double Down (6), Thunder Dice (2), … | (works with other keys on the same skill) | yes |
@@ -226,7 +226,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `keepHalf` | 1 | Aftermath (1) | (works with other keys on the same skill) | no |
 | `killReset` | 3 | Silent Kill (1), Mercy Kill (1), Last Hour (1) | No cooldown if it kills. | no |
 | `leech` | 4 | Leech (3), Blood Leech (6), Parasite (3), … | Leech: for 4 turns, drain 3 HP from the opponent each turn. | yes |
-| `lifesteal` | 18 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | yes |
+| `lifesteal` | 20 | Drain Life (0.5), Soul Harvest (0.6), Soul Drain (0.6), … | Heal 50% of the damage dealt. | yes |
 | `malice` | 4 | Malice (3), Spite (5), Torment (3), … | +3 for each effect on the opponent. | yes |
 | `mark` | 17 | Mark Prey (2), House Edge (3), Holy Brand (2), … | Mark the opponent: they take 30% more damage for 2 turns. | yes |
 | `mirror` | 1 | The Masked Entrant: Mirror Form (1) | (works with other keys on the same skill) | yes |
@@ -241,7 +241,7 @@ Written from the content itself by the checker, so it is always current. "Bot sc
 | `perCurse` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | (works with other keys on the same skill) | yes |
 | `perHit` | 20 | Flame Wave (1), Conflagration (1), Thousand Cuts (1), … | (works with other keys on the same skill) | no |
 | `perMisf` | 4 | Thirteenth Hour (3), Witching Hour (4), Last Hour (3), … | Deal 3 per Misfortune on the opponent plus 0 per Curse on you. | yes |
-| `pierce` | 20 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | yes |
+| `pierce` | 21 | Arcane Missiles (1), Arcane Cataclysm (1), Heartseeker (1), … | Ignores Block. | yes |
 | `poison` | 56 | Pandemic (6), Venom Blade (2), Hex (2), … | Apply 6 Poison. | yes |
 | `portent` | 1 | The Hanged Augur: Portent (1) | (works with other keys on the same skill) | yes |
 | `progressive` | 1 | Progressive Jackpot (1) | (works with other keys on the same skill) | yes |
@@ -326,7 +326,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `echoNext` | 1 | echo_chamber (0.5) | Every skill plays again next turn at 50% power. | set |  |  |  |
 | `encore` | 1 | Encore (1) | After three different skills in a row, your next skill plays twice. | set |  |  |  |
 | `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
-| `execBonus` | 6 | Headsman (0.5), executioner_axe (0.4), grave_shroud (0.15), … | +50% damage to opponents below 30% HP. | add |  |  | Reaper |
+| `execBonus` | 8 | Headsman (0.5), executioner_axe (0.4), grave_shroud (0.15), … | +50% damage to opponents below 30% HP. | add |  |  | Reaper |
 | `execPip` | 1 | Dead Man's Hand (0.02) | Execute thresholds rise by 2% for each pip on your highest die. | add |  |  | Gambler, Reaper |
 | `extraHit` | 1 | Bladedancer 2 (1) | Multi-hit skills hit once more. | set |  |  | Bladedancer |
 | `firstCrit` | 2 | duelist_rapier (1), Crow's Eye (1) | Your first hit each fight is critical. | set |  |  |  |
@@ -363,7 +363,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `jinxHeal` | 1 | Small Mercies (0.05) | Jinxing a move heals you 5% of your max HP. | add |  |  | Jinx, Zealot |
 | `jinxReroll` | 1 | Rigged Game (1) | When you jinx a move, reroll all your dice. | set |  |  | Jinx, Gambler |
 | `lastWords` | 3 | templar_plate (0.15), bastion_plate (0.15), Last Words (0.4) | Once per fight, dropping below 25% HP gives you Block equal to 15% of your max HP. | set |  |  |  |
-| `lifesteal` | 8 | Reaper 4 (0.3), Gambler 2 (0.25), Undying (0.15), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
+| `lifesteal` | 9 | Reaper 4 (0.3), Gambler 2 (0.25), Undying (0.15), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lightFingers` | 1 | Light Fingers (1) | The first big hit an opponent shows each fight, you steal: a one-use copy of it joins your skills. | set |  |  |  |
 | `lowDieUp` | 1 | tampered_dice (1) | Your lowest die each turn shows 1 more. | add |  |  | Gambler |
 | `lowDR` | 3 | soul_lantern (0.15), gravecloth (0.15), Comeback Kid (0.2) | Below 25% HP, take 15% less damage. | set |  | rate |  |
@@ -404,7 +404,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `rakeReroll` | 1 | croupiers_rake (1) | After a Jackpot, gain 1 reroll. | add |  |  | Gambler |
 | `reactHeal` | 1 | Dragon Blood (10) | Toxic Flare and Cauterise heal you 10. | set |  |  |  |
 | `reactMult` | 2 | Catalyst (2), Alchemist (1.2) | Reactions are 100% stronger. | mul |  |  |  |
-| `reapBlood` | 3 | Reaper 2 (0.15), Headsman (0.15), executioner_axe (0.1) | The first time you hit an opponent below half HP, heal 15% of your max HP. | set |  |  | Reaper |
+| `reapBlood` | 4 | Reaper 2 (0.15), Headsman (0.15), executioner_axe (0.1), … | The first time you hit an opponent below half HP, heal 15% of your max HP. | set |  |  | Reaper |
 | `reapPierce` | 1 | Reaper 2 (1) | Your hits ignore the Block of opponents below half HP. | set |  |  | Reaper |
 | `regen` | 11 | Zealot 4 (2), Undying (3), pilgrim_mace (2), … | Heal 2 at the start of each of your turns. | add | yes | flat, scales with power | Zealot |
 | `relic` | 1 | reliquary (0.2) | Once per fight, dropping below 30% HP heals you 20% of your max HP. | set |  |  | Zealot |
@@ -447,7 +447,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `vsBigger` | 1 | Giant Slayer (0.15) | +15% damage to opponents with more max HP than you. | add |  |  |  |
 | `vsBleed` | 1 | bloodletter (0.15) | +15% damage to bleeding opponents. | add |  |  | Bladedancer, Reaper |
 | `vsDisabled` | 4 | verdict_hammer (0.2), shock_gauntlet (0.15), lodestone (0.1), … | +20% damage to Stunned or Weakened opponents. | add |  |  | Reaper, Stormcaller |
-| `vsHalf` | 4 | Reaper 2 (0.35), whetstone_charm (0.1), notched_cleaver (0.12), … | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
+| `vsHalf` | 7 | Reaper 2 (0.35), whetstone_charm (0.1), notched_cleaver (0.12), … | Opponents below half HP take 35% more damage from you. | add |  | rate | Reaper |
 | `vsHard` | 1 | Underdog (0.1) | +10% damage to hard opponents. | add |  |  |  |
 | `vsHigherRank` | 1 | Rank Is Just a Letter (0.1) | +10% damage to opponents of a higher rank than you. | add |  |  |  |
 | `weakenPlus` | 1 | lodestone (1) | Weaken you apply lasts 1 turn longer. | add |  |  | Stormcaller |
@@ -502,11 +502,11 @@ A move's role is read from its effects (`moveRole`). A big hit is one of at leas
 
 | Role | Meaning | Used by |
 | --- | --- | --- |
-| strike | a plain hit | 45 moves |
-| big | a big hit, the one to Block or Stun | 22 moves |
-| guard | Block and nothing else | 33 moves |
+| strike | a plain hit | 46 moves |
+| big | a big hit, the one to Block or Stun | 23 moves |
+| guard | Block and nothing else | 34 moves |
 | setup | a status, buff or trick with little damage | 33 moves |
-| sustain | healing or draining | 8 moves |
+| sustain | healing or draining | 9 moves |
 
 ### Outcomes (`then`, `reward`), from `js/content/outcomes.js`
 

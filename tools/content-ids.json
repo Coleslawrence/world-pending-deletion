@@ -539,6 +539,7 @@
   "countdown_collar",
   "pain_link",
   "unsigned_patch",
+  "harvest_sickle",
   "missingno",
   "smelters_apron",
   "grounding_mail",
@@ -574,7 +575,8 @@
   "iron",
   "steppes",
   "marches",
-  "fens"
+  "fens",
+  "vales"
  ],
  "modifiers": [
   "none",
@@ -652,6 +654,7 @@
   "dealer",
   "augur",
   "herald",
+  "reaping_lord",
   "proctor",
   "legend",
   "undefeated"
@@ -666,6 +669,7 @@
   "nearmiss",
   "loadeddice",
   "lightningrod",
+  "lastsheaf",
   "appraisal",
   "monarch",
   "rewind",
@@ -767,6 +771,7 @@
   "forgebreaker",
   "housebreaker",
   "omenbreaker",
+  "scythebreaker",
   "stormbreaker",
   "ascendant",
   "pathfinder",
@@ -1018,6 +1023,7 @@
   "ironclad",
   "galedriven",
   "tellreader",
+  "gleaner",
   "omenread",
   "replicated",
   "desynced",
@@ -1378,6 +1384,36 @@
     "The horseshoe door",
     "Your aunt Hester",
     "Your rival Fitch"
+   ]
+  },
+  "vales": {
+   "roles": [
+    "reaper",
+    "gleaner",
+    "miller's hand",
+    "scarecrow mender",
+    "tithe runner"
+   ],
+   "promises": [
+    "bring the harvest in",
+    "pay off the tithe",
+    "see one full barn"
+   ],
+   "entries": [
+    "The Unmown Field",
+    "The Tenth Sheaf",
+    "The Scarecrow Road",
+    "The Long Reckoning",
+    "The Tithe Barn",
+    "The Millrace",
+    "Harvest Home",
+    "Reeve Callow",
+    "The Corn Doll",
+    "The Gleaning Fields",
+    "The farmhouse by the mill",
+    "The hayloft",
+    "Your grandmother Hattie",
+    "Your friend Rook"
    ]
   },
   "fate longnight": {
