@@ -120,6 +120,22 @@ p { margin: 0; }
 .pk-good { color: var(--good); font-size: var(--fs-2); } .pk-bad { color: var(--bad-soft); font-size: var(--fs-2); }
 .pk-stats { display: flex; gap: 10px; font-family: var(--f-m); font-size: var(--fs-1); color: var(--muted); flex-wrap: wrap; }
 .pk-stats b { color: var(--text); font-weight: 500; }
+.pk-rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 8px; align-items: baseline; font-size: var(--fs-2); color: var(--muted); }
+.pk-rules li { display: contents; }
+.pk-rules .tag { justify-self: start; }
+.pk-rules .tag.gift { border-color: var(--sys-d); color: var(--sys); }
+.pk-story { font-size: var(--fs-2); color: var(--muted); font-style: italic; border-top: 1px dashed var(--line2); padding-top: 6px; margin: 0; }
+.link.steer { justify-self: center; font-size: var(--fs-2); color: var(--muted); padding: 6px 4px; }
+/* terms of entry */
+.tm-h { font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .12em; text-transform: uppercase; color: var(--sys); margin: 4px 0 -2px; }
+.tm-list { display: grid; gap: 6px; }
+.term { text-align: left; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l go" "v go" "n go"; column-gap: 10px; row-gap: 1px; align-items: center; background: var(--bg2); border: 1px solid var(--line2); border-left: 3px solid var(--line2); border-radius: var(--r-l); padding: 9px 12px; cursor: pointer; color: var(--text); }
+.term.set { border-left-color: var(--sys); }
+.term:hover { border-color: var(--bronze); }
+.tm-l { grid-area: l; font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tm-v { grid-area: v; font-size: var(--fs-3); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.tm-n { grid-area: n; font-size: var(--fs-2); color: var(--muted); }
+.tm-go { grid-area: go; font-size: var(--fs-4); color: var(--muted); }
 .foot { display: grid; gap: 10px; }
 .kit-h { grid-column: 1 / -1; margin: 10px 0 0; font-size: 14px; }
 .sgrid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
@@ -417,6 +433,11 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .tab { background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--r-s); padding: 8px 4px; cursor: pointer; font-size: var(--fs-2); white-space: nowrap; }
 .tab.on { border-color: var(--sys); color: var(--sys); background: var(--sys-d); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.step { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--r-s); padding: 7px 4px; cursor: pointer; font-size: var(--fs-2); color: var(--muted); white-space: nowrap; }
+.step .st-i { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid currentColor; font-family: var(--f-m); font-size: 11px; line-height: 1; }
+.step.done { color: var(--text); } .step.done .st-i { border-color: var(--good); color: var(--good); }
+.step.on { border-color: var(--sys); color: var(--sys); background: var(--sys-d); } .step.on .st-i { border-color: var(--sys); color: var(--sys); }
 .sysw { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid var(--sys); border-radius: var(--r-l); background: linear-gradient(180deg, rgba(114,208,255,.06), rgba(114,208,255,.01)); padding: 12px; display: grid; gap: 10px; align-content: start; }
 .fld { display: grid; gap: 6px; } .fld > span { font-family: var(--f-m); font-size: var(--fs-1); letter-spacing: .1em; text-transform: uppercase; color: var(--sys); }
 .fld input { font: 17px var(--f-d); color: var(--text); background: var(--bg); border: 1px solid var(--line2); border-radius: var(--r-s); padding: 9px 10px; width: 100%; }

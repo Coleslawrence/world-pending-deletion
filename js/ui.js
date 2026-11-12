@@ -576,24 +576,55 @@ function titleHTML() {
       ${FIREBASE && !cloud.on ? cloudSignInHTML(true) : FIREBASE && cloud.on ? `<p class="sh-p fine center">Signed in as ${esc(publicName())} · ${window.WPD_PREVIEW ? 'dev preview, not saved to cloud' : 'cloud save on'} · <button class="link" data-act="signout">Sign out</button>${cloud.tester === false ? `<br>${PENDING}` : ''}</p>` : ''}
     </div></main>`;
 }
+// The steps before a run, numbered for the eyebrow: World, Terms (once there is a run behind you), Champion, Opening kit
+function preSteps() { return termsOn() ? ['World', 'Terms', 'Champion', 'Kit'] : ['World', 'Champion', 'Kit']; }
+function preStep(k) { const L = preSteps(); return `Step ${L.indexOf(k) + 1} of ${L.length}`; }
 function worldsHTML() {
   const cards = ui.worlds.map((w, i) => {
-    const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod], F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix];
-    const classes = w.v >= 2 ? worldArch(w, meta.unlocks) : [T.home];
-    return `<button class="pick ${ui.world === i ? 'on' : ''}" data-act="pick-world" data-i="${i}">
-      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${markChip('world', w.type)}${rankChip(w.rank)}</div>${w.bounty && BOUNTIES[w.bounty] ? `<div class="pk-row"><span class="tag bounty">${esc(BOUNTIES[w.bounty].name)}</span><span class="pk-mut">${esc(BOUNTIES[w.bounty].desc)}</span></div>` : ''}
+    const T = WORLD_TYPES[w.type], M = MODIFIERS[w.mod], F = FATES[w.fate], P = PEOPLES[w.people], C = WORLD_TYPES[w.mix], on = ui.world === i;
+    const classes = w.v >= 2 ? worldArch(w, meta.unlocks) : [T.home], B = w.bounty && BOUNTIES[w.bounty];
+    // Rules first, story only on the world you have picked: the cards stay short enough to compare at a glance
+    const rule = (tag, text, cls) => `<li><span class="tag${cls ? ' ' + cls : ''}">${esc(tag)}</span><span>${esc(text)}</span></li>`;
+    return `<button class="pick world ${on ? 'on' : ''}" data-act="pick-world" data-i="${i}" aria-pressed="${on}">
+      <div class="pk-h"><span class="pk-name">${esc(w.name)}</span>${w.steered ? '<span class="tag">Requested</span>' : ''}${markChip('world', w.type)}${rankChip(w.rank)}</div>
       <div class="pk-sub">${[T.name, P && P.name, F && F.name].filter(Boolean).map(esc).join(' · ')}</div>
-      <div class="pk-row"><span class="pk-mut">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</span></div>${P && P.custom ? `<div class="pk-row"><span class="pk-mut"><b>${esc(P.custom.name)}:</b> ${esc(P.custom.text)}</span></div>` : ''}
       <div class="pk-row">${classes.map(k => `<span class="tagn a-${k}">${ARCH[k].name}</span>`).join('')}</div>
-      <div class="pk-row"><span class="tag${M.glitch ? ' glitch' : ''}">${esc(M.name)}</span><span class="pk-mut">${esc(M.desc)}</span></div>
-      <div class="pk-row"><span class="pk-mut">World Gift: ${esc(GIFTS[T.gift].name)} · Final: a paired world's finalist</span></div>
+      <ul class="pk-rules">${B ? rule(B.name, B.desc, 'bounty') : ''}${rule(M.name, M.desc, M.glitch ? 'glitch' : '')}${P && P.custom ? rule(P.custom.name, P.custom.text) : ''}${rule('World Gift', GIFTS[T.gift].name + ': ' + GIFTS[T.gift].desc, 'gift')}</ul>
+      ${on ? `<p class="pk-story">${esc(T.flavour)}${C ? ` The ${esc(C.name)} press in.` : ''}${P ? ' ' + esc(P.line) : ''}${F ? ' ' + esc(fateLine(F, w.type)) : ''}</p>` : ''}
     </button>`;
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
-  return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
-    <p class="hint">Rank E and D worlds show 1 more Signature Gift at the Awakening. Higher ranks bring tougher opponents.${!meta.runs ? ' <span class="sysl">[First tournament? The buttons under the worlds are optional extras. Ignore them until you have a run behind you.]</span>' : meta.runs === 1 ? ' <span class="sysl">[Guide: the extras are open now. Run goal pays Echoes for a target you pick. Contracts are this week\'s three jobs. Back yourself bets Echoes on how far you get.]</span>' : ''}</p>
-    <div class="picks">${cards}</div>${ladderRow()}${goalRow()}${worldExtras()}
-    <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
+  const st = canSteer() ? `<button class="link steer" data-act="sheet" data-s="steer">${ui.worlds.some(x => x.steered) ? 'Ask for a different world' : 'None of these? Ask the System for a world'} · ${STEER_COST} Echoes</button>` : '';
+  return `<main class="screen select worlds"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">${preStep('World')}</div><h2>Choose a world to fight for</h2></div></div>
+    <p class="hint">Higher ranks bring tougher opponents. Rank E and D worlds show 1 more Signature Gift.</p>
+    <div class="picks">${cards}${st}</div>
+    <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? (termsOn() ? 'Next: terms of entry' : 'Fight for ' + esc(w.name)) : 'Pick a world'}</button></div></main>`;
+}
+
+// ---------- Terms of entry ----------
+// Everything you can set before a run that isn't the world or the champion, in one place: how hard (Priority, Challenge,
+// Entry Clause) and what you're playing for (run goal, Contracts, Back yourself). Each row shows what is set now and
+// opens the sheet that changes it. Skipped on the first run, when none of it means anything yet.
+function termsOn() { return !ui.daily && meta.runs > 0; }
+function termRow(s, label, value, note, set) {
+  return `<button class="term ${set ? 'set' : ''}" data-act="sheet" data-s="${s}"><span class="tm-l">${esc(label)}</span><span class="tm-v">${value}</span>${note ? `<span class="tm-n">${note}</span>` : ''}<span class="tm-go" aria-hidden="true">›</span></button>`;
+}
+function termsHTML() {
+  const w = ui.worlds[ui.world];
+  const P = sanitizePriority(meta.priority), C = CHALLENGES[ui.challenge], K = sanitizeClauses(meta.clauses);
+  const hard = [];
+  if (P.max) hard.push(termRow('priority', 'Priority', P.set ? `${P.set} · ${esc(PRIORITY[P.set - 1].name)}` : '0 · Standard', P.set ? `+${Math.round(P.set * PRIORITY_ECHO * 100)}% Echoes. ${P.max} open.` : `Up to ${P.max} open. Higher pays more Echoes.`, P.set > 0));
+  if (meta.wins > 0) hard.push(termRow('challenge', 'Challenge', C ? esc(C.name) : 'None', C ? esc(C.say) : 'Special terms with a first-clear Echo prize.', !!C));
+  if (Object.keys(K.open).length > 1) { const L = CLAUSES[K.set]; hard.push(termRow('clauses', 'Entry Clause', esc(L.name), K.set === 'standard' ? 'Clauses give one thing and take another.' : `Gives: ${esc(L.give)} Takes: ${esc(L.take)}`, K.set !== 'standard')); }
+  const M = goalOffer(meta), CT = contractsOf(meta), n = contractBoard(CT.week).filter(id => CT.done[id]).length, B = meta.backing, BG = B && BACK_GOALS[B.goal];
+  const play = [termRow('goal', 'Run goal', M.pick ? esc(goalText(M.pick)) : 'None', M.pick ? `Pays ${GOAL_PAY[goalDef(M.pick).tier].echoes} Echoes if you meet it.` : 'Pick a target. Meet it and it pays Echoes.', !!M.pick),
+    termRow('contracts', 'Contracts', `${n} of 3 done`, "This week's jobs. They count in any run.", false)];
+  if (BG || meta.echoes >= BACK_STAKES[0]) play.push(termRow('backing', 'Back yourself', BG ? `${esc(BG.name)} · ${B.stake} Echoes` : 'No bet', BG ? `Pays ${Math.round(B.stake * BG.mul)} if you make it.` : 'Stake Echoes on how far you get.', !!BG));
+  const guide = meta.runs === 1 ? '<p class="hint sysl">[Guide: all optional. Leave everything as it is and you play the standard tournament.]</p>' : '';
+  return `<main class="screen select terms"><div class="sel-h"><button class="icon-btn" data-act="back-worlds" aria-label="Back">‹</button><div><div class="eyebrow">${preStep('Terms')} · ${esc(w.name)}</div><h2>[Terms of entry]</h2></div></div>
+    <p class="hint">Optional. These stay as you left them from run to run.</p>${guide}
+    <div class="picks">${hard.length ? `<h4 class="tm-h">How hard</h4><div class="tm-list">${hard.join('')}</div>` : ''}<h4 class="tm-h">What you play for</h4><div class="tm-list">${play.join('')}</div></div>
+    <div class="foot"><button class="btn primary" data-act="terms-ok">Next: your champion</button></div></main>`;
 }
 
 // ---------- Awakening ----------
@@ -624,7 +655,8 @@ function awakenHTML() {
   const shown = awShown(a, w), sig = a.gifts.find(isSignature), flaw = awFlaw(a);
   // In the order they depend on each other: the Patron sets how many Signature Gifts are on show (Faithless adds 1), and
   // stats wait for the opening draft, when the skills they power are known
-  const tabs = [['id', 'Name'], ['patron', 'Patron'], ['gifts', `Gifts${sig || !shown.length ? '' : ' · 1'}`]];
+  const tabs = [['id', 'Champion'], ['patron', 'Patron'], ['gifts', 'Gift']], ti = tabs.findIndex(t => t[0] === a.tab);
+  const done = { id: !!a.name.trim(), patron: !!a.patron, gifts: !!sig || !shown.length };
   const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
   let body = '';
   if (a.tab === 'id') {
@@ -648,18 +680,21 @@ function awakenHTML() {
       Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b>${!ui.daily && !a.practice && bondLevel(meta, k) ? `<span class="tagn">Bond ${bondLevel(meta, k)}</span>` : ''}</span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
       `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+1</span></span><span class="gf-d">No Patron. 1 more Signature Gift to choose from.</span></button>`;
   }
-  const needSig = !sig && shown.length > 0;
-  const ready = a.name.trim() && a.patron && !needSig;
-  const why = !a.name.trim() ? 'Name your champion' : !a.patron ? 'Choose a Patron' : needSig ? 'Choose a Signature Gift' : 'Awaken';
-  return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="${ui.daily ? 'back-title' : 'back-worlds'}" aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : ui.aw && ui.aw.practice ? 'Practice run' : 'Step 2 of 3'} · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
-    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${a.tab === k ? 'on' : ''}" data-act="aw-tab" data-t="${k}" role="tab">${l}</button>`).join('')}</div>
+  // The footer walks the steps in order; the step row above lets you jump to any of them
+  const next = tabs[ti + 1], ready = done.id && done.patron && done.gifts;
+  const foot = next ? (done[a.tab] ? `<button class="btn primary" data-act="aw-tab" data-t="${next[0]}">Next: ${next[1]}</button>` : `<button class="btn primary" disabled>${a.tab === 'id' ? 'Name your champion' : 'Choose a Patron'}</button>`)
+    : `<button class="btn primary" data-act="aw-ok" ${ready ? '' : 'disabled'}>${ready ? 'Awaken' : !done.gifts ? 'Choose a Signature Gift' : !done.id ? 'Name your champion first' : 'Choose a Patron first'}</button>`;
+  const back = ti > 0 ? `data-act="aw-tab" data-t="${tabs[ti - 1][0]}"` : `data-act="${ui.daily ? 'back-title' : termsOn() && !a.practice ? 'back-terms' : 'back-worlds'}"`;
+  const heads = { id: '[Integration complete. Identify yourself.]', patron: '[Choose a Patron.]', gifts: '[Distributing Gifts.]' };
+  return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" ${back} aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : ui.aw && ui.aw.practice ? 'Practice run' : preStep('Champion')} · ${esc(w.name)}</div><h2>${heads[a.tab]}</h2></div></div>
+    <ol class="steps aw-steps">${tabs.map(([k, l], i) => `<li><button class="step ${a.tab === k ? 'on' : ''} ${done[k] ? 'done' : ''}" data-act="aw-tab" data-t="${k}" ${a.tab === k ? 'aria-current="step"' : ''}><span class="st-i">${done[k] && a.tab !== k ? '✓' : i + 1}</span>${l}</button></li>`).join('')}</ol>
     <section class="aw-body sysw">${body}</section>
-    <div class="foot"><button class="btn primary" data-act="aw-ok" ${ready ? '' : 'disabled'}>${why}</button></div></main>`;
+    <div class="foot">${foot}</div></main>`;
 }
 
 // ---------- Draft ----------
 // The opening draft is three steps: 3 of 6 skills, then 1 of 2 gear, then the opening stat points (kitStatsHTML)
-function draftEyebrow(step) { return `${run.daily ? 'Pending World' : run.practice ? 'Practice run' : 'Step 3 of 3'} · ${step}`; }
+function draftEyebrow(step) { return `${run.daily ? 'Pending World' : run.practice ? 'Practice run' : (meta.runs > 0 ? 'Step 4 of 4' : 'Step 3 of 3')} · ${step}`; }
 function draftHTML() {
   const gd = run.gearDraft || [];
   if (run.draftPicked && gd.length) return gearDraftHTML(gd);
@@ -1716,18 +1751,6 @@ function hallsSheet() {
   return sheetWrap('The Halls', `<button class="btn ghost small" data-act="sheet" data-s="quarters">Entrant Quarters ›</button>${rankHTML()}${cloud.on && cloud.tester === false ? `<p class="sh-p fine">${PENDING} Sharing champions opens once you are approved.</p>` : ''}<h4>Hall of the Erased</h4><p class="sh-p fine">Champions of worlds you lost. The System may enter them against you.</p><div class="cards">${meta.erased.map(x => row(x, true)).join('') || '<p class="sh-p fine">Empty. For now.</p>'}</div>${(meta.settled || []).length ? `<h4>Hall of the Settled · ${meta.settled.length}</h4><p class="sh-p fine">Erased champions you beat and settled. They do not return.</p><ul class="msgs">${meta.settled.map(x => `<li><b>${esc(x.champ)}</b><br><small>${esc(x.line)}</small></li>`).join('')}</ul>` : ''}${togetherHTML()}<h4>Hall of Champions</h4><p class="sh-p fine">Champions of worlds you saved. They appear in future elite brackets.</p><div class="cards">${meta.champions.map(x => row(x, false)).join('') || '<p class="sh-p fine">No world spared yet.</p>'}</div>${others}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Steer the next world: one requested world joins the offer (asking again replaces it). Only shown when you can pay.
-// Below the world offer: Back yourself and Steer, side by side when both are open
-function worldExtras() {
-  const b = backingBtn(), st = canSteer() ? `<button class="btn ghost small" data-act="sheet" data-s="steer">${b ? `${ui.worlds.some(x => x.steered) ? 'New request' : 'Request a world'} · ${STEER_COST}` : `${ui.worlds.some(x => x.steered) ? 'Ask for a different world' : 'Ask the System for a world'} (${STEER_COST} Echoes)`}</button>` : '';
-  return b && st ? `<div class="row2 even">${b}${st}</div>` : b + st;
-}
-// Back yourself: the world screen shows your stake, or a button to place one when you can afford the smallest
-function backingBtn() {
-  if (ui.daily) return '';
-  const B = meta.backing;
-  if (B && BACK_GOALS[B.goal]) return `<button class="btn ghost small" data-act="sheet" data-s="backing">Backed · ${B.stake} Echoes</button>`;
-  return meta.echoes >= BACK_STAKES[0] ? `<button class="btn ghost small" data-act="sheet" data-s="backing">Back yourself</button>` : '';
-}
 // The desk: everything changing this run's rules (Licences, Amendments, a door's curse, a token in use), the Licence
 // in stock, and the token this shop gives for spending nothing
 function deskCount() { return run ? amendIds(run).length + (run.curse && !run.elite ? 1 : 0) + (run.vouchers || []).length + (run.tokenOn ? 1 : 0) + (run.priority && !run.elite ? 1 : 0) + (CHALLENGES[run.challenge] && !run.elite ? 1 : 0) : 0; }
@@ -1770,21 +1793,6 @@ function bracketSheet() {
   const elite = B.elite.length ? `<h4>Elite bracket</h4>` + B.elite.map((e, i) => `<div class="bk-row elite ${e.state}"><div class="bk-bar" style="width:${60 - i * 6}%"><b>E${i + 1}</b><span>${esc(e.name)}</span></div></div>`).join('') : '';
   const lead = run.elite ? '[Your world is spared. What is left is pride.]' : `[${BRACKET_FIELD[0]} Entrants. One world walks out. You are ${run.round >= ROUNDS ? 'in the Final' : `in round ${run.round}, among the last ${BRACKET_FIELD[run.round - 1]}`}.]`;
   return sheetWrap('[Tournament bracket]', `<p class="sh-p">${lead}</p><div class="bk">${B.rows.map(row).join('')}</div>${elite}<p class="sh-p fine">Each round: choose an opponent, visit a district, shop, fight. Opponents are drawn when the round begins.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
-}
-// The difficulty ladder on the world screen: Priority once a level is open, Challenge worlds once a world has been spared
-function ladderRow() {
-  if (ui.daily) return '';
-  const P = sanitizePriority(meta.priority), C = CHALLENGES[ui.challenge];
-  const p = P.max ? `<button class="btn ghost small" data-act="sheet" data-s="priority">Priority ${P.set} of ${P.max}</button>` : '';
-  const c = meta.wins > 0 ? `<button class="btn ghost small" data-act="sheet" data-s="challenge">${C ? esc(C.name) : 'Challenge world'}</button>` : '';
-  const K = sanitizeClauses(meta.clauses), cl = Object.keys(K.open).length > 1 ? `<button class="btn ghost small" data-act="sheet" data-s="clauses">Entry: ${esc(CLAUSES[K.set].name)}</button>` : '';
-  return (p && c ? `<div class="row2 even">${p}${c}</div>` : p + c) + cl;
-}
-// Goals (Phase 6): the run goal and this week's System Contracts, side by side on the world screen
-function goalRow() {
-  if (ui.daily) return '';
-  const M = goalOffer(meta), C = contractsOf(meta), n = contractBoard(C.week).filter(id => C.done[id]).length;
-  return `<div class="row2 even"><button class="btn ghost small" data-act="sheet" data-s="goal">${M.pick ? 'Run goal ✓' : 'Run goal'}</button><button class="btn ghost small" data-act="sheet" data-s="contracts">Contracts ${n}/3</button></div>`;
 }
 function goalSheet() {
   const M = goalOffer(meta), pay = id => { const P = GOAL_PAY[goalDef(id).tier]; return `Pays ${P.echoes} Echoes and ${P.xp} Mastery XP.`; };
@@ -1992,6 +2000,7 @@ function render() {
   const scr = ui.screen;
   if (scr === 'title') h = titleHTML();
   else if (scr === 'worlds') h = worldsHTML();
+  else if (scr === 'terms') h = termsHTML();
   else if (scr === 'awaken') h = awakenHTML();
   else if (scr === 'draft') h = draftHTML();
   else if (scr === 'kitstats') h = kitStatsHTML();
@@ -2064,7 +2073,9 @@ function onAct(el) {
       ui.worlds = ui.worlds.filter(x => !x.steered).concat(w); ui.world = ui.worlds.length - 1; ui.sheet = null;
       toast(`[Request granted: ${w.name}. -${STEER_COST} Echoes.]`, 'level'); return render();
     }
-    case 'world-ok': ui.aw = newAw(ui.worlds[ui.world]); return go('awaken');
+    case 'world-ok': if (termsOn()) return go('terms'); // falls through
+    case 'terms-ok': if (!ui.aw || ui.aw.practice || ui.aw.key !== ui.seed + ':' + ui.world) ui.aw = Object.assign(newAw(ui.worlds[ui.world]), { key: ui.seed + ':' + ui.world }); return go('awaken'); // back and forward keeps your choices
+    case 'back-terms': return go('terms');
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
