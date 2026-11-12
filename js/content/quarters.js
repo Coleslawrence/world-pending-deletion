@@ -1,4 +1,4 @@
-// ===== [World Pending Deletion] — content: Entrant Quarters =====
+// ===== [World Pending Deletion] — content: Handler's Quarters =====
 'use strict';
 // Phase 8, step 2. A room between runs that fills with your history: each retired rival's trophy (grudges.js), a crown for
 // each Final Champion you have beaten, and a shard for each world you have lost. Echoes buy decor for it. Purely cosmetic.

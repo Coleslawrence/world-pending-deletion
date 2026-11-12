@@ -1314,7 +1314,7 @@ function sanitizeTogether(T) { const n = v => Math.max(0, Math.min(1e9, Math.flo
 function sharedReached(meta) { const n = sanitizeTogether(meta && meta.together).spared; return SHARED_MILESTONES.filter(M => n >= M.at); }
 function sharedNext(meta) { const n = sanitizeTogether(meta && meta.together).spared; return SHARED_MILESTONES.find(M => n < M.at) || null; }
 
-// ---------- Entrant Quarters (Phase 8; decor in quarters.js) ----------
+// ---------- Handler's Quarters (Phase 8; decor in quarters.js) ----------
 // What the room shows, all from the save: retired rivals' trophies, a crown per Final Champion beaten, a shard per world lost
 // (Erased and Settled champions), and the decor bought (meta.decor: { id: 1 }). Cosmetic only.
 function quartersOf(meta) {
