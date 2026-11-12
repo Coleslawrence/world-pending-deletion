@@ -1,4 +1,4 @@
-// The Remnant (remnant.js): entries open by runs, memories can be changed, objects reach the Quarters, recognition lines.
+// The Remnant (remnant.js): entries open by runs, memories can be changed, each keeps an object, recognition lines.
 'use strict';
 const C = require('../js/core.js');
 let bad = 0; const ok = (c, m) => { if (!c) { bad++; console.log('FAIL', m); } };
@@ -13,7 +13,7 @@ ok(C.remember(m, 'fell', 2) && C.remnantMem(m, 'fell').obj.name === "A Gatekeepe
 ok(!C.remember(m, 'fell', 3), 'only 3 options');
 ok(!C.remember(m, 'was', 0), 'next entry waits for 2 runs');
 m.runs = 99; REMNANT_ENTRIES.forEach(E => { ok(C.remnantOpts(m, E).length === 3, E.k + ' has 3 options'); ok(C.remember(m, E.k, 1), E.k + ' remembered'); });
-ok(C.quartersOf(m).memories.length === REMNANT_ENTRIES.length, 'every memory places an object');
+ok(REMNANT_ENTRIES.every(E => { const x = C.remnantMem(m, E.k); return x && x.obj && x.obj.name && x.obj.lore; }), 'every memory keeps an object');
 ok(JSON.stringify(C.remnantOf(m)) === JSON.stringify(R), 'the file is drawn once and kept');
 const T = C.remnantMem(m, 'type').key, F = C.remnantMem(m, 'fate').key;
 ok(C.remnantLines({ round: 1, world: { type: T } }, m, {}).length === 1, 'same kind of world is recognised');

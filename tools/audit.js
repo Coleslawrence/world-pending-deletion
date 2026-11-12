@@ -1,7 +1,7 @@
 // Numbers audit: plays bot careers and reports how gold, HP, Hearts, fights, events and Echoes actually flow.
 //   node tools/audit.js [careers] [runsPerCareer] [--seed S] [--json FILE] [--main A]
 // A career is one fresh meta played for runsPerCareer runs. After each run the career buys Echo unlocks (cheapest
-// first), files Unfiled designs, buys a story page or decor when nothing else is left, and takes a run goal when one
+// first), files Unfiled designs, buys a story page when nothing else is left, and takes a run goal when one
 // is offered, so Echo income and spending can be read off. The bot's own play is tools/bot.js, unchanged.
 'use strict';
 const G = require('../js/core.js'), B = require('./bot.js');
@@ -31,14 +31,14 @@ wrapGold('buy', 'pieces'); wrapGold('trainStat', 'points'); wrapGold('reroll', '
 // ---- careers ----
 const UNL = Object.keys(G.UNLOCKS).sort((a, b) => G.UNLOCKS[a].cost - G.UNLOCKS[b].cost);
 function spendEchoes(meta, log) {
-  // designs first (they add pieces), then unlocks cheapest first, then story pages, then decor
+  // designs first (they add pieces), then unlocks cheapest first, then story pages
   let any = true;
   while (any) {
     any = false;
     for (const id of Object.keys(meta.designs.found || {})) if (!meta.designs.filed[id] && G.fileDesign(meta, id)) { log.push('design'); any = true; }
     for (const k of UNL) if (!meta.unlocks[k] && meta.echoes >= G.UNLOCKS[k].cost) { meta.echoes -= G.UNLOCKS[k].cost; meta.unlocks[k] = true; log.push(k); any = true; break; }
   }
-  if (UNL.every(k => meta.unlocks[k])) { if (G.buyPage(meta)) log.push('page'); else for (const k of Object.keys(G.DECOR)) if (G.buyDecor(meta, k)) { log.push('decor'); break; } }
+  if (UNL.every(k => meta.unlocks[k])) { if (G.buyPage(meta)) log.push('page'); }
 }
 const all = [], careers = [];
 for (let c = 0; c < CAREERS; c++) {
@@ -75,7 +75,7 @@ const ev = {}; all.forEach(r => Object.entries(r.events).forEach(([k, e]) => { c
 out.events = ev;
 // careers: when unlocks are afforded
 const firstAt = {}; careers.forEach(C => C.timeline.forEach(t => t.bought.forEach(b => { (firstAt[b] = firstAt[b] || []).push(t.i + 1); })));
-out.unlockRun = {}; Object.keys(firstAt).forEach(k => { const L = firstAt[k].filter((x, i, a) => k === 'design' || k === 'page' || k === 'decor' || true); out.unlockRun[k] = { n: L.length, firstAvg: avg(L, x => x) }; });
+out.unlockRun = {}; Object.keys(firstAt).forEach(k => { const L = firstAt[k].filter((x, i, a) => k === 'design' || k === 'page' || true); out.unlockRun[k] = { n: L.length, firstAvg: avg(L, x => x) }; });
 out.allUnlocksBy = avg(careers, C => { const t = C.timeline.find(t => t.bought.length && UNL.every(k => C.timeline.slice(0, t.i + 1).some(x => x.bought.includes(k)))); return t ? t.i + 1 : RUNS + 1; });
 out.mastery = {}; G.ARCH_KEYS.forEach(k => out.mastery[k] = avg(careers, C => G.masteryLevel(C.mastery[k] || 0)));
 out.careerEnd = { echoesLeft: avg(careers, C => C.echoesLeft), designsFiled: avg(careers, C => C.designs), designsFound: avg(careers, C => C.found), pages: avg(careers, C => C.pages), priorityMax: avg(careers, C => C.priorityMax || 0) };

@@ -5,10 +5,10 @@
 // file, but its name was erased with it and is never shown.
 // The Remnant file starts empty. Over many runs the player recovers memories of their world, in reverse: the last day
 // first, the earliest memory last. Each entry offers 3 options; the player picks one and may change it later (Slaw).
-// Each memory places an object in the Handler's Quarters. Story only: no memory changes a fight.
+// Each memory comes with an object the Remnant kept, shown on the file. Story only: no memory changes a fight.
 //   k: the entry's id (meta.remnant.mem[k] holds the pick). label: shown on the file. ask: the question.
 //   opts: fixed options, or from: 'arch' | 'fate' | 'people' | 'type' (3 drawn once per player from that list).
-//   Each option (or the from-list's obj function) gives the Quarters object: name, lore.
+//   Each option (or the from-list's obj function) gives the kept object: name, lore.
 // Entries open as the player finishes runs: one more at each REMNANT_AT runs (normal runs and Pending World, not practice).
 const REMNANT_AT = [1, 2, 4, 6, 9, 12, 16, 20];
 const REMNANT_ENTRIES = [
@@ -52,16 +52,4 @@ const REMNANT_LINES = {
   fate: f => `[Note to Handler: this world's Fate is ${f}. Yours was too. You know how it goes.]`,
   people: p => `[Note to Handler: ${p} live here. So did your people. They do not know you. Yet.]`,
   final: '"You are from one of my worlds. I heard it went quiet. I am sorry. Now fight."',
-};
-// The Handler's Quarters: what each piece of decor says when inspected, and which screen it opens (Slaw, 12 Nov:
-// every object has lore and does something; no object changes a run). use: [button label, ui action, data].
-const DECOR_USE = {
-  chair: { lore: 'You sit. For a moment nothing is being judged. The moment ends.', use: ['Sit', 'sheet', 'remnant'] },
-  dummy: { lore: 'Every Handler trains on one. Yours has a face drawn on it. You did not draw it.', use: ['Train', 'practice'] },
-  rug: { lore: 'The festival it was woven for is next month, in a world you spared.', use: ['Look at the pattern', 'sheet', 'halls'] },
-  lantern: { lore: 'It burns without oil. The System has filed a complaint about it.', use: ['Read by it', 'sheet', 'pages'] },
-  shelf: { lore: 'One handbook is open on its own, at a page about you.', use: ['Read the notes', 'sheet', 'notes'] },
-  window: { lore: "Today it shows a world everyone is fighting for. Tomorrow, another.", use: ["Look at today's world", 'sheet', 'daily'] },
-  screen: { lore: 'The System recorded every match you called. It wants you to watch.', use: ['See your record', 'sheet', 'mastery'] },
-  banner: { lore: 'Your sigil. It meant a world once. Now it means you.', use: ['Look at your rank', 'sheet', 'halls'] },
 };
