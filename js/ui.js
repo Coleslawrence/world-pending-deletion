@@ -1342,8 +1342,8 @@ function pendingSheet() {
   }
   if (p.type === 'rule') {
     const T = p.kind === 'precedent' ? PRECEDENTS : HOUSE_RULES;
-    const lead = p.kind === 'precedent' ? '[Standing Precedent. File 1 rule. It binds every opponent for the rest of this run.]' : '[Chat Decides. The audience has nominated two house rules for your next fight. Choose 1. It binds both fighters.]';
-    return sheetWrap(p.kind === 'precedent' ? '[Standing Precedent]' : '[Chat Decides]', `<p class="sh-p">${lead}</p>` + p.offers.map((k, i) => `<button class="choice" data-act="take-rule" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(T[k].name)}</span></div><div class="sr-desc">${esc(T[k].say)}</div></button>`).join(''), false, 'sys', true);
+    const lead = p.kind === 'precedent' ? (p.offers.length > 2 ? '[Standing Precedent. File 2 rules, one at a time. They bind every opponent for the rest of this run.]' : '[Standing Precedent. File 1 more rule.]') : '[Poll the Crowd. The crowd has nominated three house rules for your next fight. Choose 1. Each one helps only you.]';
+    return sheetWrap(p.kind === 'precedent' ? '[Standing Precedent]' : '[Poll the Crowd]', `<p class="sh-p">${lead}</p>` + p.offers.map((k, i) => `<button class="choice" data-act="take-rule" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(T[k].name)}</span></div><div class="sr-desc">${esc(T[k].say)}</div></button>`).join(''), false, 'sys', true);
   }
   if (p.type === 'intake') {
     const body = p.offers.map((k, i) => { const D = INTAKE[k]; return D ? `<button class="choice ${D.cost ? 'chk' : ''}" data-act="take-intake" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(D.name)}</span><span class="tagn">${D.cost ? 'At a price' : 'Plain'}</span></div><div class="sr-desc">${esc(D.say)}${flavHTML(D.flavour)}</div></button>` : ''; }).join('');
@@ -2239,7 +2239,7 @@ function onAct(el) {
 // ---------- Practice run (tutorial) ----------
 const PRACTICE = {
   world: { type: 'burning', name: 'the Proving Grounds', rank: 1, mod: 'none', champ: 'Novice' },
-  setup: { name: 'Novice', sigil: 3, color: 0, stats: { STR: 2, AGI: 2, INT: 4, VIT: 4, LUK: 2 }, gifts: ['deserter', 'chosen_war'], patron: 'war', arch: ['pyre', 'venom', 'bastion', 'blade'] },
+  setup: { name: 'Novice', sigil: 3, color: 0, stats: { STR: 2, AGI: 2, INT: 4, VIT: 4, LUK: 2 }, gifts: ['deserter', 'hometown'], patron: 'war', arch: ['pyre', 'venom', 'bastion', 'blade'] },
   script: {
     rounds: 3,
     draft: ['firebolt', 'venom_blade', 'iron_guard', 'quick_slash', 'hex', 'ember_ward'],
@@ -2260,7 +2260,7 @@ const ownsStar = (id, st) => run && allPieces(run).some(p => p.id === id && p.st
 const COACH = [
   { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, a Patron god and Gifts. For practice I've filled it in.", wait: 'next' },
   { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks. Your world gives one, and you choose 1 Signature Gift: a cheat or a god\'s mark. More come during the run. Open the Gifts tab.', wait: 'aw-tab' },
-  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (Block at the start of every fight) and Chosen of War (the God of War's gift arrives at once). Tap Awaken.", wait: 'aw-ok' },
+  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (Block at the start of every fight) and Hometown Crowd (someone from your world takes big hits for you). Tap Awaken.", wait: 'aw-ok' },
   { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-skills' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },

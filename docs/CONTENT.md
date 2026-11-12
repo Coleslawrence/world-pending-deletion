@@ -276,7 +276,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 
 | Key | Used | Examples (value) | Shown to players as | Combines | Grows | Enemies | Theme |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `adminSwap` | 1 | Admin Rights (1) | See the opponent's next 2 moves. Once per fight, swap them (Quick). | set |  |  |  |
+| `adminSwap` | 1 | Running Order (1) | See the opponent's next 2 moves. Once per fight, swap them (Quick). | set |  |  |  |
 | `afterQuick` | 5 | Spellblade (0.3), apprentice_staff (0.25), shadow_leathers (0.1), … | After a Quick skill, your next skill deals 30% more. | add |  |  | Arcanist |
 | `arcCd` | 1 | Arcanist 2 (6) | Your other skills: 1 turn shorter cooldown for every 6 INT (minimum 1). | set |  |  | Arcanist |
 | `bleedHeal` | 2 | hooked_sickle (0.3), Butcher (0.5) | Heal 30% of the Bleed damage your opponent takes. | add |  |  | Bladedancer, Reaper |
@@ -311,14 +311,14 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `critMult` | 2 | Swordmaster (2), Executioner (1.75) | Critical hits deal ×2 instead of ×1.5. | set |  |  |  |
 | `curseBlock` | 1 | mirror_shard_mail (4) | Each Curse you take gives you 4 Block. | add |  |  | Jinx |
 | `curseWard` | 1 | salt_pouch (3) | The first 3 Curse you would take each fight is ignored. | add |  |  | Jinx |
-| `dejaVu` | 1 | Deja Vu (0.3) | Each turn, the skill you used two turns ago plays again at 30% power. | set |  |  |  |
+| `dejaVu` | 1 | Instant Replay (0.5) | Each turn, the skill you used two turns ago plays again at 50% power. | set |  |  |  |
 | `dieMin` | 3 | Gambler 2 (2), Card Counter (3), Loaded Dice (2) | Your dice never roll below 2. | set |  |  | Gambler |
-| `dmgPct` | 9 | Glass Cannon (0.5), Demon Blood (0.25), Blood Oath (0.1), … | All your damage +50%. | add |  | rate |  |
+| `dmgPct` | 9 | Glass Cannon (0.5), Demon Blood (0.25), Blood Oath (0.2), … | All your damage +50%. | add |  | rate |  |
 | `dodge` | 5 | shadow_leathers (0.06), dancers_wraps (0.04), Elf-touched (0.1), … | +6% dodge. | add |  |  |  |
 | `dodgeBleed` | 1 | Elf-touched (3) | Each attack you dodge or evade gives the attacker 3 Bleed. | add |  |  | Bladedancer |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
-| `dotPlus` | 3 | plague_censer (1), Card Up the Sleeve (1), The Trickster (2) | Burn, Poison and Bleed you apply +1. | add |  | flat, scales with power |  |
+| `dotPlus` | 3 | plague_censer (1), Card Up the Sleeve (2), The Trickster (2) | Burn, Poison and Bleed you apply +1. | add |  | flat, scales with power |  |
 | `echoNext` | 1 | echo_chamber (0.5) | Every skill plays again next turn at 50% power. | set |  |  |  |
 | `encore` | 1 | Encore (1) | After three different skills in a row, your next skill plays twice. | set |  |  |  |
 | `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
@@ -336,8 +336,8 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `flareFull` | 2 | tar_flask (1), Plague Flame (1) | Toxic Flare ignites all of the Poison, not half. | add |  |  | Pyre, Venom |
 | `flatDR` | 5 | tower_shield (1), bastion_plate (1), Thick Skin (3), … | Every hit you take deals 1 less damage. | add |  | flat, scales with power |  |
 | `goldDmg` | 1 | misers_ring (0.05) | +5% damage for every 10 gold you hold when a fight starts, up to +25%. | add |  |  |  |
-| `goldPerWin` | 4 | misers_ring (1), gilded_coin (1), House Credit (2), … | +1 gold after each win. | add |  |  |  |
-| `growth` | 1 | Growth Spurt (4) | Each turn of a fight, gain 4 max HP and 4% damage, up to 6 times. | set |  |  |  |
+| `goldPerWin` | 4 | misers_ring (1), gilded_coin (1), House Credit (4), … | +1 gold after each win. | add |  |  |  |
+| `growth` | 1 | Growth Spurt (6) | Each turn of a fight, gain 6 max HP and 6% damage, up to 6 times. | set |  |  |  |
 | `healBlock` | 2 | templar_plate (0.3), Paladin (0.5) | Healing also gives Block equal to 30% of it. | add |  |  | Zealot, Bastion |
 | `healBreak` | 1 | flail_of_penance (2) | Your healing skills also deal 2 Break. | add |  |  | Zealot |
 | `healDmg` | 1 | Last Rites (0.3) | Your healing also deals 30% of it as damage to the opponent. | add |  |  | Reaper, Zealot |
@@ -349,7 +349,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `hitHeal` | 3 | pilgrim_mace (2), prayer_beads (1), censer_of_dawn (1) | Heal 2 whenever a skill of yours deals damage. | add |  |  | Zealot |
 | `hitMisf` | 2 | bent_horseshoe (1), thirteenth_nail (1) | Hits apply 1 Misfortune. | add |  |  | Jinx |
 | `hometown` | 1 | Hometown Crowd (0.2) | Once per fight, a hit that would take 20% of your max HP or more is taken by someone from your world instead. | set |  |  |  |
-| `insideJob` | 1 | Inside Job (1) | Each opponent's strongest move is rigged: the first time they use it, it fails and they are Weakened. | set |  |  |  |
+| `insideJob` | 1 | Rigged Bout (1) | Each opponent's strongest move is rigged: the first time they use it, it fails and they are Weakened. | set |  |  |  |
 | `ironOdds` | 1 | Iron Odds (1) | Block from a die skill showing 5 or 6 is doubled. | set |  |  | Gambler, Bastion |
 | `jackpot` | 1 | Gambler 6 (0.5) | Jackpot: when two of your dice show the same number, both skills are 50% stronger. | set |  |  | Gambler |
 | `jackpotPoison` | 1 | Poisoned Chalice (4) | Jackpots also apply 4 Poison. | add |  |  | Gambler, Venom |
@@ -364,7 +364,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `lowDieUp` | 1 | tampered_dice (1) | Your lowest die each turn shows 1 more. | add |  |  | Gambler |
 | `lowDR` | 3 | soul_lantern (0.15), gravecloth (0.15), Comeback Kid (0.2) | Below 25% HP, take 15% less damage. | set |  | rate |  |
 | `lowHpCrit` | 1 | Berserker's Blood (0.2) | Below half HP, +20% critical chance. | add |  |  |  |
-| `lowHpDmg` | 3 | Berserker's Blood (0.4), Last Ember (0.2), The Goddess of Ruin (0.3) | Below half HP, deal 40% more damage. | add |  | rate |  |
+| `lowHpDmg` | 3 | Berserker's Blood (0.4), Last Ember (0.35), The Goddess of Ruin (0.3) | Below half HP, deal 40% more damage. | add |  | rate |  |
 | `lowLifesteal` | 3 | soul_lantern (0.25), gravecloth (0.1), tally_bone (0.1) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
 | `luckyCut` | 1 | Lucky Cut (1) | A critical hit from a die skill showing 6 hits once more. | set |  |  | Gambler, Bladedancer |
 | `mighty` | 1 | Mighty Frame (0.1) | Reaper and Stormcaller skills deal 10% more. | set |  |  |  |
@@ -384,7 +384,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `poisonMult` | 2 | Venom 6 (1.5), apothecarys_case (1.2) | Poison deals 50% more damage. | mul |  | rate | Venom |
 | `poisonOnHit` | 1 | serpent_dagger (1) | Each skill that hits also applies 1 Poison. | add |  |  | Venom |
 | `poisonPlus` | 7 | Venom 2 (1), Venom 4 (1), blight_kris (1), … | Poison you apply +1. | add |  | flat, scales with power | Venom |
-| `powerArmour` | 1 | Power Armour (0.25) | Start each fight with armour worth 25% of your max HP. When it breaks, it blasts the opponent for that much. | set |  |  |  |
+| `powerArmour` | 1 | Blast Plate (0.4) | Start each fight with armour worth 40% of your max HP. When it breaks, it blasts the opponent for that much. | set |  |  |  |
 | `quickBlock` | 4 | apprentice_staff (3), shuffling_shoe (3), robe_of_hours (3), … | Quick skills also give 3 Block. | add |  |  | Arcanist, Bastion |
 | `quickBurn` | 2 | kindling_wand (2), Spellfire (3) | Quick skills apply 2 Burn. | add |  |  | Arcanist, Pyre |
 | `quickCd` | 3 | Arcanist 2 (1), Spellblade (1), Mana Affinity (1) | Quick skills: 1 turn shorter cooldown. | add |  |  | Arcanist |
@@ -413,7 +413,7 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `sixStun` | 1 | Thunder Roll (1) | A die skill showing 6 also Stuns. | set |  |  | Gambler, Stormcaller |
 | `sleeveFix` | 1 | sharps_sleeve (1) | Once per fight, a die that rolls 1 becomes a 6. | set |  |  | Gambler |
 | `sluggish` | 1 | Sluggish (2) | Start every fight Weakened for 2 turns. | set |  |  |  |
-| `spiritGuide` | 1 | Spirit Guide (1) | On your third turn of each fight, the last opponent you beat uses its strongest move for you. | set |  |  |  |
+| `spiritGuide` | 1 | Haunted (1) | On your third turn of each fight, the last opponent you beat uses its strongest move for you. | set |  |  |  |
 | `startBlock` | 8 | spiked_buckler (6), chain_mail (8), studded_mace (4), … | Start each fight with 6 Block. | add | yes | flat, scales with power | Bastion |
 | `startBlockPct` | 3 | Legion Deserter (0.15), Iron Body (0.1), trait Braced (0.15) | Start each fight with Block equal to 15% of your max HP. | add |  | rate | Bastion |
 | `startBurn` | 1 | soot_wraps (4) | Your opponent starts each fight with 4 Burn. | add |  |  | Pyre |
@@ -510,7 +510,7 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 
 | Key | Example | Shown to players as | Late | Used by |
 | --- | --- | --- | --- | --- |
-| `gold` | 8 | 8 gold |  | 64 (quests, levels, events) |
+| `gold` | 8 | 8 gold |  | 65 (quests, levels, events) |
 | `stats` | {"VIT":2} | VIT +2 |  | 22 (events) |
 | `points` | 2 | 2 stat points to place |  | 0 () |
 | `heart` | 1 | +1 max Heart |  | 15 (quests, levels, events) |
@@ -531,9 +531,9 @@ What an event option, a quest or a wager can give. Applied in this order; one ma
 | `mod` | "none" | the world modifier Standard Rules |  | 2 (events) |
 | `always` | {"foe":{"poison":2}} | a mark on every fight from now on |  | 6 (levels, events) |
 | `fate` | 1 | your world's Fate eased | yes | 99 (quests, levels, events) |
-| `notice` | 1 | the System's notice | yes | 87 (levels, events) |
+| `notice` | 1 | the System's notice | yes | 88 (levels, events) |
 | `chain` | "done" | the story goes on | yes | 70 (events) |
-| `favour` | {"war":2} | 2 Favour with the God of War | yes | 13 (quests, events) |
+| `favour` | {"war":2} | 2 Favour with the God of War | yes | 14 (quests, events) |
 
 ### Feats (`feat`), from `js/content/feats.js`
 
