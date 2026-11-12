@@ -7,7 +7,7 @@ let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.log('FAIL ' + msg); } };
 function setup(id, kind) {
   const meta = G.newMeta(); delete meta.rank; G.bindMeta(meta);
-  const w = G.offerWorlds(meta)[0];
+  const w = Object.assign(G.offerWorlds(meta)[0], { people: 'council' }); // a People whose custom pays nothing after a win
   const run = G.newRun(w, { name: 'Test', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 4 }, gifts: [], patron: Object.keys(G.GODS)[0], offer: G.makeOffer(w, meta), arch: ['bastion', 'reaper'] }, meta);
   G.confirmDraft(run, run.draft.slice(0, 3), meta);
   G.chooseOpponent(run, 0, false);

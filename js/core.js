@@ -787,6 +787,8 @@ function checkMerges(run, msgs) {
     keep.star++; keep.mods = mods; if (corrupt) keep.corrupt = true;
     if (run.merges > 0) run.merges--;
     msgs && msgs.push({ t: 'merge', text: `[Merge! ${pieceDef(keep.id).name} is now ★${keep.star}.]` });
+    // Craft Guilds: Guild marks. Every merge pays gold (more if you backed the Guilds)
+    if (customOf(run, 'guilds')) { const g = run.customUp ? 3 : 2; run.gold += g; customPaid(run, msgs); msgs && msgs.push({ t: 'loot', text: `[Guild marks: the Guilds pay for good work. +${g} gold.]` }); }
     questEvent(run, 'merge', {}, msgs);
     if (keep.star === 3) worldFirst(run, 'star3', `has forged a ★3 piece: ${pieceDef(keep.id).name}.`, 'ascendant', msgs);
     if (keep.star === 3 && SKILLS[keep.id] && SKILLS[keep.id].evo) { run.pending.push({ type: 'evo', u: keep.u }); msgs && msgs.push({ t: 'skill', text: `[${SKILLS[keep.id].name} has reached ★3. Evolution available.]` }); }
@@ -1856,13 +1858,14 @@ const ROLL_BASE = 30, ROLL_HARD = 10, ROLL_PER = 7, ROLL_LUK = 1, ROLL_MIN = 5, 
 function rollChance(run, r) {
   const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
   const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
-  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0) + (run.world.mod === 'strange' ? 10 : 0)); // The House, Loaded Dice, Strange Times
+  const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0) + (run.world.mod === 'strange' ? 10 : 0) + (customOf(run, 'mages') ? (run.customUp ? 15 : 10) : 0)); // The House, Loaded Dice, Strange Times, Hedge Mages
   return floor && (P.chanceAll || run.chanceFloorAt !== run.round) ? Math.max(c2, floor) : c2;
 }
 // A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
 const CHANCE_UNLOCK = 3;
 function chanceWon(run, msgs) {
   run.chanceWins = (run.chanceWins || 0) + 1;
+  if (customOf(run, 'mages')) customPaid(run, msgs); // Hedge Mages: their sight helped
   Object.entries(TITLES).forEach(([k, t]) => { if (t.feat && FEATS[t.feat].at === 'chance' && featOk(t.feat, { run }, t.n)) earnTitle(run, k, msgs); });
   if (run.chanceWins >= CHANCE_UNLOCK && META && !META.unlocks.arch_dicer && !run.practice) { META.unlocks.arch_dicer = true; msgs.push({ t: 'class', text: '[Archetype unlocked: Gambler. The House has opened a line of credit.]' }); }
 }
@@ -3659,6 +3662,10 @@ function resolveFight(run, f, meta, rng) {
     if (runP(run).heartOnWin && run.hearts < run.maxHearts && !run.elite) { run.hearts++; restoreRecord(run, 1); msgs.push({ t: 'loot', text: '[Reaper: the kill restores 1 Heart.]' }); }
     if (spec.hard || spec.kind === 'final' || run.elite) run.pending.push({ type: 'rune', mods: rollPrefixes(runeCount(run), lr, null, run), got: `[Rune recovered from ${f.B.name}. Strong opponents carry them.]` });
     if (spec.hard) { run.bonusSlot = rollPiece(run, lr, { odds: [0, 0, 0, 70, 30] }); msgs.push({ t: 'loot', text: '[A rare piece will wait in your next shop.]' }); }
+    // The Sworn Order: Code of Combat. Beat a hard opponent and heal (more if you backed the Order)
+    if (spec.hard && customOf(run, 'order')) { const n = Math.round(maxHp(run) * (run.customUp ? 0.25 : 0.15)); run.hp = Math.min(maxHp(run), run.hp + n); customPaid(run, msgs); msgs.push({ t: 'loot', text: `[Code of Combat: the Order honours a hard win. +${n} HP.]` }); }
+    // Hunters' Lodges: Trophies. Beating a monster pays more gold
+    if (spec.kind === 'monster' && customOf(run, 'lodges')) { const g = run.customUp ? 5 : 3; run.gold += g; res.gold += g; customPaid(run, msgs); msgs.push({ t: 'loot', text: `[Trophies: the Lodges buy the trophy. +${g} gold.]` }); }
     if (spec.hard && !run.practice && rnd(stream(run, 'patch')) < RARE_PATCH) givePiece(run, 'unsigned_patch', msgs, `[Something unsigned was left in the arena after ${f.B.name} fell: {item}.]`);
     openClauses(run, meta, 'fight', null, msgs);
     if (spec.gate) { run.statPts++; msgs.push({ t: 'level', text: '[Gatekeeper defeated. +1 stat point.]' }); dropDesign(run, meta, msgs, rng); if (customOf(run, 'crown')) { customPaid(run, msgs); OUTCOME_APPLY.piece(run.customUp ? 'A' : 'B', { run, msgs, label: 'Royal bounty' }); } }

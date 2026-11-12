@@ -597,7 +597,11 @@
   "silence",
   "lastgen",
   "sundering",
-  "goldenage"
+  "goldenage",
+  "wyrm",
+  "drought",
+  "cursedcrown",
+  "vanishing"
  ],
  "peoples": [
   "temple",
@@ -607,7 +611,11 @@
   "council",
   "crown",
   "exiles",
-  "pilgrims"
+  "pilgrims",
+  "order",
+  "guilds",
+  "lodges",
+  "mages"
  ],
  "enemies": [
   "goblin",
@@ -1011,6 +1019,26 @@
   "ferry_cat",
   "tithe_cart",
   "gleaners",
+  "crisis_wyrm_1",
+  "crisis_wyrm_2",
+  "crisis_wyrm_2u",
+  "crisis_drought_1",
+  "crisis_drought_2",
+  "crisis_drought_2u",
+  "crisis_cursedcrown_1",
+  "crisis_cursedcrown_2",
+  "crisis_cursedcrown_2u",
+  "crisis_vanishing_1",
+  "crisis_vanishing_2",
+  "crisis_vanishing_2u",
+  "order_vigil",
+  "guild_masterpiece",
+  "lodge_hunt",
+  "hedge_circle",
+  "wyrm_scale",
+  "water_seller",
+  "crown_jeweller",
+  "missing_poster",
   "clerical_error",
   "amendment",
   "audit",
@@ -1152,6 +1180,26 @@
   "ferry_cat": 3,
   "tithe_cart": 3,
   "gleaners": 3,
+  "crisis_wyrm_1": 3,
+  "crisis_wyrm_2": 3,
+  "crisis_wyrm_2u": 3,
+  "crisis_drought_1": 3,
+  "crisis_drought_2": 3,
+  "crisis_drought_2u": 3,
+  "crisis_cursedcrown_1": 3,
+  "crisis_cursedcrown_2": 3,
+  "crisis_cursedcrown_2u": 3,
+  "crisis_vanishing_1": 3,
+  "crisis_vanishing_2": 3,
+  "crisis_vanishing_2u": 3,
+  "order_vigil": 3,
+  "guild_masterpiece": 3,
+  "lodge_hunt": 3,
+  "hedge_circle": 3,
+  "wyrm_scale": 4,
+  "water_seller": 4,
+  "crown_jeweller": 4,
+  "missing_poster": 4,
   "clerical_error": 4,
   "amendment": 4,
   "audit": 4,
@@ -1659,6 +1707,54 @@
     "The Retired General"
    ]
   },
+  "fate wyrm": {
+   "roles": [],
+   "promises": [
+    "slay the wyrm",
+    "save the town that drew the lot"
+   ],
+   "entries": [
+    "The Lot Hall",
+    "The Scorched Hill",
+    "The Wyrm-Watcher"
+   ]
+  },
+  "fate drought": {
+   "roles": [],
+   "promises": [
+    "bring the rain back",
+    "fill the last well"
+   ],
+   "entries": [
+    "The Last Well",
+    "The Rain Dance",
+    "The Water Warden"
+   ]
+  },
+  "fate cursedcrown": {
+   "roles": [],
+   "promises": [
+    "bury the crown",
+    "see a sane ruler crowned"
+   ],
+   "entries": [
+    "The Empty Throne",
+    "The Seven Coronations",
+    "The Crown's Keeper"
+   ]
+  },
+  "fate vanishing": {
+   "roles": [],
+   "promises": [
+    "find the missing villages",
+    "keep the map whole"
+   ],
+   "entries": [
+    "The Blank on the Map",
+    "Counting the Streets",
+    "The Last Mapmaker"
+   ]
+  },
   "people temple": {
    "roles": [
     "temple novice",
@@ -1753,6 +1849,54 @@
     "The Waystones",
     "The Leaving Feast",
     "The Road Elder"
+   ]
+  },
+  "people order": {
+   "roles": [
+    "squire",
+    "oath-keeper"
+   ],
+   "promises": [],
+   "entries": [
+    "The Chapter House",
+    "The Vigil of Arms",
+    "The Grand Master"
+   ]
+  },
+  "people guilds": {
+   "roles": [
+    "journeyman",
+    "guild runner"
+   ],
+   "promises": [],
+   "entries": [
+    "The Street of Guilds",
+    "Masterpiece Day",
+    "The Old Master"
+   ]
+  },
+  "people lodges": {
+   "roles": [
+    "tracker",
+    "skinner"
+   ],
+   "promises": [],
+   "entries": [
+    "The Trophy Hall",
+    "The First Kill",
+    "The Old Tracker"
+   ]
+  },
+  "people mages": {
+   "roles": [
+    "herb gatherer",
+    "charm maker"
+   ],
+   "promises": [],
+   "entries": [
+    "The Crossroads Stone",
+    "Charm Day",
+    "The Cunning Woman"
    ]
   }
  },
