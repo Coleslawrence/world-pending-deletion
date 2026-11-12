@@ -23,6 +23,13 @@ LORE.vales = {
     { k: 'place', tier: 'home', name: 'The hayloft', text: 'Where you hid every harvest day until you were old enough to swing a scythe.', near: 'under a hayloft at the edge of the fields' },
     { k: 'person', tier: 'home', name: 'Your grandmother Hattie', text: 'Has brought in sixty harvests. Says the scythe gets lighter, and nobody believes her.', rel: 'grandmother' },
     { k: 'person', tier: 'home', name: 'Your friend Rook', text: 'Raced you down every row of every field. Still owes you for the last one.', rel: 'friend' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Black Furrow', text: 'A furrow that runs straight across the Vales. Nothing grows in it, and nothing crosses it.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'The Harvest Wake', text: 'The last night of harvest is spent awake, so the collector cannot come in your sleep.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'Old Wenna', text: 'Keeps one seed from every harvest. Her house has no room left for her.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The orchard wall', text: 'Your initials are carved in it beside your mother\'s and her mother\'s.', near: 'beside the orchard wall', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The cart shed', text: 'Where you learned to mend a wheel, sharpen a scythe and keep quiet about both.', near: 'by the cart shed at the field gate', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your father Colm', text: 'Can tell the weather by his knees. Has not been wrong in thirty years.', rel: 'father', added: 'x3' },
   ],
 };
 FINAL_GREET.reaping_lord = '{champ}. You have grown well. I have come to collect.';

@@ -22,6 +22,13 @@ LORE.burning = {
     { k: 'place', tier: 'home', name: 'The forge where you were born', text: 'Your mother refused to stop working, even for that.', near: 'beside the forge where you were born' },
     { k: 'person', tier: 'home', name: 'Your brother Cass', text: 'Lost a hand at the frontier. Writes to you with the other one every week.', rel: 'brother' },
     { k: 'person', tier: 'home', name: 'Sergeant Halla', text: 'Trained you with a wooden sword until you broke it. Then she gave you a real one.', rel: 'sergeant' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Iron Road', text: 'A road built for marching. It is wide enough for twelve abreast and has never once been quiet.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'The Burning of Letters', text: 'Soldiers burn their letters home after reading, so no enemy can learn their names.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'Tribune Aurel', text: 'Wins every battle he plans and loses every argument at home.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The bathhouse on Ash Lane', text: 'The only warm water in the district. Your family has run it for three generations.', near: 'behind the bathhouse on Ash Lane', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The roof over the armoury', text: 'You watched every parade from up there. Nobody ever told you to get down.', near: 'above the old armoury', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your father Galen', text: 'A retired standard-bearer. Still salutes the flag every morning, even in the rain.', rel: 'father', added: 'x3' },
   ],
 };
 FINAL_GREET.kharros = '{champ}. At last, an enemy worth a war. I will not insult you with mercy.';

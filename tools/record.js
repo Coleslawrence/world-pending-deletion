@@ -9,7 +9,7 @@ let checks = 0; const ok = (c, msg) => { assert(c, msg); checks++; };
 // Pools: 14 entries each, enough of every kind, and home entries carry their bio phrase
 Object.entries(G.LORE).forEach(([w, L]) => {
   ok(G.WORLD_TYPES[w], `${w} is a world type`);
-  ok(L.entries.length === 14, `${w} has 14 entries`);
+  ok(L.entries.length >= 14 && L.entries.length < 100, `${w} has 14 to 99 entries`);
   const E = L.entries, n = (k, t) => E.filter(e => e.k === k && (!t || e.tier === t)).length;
   ok(n('place') >= 3 && n('person') >= 2 && n('custom') >= 2, `${w} can meet the minimums`);
   ok(n('place', 'home') >= 1 && n('person', 'home') >= 1, `${w} has a home place and person`);
@@ -241,8 +241,9 @@ const standing = run => run.record.ids.length - bits(run.record.lost);
 }
 
 // People customs: each changes one loop rule, only in its own world; the first payout earns the epithet
+// (never under The Silence, whose quiet gods would hide the Favour rule)
 {
-  const r = seeded(12), mk = people => { let w; do { w = G.genWorld(r); } while (w.people !== people); return G.newRun(w, { name: 'Ana', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, G.newMeta(), r); };
+  const r = seeded(12), mk = people => { let w; do { w = G.genWorld(r); } while (w.people !== people || w.fate === 'silence'); return G.newRun(w, { name: 'Ana', stats: { STR: 2, AGI: 2, INT: 2, VIT: 4, LUK: 2 }, gifts: [G.WORLD_TYPES[w.type].gift], patron: 'war' }, G.newMeta(), r); };
   const temple = mk('temple'), council = mk('council'), msgs = [];
   G.addFavour(temple, 'war', 2, null, msgs, r); G.addFavour(council, 'war', 2, null, [], r);
   ok(temple.favour.war === council.favour.war + 1, 'Temple State: every Favour gain +1');

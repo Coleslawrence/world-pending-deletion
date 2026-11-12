@@ -3,7 +3,7 @@
 // Each quest asks for a feat from feats.js (or several, all at once). count: true adds up the feat's measure across fights.
 // reward: outcomes from outcomes.js, given when the quest completes.
 // fate: id / people: id: a world quest, given only in a world with that Fate or People (one of each a run, on top of
-// one general quest). A Fate's quest eases the Fate.
+// one general quest). A Fate's quest eases the Fate. world: type: the same for a world type.
 const QUESTS = {
   rival_noheal: { text: 'Defeat a rival without healing.', feat: ['rival', 'noheal'], reward: { rune: 1 }, goal: 1 },
   fast3: { text: 'Win 3 fights within 6 turns each.', feat: 'fast', reward: { gold: 8 }, goal: 3 },
@@ -34,4 +34,15 @@ const QUESTS = {
   w_crown: { people: 'crown', text: 'The Old Crown: beat an opponent one rank letter above your Entrant Rank.', feat: 'outranked', n: 1, reward: { piece: 'A' }, goal: 1 },
   w_exiles: { people: 'exiles', text: 'Exiles: land a single hit of 40 or more.', feat: 'bighit', n: 40, reward: { restore: 2 }, goal: 1 },
   w_pilgrims: { people: 'pilgrims', text: 'Pilgrims: trigger 4 reactions.', feat: 'react', count: true, reward: { gold: 6, rune: 1 }, goal: 4 },
+  // World type quests (world expansion, 12 Nov): one for each world type, given only in a world of that type
+  w_drowned: { world: 'drowned', added: 'x3', text: 'Drowned Isles: win 2 fights with more than half your HP.', feat: 'healthy', reward: { restore: 1 }, goal: 2 },
+  w_burning: { world: 'burning', added: 'x3', text: 'Burning Empire: finish an opponent with 25 more damage than needed.', feat: 'overkill', n: 25, reward: { gold: 8 }, goal: 1 },
+  w_hollow: { world: 'hollow', added: 'x3', text: 'Hollow Kingdom: win a fight with 10% HP or less.', feat: 'clutch', reward: { rune: 1, gold: 4 }, goal: 1 },
+  w_verdant: { world: 'verdant', added: 'x3', text: 'Verdant Wilds: beat 2 hard opponents.', feat: 'hard', reward: { piece: 'B' }, goal: 2 },
+  w_sky: { world: 'sky', added: 'x3', text: 'Sky Reaches: use 2 Quick skills in a single turn.', feat: 'quick', n: 2, reward: { rune: 1 }, goal: 1 },
+  w_iron: { world: 'iron', added: 'x3', text: 'Iron Hold: Block 40 damage in a single fight.', feat: 'blocked', n: 40, reward: { stats: { VIT: 2 } }, goal: 1 },
+  w_steppes: { world: 'steppes', added: 'x3', text: 'Thunder Steppes: Stun or Interrupt one opponent 2 times.', feat: 'stuns', n: 2, reward: { gold: 8 }, goal: 1 },
+  w_marches: { world: 'marches', added: 'x3', text: 'Coin Marches: win 2 chance rolls in one run.', feat: 'chances', n: 2, reward: { gold: 10 }, goal: 1 },
+  w_fens: { world: 'fens', added: 'x3', text: 'Crooked Fens: jinx 3 moves in a single fight.', feat: 'jinxes', n: 3, reward: { rune: 1 }, goal: 1 },
+  w_vales: { world: 'vales', added: 'x3', text: 'Harvest Vales: win 2 fights with half your HP or less.', feat: 'wounded', reward: { restore: 1, gold: 4 }, goal: 2 },
 };

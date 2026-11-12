@@ -22,6 +22,13 @@ LORE.marches = {
     { k: 'place', tier: 'home', name: 'The corner card table', text: 'Green felt, worn to the wood where your grandmother always sat.', near: 'beside a card table in a crowded inn' },
     { k: 'person', tier: 'home', name: 'Your father Belmar', text: 'Has never lost a bet he made sober. He has never made one sober.', rel: 'father' },
     { k: 'person', tier: 'home', name: 'Your rival Pen', text: 'You have played her every week for ten years. The tally is even, and both of you cheat.', rel: 'rival' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The House of Even Odds', text: 'A casino where every game is fair. It has never once made money.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'Losing Gracefully', text: 'In the Marches the loser buys the drinks. Losing is very popular.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'The Card Widow', text: 'Plays one hand a night against anyone. Has never lost and never kept her winnings.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The gaming room over the bakery', text: 'The bread smelled better on winning nights. You are sure of it.', near: 'above a bakery with a gaming room', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The lucky step', text: 'Third step from the top. Everyone in your family touches it before a game.', near: 'beside a staircase with a lucky step', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your grandmother Lotta', text: 'Won her house in a game of knucklebones. Still claims she cheated.', rel: 'grandmother', added: 'x3' },
   ],
 };
 FINAL_GREET.dealer = '{champ}. Cut the deck. No? Then I will. The House has been expecting someone like you.';

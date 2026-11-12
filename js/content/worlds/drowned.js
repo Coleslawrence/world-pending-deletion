@@ -20,6 +20,13 @@ LORE.drowned = {
     { k: 'place', tier: 'home', name: 'The stilt house on Marrow Reef', text: 'Your family has raised it four times.', near: 'in a stilt house on Marrow Reef' },
     { k: 'person', tier: 'home', name: 'Your sister Ilsa', text: 'Mends nets, and swears she can smell land on the wind.', rel: 'sister' },
     { k: 'person', tier: 'home', name: 'Old Corwen', text: 'Taught you to swim before you could walk. Says the sea owes him one.', rel: 'teacher' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Sunken Road', text: 'A paved road runs from the shore straight into the sea. Carts still use it at low tide.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'Reading the Waterline', text: 'Every door has the year carved at the height the sea reached. The newest marks are above the handles.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'Pearl-Mother Ysolde', text: 'Has dived for pearls for fifty years. Says the sea gives one back for every island it takes.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The boat that is also a house', text: 'It was a house until the street flooded. Your family added a keel.', near: 'in a house that became a boat', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The roof garden', text: 'Your mother grows beans on the roof, because the garden is under the sea.', near: 'under a roof garden above the tide', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your cousin Maren', text: 'Swims faster than anyone on the island. Plans to swim to the mainland one day.', rel: 'cousin', added: 'x3' },
   ],
 };
 FINAL_GREET.leviathan = '{champ}. Even the deep has heard of you. It will still take you.';

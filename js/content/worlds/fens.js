@@ -22,6 +22,13 @@ LORE.fens = {
     { k: 'place', tier: 'home', name: 'The horseshoe door', text: 'Your mother nailed a horseshoe over it the right way up. It fell down the wrong way up.', near: 'behind a door with a fallen horseshoe' },
     { k: 'person', tier: 'home', name: 'Your aunt Hester', text: 'Has broken eleven mirrors and claims to be due a twelfth. Nobody lets her near glass.', rel: 'aunt' },
     { k: 'person', tier: 'home', name: 'Your rival Fitch', text: 'You both claim the worse luck. You have been arguing about it since you could talk.', rel: 'rival' },
+    // World expansion (12 Nov): 6 more each. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+    { k: 'place', tier: 'far', name: 'The Bog Bell', text: 'A bell rings under the marsh every new moon. Nobody has found where.', added: 'x3' },
+    { k: 'custom', tier: 'city', name: 'Spitting on Coins', text: 'Every coin is spat on before spending, to wash off the last owner\'s luck.', added: 'x3' },
+    { k: 'person', tier: 'city', name: 'The Ferryman Pike', text: 'Will row anyone anywhere in the Fens. The fare depends on how lucky you look.', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The willow over the well', text: 'Its roots drink from the family well. The water tastes of rain.', near: 'under the willow by the well', added: 'x3' },
+    { k: 'place', tier: 'home', name: 'The cracked mirror', text: 'Your father broke it before you were born. Nobody has dared to throw it out.', near: 'behind a cracked mirror nobody will move', added: 'x3' },
+    { k: 'person', tier: 'home', name: 'Your little brother Wat', text: 'Was born on the thirteenth. Has been lucky every day since, to spite it.', rel: 'brother', added: 'x3' },
   ],
 };
 FINAL_GREET.augur = '{champ}. I read your ending this morning. It was very good. For me.';
