@@ -204,7 +204,7 @@ const SIGIL_COLS = ['#d6a04f', '#72d0ff', '#e15b52', '#9fd86a', '#c27ce6', '#efe
 // The Awakening has no Gift Points (12 Nov): the world's Gift comes free, you choose 1 Signature Gift (a cheat or a divine
 // Gift) from a small draw, and you may take 1 Flaw, which widens the draw and pays gold. The smaller Gifts (growth, combat,
 // fortune, bloodline) are picked during the run instead: 1 of 3 after rounds 1, 3 and 5 (giftPickRounds).
-const SIG_CATS = ['cheat', 'divine'], SMALL_CATS = ['growth', 'combat', 'fortune', 'bloodline'];
+const SIG_CATS = ['cheat', 'divine', 'bloodline'], SMALL_CATS = ['growth', 'combat', 'fortune']; // bloodline: born-with Gifts, chosen at the Awakening (12 Nov)
 const SIG_BASE = 3, SIG_MAX = 6, FLAW_SIGS = 2, FLAW_GOLD = 6, SYS_GOLD = 6, AWAKEN_GOLD = 6;
 function isSignature(k) { return !!GIFTS[k] && SIG_CATS.includes(GIFTS[k].cat); }
 // How many Signature Gifts the draw shows: 3, +1 in a rank E or D world, +1 with a Gift bounty, +1 when Faithless, +2 with a Flaw
@@ -477,7 +477,8 @@ function newRun(world, setup, meta, rng) {
   run.pair = genPair(world, setup.seed ? seedRng(setup.seed + ':pair') : rng ? seedRng('pair:' + world.type + ':' + world.name) : undefined);
   if (setup.seed) Object.assign(run, { seed: setup.seed, daily: setup.daily || null, ranked: !!setup.ranked, rngN: {} });
   if (!setup.seed && !setup.script) { run.priority = sanitizePriority(meta.priority, setup.priority).set; if (CHALLENGES[setup.challenge]) run.challenge = setup.challenge; }
-  if (G.includes('bornlucky')) run.stats.LUK += 3;
+  if (G.includes('bornlucky')) run.stats.LUK += 4;
+  if (G.includes('fastlearner')) STATS.forEach(k => run.stats[k] += 1); // Fast Learner: a head start
   if (G.includes('latebloomer')) STATS.forEach(k => run.stats[k] = Math.max(1, run.stats[k] - 1));
   // Opening stat points: placed after the opening draft, once the skills and gear are known (placeStartStats).
   // floor: the stats before any are placed, Gifts included; rollSeed: where the once-only roll comes from.
@@ -524,7 +525,7 @@ function effStats(run) {
   STATS.forEach(k => s[k] = Math.max(0, s[k]));
   return s;
 }
-function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.15; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
+function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.25; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
 function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0)) * (1 - amendOf(run).hpCut)); }
 // Levels come from fighting: after every battle (win or lose) the System offers a level, which is +1 level (Max HP +4,
 // better shop odds) and +1 stat point, or a Gift drawn at random in its place. Level stops at LEVEL_MAX.
@@ -820,7 +821,7 @@ function equipBest(run, u) {
 function archCounts(barPieces, gearPieces, gifts) {
   const seen = new Set(), c = {};
   barPieces.concat(gearPieces).filter(Boolean).forEach(p => {
-    const b = baseId(p.id); if (seen.has(b)) return; seen.add(b);
+    const b = baseId(p.id); if (seen.has(b) || !pieceDef(b)) return; seen.add(b); // a filed record may hold a piece that no longer exists
     const tags = pieceDef(b).tags.slice();
     // Misfiled: the skill also counts as its class's allies on the grid
     if ((p.mods || []).some(m => bareMod(m) === 'misfiled') && tags.length) themeNear(tags[0]).forEach(t => { if (!tags.includes(t)) tags.push(t); });
@@ -833,6 +834,8 @@ function archCounts(barPieces, gearPieces, gifts) {
 // The gear that counts: the three slots, plus a Phantom piece (a glitch event's copy that takes no slot)
 function runGear(run) { return GEAR_SLOTS.map(s => run.gear[s]).concat(run.phantom && GEAR[run.phantom.id] ? [run.phantom] : []); }
 function runCounts(run) { return archCounts(run.bar, runGear(run), run.gifts); }
+// Shop marks (12 Nov): the Gifts you hold that list one of this piece's archetypes as a synergy (GIFT_SYN)
+function giftFit(run, id) { const tags = pieceDef(baseId(id)).tags; return (run.gifts || []).filter(k => (GIFT_SYN[k] || []).some(x => tags.includes(x))); }
 let META = null;
 function bindMeta(m) { META = m; }
 // Other players' champions (set by the page from the shared store). Each snap carries .owner.
@@ -922,7 +925,7 @@ function buildP(barPieces, gearPieces, gifts, favourTiers, lvl, x) {
   const c = archCounts(barPieces, gearPieces, gifts), lm = 1 + 0.08 * ((lvl || 1) - 1);
   // Archetype bonuses, then gear (both grow with level), then everything else. Effects and how they combine: effects.js
   ARCH_KEYS.forEach(k => ARCH[k].p.slice(0, archTier(c[k] || 0)).forEach((p, i) => addEffects(P, i === 2 ? advOf(x.adv, k).p : p, lm)));
-  gearPieces.filter(Boolean).forEach(g => addEffects(P, gearPas(GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll] ? g.roll : g.id, g.star), lm));
+  gearPieces.filter(g => g && GEAR[g.id]).forEach(g => addEffects(P, gearPas(GEAR[g.id] && GEAR[g.id].rolling && GEAR[g.roll] ? g.roll : g.id, g.star), lm));
   if (P.goldDmg) addEffects(P, { dmgPct: Math.min(0.25, P.goldDmg * Math.floor((x.gold || 0) / 10)) }); // per 10 gold held when the fight starts, up to +25%
   const hp = hiddenPathOf(c);
   if (hp) addEffects(P, HIDDEN_PATHS[hp].fx);
@@ -1787,7 +1790,7 @@ function rollChance(run, r) {
   const s = effStats(run), ch = Math.max(ROLL_MIN, Math.min(ROLL_MAX, (r.hard ? ROLL_HARD : ROLL_BASE) + ROLL_PER * (s[r.stat] || 0) + (r.stat === 'LUK' ? 0 : ROLL_LUK * (s.LUK || 0))));
   const P = runP(run), floor = P.chanceFloor; // Born Lucky: the first chance option each round
   const c2 = Math.min(ROLL_MAX, ch + (P.chanceBonus || 0) + (run.world.mod === 'strange' ? 10 : 0)); // The House, Loaded Dice, Strange Times
-  return floor && run.chanceFloorAt !== run.round ? Math.max(c2, floor) : c2;
+  return floor && (P.chanceAll || run.chanceFloorAt !== run.round) ? Math.max(c2, floor) : c2;
 }
 // A won chance roll counts toward Lucky Seven and, at 3 in one run, unlocks the Gambler
 const CHANCE_UNLOCK = 3;
@@ -2065,8 +2068,8 @@ function applyGift(run, k, msgs) {
   if (!GIFTS[k] || hasGift(run, k)) return false;
   run.gifts.push(k);
   if (k === 'merger') run.merges = 3;
-  if (k === 'dragon') run.hp = Math.round(run.hp * 1.15);
-  if (k === 'bornlucky') run.stats.LUK += 3;
+  if (k === 'dragon') run.hp = Math.round(run.hp * 1.25);
+  if (k === 'bornlucky') run.stats.LUK += 4;
   msgs && msgs.push({ t: 'class', text: `[Additional Gift granted: ${GIFTS[k].name}.]` });
   checkPath(run, msgs);
   return true;
@@ -2541,8 +2544,8 @@ function dmgMult(f, X, Y) {
 }
 function hit(f, X, Y, raw, o = {}) {
   if (Y.hp <= 0) return 0;
-  if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; if (Y.P.dodgeBleed && X.hp > 0 && !o.isThorns) addStatus(f, Y, X, 'bleed', Y.P.dodgeBleed); return 0; }
-  if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; if (Y.P.dodgeBleed && X.hp > 0 && !o.isThorns) addStatus(f, Y, X, 'bleed', Y.P.dodgeBleed); return 0; }
+  if (!o.noDodge && Y.evade > 0) { Y.evade--; ev(f, { k: 'miss', side: Y.side, text: 'Evaded' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; if (Y.P.dodgeBleed && X.hp > 0 && !o.isThorns) addStatus(f, Y, X, 'bleed', Y.P.dodgeBleed); if (Y.P.dodgeCrit) Y.critNext = true; return 0; }
+  if (!o.noDodge && rnd(f.rng) < Y.dodge) { ev(f, { k: 'miss', side: Y.side, text: 'Dodged' }); if (Y.isPlayer) f.tally.missed = (f.tally.missed || 0) + 1; if (Y.P.dodgeBleed && X.hp > 0 && !o.isThorns) addStatus(f, Y, X, 'bleed', Y.P.dodgeBleed); if (Y.P.dodgeCrit) Y.critNext = true; return 0; }
   let d = raw, crit = false;
   if (!o.noCrit && (o.alwaysCrit || X.critNext || rnd(f.rng) < X.crit + (o.critBonus || 0) + (X.P.lowHpCrit && half(X) ? X.P.lowHpCrit : 0))) { crit = true; d *= X.critMult; X.critNext = false; X.lastCrit = true; if (X.P.critEmpower) X.empower = Math.max(X.empower, 2); }
   if (o.resist) d *= o.resist;
@@ -2590,10 +2593,10 @@ function checkRevive(f, X) {
   if (X.hp <= 0 && X.revive) { X.hp = Math.round(X.maxHp * X.revive); X.revive = 0; say(f, `[${X.name} rises again.]`, 'loss'); if (X.id && FOE_LINES[X.id] && FOE_LINES[X.id].rise) say(f, `"${FOE_LINES[X.id].rise}"`, 'foe'); ev(f, { k: 'revive', side: X.side }); }
   if (X.hp <= 0 && X.breath) { X.hp = 1; X.breath = false; f.usedBreath = true; say(f, '[Second Breath! You cling to life with 1 HP.]', 'class'); }
 }
-function heal(f, X, v) {
+function heal(f, X, v, full) {
   if (v <= 0 || X.hp <= 0) return 0;
   if (!X.isPlayer && f.prec.includes('noheal')) return 0; // Standing Precedent
-  v = Math.round(v * (1 + (X.P.healPct || 0) + (X.healFin || 0)));
+  v = Math.round(v * (1 + (full && (X.P.healPct || 0) < 0 ? 0 : X.P.healPct || 0) + (X.healFin || 0))); // Demon Blood: drain ignores its healing cut
   const b = X.hp; X.hp = Math.min(X.maxHp, X.hp + v); const h = X.hp - b;
   if (h > 0) { ev(f, { k: 'heal', side: X.side, amt: h }); if (X.isPlayer) f.tally.healed += h; }
   if (X.P.overhealBlock && v > h) X.block += v - h;
@@ -2612,6 +2615,7 @@ function gainBlock(f, X, v) {
 // --- statuses and reactions ---
 function addStatus(f, X, Y, kind, v) {
   if (v <= 0 || Y.hp <= 0) return;
+  if (kind === 'burn' && Y.P.burnImmune) return; // Dragon Blood
   const P = X.P;
   if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0) + (P.burnLowDie ? lowDie(X) : 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
   if (kind === 'poison') { v += (P.poisonPlus || 0) + (P.dotPlus || 0); Y.poison += v; }
@@ -2982,7 +2986,7 @@ function useSkill(f, X, s, opt) {
   if (fx.shake) shakeOff(f, X, fx.shake); // a cleanse of sorts: Burn, Poison and Bleed each drop by up to that much
   if (fx.cleanse) { if (fx.reflect) { Y.burn += X.burn; Y.poison += X.poison; Y.bleed += X.bleed; } if (X.burn + X.poison + X.bleed + X.weaken > 0) say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} cleansed.]`); const keepPoison = Y.P && Y.P.misfNoCleanse && (X.misfortune || 0) >= Y.P.misfNoCleanse; X.burn = 0; if (!keepPoison) X.poison = 0; else say(f, '[Bad Water: the Poison stays.]'); X.bleed = 0; X.weaken = 0; }
   const ls = (fx.lifesteal || 0) + (damaging ? (X.P.lifesteal || 0) + (half(X) ? X.P.lowLifesteal || 0 : 0) : 0);
-  if (ls && dealt > 0) heal(f, X, dealt * ls);
+  if (ls && dealt > 0) heal(f, X, dealt * ls, X.P.drainFull);
   if (damaging && dealt > 0 && X.P.hitHeal) heal(f, X, X.P.hitHeal);
   if (fx.xburn) addStatus(f, X, Y, 'burn', Math.round(fx.xburn * p));
   if (fx.xpoison) addStatus(f, X, Y, 'poison', Math.round(fx.xpoison * p));
@@ -3511,6 +3515,7 @@ const REACTIONS = {
 // ---------- After a fight ----------
 function resolveFight(run, f, meta, rng) {
   const msgs = [], won = f.winner === 'A', spec = f.spec, lr = stream(run, 'loot', rng);
+  if (!won && hasGift(run, 'ironwill') && !run.elite) run.nextFlags.empower = Math.max(run.nextFlags.empower || 0, 2); // Iron Will
   bindMeta(meta);
   run.hp = Math.max(0, Math.min(f.A.hp, maxHp(run)));
   if (f.usedDouble) run.usedDouble = (+run.usedDouble || 0) + 1; // Second Self: twice per run
@@ -3955,7 +3960,7 @@ if (typeof module !== 'undefined') module.exports = {
   forecast, cloneFight,
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, GIFT_SYN, SIGILS, SIGIL_COLS, SIG_CATS, SMALL_CATS, SIG_BASE, SIG_MAX, FLAW_SIGS, FLAW_GOLD, SYS_GOLD, isSignature, sigCount, sigShown, flawsAllowed, giftGold, giftsAllowed, giftCheck, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, GIFT_SYN, giftFit, addStatus, SIGILS, SIGIL_COLS, SIG_CATS, SMALL_CATS, SIG_BASE, SIG_MAX, FLAW_SIGS, FLAW_GOLD, SYS_GOLD, isSignature, sigCount, sigShown, flawsAllowed, giftGold, giftsAllowed, giftCheck, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, ARCH_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
