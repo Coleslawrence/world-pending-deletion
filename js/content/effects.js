@@ -203,6 +203,10 @@ const EFFECTS = {
   firstTwice: { how: 'set', say: () => 'Your first skill each fight plays twice.' },
   critEmpower: { how: 'set', say: () => 'Critical hits Empower you for 1 turn.' },
   dodgeBleed: { say: v => `Each attack you dodge or evade gives the attacker ${v} Bleed.`, theme: 'blade' },
+  dodgeCrit: { how: 'set', say: () => 'A dodge or evade makes your next hit critical.', theme: 'blade' },
+  burnImmune: { how: 'set', say: () => "Burn can't hurt you.", theme: 'pyre' },
+  drainFull: { how: 'set', say: () => 'Your lifesteal ignores healing cuts.', theme: 'reaper' },
+  chanceAll: { how: 'set', say: () => 'Every chance option gets the floor, not just the first.' },
   brkPlus: { say: v => `Your hits fill the opponent's guard bar ${pct(v)} faster.`, theme: 'storm' },
 };
 // Adds one source's effects to P. lm is the level multiplier, for sources that grow with level (gear, archetype bonuses).

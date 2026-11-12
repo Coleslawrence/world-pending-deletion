@@ -52,6 +52,11 @@ function fightWith(gifts, opts = {}) {
 Object.keys(G.GIFTS).filter(k => !['retired', 'extra', 'flaw'].includes(G.GIFTS[k].cat)).forEach(k => { const L = G.GIFT_SYN[k]; ok(L && L.length >= 2 && L.every(x => G.ARCH[x] || G.GIFTS[x]), `${k} lists what it works with`); });
 { const { f } = fightWith(['trashtalk']); const t = f.A.skills.find(s => s.key === 'bait'); G.playerAct(f, f.A.skills.indexOf(t)); ok(f.A.critNext, 'Trash Talk makes your next hit critical'); }
 { const { f } = fightWith(['adminrights']); const sw = f.A.skills.find(s => s.key === 'swap'), nx = G.peekNext(f); if (nx && nx !== f.B.intent) { G.playerAct(f, f.A.skills.indexOf(sw)); ok(f.B.weaken > 0, 'Running Order Weakens on a swap'); } }
+// Born-with Gifts are Signature Gifts now, and shop pieces show which held Gifts they fit
+['dragon', 'elf', 'demon', 'ironwill', 'berserker', 'bornlucky', 'lucky', 'fastlearner'].forEach(k => ok(G.isSignature(k), `${k} is a Signature Gift`));
+{ const { f } = fightWith(['dragon']); G.addStatus(f, f.B, f.A, 'burn', 10); ok(f.A.burn === 0, "Dragon Blood: Burn can't hurt you"); }
+{ const { f } = fightWith(['elf']); ok(f.A.P.dodgeCrit && f.A.dodge >= 0.2, 'Elf-touched: +20% dodge, a dodge sets a crit'); }
+{ const { run } = fightWith(['hometown']); const bast = Object.keys(G.SKILLS).find(id => G.SKILLS[id].tags && G.SKILLS[id].tags.includes('bastion')); ok(G.giftFit(run, bast).includes('hometown'), 'a Bastion piece fits Hometown Crowd'); }
 // Sponsorship Offer replaces the Chosen Gifts
 ok(G.EVENTS.sponsorship && G.GIFTS.chosen_war.cat === 'retired', 'the Chosen Gifts are now the Sponsorship Offer event');
 console.log(fails ? `${fails} failed` : 'signature gifts: all passed');

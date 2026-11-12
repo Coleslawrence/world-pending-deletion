@@ -536,6 +536,8 @@ div.bar.brk-bar.near i { background: #f2cc5c; box-shadow: 0 0 6px #f2cc5c; }
 .mergetag { color: var(--ink); background: var(--stun); font-weight: 500; }
 .owntag { color: var(--good); background: #10241a; border: 1px solid #3d6b47; }
 .owntag.off { color: var(--gold-hi); background: #241d10; border-color: #6b5a3d; }
+.gfit { font-family: var(--f-m); font-size: var(--fs-1); color: var(--ink); background: var(--bronze); border-radius: var(--r-s); padding: 0 4px; }
+.fitline b { color: var(--bronze); }
 .tw { position: relative; display: grid; min-width: 0; } .tw > .tile { height: 100%; }
 .qbuy { position: absolute; z-index: 1; right: 3px; top: 3px; min-width: 52px; min-height: 28px; padding: 0 8px; font-family: var(--f-m); font-size: var(--fs-1); color: var(--ink); background: var(--good); border: 0; border-radius: var(--r-s); cursor: pointer; }
 .tw:has(.merge) .qbuy { background: var(--stun); }

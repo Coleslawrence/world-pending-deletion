@@ -297,10 +297,12 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `burnExec` | 3 | ember_gauntlets (0.2), ashen_mantle (0.2), Funeral Pyre (0.25) | +20% damage to Burning opponents below half HP. | add |  |  | Pyre, Reaper |
 | `burnFade` | 2 | Pyre 2 (0.15), Pyre 6 (0) | Burn on the opponent fades slower (15% a turn, not 30%). | min |  |  | Pyre |
 | `burnHeal` | 4 | Cinder Warden (0.2), cinder_robe (0.3), bellows (0.15), … | Heal 20% of the Burn damage your opponent takes. | add |  |  | Pyre, Zealot |
+| `burnImmune` | 1 | Dragon Blood (1) | Burn can't hurt you. | set |  |  | Pyre |
 | `burnLowDie` | 1 | Wildfire Bet (1) | Burn you apply is raised by your lowest die. | set |  |  | Gambler, Pyre |
 | `burnMisf` | 1 | Black Candle (1) | Burning opponents gain 1 Misfortune each turn. | add |  |  | Jinx, Pyre |
-| `burnPlus` | 11 | Pyre 4 (6), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +6. | add |  | flat, scales with power | Pyre |
+| `burnPlus` | 12 | Pyre 4 (6), ember_gauntlets (2), cinder_robe (1), … | Burn you apply +6. | add |  | flat, scales with power | Pyre |
 | `burnPoison` | 2 | plague_censer (2), tar_flask (1) | Whenever you apply Burn, also apply 2 Poison. | add |  |  | Pyre, Venom |
+| `chanceAll` | 1 | Born Lucky (1) | Every chance option gets the floor, not just the first. | set |  |  |  |
 | `chanceBonus` | 3 | Loaded Dice (15), House Credit (10), The House (10) | Chance options in events +15%. | add |  |  |  |
 | `chanceFloor` | 1 | Born Lucky (50) | Your first chance option each round can't be under 50%. | set |  |  |  |
 | `charm` | 1 | rabbit_foot (3) | Each turn, your lowest die decides: 1 or 2, shake off 3 of each of your Burn, Poison and Bleed; 3 or 4, heal 3; 5 or 6, gain 3 Block. | add |  |  | Gambler |
@@ -313,12 +315,14 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `curseWard` | 1 | salt_pouch (3) | The first 3 Curse you would take each fight is ignored. | add |  |  | Jinx |
 | `dejaVu` | 1 | Instant Replay (0.5) | Each turn, the skill you used two turns ago plays again at 50% power. | set |  |  |  |
 | `dieMin` | 3 | Gambler 2 (2), Card Counter (3), Loaded Dice (2) | Your dice never roll below 2. | set |  |  | Gambler |
-| `dmgPct` | 9 | Glass Cannon (0.5), Demon Blood (0.25), Blood Oath (0.2), … | All your damage +50%. | add |  | rate |  |
-| `dodge` | 5 | shadow_leathers (0.06), dancers_wraps (0.04), Elf-touched (0.1), … | +6% dodge. | add |  |  |  |
-| `dodgeBleed` | 1 | Elf-touched (3) | Each attack you dodge or evade gives the attacker 3 Bleed. | add |  |  | Bladedancer |
+| `dmgPct` | 9 | Glass Cannon (0.5), Demon Blood (0.4), Blood Oath (0.2), … | All your damage +50%. | add |  | rate |  |
+| `dodge` | 5 | shadow_leathers (0.06), dancers_wraps (0.04), Elf-touched (0.2), … | +6% dodge. | add |  |  |  |
+| `dodgeBleed` | 1 | Elf-touched (4) | Each attack you dodge or evade gives the attacker 4 Bleed. | add |  |  | Bladedancer |
+| `dodgeCrit` | 1 | Elf-touched (1) | A dodge or evade makes your next hit critical. | set |  |  | Bladedancer |
 | `doomFaster` | 1 | Reaper 6 (1) | Doom lands a turn sooner. | set |  |  | Reaper |
 | `doomLeech` | 1 | Soul Weaver (0.4) | Doom and Leech you apply are 40% stronger. | add |  |  | Reaper, Arcanist |
 | `dotPlus` | 3 | plague_censer (1), Card Up the Sleeve (2), The Trickster (2) | Burn, Poison and Bleed you apply +1. | add |  | flat, scales with power |  |
+| `drainFull` | 1 | Demon Blood (1) | Your lifesteal ignores healing cuts. | set |  |  | Reaper |
 | `echoNext` | 1 | echo_chamber (0.5) | Every skill plays again next turn at 50% power. | set |  |  |  |
 | `encore` | 1 | Encore (1) | After three different skills in a row, your next skill plays twice. | set |  |  |  |
 | `every3Stun` | 1 | Stormcaller 6 (1) | Every 3rd skill you use Stuns. | set |  |  | Stormcaller |
@@ -359,12 +363,12 @@ Used by archetype bonuses (`p`), gear (`pas` scales with stars, `fix` does not),
 | `jinxHeal` | 1 | Small Mercies (0.05) | Jinxing a move heals you 5% of your max HP. | add |  |  | Jinx, Zealot |
 | `jinxReroll` | 1 | Rigged Game (1) | When you jinx a move, reroll all your dice. | set |  |  | Jinx, Gambler |
 | `lastWords` | 3 | templar_plate (0.15), bastion_plate (0.15), Last Words (0.4) | Once per fight, dropping below 25% HP gives you Block equal to 15% of your max HP. | set |  |  |  |
-| `lifesteal` | 7 | Reaper 4 (0.3), Gambler 2 (0.25), Undying (0.15), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
+| `lifesteal` | 8 | Reaper 4 (0.3), Gambler 2 (0.25), Undying (0.15), … | Heal 30% of the damage you deal. | add |  | rate | Reaper |
 | `lightFingers` | 1 | Light Fingers (1) | The first big hit an opponent shows each fight, you steal: a one-use copy of it joins your skills. | set |  |  |  |
 | `lowDieUp` | 1 | tampered_dice (1) | Your lowest die each turn shows 1 more. | add |  |  | Gambler |
 | `lowDR` | 3 | soul_lantern (0.15), gravecloth (0.15), Comeback Kid (0.2) | Below 25% HP, take 15% less damage. | set |  | rate |  |
-| `lowHpCrit` | 1 | Berserker's Blood (0.2) | Below half HP, +20% critical chance. | add |  |  |  |
-| `lowHpDmg` | 3 | Berserker's Blood (0.4), Last Ember (0.35), The Goddess of Ruin (0.3) | Below half HP, deal 40% more damage. | add |  | rate |  |
+| `lowHpCrit` | 1 | Berserker's Blood (0.25) | Below half HP, +25% critical chance. | add |  |  |  |
+| `lowHpDmg` | 3 | Berserker's Blood (0.5), Last Ember (0.35), The Goddess of Ruin (0.3) | Below half HP, deal 50% more damage. | add |  | rate |  |
 | `lowLifesteal` | 3 | soul_lantern (0.25), gravecloth (0.1), tally_bone (0.1) | Below half HP, heal 25% of the damage you deal. | add |  |  | Reaper |
 | `luckyCut` | 1 | Lucky Cut (1) | A critical hit from a die skill showing 6 hits once more. | set |  |  | Gambler, Bladedancer |
 | `mighty` | 1 | Mighty Frame (0.1) | Reaper and Stormcaller skills deal 10% more. | set |  |  |  |

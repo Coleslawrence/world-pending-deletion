@@ -791,7 +791,8 @@ function shopItemTile(it, kind, i) {
   // Copies of pieces you own need no reading: they get a one-tap Buy over the price. Everything else opens its details first.
   const quick = D.owned && canBuy(run, it) ? `<button class="qbuy" data-act="quick-buy" data-k="${kind}" data-i="${i}" aria-label="Buy ${esc(d.name)} for ${price(run, it)} gold">Buy ${price(run, it)}g</button>` : '';
   // Archetype shapes sit beside the rank, so the tile only needs a footer row for owned pips, a lock or a gear slot
-  const foot = `${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}`;
+  const fit = giftFit(run, it.id);
+  const foot = `${fit.length ? `<span class="gfit" title="Fits ${esc(fit.map(k => GIFTS[k].name).join(', '))}">Gift</span>` : ''}${D.owned || D.merge ? pips(D.have, D.need) : ''}${locked ? '<span class="lk">🔒</span>' : ''}${isGear(it.id) ? `<span class="slt">${GEAR[it.id].slot}</span>` : ''}`;
   return `<div class="tw">${quick}<button class="tile shopt ${mainTag(it.id)} ${isGear(it.id) ? 'gear' : ''} ${kind === 'bonus' ? 'bonus' : ''} ${locked ? 'locked' : ''} ${D.merge ? 'merge' : D.owned ? 'owned' : ''}" data-act="shop-item" data-k="${kind}" data-i="${i}" title="${esc(skillTip(pieceDef(baseId(it.id))))}">
     ${tag}<span class="tl-h"><span class="tl-rk">${rk(effRank(it.id, it.mods))}${tagDots(it.id)}</span><span class="price">${price(run, it)}g</span></span><span class="tl-n">${esc(d.name)}</span>
     <span class="tl-fx">${esc(shortFx(it.id, it.mods))}</span>${pfxLine(it.mods)}${foot ? `<span class="tl-f">${foot}</span>` : ''}</button></div>`;
@@ -1267,7 +1268,8 @@ function pieceSheet() {
     const note = D.owned ? `<div class="dupbox ${D.merge ? 'merge' : ''}">${pips(have, need)}<p>${D.merge ? `<b>Buying this merges your copies into ★2</b> (+50% power${isGear(it.id) ? ', stronger passive' : ''}).` : have ? `You own ${have} of ${need}. ${need - have - 1} more after this one for ★2.` : 'You already own this at ★2. Three more ★1 copies make another ★2, and three ★2 make ★3.'}</p><p class="fine">Yours: ${where.join(', ')}</p></div>` : '';
     const full = run.bench.length >= 8 && !wouldMerge(run, it.id) && !(isGear(it.id) ? !run.gear[GEAR[it.id].slot] : run.bar.includes(null));
     const pr = price(run, it);
-    return sheetWrap(S.shop === 'bonus' ? 'System reward slot' : S.shop === 'gear' ? 'Gear shop' : 'Skill shop', pieceBody(it.id, 1, it.mods) + note + (full ? '<p class="sh-p bad">Your bench is full. Sell something first.</p>' : ''),
+    const fit = giftFit(run, it.id), fitP = fit.length ? `<p class="sh-p fitline">Fits your Gifts: ${fit.map(k => `<b>${esc(GIFTS[k].name)}</b>`).join(', ')}.</p>` : '';
+    return sheetWrap(S.shop === 'bonus' ? 'System reward slot' : S.shop === 'gear' ? 'Gear shop' : 'Skill shop', pieceBody(it.id, 1, it.mods) + fitP + note + (full ? '<p class="sh-p bad">Your bench is full. Sell something first.</p>' : ''),
       `${S.shop !== 'bonus' ? `<button class="btn ghost" data-act="lock" data-k="${S.shop}" data-i="${S.i}">${run.locks[S.shop][S.i] ? 'Unlock' : 'Lock'}</button>` : ''}<button class="btn primary" data-act="buy" data-k="${S.shop}" data-i="${S.i}" ${canBuy(run, it) ? '' : 'disabled'}>${D.merge ? 'Buy and merge' : 'Buy'} · ${pr}g</button>`);
   }
   const f = findPiece(run, S.u); if (!f) { ui.sheet = null; return ''; }

@@ -1,7 +1,7 @@
 // ===== [World Pending Deletion] — content: Gifts =====
 'use strict';
-// cat: world (free, one per world type) | cheat, divine (Signature Gifts: choose 1 of a small draw at the Awakening)
-//      growth, combat, fortune, bloodline (picked during the run) | flaw (max 1, widens the draw) | retired (no longer offered;
+// cat: world (free, one per world type) | cheat, divine, bloodline (Signature Gifts: choose 1 of a small draw at the Awakening)
+//      growth, combat, fortune (picked during the run) | flaw (max 1, widens the draw) | retired (no longer offered;
 //      kept so runs that hold one still work)
 // cost: the old Gift Point price. The Awakening no longer uses points (12 Nov); kept as a rough power guide.
 // lock: a Title id that unlocks it, 'echo' (bought with Echoes) or 'chain' (found in an event chain)
@@ -41,13 +41,13 @@ const GIFTS = {
   trashtalk: { name: 'Trash Talk', cat: 'cheat', cost: 3, desc: 'Every 3 turns (Quick), bait the opponent: its shown move becomes a guard, and your next hit is critical.', p: { trashTalk: 1 }, flavour: "Say the right thing and they forget to swing." },
   insidejob: { name: 'Rigged Bout', cat: 'cheat', cost: 4, desc: "Each opponent's strongest move is rigged: the first 2 times they use it, it fails and they are Weakened.", p: { insideJob: 1 }, flavour: 'Someone in the arena crew owes you a favour. Two, actually.' },
   gacha: { name: 'Lucky Draw', cat: 'fortune', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo', flavour: "[Random allocation adjusted in your favour. The System denies this.]" },
-  fastlearner: { name: 'Fast Learner', cat: 'growth', cost: 3, desc: 'Stat points cost half (rounded up).', flavour: "You learn in a week what takes others a season." },
+  fastlearner: { name: 'Fast Learner', cat: 'bloodline', cost: 3, desc: 'Start with +1 to every stat, and stat points cost half (rounded up).', flavour: "You learn in a week what takes others a season." },
   merger: { name: 'Quick Study', cat: 'growth', cost: 3, desc: 'Your skills merge at 2 copies instead of 3.', flavour: "You see how two things become one before anyone shows you." },
   veteran: { name: 'Tournament Veteran', cat: 'retired', cost: 2, desc: 'Start with 6 more gold and an extra draft reroll.', flavour: "Not your first tournament. You know where the coin is hidden." },
   latebloomer: { name: 'Late Bloomer', cat: 'flaw', cost: 2, desc: 'Every stat starts 1 lower, but each level you reach gives a free stat point.', lock: 'echo', flavour: "Slow to start. Impossible to stop." },
   affinity: { name: 'Skill Affinity', cat: 'growth', cost: 2, desc: "Your world's home archetype pieces cost 2 less (minimum 1).", lock: 'echo', flavour: "Your home world's ways come cheaply to you." },
   catalyst: { name: 'Catalyst', cat: 'combat', cost: 3, desc: 'Reactions are twice as strong.', p: { reactMult: 2 }, flavour: "When two afflictions meet, you make them argue." },
-  berserker: { name: "Berserker's Blood", cat: 'combat', cost: 2, desc: 'Below half HP, deal 40% more damage and gain +20% critical chance.', p: { lowHpDmg: 0.4, lowHpCrit: 0.2 }, flavour: "Wound you, and something old wakes up." },
+  berserker: { name: "Berserker's Blood", cat: 'bloodline', cost: 2, desc: 'Below half HP, deal 50% more damage and gain +25% critical chance.', p: { lowHpDmg: 0.5, lowHpCrit: 0.25 }, flavour: "Wound you, and something old wakes up." },
   ironbody: { name: 'Iron Body', cat: 'retired', cost: 2, desc: 'Start each fight with Block equal to 10% of your max HP.', p: { startBlockPct: 0.1 }, flavour: "You were built for this, even if nobody asked you." },
   glass: { name: 'Glass Cannon', cat: 'combat', cost: 2, desc: 'All your damage +50%, but you can never gain Block.', p: { dmgPct: 0.5, noBlock: 1 }, flavour: "Hit hard, break easily. The crowd adores you for it." },
   foresight: { name: 'Foresight', cat: 'retired', cost: 3, desc: "Always see the opponent's next 2 moves.", flavour: "You read their next move the way others read the weather." },
@@ -55,8 +55,8 @@ const GIFTS = {
   thickskin: { name: 'Thick Skin', cat: 'combat', cost: 2, desc: 'Every hit you take deals 3 less damage.', lock: 'untouched', p: { flatDR: 3 }, flavour: "Years of knocks have left you hard to dent." },
   vampire: { name: 'Vampirism', cat: 'combat', cost: 3, desc: 'Heal 12% of the damage you deal. Overhealing becomes Block.', lock: 'bloodthirsty', p: { lifesteal: 0.12, overhealBlock: 1 }, flavour: "You are always a little thirsty in a fight." },
   manaaffinity: { name: 'Mana Affinity', cat: 'combat', cost: 2, desc: 'Quick skills: 1 turn shorter cooldown. Your first 2 Quick skills each fight have no cooldown.', lock: 'spellweaver', p: { quickCd: 1, quickFree: 2 }, flavour: "Quick spells come back to your hands like trained birds." },
-  bornlucky: { name: 'Born Lucky', cat: 'fortune', cost: 2, desc: "+3 LUK. Your first chance option each round can't be under 50%.", p: { chanceFloor: 50 }, flavour: "The midwife lost a bet on you. She never stopped telling people." },
-  lucky: { name: 'Lucky Star', cat: 'fortune', cost: 2, desc: '+10% critical chance, better shop odds, and critical hits Empower you for 1 turn.', p: { critBonus: 0.1, critEmpower: 1 }, flavour: "Born under a good star. The star is still watching." },
+  bornlucky: { name: 'Born Lucky', cat: 'bloodline', cost: 2, desc: '+4 LUK. Every chance option is at least 50%.', p: { chanceFloor: 50, chanceAll: 1 }, flavour: "The midwife lost a bet on you. She never stopped telling people." },
+  lucky: { name: 'Lucky Star', cat: 'bloodline', cost: 2, desc: '+15% critical chance, shop odds 1 level better, and critical hits Empower you for 1 turn.', p: { critBonus: 0.15, critEmpower: 1 }, flavour: "Born under a good star. The star is still watching." },
   golden: { name: 'Golden Touch', cat: 'fortune', cost: 3, desc: 'Interest cap rises from 5 to 10.', flavour: "Coin sticks to you. Nobody can say why." },
   breath: { name: 'Second Breath', cat: 'fortune', cost: 3, desc: 'Once per fight, survive a killing blow with 1 HP.', flavour: "Once, you should have died. You did not." },
   gambler: { name: 'Big Spender', cat: 'fortune', cost: 2, desc: 'Winning a wager pays 20 gold instead of 10.', lock: 'high_roller', flavour: "You never bet what you cannot afford. You can afford a lot." },
@@ -67,11 +67,11 @@ const GIFTS = {
   chosen_house: { name: 'Chosen of the House', cat: 'retired', cost: 2, desc: 'Start with 4 Favour with the House: their gift arrives at once.', flavour: "The House opened an account in your name the day you were born." },
   chosen_crow: { name: 'Chosen of the Crow', cat: 'retired', cost: 2, desc: 'Start with 4 Favour with the Crow: their gift arrives at once.', flavour: "A crow sat on your cradle every night. Nobody ever chased it off." },
   chosen_ruin: { name: 'Chosen of Ruin', cat: 'retired', cost: 2, desc: 'Start with 4 Favour with the Goddess of Ruin: their gift arrives at once.', flavour: "The Goddess of Ruin smiles whenever you bleed." },
-  ironwill: { name: 'Iron Will', cat: 'bloodline', cost: 3, desc: 'Lose 1 fewer Heart per defeat (minimum 1).', flavour: "You refuse to let your world go quietly." },
-  dragon: { name: 'Dragon Blood', cat: 'bloodline', cost: 4, desc: '+15% max HP. Toxic Flare and Cauterise heal you 10.', lock: 'emberfall', p: { reactHeal: 10 }, flavour: "Somewhere up your family tree, someone married a dragon." },
-  elf: { name: 'Elf-touched', cat: 'bloodline', cost: 3, desc: '+10% dodge. Each attack you dodge or evade gives the attacker 3 Bleed.', lock: 'thornbane', p: { dodge: 0.1, dodgeBleed: 3 }, flavour: "The fey brushed your cradle. You move the way they do." },
-  demon: { name: 'Demon Blood', cat: 'bloodline', cost: 3, desc: 'All your damage +25%, but healing is 50% weaker.', lock: 'comeback', p: { dmgPct: 0.25, healPct: -0.5 }, flavour: "Something below lent you strength. It wants it back with interest." },
-  lastwords: { name: 'Last Words', cat: 'bloodline', cost: 3, desc: 'Once per fight, dropping below 25% HP gives you Block equal to 40% of your max HP.', lock: 'chain', p: { lastWords: 0.4 }, flavour: "A dead champion's final gift. Make it mean something." },
+  ironwill: { name: 'Iron Will', cat: 'bloodline', cost: 3, desc: 'Lose 1 fewer Heart per defeat (minimum 1). After a defeat, start your next fight Empowered for 2 turns.', flavour: "You refuse to let your world go quietly." },
+  dragon: { name: 'Dragon Blood', cat: 'bloodline', cost: 4, desc: "+25% max HP. Burn can't hurt you, Burn you apply +3, and Toxic Flare and Cauterise heal you 10.", lock: 'emberfall', p: { reactHeal: 10, burnImmune: 1, burnPlus: 3 }, flavour: "Somewhere up your family tree, someone married a dragon." },
+  elf: { name: 'Elf-touched', cat: 'bloodline', cost: 3, desc: '+20% dodge. Each attack you dodge or evade gives the attacker 4 Bleed and makes your next hit critical.', lock: 'thornbane', p: { dodge: 0.2, dodgeBleed: 4, dodgeCrit: 1 }, flavour: "The fey brushed your cradle. You move the way they do." },
+  demon: { name: 'Demon Blood', cat: 'bloodline', cost: 3, desc: 'All your damage +40%, and heal 10% of the damage you deal. Other healing is 50% weaker.', lock: 'comeback', p: { dmgPct: 0.4, healPct: -0.5, lifesteal: 0.1, drainFull: 1 }, flavour: "Something below lent you strength. It wants it back with interest." },
+  lastwords: { name: 'Last Words', cat: 'combat', cost: 3, desc: 'Once per fight, dropping below 25% HP gives you Block equal to 40% of your max HP.', lock: 'chain', p: { lastWords: 0.4 }, flavour: "A dead champion's final gift. Make it mean something." },
   illstarred: { name: 'Ill-Starred', cat: 'flaw', cost: -1, desc: 'Start each fight with 5 Curse.', p: { startCurse: 5 }, flavour: "Born under the wrong star. It has been following you since." },
   f_glass: { name: 'Glass Body', cat: 'flaw', cost: -2, desc: '20% less max HP.', flavour: "You bruise if someone looks at you too hard." },
   f_marked: { name: 'Marked by the System', cat: 'flaw', cost: -2, desc: 'Opponents are 10% stronger.', flavour: "[Entrant flagged for additional scrutiny.]" },
@@ -95,12 +95,12 @@ const GIFT_SYN = {
   chatdecides: ['pyre', 'venom', 'blade', 'bastion'], powerarmour: ['bastion', 'dragon', 'thickskin'], growthspurt: ['zealot', 'bastion', 'chatdecides'],
   silvertongue: ['storm', 'lightningrod', 'bond_war'], precedent: ['zealot', 'venom', 'pyre'], bodydouble: ['reaper', 'berserker', 'bond_ruin', 'lastwords'],
   dejavu: ['pyre', 'venom', 'jinx', 'encore'], trashtalk: ['blade', 'lucky', 'bond_crow', 'adminrights'], insidejob: ['storm', 'venom', 'adminrights'],
-  gacha: ['fivefinger', 'merger', 'haggler'], fastlearner: ['unregistered', 'bornlucky'], merger: ['fivefinger', 'runesmith', 'monarch'], affinity: ['haggler', 'merger'],
+  gacha: ['fivefinger', 'merger', 'haggler'], fastlearner: ['unregistered', 'bornlucky', 'monarch'], merger: ['fivefinger', 'runesmith', 'monarch'], affinity: ['haggler', 'merger'],
   catalyst: ['pyre', 'venom', 'dragon'], berserker: ['reaper', 'bodydouble', 'bond_ruin'], glass: ['hometown', 'nearmiss', 'vampire'], firststrike: ['encore', 'swordsaint', 'storm'],
   thickskin: ['bastion', 'deserter', 'powerarmour'], vampire: ['reaper', 'zealot', 'tidecaller'], manaaffinity: ['arcanist', 'lightfingers', 'adminrights', 'trashtalk'],
-  bornlucky: ['dicer', 'jinx', 'loadeddice'], lucky: ['blade', 'trashtalk', 'bond_crow'], golden: ['fivefinger', 'treasure', 'gambler'], breath: ['berserker', 'bodydouble', 'lastwords'],
+  bornlucky: ['dicer', 'jinx', 'loadeddice', 'bond_house'], lucky: ['blade', 'trashtalk', 'bond_crow'], golden: ['fivefinger', 'treasure', 'gambler'], breath: ['berserker', 'bodydouble', 'lastwords'],
   gambler: ['bond_house', 'golden'], haggler: ['affinity', 'gacha'], treasure: ['spiritguide', 'fivefinger', 'golden'],
-  ironwill: ['glass', 'bodydouble'], dragon: ['catalyst', 'pyre', 'powerarmour'], elf: ['blade', 'nearmiss', 'hedgewitch'], demon: ['reaper', 'berserker'], lastwords: ['bastion', 'hometown', 'bodydouble'],
+  ironwill: ['glass', 'bodydouble', 'storm'], dragon: ['pyre', 'catalyst', 'chatdecides'], elf: ['blade', 'nearmiss', 'lucky'], demon: ['reaper', 'vampire', 'berserker'], lastwords: ['bastion', 'hometown', 'bodydouble'],
   bond_war: ['storm', 'silvertongue', 'lightningrod'], bond_trick: ['pyre', 'venom', 'blade'], bond_ruin: ['pyre', 'berserker', 'bodydouble'], bond_house: ['dicer', 'gambler', 'golden'], bond_crow: ['blade', 'lucky', 'trashtalk'],
 };
 const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw', retired: 'Retired' };
