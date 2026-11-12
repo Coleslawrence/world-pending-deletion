@@ -1,5 +1,5 @@
 // World bounty test: one world per offer gets a bounty (never a Steered one), and each bounty does what its card says:
-// Echoes x2, Rank Points +50%, +2 Gift Points. Seeded (Pending World) and practice runs never pay a bounty.
+// Echoes x2, Rank Points +50%, 1 more Signature Gift. Seeded (Pending World) and practice runs never pay a bounty.
 //   node tools/bounty-test.js     # exits 1 on any failure
 'use strict';
 const G = require('../js/core.js');
@@ -21,7 +21,7 @@ const plain = runOn(null), echo = runOn('echoes'), rank = runOn('rank'), gift = 
 echo.run.world.rank = rank.run.world.rank = plain.run.world.rank;
 ok(G.echoesFor(echo.run, 'spared') === 2 * G.echoesFor(plain.run, 'spared'), 'Echo bounty doubles Echoes');
 ok(G.rpFor(rank.run, 'spared') === Math.round(G.rpFor(plain.run, 'spared') * 1.5) || Math.abs(G.rpFor(rank.run, 'spared') - 1.5 * G.rpFor(plain.run, 'spared')) <= 1, 'Rank bounty pays +50% RP');
-ok(G.giftBudget(gift.w) === G.giftBudget(Object.assign({}, gift.w, { bounty: null })) + 2, 'Gift bounty adds 2 Gift Points');
+ok(G.sigCount(Object.assign({}, gift.w, { rank: 3 }), 'war', 0) === G.sigCount(Object.assign({}, gift.w, { rank: 3, bounty: null }), 'war', 0) + 1, 'Gift bounty shows 1 more Signature Gift');
 const seeded = runOn('echoes', 'wpd:2026-11-08');
 ok(G.echoesFor(seeded.run, 'spared') === G.echoesFor(Object.assign({}, seeded.run, { world: Object.assign({}, seeded.run.world, { bounty: null }) }), 'spared'), 'seeded runs pay no bounty');
 console.log(fails ? `${fails} failed` : 'bounty test: all passed');

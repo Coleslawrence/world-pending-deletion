@@ -201,34 +201,37 @@ function sanitizeRec(r, type) {
 // ---------- Gifts ----------
 const SIGILS = ['✦', '☾', '♜', '⚔', '❖', '✠'];
 const SIGIL_COLS = ['#d6a04f', '#72d0ff', '#e15b52', '#9fd86a', '#c27ce6', '#efe6d8'];
-function giftBudget(world) { return 10 + [4, 3, 2, 1, 0, 0][world.rank] + (world.bounty === 'gift' ? BOUNTIES.gift.points : 0); }
+// The Awakening has no Gift Points (12 Nov): the world's Gift comes free, you choose 1 Signature Gift (a cheat or a divine
+// Gift) from a small draw, and you may take 1 Flaw, which widens the draw and pays gold. The smaller Gifts (growth, combat,
+// fortune, bloodline) are picked during the run instead: 1 of 3 after rounds 1, 3 and 5 (giftPickRounds).
+const SIG_CATS = ['cheat', 'divine'], SMALL_CATS = ['growth', 'combat', 'fortune', 'bloodline'];
+const SIG_BASE = 3, SIG_MAX = 6, FLAW_SIGS = 2, FLAW_GOLD = 6, SYS_GOLD = 6, AWAKEN_GOLD = 6;
+function isSignature(k) { return !!GIFTS[k] && SIG_CATS.includes(GIFTS[k].cat); }
+// How many Signature Gifts the draw shows: 3, +1 in a rank E or D world, +1 with a Gift bounty, +1 when Faithless, +2 with a Flaw
+function sigCount(world, patron, flaw) { return Math.min(SIG_MAX, SIG_BASE + (world.rank <= 1 ? 1 : 0) + (world.bounty === 'gift' ? BOUNTIES.gift.sigs : 0) + (patron === 'none' ? 1 : 0) + (flaw ? FLAW_SIGS : 0)); }
 function giftUnlocked(k, meta) { const g = GIFTS[k]; if (!g.lock) return true; if (!meta) return false; if (g.lock === 'bond') return bondLevel(meta, g.bond) >= BOND_AT.length; if (g.lock === 'echo') return !!meta.unlocks['gift_' + k]; if (g.lock === 'chain') return !!(meta.found && meta.found[k]); return !!meta.titles[g.lock]; }
 function giftLockText(k) { const g = GIFTS[k]; if (g.lock === 'bond') return `Reach Bond ${BOND_AT.length} with ${GODS[g.bond].name}`; if (g.lock === 'echo') return 'Unlock with Echoes'; if (g.lock === 'chain') return 'Found at the end of an event chain'; return 'Earn the Title: ' + TITLES[g.lock].name; }
-function giftsAllowed(world) { const wg = WORLD_TYPES[world.type].gift; return Object.keys(GIFTS).filter(k => GIFTS[k].cat !== 'extra' && (GIFTS[k].cat !== 'world' || k === wg)); }
-// System Offer: 3 random Gifts cost 1 less, one random cheat costs 2 less.
-function makeOffer(world, meta, rng) {
-  const pool = giftsAllowed(world).filter(k => giftUnlocked(k, meta) && GIFTS[k].cost >= 2 && !['cheat', 'flaw', 'world'].includes(GIFTS[k].cat));
-  const cheats = giftsAllowed(world).filter(k => giftUnlocked(k, meta) && GIFTS[k].cat === 'cheat');
-  const o = {}; shuffle(pool, rng).slice(0, 3).forEach(k => o[k] = 1); if (cheats.length) o[pick(cheats, rng)] = 2;
-  return o;
+function giftsAllowed(world) { const wg = WORLD_TYPES[world.type].gift; return Object.keys(GIFTS).filter(k => GIFTS[k].cat !== 'extra' && GIFTS[k].cat !== 'retired' && (GIFTS[k].cat !== 'world' || k === wg)); }
+function flawsAllowed(meta) { return Object.keys(GIFTS).filter(k => GIFTS[k].cat === 'flaw' && giftUnlocked(k, meta)); }
+// The Signature draw: SIG_MAX unlocked Signature Gifts in a seeded order. The Awakening shows the first sigCount of them,
+// so a Flaw or Faithless adds options without reshuffling the ones already shown. Locked Gifts are never drawn.
+function makeOffer(world, meta, rng) { return shuffle(giftsAllowed(world).filter(k => isSignature(k) && giftUnlocked(k, meta)), rng).slice(0, SIG_MAX); }
+function sigShown(world, patron, flaw, offer) { return (offer || []).slice(0, sigCount(world, patron, flaw)); }
+// Valid picks: the world's Gift, at most 1 Signature Gift from those shown (when a draw is given), at most 1 Flaw
+function giftCheck(world, sel, patron, offer) {
+  const sigs = sel.filter(isSignature), flaws = sel.filter(k => GIFTS[k] && GIFTS[k].cat === 'flaw');
+  const other = sel.filter(k => !GIFTS[k] || (!isSignature(k) && GIFTS[k].cat !== 'flaw' && k !== WORLD_TYPES[world.type].gift));
+  const shown = Array.isArray(offer) ? sigShown(world, patron, flaws.length, offer) : null;
+  const ok = sigs.length <= 1 && flaws.length <= 1 && !other.length && (!shown || sigs.every(k => shown.includes(k)));
+  return { ok, sigs: sigs.length, flaws: flaws.length, shown };
 }
-function giftCost(k, offer) { return GIFTS[k].cost - ((offer && offer[k]) || 0); }
-// bonus: Gift Points the System adds while you keep its picks
-function giftCheck(world, sel, patron, offer, bonus) {
-  const spent = sel.reduce((a, k) => a + giftCost(k, offer), 0);
-  const budget = giftBudget(world) + (patron === 'none' ? 2 : 0) + (bonus || 0);
-  const cheats = sel.filter(k => GIFTS[k].cat === 'cheat').length, flaws = sel.filter(k => GIFTS[k].cat === 'flaw').length;
-  return { spent, budget, left: budget - spent, ok: spent <= budget && cheats <= 1 && flaws <= 2, cheats, flaws };
+// "Let the System decide": the world's Gift and one Signature Gift from those shown, no Flaw. It pays SYS_GOLD.
+function randomGifts(world, meta, patron, offer, rng) {
+  const shown = Array.isArray(offer) ? sigShown(world, patron, 0, offer) : makeOffer(world, meta, rng).slice(0, sigCount(world, patron, 0));
+  return [WORLD_TYPES[world.type].gift].concat(shown.length ? [pick(shown, rng)] : []);
 }
-function randomGifts(world, meta, patron, offer, rng, bonus) {
-  // "Let the System decide": the world's Gift, maybe a cheat, then fill the budget
-  let sel = [WORLD_TYPES[world.type].gift];
-  const pool = giftsAllowed(world).filter(k => giftUnlocked(k, meta) && !['world', 'flaw'].includes(GIFTS[k].cat));
-  for (const k of shuffle(pool, rng)) { const t = sel.concat(k); if (giftCheck(world, t, patron, offer, bonus).ok) sel = t; }
-  return sel;
-}
-// Letting the System decide pays: SYS_BONUS extra Gift Points while you keep its picks
-const SYS_BONUS = 2;
+// Starting gold the Gifts add: a Flaw's payment and the System's
+function giftGold(gifts, sys) { return (gifts.some(k => GIFTS[k] && GIFTS[k].cat === 'flaw') ? FLAW_GOLD : 0) + (sys ? SYS_GOLD : 0); }
 // The stat roll: ROLL_PTS points instead of the usual 4, one stat favoured with 3 of them. Once per Awakening.
 const ROLL_PTS = 6;
 function rollStats(rng) {
@@ -260,8 +263,8 @@ const UNLOCKS = {
   reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 30 },
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 60 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 30 },
-  gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Cheat skill: a free reroll each round and better shop odds.', cost: 60 },
-  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Growth: weaker start, a free stat point each level.', cost: 35 },
+  gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Fortune: a free reroll each round and better shop odds.', cost: 60 },
+  gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Flaw: weaker start, a free stat point each level.', cost: 35 },
   gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 1 less.", cost: 35 },
   gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs 1 less.', cost: 35 },
 };
@@ -390,7 +393,7 @@ function offerWorlds(meta, rng) {
 const BOUNTIES = {
   echoes: { name: 'Echo bounty', desc: 'Echoes from this world are doubled.', mul: 2 },
   rank: { name: 'Rank bounty', desc: 'Rank Points from this world +50%.', mul: 1.5 },
-  gift: { name: 'Gift bounty', desc: '+2 Gift Points at the Awakening.', points: 2 },
+  gift: { name: 'Gift bounty', desc: '1 more Signature Gift to choose from at the Awakening.', sigs: 1 },
 };
 function worldBounty(worlds, rng) {
   const open = worlds.filter(w => !w.steered); if (!open.length) return worlds;
@@ -476,13 +479,12 @@ function newRun(world, setup, meta, rng) {
   const home = WORLD_TYPES[world.type].home;
   const pool = unlockedArch({ unlocks: U }).filter(k => k !== home), allies = pool.filter(k => alliesOf(home).includes(k));
   const others = setup.arch ? setup.arch.filter(k => k !== home).slice(0, 3) : world.v >= 2 ? worldArch(world, U).slice(1) : shuffle(allies, rs).concat(shuffle(pool.filter(k => !allies.includes(k)), rs)).slice(0, 3);
-  const chk = giftCheck(world, setup.gifts, setup.patron, setup.offer, setup.sysBonus);
   const G = setup.gifts;
   const run = {
     titles0: Object.keys((meta && meta.titles) || {}).length, // Titles held when the run began, for the end screen's progress bars
     v: VERSION, world, name: setup.name, sigil: setup.sigil || 0, color: setup.color || 0, champ: setup.name + ' of ' + world.name,
     stats: Object.assign({}, setup.stats), statPts: 0, level: 1, bought: 0, notice: 0,
-    gold: Math.max(0, chk.left) * 3 + (U.purse ? 3 : 0) + (G.includes('veteran') ? 6 : 0),
+    gold: AWAKEN_GOLD + giftGold(setup.gifts, setup.sys) + (U.purse ? 3 : 0),
     gifts: setup.gifts.slice(), patron: setup.patron, arch: [home].concat(others),
     favour: godZeros(), gifted: godZeros(),
     slots: setup.gifts.includes('prodigy') ? 5 : 4, bar: [], gear: { weapon: null, armour: null, accessory: null }, bench: [], uid: 0,
@@ -491,7 +493,7 @@ function newRun(world, setup, meta, rng) {
     pending: [], log: [], hp: 0, ended: false, stage: 'draft', rerolls: 1 + (U.reroll ? 1 : 0) + (G.includes('veteran') ? 1 : 0), draft: [],
     met: [], choices: null, chosen: null, wager: null, wagerOn: false, districts: [], scouted: false, nextFlags: {}, usedRewind: false, usedBreath: false, path: null, history: [],
     title: setup.title && meta.titles[setup.title] ? setup.title : null, hiddenPath: null, milestones: {}, chains: {}, quests: [], wagersWon: 0, freeRerolls: 0, haggle: false,
-    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, earned: [], picks: [], t0: Date.now(),
+    entrant: 100 + (meta.runs || 0) * 7 + Math.floor(rnd(rs) * 7), extraGiven: false, giftPicks: {}, earned: [], picks: [], t0: Date.now(),
   };
   // Its own stream, so pairing never shifts the draft, shops or opponents (a sim's rng keys it by the world)
   run.pair = genPair(world, setup.seed ? seedRng(setup.seed + ':pair') : rng ? seedRng('pair:' + world.type + ':' + world.name) : undefined);
@@ -563,8 +565,11 @@ function trainStat(run, k, msgs) {
 }
 function midGiftPool(run) {
   const M = run.seed && META ? levelMeta(META) : META;
-  return Object.keys(GIFTS).filter(k => ['growth', 'combat', 'fortune', 'bloodline'].includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M) && !['latebloomer', 'veteran'].includes(k));
+  return Object.keys(GIFTS).filter(k => SMALL_CATS.includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M));
 }
+// In-run Gift picks: entering these rounds, choose 1 of 3 smaller Gifts. Round 5 still brings the Additional Gift.
+const GIFT_PICK_ROUNDS = [2, 4];
+function giftPickOffers(run, rng) { return shuffle(midGiftPool(run), rng).slice(0, 3); }
 // The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now,
 // never one already offered this run while a fresh one fits
 function levelPerk(run, rng) { const t = run.fateTrack || 0, x = { maxHp: maxHp(run), fateOpen: !!FATES[run.world.fate] && t > FATE_TRACK.min && t < FATE_TRACK.max, noticeRoom: !run.noticeOff && (run.notice || 0) < TUNE.noticeMax }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); const fresh = pool.filter(k => !(run.perksShown || []).includes(k)), k = pick(fresh.length ? fresh : pool, rng); if (k) run.perksShown = (run.perksShown || []).concat(k); return k || null; }
@@ -1560,6 +1565,7 @@ function bracketMap(run) {
       if (row.gate) M('gate', 'Gatekeeper: the hard opponent guards the way on. Beat them for a stat point.');
       if (run.trial && !run.trial.done && run.trial.round === r) M('trial', `Rank Trial: the ${run.trial.to}-rank Proctor takes the hard slot.`);
       if (live && AUGMENT_ROUNDS.includes(r) && !done['a' + r]) M('rules', 'Rules review: pass 1 of 3 Amendments, or none.');
+      if (live && run.giftPicks && GIFT_PICK_ROUNDS.includes(r) && !run.giftPicks[r]) M('gift', 'Choose 1 of 3 Gifts.');
       if (live && r === 5 && !run.extraGiven) M('gift', 'Milestone: one more Gift.');
       if (live && F && F.crises && PULSE.stageAt.includes(r) && (r > run.round || crisisDue(run))) M('crisis', `Crisis: ${F.name} comes to a head.`);
       if (live && V && V.at === r && !run.customOff && (r > run.round || visitDue(run))) M('visit', `${P.name}: a visit is due.`);
@@ -2133,6 +2139,8 @@ function enterChoose(run, meta, rng, msgs) {
   checkMilestones(run, msgs);
   if (run.pulsed !== run.round) { run.pulsed = run.round; const pulse = worldPulse(run, stream(run, 'pulse', rng)); if (pulse) { run.log.push({ t: 'sys', text: pulse }); msgs && msgs.push({ t: 'sys', text: pulse }); } }
   (run.quests || []).forEach(q => { if (!q.done && !q.failed && QUESTS[q.id].by && run.round > QUESTS[q.id].by) { q.failed = true; msgs && msgs.push({ t: 'loss', text: `[Quest failed: ${QUESTS[q.id].text}]` }); } });
+  // run.giftPicks: runs started before in-run picks have none, so they aren't handed extra Gifts
+  if (!run.elite && run.giftPicks && GIFT_PICK_ROUNDS.includes(run.round) && !run.giftPicks[run.round]) { run.giftPicks[run.round] = true; const o = giftPickOffers(run, stream(run, 'loot', rng)); if (o.length) { run.pending.push({ type: 'gift', offers: o, pick: true }); msgs && msgs.push({ t: 'class', text: '[Gift issued. Choose 1 of 3.]' }); } }
   if (!run.elite && run.round >= 5 && !run.extraGiven) { run.extraGiven = true; run.pending.push({ type: 'gift', offers: extraGiftOffers(run, stream(run, 'loot', rng)) }); msgs && msgs.push({ t: 'class', text: '[Milestone reached. Additional Gift granted.]' }); }
   if (shaped(run) && !run.elite) {
     const done = run.shapeDone = run.shapeDone || {};
@@ -3875,7 +3883,7 @@ if (typeof module !== 'undefined') module.exports = {
   forecast, cloneFight,
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
-  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, giftBudget, giftsAllowed, giftCheck, SYS_BONUS, ROLL_PTS, rollStats,
+  PREFIXES, MAX_MODS, MAX_MODS_CORRUPT, MODS_FROM, modCap, GLITCH_GEAR, GLITCH_SKILL, GLITCH_TRAIT, KNOWN_ISSUES, BUG_BOUNTY, issueKey, issueName, issuesSeen, fileIssues, GLITCH_DAY, glitchDay, glitchMul, CORRUPT_WORLD, rollTraits, unstableSkill, registerGlitchGear, spliceGear, spliceId, GLITCH_PREFIXES, bareMod, glitchesOn, corruptTargets, corruptOptions, corruptText, corrupt, prefixOk, rollPrefixes, moddedDef, effRank, modName, GODS, WORLD_TYPES, WORLD_RANKS, MODIFIERS, GIFTS, GIFT_CATS, SIGILS, SIGIL_COLS, SIG_CATS, SMALL_CATS, SIG_BASE, SIG_MAX, FLAW_SIGS, FLAW_GOLD, SYS_GOLD, isSignature, sigCount, sigShown, flawsAllowed, giftGold, giftsAllowed, giftCheck, ROLL_PTS, rollStats,
   ENEMIES, MONSTERS, MONSTER_ROUNDS, RIVALS, ROUNDS, summonSpec, amendOf, rollChance, rollTag, pushEvent, ROLL_BASE, ROLL_HARD, ROLL_PER, UNLOCKS, TUNE, GATES, CURVE, RANK_POWER, ARCH_POWER, OFF_PLAN, SELL_VALUE, GAP, gapMul, STAT_POWER, noticeOf, noticeMul, BREAK, addBreak, HEART_COST, REACTIONS, FEATS, FEAT_ATS, FEAT_TOOLS, WAGER_FEATS, featCtx, featOk, featPossible, featFair, WAGERS, DISTRICTS, EVENTS, CHAINS, eventText, ENEMY_TRAITS, ENEMY_PASSIVES, TRAIT_POOL, TRAIT_COUNT,
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
@@ -3884,6 +3892,6 @@ if (typeof module !== 'undefined') module.exports = {
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
-  TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, giftCost, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
+  TITLES, FINAL_TITLE, QUESTS, OUTCOMES, outcomeText, applyOutcomes, HIDDEN_PATHS, MILESTONES, CHAIN_STARTERS, giftUnlocked, giftLockText, makeOffer, randomGifts, bindMeta, earnTitle, worldFirst, questEvent, extraGiftOffers, GIFT_PICK_ROUNDS, giftPickOffers, applyGift, checkMilestones, hiddenPathOf, undercityEvent, dueChainEvents, rerollCost, checkPath,
   buildPlayer, buildEnemy, snapshot, usePatch, patchOffer, givePiece, RARE_PATCH, POOL, POOL_SIZE, POOL_ROUNDS, POOL_HEARTS, poolResolve, finalFill, finalResolve, genPair, pairOf, finalId, POOL_KEYS, POOL_SEED, poolOn, poolSlot, poolId, poolSnap, poolReserve, poolSpec, poolFill, poolStyle, poolIntro, newFight, playerAct, rerollDie, resolveDice, DIE_FACES, dmgMult, jinxMove, canJinx, jinxCost, jinxRole, JINX_COST, skipPlayer, enemyTurn, intentInfo, REFLEXES, REFLEX_ON, reflexText, reflexRules, SIDE_GOALS, goalState, WINDUP, planIntentForTest: planIntent, previewSkill, describe, canUse, resolveFight, startElite, endRun, echoesFor, skillPower, notePick, runSummary, PICKS_MAX, feedbackDoc, FEEDBACK_TYPES, FEEDBACK_MAX,
 };
