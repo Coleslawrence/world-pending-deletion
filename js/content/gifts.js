@@ -1,6 +1,9 @@
 // ===== [World Pending Deletion] — content: Gifts =====
 'use strict';
-// cat: world | cheat (max 1) | growth | combat | fortune | divine | bloodline | flaw (max 2)
+// cat: world (free, one per world type) | cheat, divine (Signature Gifts: choose 1 of a small draw at the Awakening)
+//      growth, combat, fortune, bloodline (picked during the run) | flaw (max 1, widens the draw) | retired (no longer offered;
+//      kept so runs that hold one still work)
+// cost: the old Gift Point price. The Awakening no longer uses points (12 Nov); kept as a rough power guide.
 // lock: a Title id that unlocks it, 'echo' (bought with Echoes) or 'chain' (found in an event chain)
 // p: what it does in a fight, as effects from effects.js. Gifts that change the run instead (gold, odds, Hearts, merges)
 // have no p yet and are read in core.js.
@@ -19,17 +22,17 @@ const GIFTS = {
   rewind: { name: 'Return by Death', cat: 'cheat', cost: 6, desc: 'Once per run, a loss rewinds to the start of that fight.', flavour: "[Death recorded. Death reversed. Record amended.]" },
   copycat: { name: 'Copycat', cat: 'cheat', cost: 5, desc: "Once per fight, use the opponent's last move as your own.", lock: 'mirror_breaker', p: { copycat: 1 }, flavour: "You learn every trick by watching it once." },
   swordsaint: { name: 'Sword Saint', cat: 'cheat', cost: 5, desc: 'Your basic Attack becomes S-rank: far stronger, and it ignores Block.', lock: 'giant_slayer', p: { swordSaint: 1 }, flavour: "One swing, practised until it stopped being a swing." },
-  gacha: { name: 'Gacha Luck', cat: 'cheat', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo', flavour: "[Random allocation adjusted in your favour. The System denies this.]" },
+  gacha: { name: 'Gacha Luck', cat: 'fortune', cost: 4, desc: 'Your first reroll each round is free, and shop odds are 1 level better.', lock: 'echo', flavour: "[Random allocation adjusted in your favour. The System denies this.]" },
   fastlearner: { name: 'Fast Learner', cat: 'growth', cost: 3, desc: 'Stat points cost a third less.', flavour: "You learn in a week what takes others a season." },
   merger: { name: 'Quick Study', cat: 'growth', cost: 3, desc: 'Your first 3 merges need only 2 copies.', flavour: "You see how two things become one before anyone shows you." },
-  veteran: { name: 'Tournament Veteran', cat: 'growth', cost: 2, desc: 'Start with 6 more gold and an extra draft reroll.', flavour: "Not your first tournament. You know where the coin is hidden." },
-  latebloomer: { name: 'Late Bloomer', cat: 'growth', cost: 2, desc: 'Every stat starts 1 lower, but each level you reach gives a free stat point.', lock: 'echo', flavour: "Slow to start. Impossible to stop." },
+  veteran: { name: 'Tournament Veteran', cat: 'retired', cost: 2, desc: 'Start with 6 more gold and an extra draft reroll.', flavour: "Not your first tournament. You know where the coin is hidden." },
+  latebloomer: { name: 'Late Bloomer', cat: 'flaw', cost: 2, desc: 'Every stat starts 1 lower, but each level you reach gives a free stat point.', lock: 'echo', flavour: "Slow to start. Impossible to stop." },
   affinity: { name: 'Skill Affinity', cat: 'growth', cost: 2, desc: "Your world's home archetype pieces cost 1 less (minimum 1).", lock: 'echo', flavour: "Your home world's ways come cheaply to you." },
   catalyst: { name: 'Catalyst', cat: 'combat', cost: 3, desc: 'Reactions are 50% stronger.', p: { reactMult: 1.5 }, flavour: "When two afflictions meet, you make them argue." },
   berserker: { name: "Berserker's Blood", cat: 'combat', cost: 2, desc: '+30% damage below half HP.', p: { lowHpDmg: 0.3 }, flavour: "Wound you, and something old wakes up." },
-  ironbody: { name: 'Iron Body', cat: 'combat', cost: 2, desc: 'Start each fight with Block equal to 10% of your max HP.', p: { startBlockPct: 0.1 }, flavour: "You were built for this, even if nobody asked you." },
+  ironbody: { name: 'Iron Body', cat: 'retired', cost: 2, desc: 'Start each fight with Block equal to 10% of your max HP.', p: { startBlockPct: 0.1 }, flavour: "You were built for this, even if nobody asked you." },
   glass: { name: 'Glass Cannon', cat: 'combat', cost: 2, desc: '+30% damage, 20% less max HP.', p: { dmgPct: 0.3 }, flavour: "Hit hard, break easily. The crowd adores you for it." },
-  foresight: { name: 'Foresight', cat: 'combat', cost: 3, desc: "Always see the opponent's next 2 moves.", flavour: "You read their next move the way others read the weather." },
+  foresight: { name: 'Foresight', cat: 'retired', cost: 3, desc: "Always see the opponent's next 2 moves.", flavour: "You read their next move the way others read the weather." },
   firststrike: { name: 'First Strike', cat: 'combat', cost: 2, desc: 'Your first damaging skill each fight deals double.', lock: 'first_blood', p: { firstHit: 1 }, flavour: "The first blow decides most fights. You make sure of it." },
   thickskin: { name: 'Thick Skin', cat: 'combat', cost: 2, desc: 'Every hit you take deals 2 less damage.', lock: 'untouched', p: { flatDR: 2 }, flavour: "Years of knocks have left you hard to dent." },
   vampire: { name: 'Vampirism', cat: 'combat', cost: 3, desc: 'Heal 8% of all damage you deal.', lock: 'bloodthirsty', p: { lifesteal: 0.08 }, flavour: "You are always a little thirsty in a fight." },
@@ -62,4 +65,4 @@ const GIFTS = {
 };
 // Affinity Gifts are only offered as the Additional Gift: +1 piece to one archetype.
 Object.keys(ARCH).forEach(k => { GIFTS['aff_' + k] = { name: `${ARCH[k].name} Affinity`, cat: 'extra', cost: 0, desc: `Your ${ARCH[k].name} bonuses count 1 extra piece.`, flavour: ARCH[k].line, arch: k }; });
-const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw' };
+const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw', retired: 'Retired' };

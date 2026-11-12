@@ -258,10 +258,10 @@ function playRun(meta, verbose, opts = {}) {
   const patron = G.pick(Object.keys(G.GODS));
   G.bindMeta(meta);
   const offer = G.makeOffer(w, meta);
-  const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer, null, opts.sys ? G.SYS_BONUS : 0);
+  const gifts = opts.gifts || G.randomGifts(w, meta, patron, offer, null);
   const titles = Object.keys(meta.titles);
   const arch = opts.main && opts.main !== home ? [opts.main].concat(G.shuffle(G.unlockedArch(meta).filter(k => k !== home && k !== opts.main))) : undefined;
-  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, sysBonus: opts.sys ? G.SYS_BONUS : 0, arch, title: titles.length ? G.pick(titles) : null }, meta);
+  const run = G.newRun(w, { name: 'Bot', stats: st, gifts, patron, offer, sys: !!opts.sys, arch, title: titles.length ? G.pick(titles) : null }, meta);
   if (opts.main) run.botMain = opts.main;
   const ids = run.draft.slice().sort((a, b) => (G.SKILLS[b].tags.includes(main) ? 1 : 0) - (G.SKILLS[a].tags.includes(main) ? 1 : 0)).slice(0, 3);
   G.confirmDraft(run, ids, meta);

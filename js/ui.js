@@ -591,7 +591,7 @@ function worldsHTML() {
   }).join('');
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   return `<main class="screen select"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">Step 1 of 3</div><h2>Choose a world to fight for</h2></div></div>
-    <p class="hint">Lower-rank worlds give more Gift Points at the Awakening. Higher ranks bring tougher opponents.${!meta.runs ? ' <span class="sysl">[First tournament? The buttons under the worlds are optional extras. Ignore them until you have a run behind you.]</span>' : meta.runs === 1 ? ' <span class="sysl">[Guide: the extras are open now. Run goal pays Echoes for a target you pick. Contracts are this week\'s three jobs. Back yourself bets Echoes on how far you get.]</span>' : ''}</p>
+    <p class="hint">Rank E and D worlds show 1 more Signature Gift at the Awakening. Higher ranks bring tougher opponents.${!meta.runs ? ' <span class="sysl">[First tournament? The buttons under the worlds are optional extras. Ignore them until you have a run behind you.]</span>' : meta.runs === 1 ? ' <span class="sysl">[Guide: the extras are open now. Run goal pays Echoes for a target you pick. Contracts are this week\'s three jobs. Back yourself bets Echoes on how far you get.]</span>' : ''}</p>
     <div class="picks">${cards}</div>${ladderRow()}${goalRow()}${worldExtras()}
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? 'Fight for ' + esc(w.name) : 'Pick a world'}</button></div></main>`;
 }
@@ -599,31 +599,32 @@ function worldsHTML() {
 // ---------- Awakening ----------
 // In Pending World the record and the System Offer come from the day's seed, and Echo unlocks don't count
 function newAw(w, date) {
-  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), gifts: [WORLD_TYPES[w.type].gift], patron: null, cat: 'world',
+  return { record: date ? dailyRecord(date, w) : buildRecord(w.type, awRng('record'), w), tab: 'id', name: w.champ, sigil: Math.floor(Math.random() * 6), color: Math.floor(Math.random() * 6), gifts: [WORLD_TYPES[w.type].gift], patron: null,
     offer: date ? makeOffer(w, levelMeta(meta), seedRng(dailySeed(date) + ':offer')) : makeOffer(w, meta, awRng('offer')), title: null };
 }
 // Everything the System draws at an Awakening comes from a seed: the day's in Pending World, otherwise one drawn when
 // the worlds are offered. Backing out to the worlds and returning, or asking the System again, gives the same record,
 // Offer, Gift picks and stat roll, so they can't be fished for. A fresh set of worlds brings a fresh seed.
 function awRng(tag) { return seedRng((ui.daily ? dailySeed(ui.daily.date) : 'aw:' + ui.seed + ':' + ui.world) + ':' + tag); }
-// Any change to the System's Gift picks withdraws its bonus points
-function sysOverruled(A) { if (!A.sysPts) return; A.sysPts = 0; toast('[You overruled the System. Its bonus Gift Points are withdrawn.]', 'loss'); }
+// Changing the System's pick withdraws its gold
+function sysOverruled(A) { if (!A.sys) return; A.sys = false; toast(`[You overruled the System. Its ${SYS_GOLD} gold is withdrawn.]`, 'loss'); }
 function awMeta() { return ui.daily ? levelMeta(meta) : meta; }
-function giftRow(k, a, w) {
-  const g = GIFTS[k], on = a.gifts.includes(k), unlocked = giftUnlocked(k, awMeta());
-  const cost = giftCost(k, a.offer), disc = cost !== g.cost;
-  const t = on ? a.gifts.filter(x => x !== k) : a.gifts.concat(k);
-  // Adding a Gift overrules the System, so it has to fit without the System's bonus points
-  const can = unlocked && (on || giftCheck(w, t, a.patron, a.offer).ok);
-  const c = g.cost < 0 ? `<span class="gcost neg">+${-g.cost}</span>` : `<span class="gcost ${disc ? 'disc' : ''}">${disc ? `<s>${g.cost}</s> ` : ''}${cost}</span>`;
-  return `<button class="gift ${on ? 'on' : ''} ${unlocked ? '' : 'locked'}" data-act="aw-gift" data-k="${k}" ${can ? '' : 'disabled'}><span class="gf-h"><b>${unlocked ? '' : '🔒 '}${esc(g.name)}${disc ? ' <em class="offer">System Offer</em>' : ''}</b>${c}</span><span class="gf-d">${esc(unlocked ? g.desc : giftLockText(k))}${unlocked ? flavHTML(g.flavour) : ''}</span></button>`;
+function awFlaw(A) { return A.gifts.find(k => GIFTS[k] && GIFTS[k].cat === 'flaw') || null; }
+// The Signature Gifts on show: the draw's first few (more with a Flaw, Faithless, a rank E or D world or a Gift bounty)
+function awShown(A, w) { const shown = sigShown(w, A.patron, !!awFlaw(A), Array.isArray(A.offer) ? A.offer : []); return shown.concat(A.gifts.filter(k => isSignature(k) && !shown.includes(k) && !Array.isArray(A.offer))); }
+// A Signature Gift that is no longer on show (the Flaw or Patron changed) is dropped
+function awTidy(A, w) { const shown = awShown(A, w); const gone = A.gifts.find(k => isSignature(k) && !shown.includes(k)); if (gone) { A.gifts = A.gifts.filter(k => k !== gone); toast(`[${GIFTS[gone].name} is no longer on offer. Choose again.]`, 'loss'); } }
+function giftRow(k, a, fixed) {
+  const g = GIFTS[k], on = a.gifts.includes(k);
+  const tag = fixed ? '<span class="tagn">World</span>' : g.cat === 'flaw' ? `<span class="gcost neg">+${FLAW_GOLD} gold</span>` : `<span class="tagn">${GIFT_CATS[g.cat]}</span>`;
+  return `<${fixed ? 'div' : 'button'} class="gift ${on ? 'on' : ''}" ${fixed ? '' : `data-act="aw-gift" data-k="${k}"`}><span class="gf-h"><b>${esc(g.name)}</b>${tag}</span><span class="gf-d">${esc(g.desc)}${flavHTML(g.flavour)}</span></${fixed ? 'div' : 'button'}>`;
 }
 function awakenHTML() {
   const a = ui.aw, w = ui.worlds[ui.world];
-  const chk = giftCheck(w, a.gifts, a.patron, a.offer, a.sysPts);
-  // In the order they depend on each other: the Patron sets the Gift Points (Faithless adds 2), and stats wait for the
-  // opening draft, when the skills they power are known
-  const tabs = [['id', 'Name'], ['patron', 'Patron'], ['gifts', `Gifts · ${chk.left}`]];
+  const shown = awShown(a, w), sig = a.gifts.find(isSignature), flaw = awFlaw(a);
+  // In the order they depend on each other: the Patron sets how many Signature Gifts are on show (Faithless adds 1), and
+  // stats wait for the opening draft, when the skills they power are known
+  const tabs = [['id', 'Name'], ['patron', 'Patron'], ['gifts', `Gifts${sig || !shown.length ? '' : ' · 1'}`]];
   const titles = Object.keys(TITLES).filter(k => meta.titles[k]);
   let body = '';
   if (a.tab === 'id') {
@@ -634,22 +635,22 @@ function awakenHTML() {
       ${titles.length ? `<div class="fld"><span>Title</span></div>` + titles.map(k => `<button class="gift ${a.title === k ? 'on' : ''}" data-act="aw-title" data-k="${k}"><span class="gf-h"><b>${esc(TITLES[k].name)}</b></span><span class="gf-d">${esc(TITLES[k].desc)}${flavHTML(TITLES[k].flavour)}</span></button>`).join('') : ''}
       ${a.practice ? '' : `<p class="sh-p bio">${bioHTML(a.record, w.type, w.name)}</p><p class="sh-p sysl">[Filing world record: ${esc(w.name)}. ${a.record.ids.length} entries.]</p>`}`;
   } else if (a.tab === 'gifts') {
-    const allowed = giftsAllowed(w);
-    const list = allowed.filter(k => GIFTS[k].cat === a.cat).sort((x, y) => giftUnlocked(y, awMeta()) - giftUnlocked(x, awMeta())).map(k => giftRow(k, a, w)).join('');
-    const presets = (meta.presets || []).map((p, i) => `<button class="btn small ghost" data-act="aw-preset" data-i="${i}">${esc(p.name)}</button>`).join('');
-    body = `<div class="pts-row"><span><b>${chk.left}</b> of ${chk.budget} Gift Points${a.sysPts ? ` <em class="offer">+${a.sysPts} System</em>` : ''}</span><span class="fine">${chk.cheats}/1 cheat · ${chk.flaws}/2 flaws</span></div>
-      <div class="aw-sys"><button class="btn small" data-act="aw-random">Let the System decide</button><span>${a.sysPts ? `[Bonus active: +${a.sysPts} Gift Points. Changing a Gift withdraws it.]` : `The System picks your Gifts and adds <b>${SYS_BONUS} Gift Points</b> while you keep its picks.`}</span></div>
-      <div class="cats c8">${Object.keys(GIFT_CATS).map(c => { const n = a.gifts.filter(k => GIFTS[k].cat === c).length; return `<button class="cat ${a.cat === c ? 'on' : ''}" data-act="aw-cat" data-c="${c}">${GIFT_CATS[c]}${n ? ` · ${n}` : ''}</button>`; }).join('')}</div>
-      <div class="glist">${list}</div>
-      <div class="aw-tools"><button class="btn small ghost" data-act="aw-save">Save as preset</button>${presets}</div>
-      <p class="sh-p fine">Unspent points become 3 gold each. Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ') || 'none'}.</p>`;
+    const flaws = flawsAllowed(awMeta());
+    body = `<p class="sh-p">Your world's Gift is already yours. Choose 1 Signature Gift. Smaller Gifts come during the run: choose 1 of 3 entering rounds 2 and 4.</p>
+      <div class="fld"><span>World Gift</span></div>${giftRow(WORLD_TYPES[w.type].gift, a, true)}
+      <div class="fld"><span>Signature Gift · choose 1 of ${shown.length}</span></div>
+      <div class="aw-sys"><button class="btn small" data-act="aw-random">Let the System decide</button><span>${a.sys ? `[The System has chosen. +${SYS_GOLD} gold while you keep its pick.]` : `The System picks your Signature Gift and pays <b>${SYS_GOLD} gold</b> while you keep it.`}</span></div>
+      <div class="glist">${shown.map(k => giftRow(k, a)).join('')}</div>
+      ${flaws.length ? `<div class="fld"><span>Flaw · optional, 1 at most</span></div><p class="sh-p fine">A Flaw shows ${FLAW_SIGS} more Signature Gifts and pays ${FLAW_GOLD} gold.</p><div class="glist">${flaws.map(k => giftRow(k, a)).join('')}</div>` : ''}
+      <p class="sh-p fine">Chosen: ${a.gifts.map(k => esc(GIFTS[k].name)).join(', ')}.</p>`;
   } else {
     body = `<p class="sh-p">Pledge to a god for 2 Favour with them; their wagers come up more often. Win wagers to reach 4 Favour (a free B-rank piece) and 8 (a blessing for the run).</p>` +
       Object.entries(GODS).map(([k, G]) => `<button class="gift ${a.patron === k ? 'on' : ''}" data-act="aw-patron" data-k="${k}"><span class="gf-h"><b>${esc(G.name)}</b>${!ui.daily && !a.practice && bondLevel(meta, k) ? `<span class="tagn">Bond ${bondLevel(meta, k)}</span>` : ''}</span><span class="gf-d">Archetypes: ${G.arch.map(x => ARCH[x].name).join(', ')}. Blessing: ${esc(G.blessing)}</span></button>`).join('') +
-      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+2</span></span><span class="gf-d">No Patron. +2 Gift Points.</span></button>`;
+      `<button class="gift ${a.patron === 'none' ? 'on' : ''}" data-act="aw-patron" data-k="none"><span class="gf-h"><b>Faithless</b><span class="gcost neg">+1</span></span><span class="gf-d">No Patron. 1 more Signature Gift to choose from.</span></button>`;
   }
-  const ready = a.name.trim() && a.patron && chk.ok;
-  const why = !a.name.trim() ? 'Name your champion' : !a.patron ? 'Choose a Patron' : !chk.ok ? 'Too many Gift Points' : 'Awaken';
+  const needSig = !sig && shown.length > 0;
+  const ready = a.name.trim() && a.patron && !needSig;
+  const why = !a.name.trim() ? 'Name your champion' : !a.patron ? 'Choose a Patron' : needSig ? 'Choose a Signature Gift' : 'Awaken';
   return `<main class="screen select awaken"><div class="sel-h"><button class="icon-btn" data-act="${ui.daily ? 'back-title' : 'back-worlds'}" aria-label="Back">‹</button><div><div class="eyebrow">${ui.daily ? 'Pending World' : ui.aw && ui.aw.practice ? 'Practice run' : 'Step 2 of 3'} · ${esc(w.name)}</div><h2>[Integration complete. Distributing Gifts.]</h2></div></div>
     <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab ${a.tab === k ? 'on' : ''}" data-act="aw-tab" data-t="${k}" role="tab">${l}</button>`).join('')}</div>
     <section class="aw-body sysw">${body}</section>
@@ -1314,7 +1315,7 @@ function evResultSheet() {
 // ONE page: a list of the round's steps, the ones settled with what you chose, the current one open, the rest to come.
 // Each step keeps its own choices and handlers; the page is the frame around them.
 const PEND_LABEL = { gift: 'Additional Gift', intake: 'Intake Interview', augment: 'Rules review', door: 'Unlisted door', spoils: 'Spoils', levelup: 'Level up', perk: 'Class advancement', rune: 'Rune', adv: 'Path evolution', evo: 'Evolution' };
-function pendLabel(p) { return p.type === 'event' ? (EVENTS[p.key] ? EVENTS[p.key].title : 'Event') : PEND_LABEL[p.type] || 'Notice'; }
+function pendLabel(p) { return p.type === 'event' ? (EVENTS[p.key] ? EVENTS[p.key].title : 'Event') : p.type === 'gift' && p.pick ? 'Gift' : PEND_LABEL[p.type] || 'Notice'; }
 function betweenDone(p, choice) { if (!run) return; if (run.guide && p) (run.guideSeen = run.guideSeen || {})[p.type] = 1; run.between = run.between || { done: [] }; run.between.done.push({ label: pendLabel(p), choice: (choice || 'Done').slice(0, 60) }); }
 function betweenPage(sh) {
   if (!sh) return sh;
@@ -1337,7 +1338,7 @@ function pendingSheet() {
     return sheetWrap(E.title, lead + E.opts.map((_, i) => { const o = eventOpt(run, p.key, i); return o ? `<button class="choice ${o.check || o.roll ? 'chk' : ''} ${E.opts[i].glitch ? 'inserted' : ''}" data-act="event" data-i="${i}">${E.opts[i].glitch ? '<span class="ins-tag">[Option inserted]</span>' : ''}<div class="sr-h"><span class="sr-name">${o.check || o.roll ? `<span class="chk-tag">${esc(o.roll ? rollTag(run, o.roll) : checkTag(o.check))}</span> ` : ''}${esc(o.label)}</span></div><div class="sr-desc">${esc(o.desc)}</div></button>` : ''; }).join(''), false, (E.crisis ? 'sys crisis' : E.chain ? 'sys' : '') + ' k-event');
   }
   if (p.type === 'gift') {
-    return sheetWrap('[Additional Gift]', `<p class="sh-p">${p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys k-gift');
+    return sheetWrap(p.pick ? '[Gift issued]' : '[Additional Gift]', `<p class="sh-p">${p.pick ? '[The System issues Gifts as you earn them. Choose 1 for the rest of this run.]' : p.why ? `[${esc(p.why)}. One more god signs your file. Choose 1 Gift.]` : '[Milestone reached. The System grants one more Gift. Choose 1.]'}</p>` + p.offers.map(k => `<button class="choice" data-act="take-gift" data-k="${k}"><div class="sr-h"><span class="sr-name">${esc(GIFTS[k].name)}</span><span class="tagn">${GIFTS[k].arch ? 'Affinity' : GIFT_CATS[GIFTS[k].cat]}</span></div><div class="sr-desc">${esc(GIFTS[k].desc)}${flavHTML(GIFTS[k].flavour)}</div></button>`).join(''), false, 'sys k-gift');
   }
   if (p.type === 'intake') {
     const body = p.offers.map((k, i) => { const D = INTAKE[k]; return D ? `<button class="choice ${D.cost ? 'chk' : ''}" data-act="take-intake" data-i="${i}"><div class="sr-h"><span class="sr-name">${esc(D.name)}</span><span class="tagn">${D.cost ? 'At a price' : 'Plain'}</span></div><div class="sr-desc">${esc(D.say)}${flavHTML(D.flavour)}</div></button>` : ''; }).join('');
@@ -1534,7 +1535,7 @@ function menuSheet() {
 // each new one once, in the System's voice. On when meta.runs is 0, or after Settings > "Guide my next run".
 const guideOn = () => !!(run && run.guide && !run.practice);
 const HINTS = [
-  { k: 'g-awaken', guide: 1, scr: 'awaken', when: guideOn, text: '[Your first real tournament. The System will explain each new screen once. Patron: the god who backs you and offers wagers. Gifts: starting perks, paid in Gift Points.]' },
+  { k: 'g-awaken', guide: 1, scr: 'awaken', when: guideOn, text: '[Your first real tournament. The System will explain each new screen once. Patron: the god who backs you and offers wagers. Gifts: the one your world gives, plus 1 Signature Gift you choose.]' },
   { k: 'g-kitstats', guide: 1, scr: 'kitstats', when: guideOn, text: '[Place your stat points. Each stat powers the skills listed under it, so put them where your skills are. You get more with each level.]' },
   { k: 'g-choose', guide: 1, scr: 'choose', when: guideOn, text: '[Your world has Hearts. Losing a fight costs some, more in later rounds and more against a Hard opponent. At 0 Hearts the world is erased. Hard opponents pay better.]' },
   { k: 'g-district', guide: 1, scr: 'district', when: guideOn, text: '[One district visit before each shop: Infirmary heals, Sanctum restores Hearts, the Scout reads your opponent, the Enchanter adds a prefix, the Undercity is an event.]' },
@@ -2062,16 +2063,16 @@ function onAct(el) {
     case 'aw-tab': ui.aw.tab = d.t; return render();
     case 'aw-sigil': ui.aw.sigil = +d.i; return render();
     case 'aw-color': ui.aw.color = +d.i; return render();
-    case 'aw-cat': ui.aw.cat = d.c; return render();
-    case 'aw-gift': { const A = ui.aw, k = d.k; sysOverruled(A); if (A.gifts.includes(k)) A.gifts = A.gifts.filter(x => x !== k); else if (giftCheck(ui.worlds[ui.world], A.gifts.concat(k), A.patron, A.offer).ok) A.gifts.push(k); return render(); }
-    case 'aw-patron': { ui.aw.patron = d.k; if (!giftCheck(ui.worlds[ui.world], ui.aw.gifts, ui.aw.patron, ui.aw.offer, ui.aw.sysPts).ok) toast('[Too many Gift Points for that choice. Remove a Gift.]', 'loss'); return render(); }
+    case 'aw-gift': { const A = ui.aw, k = d.k, w = ui.worlds[ui.world];
+      if (isSignature(k)) { sysOverruled(A); A.gifts = A.gifts.filter(x => !isSignature(x)).concat(A.gifts.includes(k) ? [] : [k]); }
+      else if (GIFTS[k] && GIFTS[k].cat === 'flaw') { const on = A.gifts.includes(k); A.gifts = A.gifts.filter(x => GIFTS[x].cat !== 'flaw').concat(on ? [] : [k]); awTidy(A, w); }
+      return render(); }
+    case 'aw-patron': { ui.aw.patron = d.k; awTidy(ui.aw, ui.worlds[ui.world]); return render(); }
     case 'aw-title': ui.aw.title = ui.aw.title === d.k ? null : d.k; return render();
-    case 'aw-random': { const A = ui.aw; A.sysPts = SYS_BONUS; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, awRng('sys'), A.sysPts); toast(`[The System has chosen for you. +${SYS_BONUS} Gift Points for your trust.]`, 'sys'); return render(); }
-    case 'aw-save': { const A = ui.aw; meta.presets = (meta.presets || []).concat({ name: 'Preset ' + ((meta.presets || []).length + 1), gifts: A.gifts.filter(k => GIFTS[k].cat !== 'world') }).slice(-3); meta.presets.forEach((p, i) => p.name = 'Preset ' + (i + 1)); saveMeta(); toast('[Preset saved.]', 'sys'); return render(); }
-    case 'aw-preset': { const A = ui.aw, w = ui.worlds[ui.world], p = meta.presets[+d.i]; sysOverruled(A); let sel = [WORLD_TYPES[w.type].gift]; p.gifts.forEach(k => { if (GIFTS[k] && giftUnlocked(k, awMeta()) && giftsAllowed(w).includes(k) && giftCheck(w, sel.concat(k), A.patron, A.offer).ok) sel.push(k); }); A.gifts = sel; if (sel.length - 1 < p.gifts.length) toast('[Some Gifts in that preset do not fit this world or budget.]', 'loss'); return render(); }
+    case 'aw-random': { const A = ui.aw; A.sys = true; A.gifts = randomGifts(ui.worlds[ui.world], awMeta(), A.patron || 'war', A.offer, awRng('sys')).concat(A.gifts.filter(k => GIFTS[k].cat === 'flaw')); awTidy(A, ui.worlds[ui.world]); toast(`[The System has chosen for you. +${SYS_GOLD} gold for your trust.]`, 'sys'); return render(); }
     case 'aw-ok': {
       const A = ui.aw;
-      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, startPts: 4, rollSeed: 'aw:' + ui.seed + ':' + ui.world + ':roll', gifts: A.gifts, patron: A.patron, offer: A.offer, sysBonus: A.sysPts || 0, title: A.title, record: A.record, challenge: ui.daily ? null : ui.challenge }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
+      run = newRun(ui.worlds[ui.world], A.practice ? Object.assign({}, PRACTICE.setup, { name: A.name.trim() || 'Novice', sigil: A.sigil, color: A.color, script: PRACTICE.script }) : Object.assign({ name: A.name.trim(), sigil: A.sigil, color: A.color, stats: { STR: 2, AGI: 2, INT: 2, VIT: 2, LUK: 2 }, startPts: 4, rollSeed: 'aw:' + ui.seed + ':' + ui.world + ':roll', gifts: A.gifts, patron: A.patron, offer: A.offer, sys: !!A.sys, title: A.title, record: A.record, challenge: ui.daily ? null : ui.challenge }, ui.daily ? { seed: dailySeed(ui.daily.date), daily: ui.daily.date, ranked: ui.daily.ranked } : {}), A.practice ? META : meta);
       // The first real run (or one asked for in Settings) is guided: each new screen explained once
       if (!A.practice && !ui.noGuide && (!meta.runs || meta.guideAgain)) { run.guide = true; meta.guideAgain = false; meta.hints = meta.hints || {}; Object.keys(meta.hints).forEach(k => { if (k.startsWith('g-') && k !== 'g-awaken') delete meta.hints[k]; }); }
       ui.noGuide = false;
@@ -2232,7 +2233,7 @@ function onAct(el) {
 // ---------- Practice run (tutorial) ----------
 const PRACTICE = {
   world: { type: 'burning', name: 'the Proving Grounds', rank: 1, mod: 'none', champ: 'Novice' },
-  setup: { name: 'Novice', sigil: 3, color: 0, stats: { STR: 2, AGI: 2, INT: 4, VIT: 4, LUK: 2 }, gifts: ['deserter', 'catalyst'], patron: 'war', arch: ['pyre', 'venom', 'bastion', 'blade'] },
+  setup: { name: 'Novice', sigil: 3, color: 0, stats: { STR: 2, AGI: 2, INT: 4, VIT: 4, LUK: 2 }, gifts: ['deserter', 'chosen_war'], patron: 'war', arch: ['pyre', 'venom', 'bastion', 'blade'] },
   script: {
     rounds: 3,
     draft: ['firebolt', 'venom_blade', 'iron_guard', 'quick_slash', 'hex', 'ember_ward'],
@@ -2252,8 +2253,8 @@ const PRACTICE = {
 const ownsStar = (id, st) => run && allPieces(run).some(p => p.id === id && p.star >= st);
 const COACH = [
   { scr: 'awaken', pos: 'bottom', text: "[Welcome to the practice run, Entrant. I am the System, and I will be your guide. Reluctantly.] This is the Awakening, where you make your champion: a name and sigil, a Patron god and Gifts. For practice I've filled it in.", wait: 'next' },
-  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks and cheat skills, bought with Gift Points. Weaker worlds give more points. Open the Gifts tab.', wait: 'aw-tab' },
-  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (Block at the start of every fight) and Catalyst (stronger reactions). Tap Awaken.", wait: 'aw-ok' },
+  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-tab"][data-t="gifts"]', text: 'Gifts are your perks. Your world gives one, and you choose 1 Signature Gift: a cheat or a god\'s mark. More come during the run. Open the Gifts tab.', wait: 'aw-tab' },
+  { scr: 'awaken', pos: 'bottom', hl: '[data-act="aw-ok"]', text: "Novice has Legion Deserter (Block at the start of every fight) and Chosen of War (the God of War's gift arrives at once). Tap Awaken.", wait: 'aw-ok' },
   { scr: 'draft', pos: 'bottom', text: 'Choose 3 starting skills; the coloured tags are archetypes. Try Firebolt, Venom Blade and Iron Guard: Burn on a Poisoned target sets off a reaction.', wait: 'draft-skills' },
   { scr: 'choose', pos: 'bottom', hl: '.opps', text: 'Every round you choose your opponent. The Hard one pays more, a rune and a rare shop piece, but losing to it costs an extra Heart. Hearts are your world: run out and it is erased.', wait: 'next' },
   { scr: 'choose', pos: 'top', hl: '.wager', text: 'Gods offer wagers on your fight: stake 5 gold on a condition, win 10 back and their Favour. Leave this one.', wait: 'next' },
