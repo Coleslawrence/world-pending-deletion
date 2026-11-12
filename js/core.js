@@ -263,10 +263,10 @@ const UNLOCKS = {
   reroll: { name: 'Extra draft reroll', desc: 'One more reroll at the opening draft.', cost: 30 },
   fourth: { name: 'Fourth world', desc: 'The System offers 4 worlds instead of 3.', cost: 60 },
   purse: { name: 'Heavier purse', desc: 'Start every run with 3 more gold.', cost: 30 },
-  gift_gacha: { name: 'Gift: Gacha Luck', desc: 'Fortune: a free reroll each round and better shop odds.', cost: 60 },
+  gift_gacha: { name: 'Gift: Lucky Draw', desc: 'Fortune: a free reroll each round and better shop odds.', cost: 60 },
   gift_latebloomer: { name: 'Gift: Late Bloomer', desc: 'Flaw: weaker start, a free stat point each level.', cost: 35 },
-  gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 1 less.", cost: 35 },
-  gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs 1 less.', cost: 35 },
+  gift_affinity: { name: 'Gift: Skill Affinity', desc: "Growth: your world's home archetype costs 2 less.", cost: 35 },
+  gift_haggler: { name: 'Gift: Haggler', desc: 'Fortune: your first purchase each round costs half.', cost: 35 },
 };
 
 // ---------- Helpers ----------
@@ -567,12 +567,12 @@ function midGiftPool(run) {
   const M = run.seed && META ? levelMeta(META) : META;
   return Object.keys(GIFTS).filter(k => SMALL_CATS.includes(GIFTS[k].cat) && !hasGift(run, k) && giftUnlocked(k, M));
 }
-// Chat Decides: before each fight, 1 of 2 house rules for that fight. Both fighters live by it.
+// Poll the Crowd (chatdecides): before each fight, the crowd nominates 1 of 3 house rules for that fight. The crowd is on your side.
 const HOUSE_RULES = {
-  bloodbath: { name: 'Bloodbath', say: 'All damage +30%, both ways.', dmg: 1.3 },
-  fortress: { name: 'Fortress', say: 'Both fighters start with Block worth 20% of their max HP.', block: 0.2 },
-  toxic: { name: 'Toxic', say: 'Every Burn, Poison and Bleed applied is 2 stronger, both ways.', dot: 2 },
-  sudden: { name: 'Sudden Death', say: 'From turn 9, both fighters are worn down each turn.', at: 8 },
+  bloodbath: { name: 'Bloodbath', say: 'Your damage +30% this fight.', dmg: 1.3 },
+  fortress: { name: 'Fortress', say: 'You start this fight with Block worth 25% of your max HP.', block: 0.25 },
+  toxic: { name: 'Toxic', say: 'Burn, Poison and Bleed you apply are 3 stronger this fight.', dot: 3 },
+  sudden: { name: 'Sudden Death', say: 'From its turn 6, your opponent is worn down each turn.', at: 5 },
 };
 // Standing Precedent: after the opening draft, 1 of 3 rules that binds every opponent for the run
 const PRECEDENTS = {
@@ -585,8 +585,8 @@ function takeRule(run, i, msgs) {
   const k = run.pending.findIndex(p => p.type === 'rule'); if (k < 0) return false;
   const p = run.pending[k], id = p.offers[+i]; if (!id) return false;
   run.pending.splice(k, 1);
-  if (p.kind === 'precedent') { run.precedent = id; msgs && msgs.push({ t: 'class', text: `[Precedent filed: ${PRECEDENTS[id].name}. ${PRECEDENTS[id].say}]` }); }
-  else { run.chatRule = id; msgs && msgs.push({ t: 'class', text: `[Chat has decided: ${HOUSE_RULES[id].name}. ${HOUSE_RULES[id].say}]` }); }
+  if (p.kind === 'precedent') { run.precedent = [].concat(run.precedent || [], id); msgs && msgs.push({ t: 'class', text: `[Precedent filed: ${PRECEDENTS[id].name}. ${PRECEDENTS[id].say}]` }); const rest = p.offers.filter(o => o !== id); if (run.precedent.length < 2 && rest.length) run.pending.splice(k, 0, { type: 'rule', kind: 'precedent', offers: rest }); }
+  else { run.chatRule = id; msgs && msgs.push({ t: 'class', text: `[The crowd has decided: ${HOUSE_RULES[id].name}. ${HOUSE_RULES[id].say}]` }); }
   return true;
 }
 // In-run Gift picks: entering these rounds, choose 1 of 3 smaller Gifts. Round 5 still brings the Additional Gift.
@@ -702,7 +702,7 @@ function price(run, item) {
   if (clauseOf(run).skillTax && SKILLS[item.id]) v += clauseOf(run).skillTax; // Collector's Clause
   if (run.tokenOn === 'discount') v = Math.max(0, v - 1);
   if (run.haggle) v = Math.ceil(v / 2);
-  if (run.ffree) v = 0; // Five-Finger Discount
+  if (run.ffree) v = 0; // Open Tab
   return v;
 }
 function sellValue(p) { return (SELL_VALUE[pieceDef(baseId(p.id)).rank] || 1) * [0, 1, 3, 9][p.star] + (p.mods ? p.mods.length : 0); }
@@ -763,7 +763,7 @@ function buy(run, kind, i, msgs) {
   const item = shopItem(run, kind, i);
   if (!canBuy(run, item)) return false;
   run.gold -= price(run, item); run.haggle = false; run.shopSpent = true;
-  if (run.ffree) { run.ffree = false; run.ffCount = (run.ffCount || 0) + 1; if (run.ffCount % 3 === 0) { run.enforcer = true; msgs && msgs.push({ t: 'loss', text: '[Five-Finger Discount: the arena has noticed. Your next opponent is 25% stronger.]' }); } }
+  if (run.ffree) { run.ffree = Math.max(0, (+run.ffree || 1) - 1); run.ffCount = (run.ffCount || 0) + 1; if (run.ffCount % 4 === 0) { run.enforcer = true; msgs && msgs.push({ t: 'loss', text: '[Open Tab: your tab has been called in. Your next opponent is 25% stronger.]' }); } }
   if (kind === 'bonus') run.bonusSlot = null; else { run.shop[kind][i] = null; run.locks[kind][i] = false; }
   addPiece(run, item.id, item.mods, msgs);
   if (pieceDef(item.id).glitch) { msgs && msgs.push({ t: 'skill', text: `[Glitched item acquired: ${pieceDef(item.id).name}. ${pieceDef(item.id).flavour}]` }); OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] }); }
@@ -848,7 +848,7 @@ function archCounts(barPieces, gearPieces, gifts) {
     if ((p.mods || []).some(m => bareMod(m) === 'misfiled') && tags.length) themeNear(tags[0]).forEach(t => { if (!tags.includes(t)) tags.push(t); });
     tags.forEach(t => c[t] = (c[t] || 0) + 1);
   });
-  if (gifts && gifts.includes('monarch')) Object.keys(c).forEach(k => c[k]++);
+  if (gifts && gifts.includes('monarch')) Object.keys(c).forEach(k => c[k] += 2);
   (gifts || []).forEach(g => { if (GIFTS[g] && GIFTS[g].arch && c[GIFTS[g].arch]) c[GIFTS[g].arch]++; });
   return c;
 }
@@ -2159,8 +2159,8 @@ function enterChoose(run, meta, rng, msgs) {
   const inc = income(run); run.gold += inc; run.lastIncome = inc;
   if (run.visit > 1) refreshShop(run, stream(run, 'shop', rng));
   run.freeRerolls = (hasGift(run, 'gacha') ? 1 : 0) + (run.milestones.LUK ? 1 : 0) + (run.world.mod === 'market' ? 1 : 0);
-  run.haggle = hasGift(run, 'haggler'); run.ffree = hasGift(run, 'fivefinger');
-  if (hasGift(run, 'chatdecides') && !run.practice) { const o = shuffle(Object.keys(HOUSE_RULES), stream(run, 'rule', rng)).slice(0, 2); run.pending.push({ type: 'rule', kind: 'chat', offers: o }); }
+  run.haggle = hasGift(run, 'haggler'); run.ffree = hasGift(run, 'fivefinger') ? 2 : 0;
+  if (hasGift(run, 'chatdecides') && !run.practice) { const o = shuffle(Object.keys(HOUSE_RULES), stream(run, 'rule', rng)).slice(0, 3); run.pending.push({ type: 'rule', kind: 'chat', offers: o }); }
   tokenStart(run, stream(run, 'token', rng), msgs); stockVoucher(run, stream(run, 'voucher', rng), msgs);
   if (hasGift(run, 'f_debt') && !run.elite && (run.round === 3 || run.round === 6) && run.debtPaid !== run.round) { run.debtPaid = run.round; const d = Math.min(10, run.gold); run.gold -= d; msgs && msgs.push({ t: 'loss', text: `[The Trickster collects their debt: −${d} gold.]` }); }
   checkMilestones(run, msgs);
@@ -2201,8 +2201,8 @@ function skillPower(def, s, star) { const stat = def.basic ? Math.max(s.STR, s.A
 function fighterSkills(barPieces, s0, P) {
   const out = [];
   // Unregistered: every stat counts as your highest for skill power (s0 stays for cooldown rules)
-  const top = Math.max(...STATS.map(k => s0[k] || 0)), s = P.unregistered ? Object.assign({}, s0, { STR: top, AGI: top, INT: top, VIT: top, LUK: top }) : s0;
-  const atk = P.swordSaint ? Object.assign({}, SKILLS.attack, { name: "Heaven's Edge", rank: 'S', fx: { dmg: 16, pierce: 1 } }) : SKILLS.attack;
+  const top = Math.max(...STATS.map(k => s0[k] || 0)) + (P.unregistered ? 2 : 0), s = P.unregistered ? Object.assign({}, s0, { STR: top, AGI: top, INT: top, VIT: top, LUK: top }) : s0;
+  const atk = P.swordSaint ? Object.assign({}, SKILLS.attack, { name: "Heaven's Edge", rank: 'S', fx: { dmg: 24, pierce: 1 } }) : SKILLS.attack;
   out.push({ key: 'attack', def: atk, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
   barPieces.forEach((p, i) => {
     if (!p || !SKILLS[p.id]) return;
@@ -2216,9 +2216,9 @@ function fighterSkills(barPieces, s0, P) {
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
     out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0, unstable: def.unstable ? { name: def.name, cd: def.cd } : null });
   });
-  const cheat = (key, name, fx, desc, quick) => out.push({ key, def: { id: key, name, tags: [], rank: 'S', cd: 99, quick: !!quick, fx, cheat: true, desc }, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
-  if (P.adminSwap) cheat('swap', 'Swap', { swap: 1 }, "Quick. Once per fight: the opponent's next 2 moves trade places.", true);
-  if (P.trashTalk) cheat('bait', 'Trash Talk', { bait: 1 }, 'Quick. Once per fight: its shown move becomes a guard.', true);
+  const cheat = (key, name, fx, desc, quick, cd) => out.push({ key, def: { id: key, name, tags: [], rank: 'S', cd: cd || 99, quick: !!quick, fx, cheat: true, desc }, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
+  if (P.adminSwap) cheat('swap', 'Swap', { swap: 1 }, "Quick. The opponent's next 2 moves trade places. Every 3 turns.", true, 3);
+  if (P.trashTalk) cheat('bait', 'Trash Talk', { bait: 1 }, 'Quick. Its shown move becomes a guard. Every 3 turns.', true, 3);
   if (P.copycat) out.push({ key: 'copycat', def: { id: 'copycat', name: 'Copycat', tags: [], rank: 'S', cd: 99, fx: { copy: 1 }, cheat: true }, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
   return out;
 }
@@ -2229,7 +2229,7 @@ function buildPlayer(run) {
   return blankFighter({
     side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
     crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
-    breath: hasGift(run, 'breath'), double: hasGift(run, 'bodydouble') && !run.usedDouble, weaken: (P.sluggish || 0) + (run.nextFlags.weaken || 0), empower: run.nextFlags.empower || 0, lastWords: P.lastWords || 0, str: s.STR,
+    breath: hasGift(run, 'breath'), double: hasGift(run, 'bodydouble') && (+run.usedDouble || 0) < 2, weaken: (P.sluggish || 0) + (run.nextFlags.weaken || 0), empower: run.nextFlags.empower || 0, lastWords: P.lastWords || 0, str: s.STR,
     res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT, won: run.wins || 0,
   });
 }
@@ -2476,15 +2476,15 @@ function newFight(run, rng) {
     spec, bloodmoon: run.world.mod === 'bloodmoon', startHp: run.hp, rx: [], lastEnemySkill: null,
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'adminrights') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && (run.finalTip || (run.chains && run.chains.official === 'tip'))),
   };
-  f.rule = run.chatRule || null; f.prec = run.precedent || null; // Chat Decides, Standing Precedent
-  if (run.enforcer) { run.enforcer = false; B.maxHp = Math.round(B.maxHp * 1.25); B.hp = Math.round(B.hp * 1.25); B.P = Object.assign({}, B.P, { dmgPct: (B.P.dmgPct || 0) + 0.25 }); say(f, `[Five-Finger Discount: ${B.name} was sent to collect. 25% stronger.]`, 'loss'); }
+  f.rule = run.chatRule || null; f.prec = [].concat(run.precedent || []); // Poll the Crowd, Standing Precedent (old runs hold a single id)
+  if (run.enforcer) { run.enforcer = false; B.maxHp = Math.round(B.maxHp * 1.25); B.hp = Math.round(B.hp * 1.25); B.P = Object.assign({}, B.P, { dmgPct: (B.P.dmgPct || 0) + 0.25 }); say(f, `[Open Tab: ${B.name} has come to collect. 25% stronger.]`, 'loss'); }
   if (run.spirit && A.P.spiritGuide) f.spirit = run.spirit;
-  if (A.P.insideJob) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power; B.rigged = B.skills.slice().sort((a, b) => mv(b) - mv(a))[0] || null; if (B.rigged) say(f, `[Inside Job: ${B.rigged.def.name} has been rigged.]`, 'skill'); }
+  if (A.P.insideJob) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power; B.rigged = B.skills.slice().sort((a, b) => mv(b) - mv(a))[0] || null; if (B.rigged) say(f, `[Rigged Bout: ${B.rigged.def.name} has been rigged, twice.]`, 'skill'); }
   [A, B].forEach(X => {
     const P = X.P;
-    X.block += (P.startBlock || 0) + Math.round(((P.startBlockPct || 0) + (run.world.mod === 'siege' && !run.elite ? 0.15 : 0) + (f.rule === 'fortress' ? HOUSE_RULES.fortress.block : 0)) * X.maxHp);
+    X.block += (P.startBlock || 0) + Math.round(((P.startBlockPct || 0) + (run.world.mod === 'siege' && !run.elite ? 0.15 : 0) + (f.rule === 'fortress' && X.isPlayer ? HOUSE_RULES.fortress.block : 0)) * X.maxHp);
     if (P.noBlock) X.block = 0;
-    if (P.powerArmour) { X.armour = X.armourMax = Math.round(P.powerArmour * X.maxHp); say(f, `[Power Armour: ${X.armour} armour.]`, 'skill'); }
+    if (P.powerArmour) { X.armour = X.armourMax = Math.round(P.powerArmour * X.maxHp); say(f, `[Blast Plate: ${X.armour} armour.]`, 'skill'); }
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
     if (P.startPoison) (X === A ? B : A).poison += P.startPoison;
@@ -2505,8 +2505,8 @@ function newFight(run, rng) {
     const ks = Object.keys(SIDE_GOALS).filter(k => SIDE_GOALS[k].can(f, B));
     if (ks.length) { const k = ks[Math.floor(rnd(f.rng) * ks.length)], g = SIDE_GOALS[k]; f.goal = { key: k, gold: SIDE_GOAL_GOLD[ENEMIES[B.id].tier] || 3 }; say(f, `[Side goal: ${g.text}. +${f.goal.gold} gold if you win.]`, 'skill'); }
   }
-  if (f.prec === 'weakstart') B.weaken = Math.max(B.weaken, 2);
-  if (f.prec === 'halfblock') B.block = Math.round(B.block / 2);
+  if (f.prec.includes('weakstart')) B.weaken = Math.max(B.weaken, 2);
+  if (f.prec.includes('halfblock')) B.block = Math.round(B.block / 2);
   if (f.rule) say(f, `[House rule: ${HOUSE_RULES[f.rule].name}. ${HOUSE_RULES[f.rule].say}]`, 'skill');
   planIntent(f, B);
   startTurn(f, A, true);
@@ -2531,7 +2531,7 @@ function dmgMult(f, X, Y) {
   if (X.curse) m *= 1 + CURSE_DMG * X.curse; // Curse: your skills hit harder
   if (P.lowHpDmg && half(X)) m *= 1 + P.lowHpDmg;
   if (X.grown) m *= 1 + 0.01 * (P.growth || 0) * X.grown; // Growth Spurt
-  if (f.rule === 'bloodbath') m *= HOUSE_RULES.bloodbath.dmg;
+  if (f.rule === 'bloodbath' && X.isPlayer) m *= HOUSE_RULES.bloodbath.dmg;
   if (Y) {
     if (P.vsHalf && half(Y)) m *= 1 + P.vsHalf;
     if (P.execBonus && Y.hp / Y.maxHp <= 0.3) m *= 1 + P.execBonus;
@@ -2562,13 +2562,13 @@ function hit(f, X, Y, raw, o = {}) {
   d = Math.max(0, Math.round(d));
   // Delay Engine (experimental): the hit is stored, to strike all at once later (startTurn)
   if (X.P.suspend && !o.released && !o.isThorns) { X.bank = (X.bank || 0) + d; ev(f, { k: 'miss', side: Y.side, text: 'Stored' }); return 0; }
-  // Power Armour: soaks hits before Block; when it breaks it blasts the attacker
-  if (Y.armour > 0 && !o.pierce && d > 0) { const a = Math.min(Y.armour, d); Y.armour -= a; d -= a; if (Y.armour <= 0) { say(f, `[Power Armour breaks and blasts ${X.isPlayer ? 'you' : X.name} for ${Y.armourMax}.]`, Y.isPlayer ? 'skill' : 'loss'); hit(f, Y, X, Y.armourMax, { noDodge: 1, noCrit: 1, isThorns: true, src: 'Power Armour' }); } }
+  // Blast Plate (powerarmour): soaks hits before Block; when it breaks it blasts the attacker
+  if (Y.armour > 0 && !o.pierce && d > 0) { const a = Math.min(Y.armour, d); Y.armour -= a; d -= a; if (Y.armour <= 0) { say(f, `[Blast Plate breaks and blasts ${X.isPlayer ? 'you' : X.name} for ${Y.armourMax}.]`, Y.isPlayer ? 'skill' : 'loss'); hit(f, Y, X, Y.armourMax, { noDodge: 1, noCrit: 1, isThorns: true, src: 'Blast Plate' }); } }
   let absorbed = 0;
   if (!o.pierce) { absorbed = Math.min(Y.block, d); Y.block -= absorbed; }
   let rest = d - absorbed;
   // Hometown Crowd: once per fight, someone from your world takes a big hit for you
-  if (Y.P.hometown && !Y.htUsed && !o.isThorns && rest >= Y.maxHp * Y.P.hometown) { Y.htUsed = true; say(f, `[Hometown Crowd: someone from your world takes the hit. ${rest} damage, gone.]`, 'class'); rest = 0; }
+  if (Y.P.hometown && (Y.htUsed || 0) < 2 && !o.isThorns && rest >= Y.maxHp * Y.P.hometown) { Y.htUsed = (Y.htUsed || 0) + 1; say(f, `[Hometown Crowd: someone from your world takes the hit. ${rest} damage, gone.]`, 'class'); rest = 0; }
   if (absorbed > 0 && rest === 0 && Y.P.blockMisf && !o.isThorns) addMisfortune(f, X, Y.P.blockMisf); // Bad Landing
   if (absorbed > 0 && rest === 0 && Y.P.blockWeaken && !o.isThorns && X.hp > 0) X.weaken = Math.max(X.weaken, Y.P.blockWeaken); // Grounding Mail
   // Pain Link (experimental): every hit is split evenly between both fighters
@@ -2596,13 +2596,13 @@ function hit(f, X, Y, raw, o = {}) {
   return rest;
 }
 function checkRevive(f, X) {
-  if (X.hp <= 0 && X.double && !X.breath) { X.hp = Math.round(X.maxHp * 0.3); X.double = false; f.usedDouble = true; say(f, '[Body Double! Your other self steps in.]', 'class'); }
+  if (X.hp <= 0 && X.double && !X.breath) { X.hp = Math.round(X.maxHp * 0.5); X.double = false; f.usedDouble = true; say(f, '[Second Self! Your other self steps in.]', 'class'); }
   if (X.hp <= 0 && X.revive) { X.hp = Math.round(X.maxHp * X.revive); X.revive = 0; say(f, `[${X.name} rises again.]`, 'loss'); if (X.id && FOE_LINES[X.id] && FOE_LINES[X.id].rise) say(f, `"${FOE_LINES[X.id].rise}"`, 'foe'); ev(f, { k: 'revive', side: X.side }); }
   if (X.hp <= 0 && X.breath) { X.hp = 1; X.breath = false; f.usedBreath = true; say(f, '[Second Breath! You cling to life with 1 HP.]', 'class'); }
 }
 function heal(f, X, v) {
   if (v <= 0 || X.hp <= 0) return 0;
-  if (!X.isPlayer && f.prec === 'noheal') return 0; // Standing Precedent
+  if (!X.isPlayer && f.prec.includes('noheal')) return 0; // Standing Precedent
   v = Math.round(v * (1 + (X.P.healPct || 0) + (X.healFin || 0)));
   const b = X.hp; X.hp = Math.min(X.maxHp, X.hp + v); const h = X.hp - b;
   if (h > 0) { ev(f, { k: 'heal', side: X.side, amt: h }); if (X.isPlayer) f.tally.healed += h; }
@@ -2613,7 +2613,7 @@ function heal(f, X, v) {
 }
 function gainBlock(f, X, v) {
   if (X.P.noBlock) return; // Glass Cannon
-  if (!X.isPlayer && f.prec === 'halfblock') v /= 2; // Standing Precedent
+  if (!X.isPlayer && f.prec.includes('halfblock')) v /= 2; // Standing Precedent
   v = Math.round(v); if (v <= 0) return;
   X.block += v;
   if (X.P.blockThorns) X.thorns += v * X.P.blockThorns;
@@ -2626,8 +2626,8 @@ function addStatus(f, X, Y, kind, v) {
   if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0) + (P.burnLowDie ? lowDie(X) : 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
   if (kind === 'poison') { v += (P.poisonPlus || 0) + (P.dotPlus || 0); Y.poison += v; }
   if (kind === 'bleed') { v += (P.bleedPlus || 0) + (P.dotPlus || 0) + (P.bleedMisf ? P.bleedMisf * Math.floor((Y.misfortune || 0) / 3) : 0); Y.bleed += v; if (P.healOnBleed) heal(f, X, P.healOnBleed); if (P.bleedPoison) Y.poison += P.bleedPoison; }
-  if (f.rule === 'toxic' && (kind === 'burn' || kind === 'poison' || kind === 'bleed')) Y[kind] += HOUSE_RULES.toxic.dot; // Chat Decides
-  if (Y.isPlayer && f.prec === 'dotcap' && (kind === 'burn' || kind === 'poison')) Y[kind] = Math.min(Y[kind], PRECEDENTS.dotcap.cap); // Standing Precedent
+  if (f.rule === 'toxic' && X.isPlayer && (kind === 'burn' || kind === 'poison' || kind === 'bleed')) Y[kind] += HOUSE_RULES.toxic.dot; // Poll the Crowd
+  if (Y.isPlayer && f.prec.includes('dotcap') && (kind === 'burn' || kind === 'poison')) Y[kind] = Math.min(Y[kind], PRECEDENTS.dotcap.cap); // Standing Precedent
   if (X.isPlayer) f.tally.maxPoison = Math.max(f.tally.maxPoison, Y.poison);
   react(f, X, Y, kind);
 }
@@ -2672,7 +2672,7 @@ function addBreak(f, X, Y, v) {
   say(f, `[${Y.name}'s guard breaks. Broken!]`, 'skill'); ev(f, { k: 'break', side: Y.side });
   stunTarget(f, X, Y); Y.brokenT = Math.max(Y.brokenT, GAP.brokenT);
   if (X.P.breakEmpower) { X.empower = Math.max(X.empower, X.P.breakEmpower + 1); say(f, `[Lightning Rod: Empowered for ${X.P.breakEmpower} turns.]`, 'skill'); }
-  if (X.P.silverTongue && Y.hp > 0 && Y.hp < Y.maxHp * 0.5 && f.spec && f.spec.kind !== 'final') { Y.hp = 0; f.terms = true; say(f, `[Silver Tongue: ${Y.name} yields. Terms accepted, at half the purse.]`, 'class'); ev(f, { k: 'hit', side: Y.side, amt: 0, blocked: 0, tag: 'Yields' }); }
+  if (X.P.silverTongue && Y.hp > 0 && Y.hp < Y.maxHp * 0.6 && f.spec && f.spec.kind !== 'final') { Y.hp = 0; f.terms = true; say(f, `[Silver Tongue: ${Y.name} yields. Terms accepted.]`, 'class'); ev(f, { k: 'hit', side: Y.side, amt: 0, blocked: 0, tag: 'Yields' }); }
 }
 // Resistance (STAT_FACES): how much of a status's effect a fighter shrugs off, 0 for enemies
 function resistance(X, k) { return (X.res && X.res[k]) || 0; }
@@ -2874,12 +2874,12 @@ function useSkill(f, X, s, opt) {
     if (last) { def = Object.assign({}, last.def); say(f, `[${X.name} copies ${last.def.name}.]`, 'loss'); }
     else def = { name: 'Mirror Strike', fx: { dmg: 8 }, tags: [] };
   }
-  if (def.fx.swap) { // Admin Rights
+  if (def.fx.swap) { // Running Order (adminrights)
     const B = f.B, nx = peekNext(f);
     if (!nx || !B.intent || nx === B.intent) { say(f, '[Swap: nothing to swap.]', 'skill'); return; }
     const cur = B.intent; B.intent = nx; if (B.hist && B.next != null) B.next = B.skills.indexOf(cur); B.interrupted = null;
     B.windup = !(B.stun > 0) && isBig(f, B) ? { need: Math.max(1, Math.round(B.maxHp * WINDUP.share)), got: 0 } : null;
-    say(f, `[Admin Rights: ${nx.def.name} now, ${cur.def.name} after.]`, 'class'); return;
+    say(f, `[Running Order: ${nx.def.name} now, ${cur.def.name} after.]`, 'class'); return;
   }
   if (def.fx.bait) { // Trash Talk
     const B = f.B; if (!B.intent || B.stun > 0) { say(f, '[Trash Talk: they are not listening.]', 'skill'); return; }
@@ -3076,8 +3076,8 @@ function startTurn(f, X, first) {
   if (!X.isPlayer && X.aura) addStatus(f, X, Y, 'burn', Math.round(X.aura));
   if (!X.isPlayer && X.briar) addStatus(f, X, Y, 'bleed', Math.round(X.briar));
   const turns = X.isPlayer ? f.turn : (X.turns || 0);
-  const sdAt = f.rule === 'sudden' ? HOUSE_RULES.sudden.at : 24;
-  if (turns > sdAt) { const sd = Math.round(X.maxHp * 0.04 * (turns - sdAt)); X.hp -= sd; ev(f, { k: 'dot', side: X.side, amt: sd, kind: 'sudden' }); if (X.isPlayer && turns === sdAt + 1) say(f, '[The crowd grows restless. Both fighters are worn down each turn.]', 'loss'); }
+  const sdAt = f.rule === 'sudden' && !X.isPlayer ? HOUSE_RULES.sudden.at : 24;
+  if (turns > sdAt) { const sd = Math.round(X.maxHp * 0.04 * (turns - sdAt)); X.hp -= sd; ev(f, { k: 'dot', side: X.side, amt: sd, kind: 'sudden' }); if (turns === sdAt + 1) say(f, sdAt < 24 ? `[Sudden Death: the crowd turns on ${X.name}.]` : '[The crowd grows restless. Both fighters are worn down each turn.]', sdAt < 24 ? 'skill' : 'loss'); }
   if (X.burn > 0) {
     const v = Math.round(X.burn * (1 - resistance(X, 'burn'))); X.hp -= v; ev(f, { k: 'dot', side: X.side, amt: v, kind: 'burn' });
     if (Y.isPlayer) f.dealt['Burn'] = (f.dealt['Burn'] || 0) + v; else f.tally.hurtBy['Burn'] = (f.tally.hurtBy['Burn'] || 0) + v;
@@ -3099,8 +3099,8 @@ function startTurn(f, X, first) {
   if (X.isPlayer && P.countdown && f.turn >= P.countdown && Y.hp > 0) { Y.hp = 0; say(f, `[Countdown complete. ${Y.name} has been deleted.]`, 'class'); ev(f, { k: 'hit', side: Y.side, amt: 0, blocked: 0, tag: 'Deleted' }); return true; }
   if (P.suspend && X.bank > 0 && f.turn % P.suspend === 0 && Y.hp > 0) { const v = X.bank; X.bank = 0; say(f, `[Delay Engine: ${v} stored damage released.]`, 'skill'); hit(f, X, Y, v * 1.5, { released: 1, noDodge: 1, noCrit: 1, src: 'Delay Engine' }); if (Y.hp <= 0) return true; }
   if (X.echoQ && Y.hp > 0) { const q = X.echoQ; X.echoQ = null; say(f, `[Echo Chamber: ${q.def.name} plays again.]`, 'skill'); useSkill(f, X, q, { echo: true, mult: P.echoNext }); if (Y.hp <= 0 || X.hp <= 0) return X.hp > 0; }
-  if (X.isPlayer && !first && P.growth && (X.grown || 0) < 6) { X.grown = (X.grown || 0) + 1; X.maxHp += P.growth; X.hp += P.growth; } // Growth Spurt
-  if (X.isPlayer && f.spirit && f.turn === 3 && Y.hp > 0) { const g = f.spirit; say(f, `[Spirit Guide: ${g.name} uses ${g.def.label || g.def.name} for you.]`, 'class'); useSkill(f, X, { key: 'spirit', def: Object.assign({}, g.def, { cheat: true }), power: g.power, cd: 0 }, { echo: true }); if (Y.hp <= 0) return true; }
+  if (X.isPlayer && !first && P.growth && (X.grown || 0) < 8) { X.grown = (X.grown || 0) + 1; X.maxHp += P.growth; X.hp += P.growth; } // Growth Spurt
+  if (X.isPlayer && f.spirit && f.turn % 3 === 0 && Y.hp > 0) { const g = f.spirit; say(f, `[Haunted: ${g.name} uses ${g.def.label || g.def.name} for you.]`, 'class'); useSkill(f, X, { key: 'spirit', def: Object.assign({}, g.def, { cheat: true }), power: g.power, cd: 0 }, { echo: true }); if (Y.hp <= 0) return true; }
   if (X.stun > 0) { X.stun = 0; say(f, `[${X.isPlayer ? 'You are' : X.name + ' is'} stunned and lose${X.isPlayer ? '' : 's'} the turn.]`, X.isPlayer ? 'loss' : 'skill'); ev(f, { k: 'stunned', side: X.side }); return false; }
   return true;
 }
@@ -3127,7 +3127,7 @@ function playerAct(f, idx) {
   if (!s.def.cheat && f.B.hp > 0 && A.hp > 0) {
     if (A.P.firstTwice && !A.ftDone) { A.ftDone = true; say(f, `[First Strike: ${s.def.name} plays twice.]`, 'class'); useSkill(f, A, s, { echo: true }); }
     else if (A.encReady) { A.encReady = false; say(f, `[Encore! ${s.def.name} plays twice.]`, 'class'); useSkill(f, A, s, { echo: true }); }
-    else if (A.P.encore) { A.enc = (A.enc || []).concat(s.key).slice(-3); if (A.enc.length === 3 && new Set(A.enc).size === 3) { A.enc = []; A.encReady = true; say(f, '[Encore building. Your next skill plays twice.]', 'class'); } }
+    else if (A.P.encore) { A.enc = (A.enc || []).concat(s.key).slice(-2); if (A.enc.length === 2 && new Set(A.enc).size === 2) { A.enc = []; A.encReady = true; say(f, '[Encore building. Your next skill plays twice.]', 'class'); } }
   }
   if (s.def.oneUse) A.skills = A.skills.filter(x => x !== s);
   s.cd = s.def.fx.killReset && f.B.hp <= 0 ? 0 : s.def.cd || 0; // Last Hour
@@ -3144,8 +3144,8 @@ function playerAct(f, idx) {
   if (s.def.quick) { f.tally.quickTurn++; f.tally.maxQuick = Math.max(f.tally.maxQuick, f.tally.quickTurn); } else f.tally.quickTurn = 0;
   const mu = Object.entries(f.useCounts).sort((a, b) => b[1] - a[1])[0]; f.tally.mostUsed = mu ? mu[0] : null;
   if (s.def.quick) { checkOver(f); return true; }
-  // Deja Vu: the skill used two turns ago plays again, weaker
-  if (A.P.dejaVu && !s.def.cheat) { A.dv = (A.dv || []).concat(s).slice(-3); const old = A.dv.length >= 3 && A.dv[0]; if (old && f.B.hp > 0 && A.hp > 0) { say(f, `[Deja Vu: ${old.def.name} again.]`, 'class'); useSkill(f, A, old, { echo: true, mult: A.P.dejaVu }); } }
+  // Instant Replay (dejavu): the skill used two turns ago plays again, weaker
+  if (A.P.dejaVu && !s.def.cheat) { A.dv = (A.dv || []).concat(s).slice(-3); const old = A.dv.length >= 3 && A.dv[0]; if (old && f.B.hp > 0 && A.hp > 0) { say(f, `[Instant Replay: ${old.def.name}.]`, 'class'); useSkill(f, A, old, { echo: true, mult: A.P.dejaVu }); } }
   endTurn(f, A, s.key);
   f.tally.turns = f.turn;
   if (!checkOver(f)) f.phase = 'enemy';
@@ -3227,7 +3227,7 @@ function planIntent(f, B, turnEnd) {
   planMove(f, B, turnEnd);
   B.windup = B.intent && !(B.stun > 0) && isBig(f, B) ? { need: Math.max(1, Math.round(B.maxHp * WINDUP.share)), got: 0 } : null;
   // Light Fingers: the first big hit they show, you steal a one-use copy of
-  const A = f.A; if (A && A.P.lightFingers && !f.stolen && B === f.B && B.intent && isBig(f, B)) { f.stolen = true; const d = B.intent.def; A.skills.push({ key: 'stolen', def: Object.assign({}, d, { id: 'stolen', name: 'Stolen ' + (d.label || d.name), tags: [], cd: 0, cheat: true, oneUse: true, desc: 'One use: ' + describe(d, B.intent.power) }), power: B.intent.power, cd: 0, star: 1 }); say(f, `[Light Fingers: you lift ${d.label || d.name}. One use.]`, 'class'); }
+  const A = f.A; if (A && A.P.lightFingers && (f.stolen || 0) < 3 && B === f.B && B.intent && isBig(f, B)) { f.stolen = (f.stolen || 0) + 1; const d = B.intent.def; A.skills.push({ key: 'stolen' + f.stolen, def: Object.assign({}, d, { id: 'stolen', name: 'Stolen ' + (d.label || d.name), tags: [], cd: 0, cheat: true, oneUse: true, desc: 'One use: ' + describe(d, B.intent.power) }), power: B.intent.power, cd: 0, star: 1 }); say(f, `[Light Fingers: you lift ${d.label || d.name}. One use.]`, 'class'); }
 }
 // Damage you deal on your own turn counts against a wind-up; enough of it and the move is wasted
 function hitWindup(f, X, Y, v) {
@@ -3305,7 +3305,7 @@ function enemyTurn(f) {
   if (can) {
     if (B.flood && B.turns % B.flood === 0) { const T = f.A.block < B.block ? f.A : f.A.block > B.block ? B : f.A; T.weaken = Math.max(T.weaken, 2); say(f, `[The arena floods. ${T === f.A ? 'You are' : B.name + ' is'} Weakened.]`, T === f.A ? 'loss' : 'skill'); ev(f, { k: 'flood' }); react(f, B, T); }
     const s = B.intent || B.skills[0], role = (B.omens && B.omens.length) || B.jinxed ? jinxRole(f, s) : null;
-    if (B.rigged && s === B.rigged) { B.rigged = null; B.weaken = Math.max(B.weaken, 2); say(f, `[Inside Job: ${s.def.name} was rigged. It fails, and ${B.name} is Weakened.]`, 'class'); ev(f, { k: 'interrupt', side: B.side, name: s.def.name }); }
+    if (B.rigged && s === B.rigged) { B.rigCount = (B.rigCount || 0) + 1; if (B.rigCount >= 2) B.rigged = null; B.weaken = Math.max(B.weaken, 2); say(f, `[Rigged Bout: ${s.def.name} was rigged. It fails, and ${B.name} is Weakened.]`, 'class'); ev(f, { k: 'interrupt', side: B.side, name: s.def.name }); }
     else if (B.jinxed) fireJinx(f, B, s); else useSkill(f, B, s);
     if (role) fireOmens(f, B, s, role);
     if (!s.def.fx.mirror) f.lastEnemySkill = { def: s.def, power: s.power };
@@ -3523,7 +3523,7 @@ function resolveFight(run, f, meta, rng) {
   const msgs = [], won = f.winner === 'A', spec = f.spec, lr = stream(run, 'loot', rng);
   bindMeta(meta);
   run.hp = Math.max(0, Math.min(f.A.hp, maxHp(run)));
-  if (f.usedDouble) run.usedDouble = true;
+  if (f.usedDouble) run.usedDouble = (+run.usedDouble || 0) + 1; // Second Self: twice per run
   run.chatRule = null;
   if (won && f.B.skills && f.B.skills.length && !spec.snap) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power, best = f.B.skills.slice().sort((a, b) => mv(b) - mv(a))[0]; if (mv(best) > 0) run.spirit = { name: f.B.name, def: best.def, power: best.power }; }
   if (f.usedBreath) run.usedBreath = true;

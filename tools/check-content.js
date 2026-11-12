@@ -133,7 +133,8 @@ archs.forEach((a, i) => archs.slice(0, i).forEach(b => ref('archetypes ' + a, C.
 C.START_ARCH.forEach(a => ref('archetypes START_ARCH', isArch(a), `${a} is not an archetype`));
 Object.entries(C.GODS).forEach(([k, g]) => {
   g.arch.forEach(a => ref('gods ' + k, isArch(a), `${a} is not an archetype`));
-  ref('gods ' + k, C.GIFTS['chosen_' + k] && C.GIFTS['chosen_' + k].cat === 'divine', `needs a divine Gift chosen_${k} in gifts.js`);
+  // The Chosen Gifts were folded into the Sponsorship Offer event (12 Nov); a god no longer needs one
+  ref('gods ' + k, !C.GIFTS['chosen_' + k] || ['divine', 'retired'].includes(C.GIFTS['chosen_' + k].cat), `chosen_${k} must be divine or retired`);
   ref('gods ' + k, g.reply && g.reply.label && typeof g.reply.go === 'function', 'reply needs a label and go(f)');
 });
 const nextRead = new Set([...core.matchAll(/nextFlags\.(\w+)/g)].map(m => m[1]));

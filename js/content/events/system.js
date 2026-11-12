@@ -76,3 +76,11 @@ EVENTS.hotfix = { people: 'pilgrims', title: 'Hotfix', theme: 'system', text: ru
   { label: 'Exploit it before it lands', desc: 'One last fight at full power.', then: { next: { empower: 3 }, notice: 1 }, go: (run, h) => { const k = hotfixOf(run).stat; run.stats[k] = Math.max(1, run.stats[k] - 1); h.say(`[You start your next fight Empowered for 3 turns. The patch lands anyway: −1 ${k}.]`); } },
   { label: 'Appeal: pay 10 gold', desc: 'There is a form for this.', pay: 10, then: { notice: -1 }, reveal: '[Appeal upheld. Patch cancelled. Your patience is appreciated.]' },
   { check: { people: 'pilgrims' }, label: 'Leave before it lands', desc: 'Pilgrims never stay long.', then: { gold: 5, notice: -1 }, go: (run, h) => h.say('[You are three districts away when the patch lands. +5 gold.]') }] };
+
+// Sponsorship Offer (12 Nov): replaces the Chosen-of-a-god Gifts. Signing raises that god to 4 Favour, so their gift arrives at once.
+const signWith = (run, h, g) => h.favour(g, Math.max(1, 4 - ((run.favour || {})[g] || 0)));
+EVENTS.sponsorship = { title: 'Sponsorship Offer', theme: 'system', weight: 3, can: run => run.round <= 4 && !run.practice, text: '[Sponsorship window open. Entrant may sign with one god.] Contracts slide under the door, each in a different hand.', opts: [
+  { label: 'Sign the first contract', desc: "Your Patron's, if you have one. The ink is still wet.", go: (run, h) => { const g = patronOf(run, h); h.say(`[Contract signed with ${GODS[g].name.replace(/^The /, "the ")}.]`); signWith(run, h, g); } },
+  { label: 'Sign with another god', desc: 'Your Patron will read about it.', go: (run, h) => { const g = h.pick(Object.keys(GODS).filter(o => o !== run.patron)); h.say(`[Contract signed with ${GODS[g].name.replace(/^The /, "the ")}.]`); signWith(run, h, g); if (GODS[run.patron]) h.favour(run.patron, -2); } },
+  { label: 'Sign every contract', desc: 'Nobody reads the small print.', then: { notice: 1 }, go: (run, h) => { h.say('[Every contract signed. Every god now owns a small part of you.]'); Object.keys(GODS).forEach(g => h.favour(g, 2)); } },
+  { label: 'Tear them all up', desc: 'You fight for your world, not for them.', then: { gold: 10, favour: { war: 2 } }, reveal: "[Contracts destroyed. The deposit is refunded: +10 gold. Somewhere, War approves.]" }] };
