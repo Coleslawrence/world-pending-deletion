@@ -36,7 +36,7 @@ for (const round of [2, 3, 4]) {
   run.round = round; run.pending = []; G.enterChoose(run, meta);
   const p = run.pending.find(x => x.type === 'gift' && x.pick);
   ok(!!p === G.GIFT_PICK_ROUNDS.includes(round), `round ${round}: a Gift pick ${G.GIFT_PICK_ROUNDS.includes(round) ? 'is' : 'is not'} offered`);
-  if (p) { ok(p.offers.length === 3 && p.offers.every(k => G.SMALL_CATS.includes(G.GIFTS[k].cat)), 'a pick offers 3 smaller Gifts'); G.applyGift(run, p.offers[0], []); ok(G.hasGift(run, p.offers[0]), 'the picked Gift is held'); }
+  if (p) { ok(p.offers.length === 3 && p.offers.every(k => G.SMALL_CATS.includes(G.GIFTS[k].cat) || G.GIFTS[k].cat === 'glitch'), 'a pick offers 3 smaller Gifts'); G.applyGift(run, p.offers[0], []); ok(G.hasGift(run, p.offers[0]), 'the picked Gift is held'); }
   run.pending = []; G.enterChoose(run, meta);
   ok(!run.pending.some(x => x.type === 'gift' && x.pick), `round ${round}: never offered twice`);
 }

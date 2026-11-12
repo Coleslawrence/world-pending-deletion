@@ -206,6 +206,10 @@ const EFFECTS = {
   dodgeCrit: { how: 'set', say: () => 'A dodge or evade makes your next hit critical.', theme: 'blade' },
   burnImmune: { how: 'set', say: () => "Burn can't hurt you.", theme: 'pyre' },
   drainFull: { how: 'set', say: () => 'Your lifesteal ignores healing cuts.', theme: 'reaper' },
+  nullBlock: { how: 'set', say: () => 'Nobody can gain Block.' },
+  overrun: { how: 'set', say: () => 'Every Burn, Poison and Bleed is doubled, both ways.', theme: ['pyre', 'venom', 'blade'] },
+  offByOne: { how: 'set', say: () => 'Cooldowns are 1 turn shorter; every skill starts on cooldown.', theme: 'arcanist' },
+  critHalf: { how: 'set', say: () => 'Your critical chance is halved.' },
   chanceAll: { how: 'set', say: () => 'Every chance option gets the floor, not just the first.' },
   brkPlus: { say: v => `Your hits fill the opponent's guard bar ${pct(v)} faster.`, theme: 'storm' },
 };

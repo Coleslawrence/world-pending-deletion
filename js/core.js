@@ -525,8 +525,8 @@ function effStats(run) {
   STATS.forEach(k => s[k] = Math.max(0, s[k]));
   return s;
 }
-function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.25; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
-function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0)) * (1 - amendOf(run).hpCut)); }
+function hpMult(gifts) { let m = 1; if (gifts.includes('dragon')) m *= 1.25; if (gifts.includes('g_overflow')) m *= 0.6; if (gifts.includes('prodigy')) m *= 0.9; if (gifts.includes('glass')) m *= 0.8; if (gifts.includes('f_glass')) m *= 0.8; return m; }
+function maxHp(run) { const s = effStats(run); return Math.round((40 + s.VIT * 8 + s.STR * 5 + run.level * 4 + (hasPerk(run, 'frame') ? 8 : 0) + (hasGift(run, 'g_leak') ? 6 * (run.leak || 0) : 0)) * hpMult(run.gifts) * (1 - (run.hpCut || 0)) * (1 - amendOf(run).hpCut)); }
 // Levels come from fighting: after every battle (win or lose) the System offers a level, which is +1 level (Max HP +4,
 // better shop odds) and +1 stat point, or a Gift drawn at random in its place. Level stops at LEVEL_MAX.
 // Stat points can also be bought with gold, one at a time, at a rising price (Train). Bought points never raise the level.
@@ -570,7 +570,17 @@ function takeRule(run, i, msgs) {
 }
 // In-run Gift picks: entering these rounds, choose 1 of 3 smaller Gifts. Round 5 still brings the Additional Gift.
 const GIFT_PICK_ROUNDS = [2, 4];
-function giftPickOffers(run, rng) { return shuffle(midGiftPool(run), rng).slice(0, 3); }
+function giftPickOffers(run, rng) { return glitchGift(run, shuffle(midGiftPool(run), rng).slice(0, 3), rng); }
+// Glitched Gifts (12 Nov): where glitches are on, a Gift offer sometimes has its last slot replaced by a glitched Gift
+// (cat 'glitch'): far stronger, breaks one rule, and raises the System's notice when taken. No draw when glitches are off,
+// so Pending World stays as it was.
+const GLITCH_GIFT = 0.2;
+function glitchGift(run, offers, rng) {
+  if (!glitchesOn(run) || !offers.length || run.practice || rnd(rng) >= GLITCH_GIFT * glitchMul(run)) return offers;
+  const g = Object.keys(GIFTS).filter(k => GIFTS[k].cat === 'glitch' && !hasGift(run, k));
+  if (g.length) offers[offers.length - 1] = pick(g, rng);
+  return offers;
+}
 // The perk offered in place of a level (LEVEL_PERKS in levels.js): one at random from those that would do something now,
 // never one already offered this run while a fresh one fits
 function levelPerk(run, rng) { const t = run.fateTrack || 0, x = { maxHp: maxHp(run), fateOpen: !!FATES[run.world.fate] && t > FATE_TRACK.min && t < FATE_TRACK.max, noticeRoom: !run.noticeOff && (run.notice || 0) < TUNE.noticeMax }, pool = Object.keys(LEVEL_PERKS).filter(k => { const L = LEVEL_PERKS[k]; return (!L.when || L.when(run, x)) && !(L.then && L.then.piece && !poolIds(run).some(id => pieceDef(id).rank === L.then.piece)); }); const fresh = pool.filter(k => !(run.perksShown || []).includes(k)), k = pick(fresh.length ? fresh : pool, rng); if (k) run.perksShown = (run.perksShown || []).concat(k); return k || null; }
@@ -715,7 +725,7 @@ function ownedCopies(run, id) { return allPieces(run).filter(p => p.id === id &&
 // a full bank (20 gold) earns as much as the base income again.
 const INCOME = { base: 5, per: 4, cap: 5, golden: 10 };
 function interestCap(run) { return (hasGift(run, 'golden') ? INCOME.golden : INCOME.cap) + (hasPerk(run, 'ledger') ? 1 : 0) + (hasVoucher(run, 'interest') ? 2 : 0); }
-function interestOf(run) { return Math.min(interestCap(run), Math.floor(run.gold / INCOME.per)); }
+function interestOf(run) { if (hasGift(run, 'f_spend')) return 0; return Math.min(interestCap(run), Math.floor(run.gold / INCOME.per)); }
 function income(run) { return Math.max(0, INCOME.base + interestOf(run) + (run.world.mod === 'golden' ? 2 : 0) + (hasVoucher(run, 'income') ? 3 : 0) + amendOf(run).income + (clauseOf(run).income || 0)); }
 function allPieces(run) { return run.bar.filter(Boolean).concat(GEAR_SLOTS.map(s => run.gear[s]).filter(Boolean), run.bench); }
 function findPiece(run, u) {
@@ -984,7 +994,7 @@ function curveOf(run, k) { return run.elite ? 1 : CURVE[k][Math.min(ROUNDS, run.
 function curRound(run) { return run.elite ? ROUNDS + Math.min(1, run.eliteIdx) : run.round; }
 function rankMul(run) { return (0.92 + 0.05 * run.world.rank) * (hasGift(run, 'f_marked') ? 1.1 : 1); }
 const HEART_COST = [1, 1, 2, 3, 3, 4, 5, 6];
-function heartCost(run, spec) { if (run.elite) return 0; const c = Math.max(1, HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0) - amendOf(run).heartCut); return hasGift(run, 'ironwill') ? Math.max(1, c - 1) : c; }
+function heartCost(run, spec) { if (run.elite) return 0; const c = Math.max(1, HEART_COST[Math.min(ROUNDS, run.round) - 1] + (spec && spec.hard && spec.kind !== 'trial' ? 1 : 0) - amendOf(run).heartCut); const c2 = hasGift(run, 'g_leak') ? c + 1 : c; return hasGift(run, 'ironwill') ? Math.max(1, c2 - 1) : c2; }
 function makeChoices(run, meta, rng) {
   if (run.script && run.script.choices && run.script.choices[run.round - 1]) return run.script.choices[run.round - 1].map(c => Object.assign({}, c));
   if (run.round >= ROUNDS) return [Object.assign({ kind: 'final', id: finalId(run), round: ROUNDS }, poolOn(run) ? { pool: true } : {}, run.finalTraits ? { traits: run.finalTraits.slice() } : {})];
@@ -2062,7 +2072,7 @@ function completeQuest(run, q, msgs) {
 function extraGiftOffers(run, rng) {
   const c = runCounts(run);
   const top = Object.keys(c).filter(k => run.arch.includes(k)).sort((a, b) => c[b] - c[a])[0] || run.arch[0];
-  return ['aff_' + top].concat(shuffle(midGiftPool(run), rng).slice(0, 2));
+  return ['aff_' + top].concat(glitchGift(run, shuffle(midGiftPool(run), rng).slice(0, 2), rng));
 }
 function applyGift(run, k, msgs) {
   if (!GIFTS[k] || hasGift(run, k)) return false;
@@ -2071,6 +2081,7 @@ function applyGift(run, k, msgs) {
   if (k === 'dragon') run.hp = Math.round(run.hp * 1.25);
   if (k === 'bornlucky') run.stats.LUK += 4;
   msgs && msgs.push({ t: 'class', text: `[Additional Gift granted: ${GIFTS[k].name}.]` });
+  if (GIFTS[k].cat === 'glitch') { msgs && msgs.push({ t: 'skill', text: `[Glitched Gift acquired: ${GIFTS[k].name}. ${GIFTS[k].flavour}]` }); OUTCOME_APPLY.notice(1, { run, msgs: msgs || [] }); }
   checkPath(run, msgs);
   return true;
 }
@@ -2206,8 +2217,9 @@ function fighterSkills(barPieces, s0, P) {
     const fin = STAT_FACES.INT.finesse; // INT's Finesse: long cooldowns shorten
     if (!def.quick && def.cd >= fin.cdFrom) def.cd = Math.max(fin.cdMin, def.cd - Math.floor((s0.INT || 0) / fin.cdEvery));
     if (!def.quick && P.arcCd && def.cd > 1) def.cd = Math.max(1, def.cd - Math.floor(s0.INT / P.arcCd)); // Arcanist: INT shortens cooldowns
+    if (P.offByOne) def.cd = Math.max(1, def.cd - 1); // Off By One
     const mighty = P.mighty && ['reaper', 'storm'].includes(def.tags[0]) ? 1 + P.mighty : 1;
-    out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: 0, unstable: def.unstable ? { name: def.name, cd: def.cd } : null });
+    out.push({ key: 's' + i, u: p.u, def, mods: p.mods, star: p.star, power: skillPower(def, s, p.star) * def.powerMult * mighty, cd: P.offByOne ? 1 : 0, unstable: def.unstable ? { name: def.name, cd: def.cd } : null });
   });
   const cheat = (key, name, fx, desc, quick, cd) => out.push({ key, def: { id: key, name, tags: [], rank: 'S', cd: cd || 99, quick: !!quick, fx, cheat: true, desc }, power: skillPower(SKILLS.attack, s, 1), cd: 0, star: 1 });
   if (P.adminSwap) cheat('swap', 'Swap', { swap: 1 }, "Quick. The opponent's next 2 moves trade places. Every 3 turns.", true, 3);
@@ -2220,8 +2232,8 @@ function buildPlayer(run) {
   const s = effStats(run), P = runP(run), mh = maxHp(run);
   if (P.stormBreak) P.stunDmg += s.STR; // Stormcaller: Stuns and Interrupts scale with STR
   return blankFighter({
-    side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: run.nextFlags.bleed || 0, P,
-    crit: 0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
+    side: 'A', name: run.name || 'You', isPlayer: true, maxHp: mh, hp: Math.min(run.hp, mh), poison: run.nextFlags.poison || 0, burn: run.nextFlags.burn || 0, bleed: (run.nextFlags.bleed || 0) + (hasGift(run, 'f_bleeder') ? 5 : 0), P,
+    crit: (0.05 + STAT_FACES.LUK.finesse.crit * s.LUK + (P.critBonus || 0)) * (P.critHalf ? 0.5 : 1), critMult: P.critMult || 1.5, dodge: Math.min(0.25, STAT_FACES.AGI.finesse.dodge * s.AGI + (P.dodge || 0)), skills: fighterSkills(run.bar, s, P),
     breath: hasGift(run, 'breath'), double: hasGift(run, 'bodydouble') && (+run.usedDouble || 0) < 2, weaken: (P.sluggish || 0) + (run.nextFlags.weaken || 0), empower: run.nextFlags.empower || 0, lastWords: P.lastWords || 0, str: s.STR,
     res: resistOf(s), healFin: STAT_FACES.VIT.finesse.heal * s.VIT, won: run.wins || 0,
   });
@@ -2470,13 +2482,14 @@ function newFight(run, rng) {
     foresight: hasGift(run, 'appraisal') || hasGift(run, 'adminrights') || hasGift(run, 'foresight') || run.scouted || (spec.kind === 'final' && (run.finalTip || (run.chains && run.chains.official === 'tip'))),
   };
   f.rule = run.chatRule || null; f.prec = [].concat(run.precedent || []); // Poll the Crowd, Standing Precedent (old runs hold a single id)
+  if (hasGift(run, 'f_hunted') && f.spec && f.spec.hard) { B.maxHp = Math.round(B.maxHp * 1.2); B.hp = Math.round(B.hp * 1.2); B.P = Object.assign({}, B.P, { dmgPct: (B.P.dmgPct || 0) + 0.2 }); } // Hunted
   if (run.enforcer) { run.enforcer = false; f.collector = true; B.maxHp = Math.round(B.maxHp * 1.25); B.hp = Math.round(B.hp * 1.25); B.P = Object.assign({}, B.P, { dmgPct: (B.P.dmgPct || 0) + 0.25 }); say(f, `[Open Tab: ${B.name} has come to collect. 25% stronger.]`, 'loss'); }
   if (run.spirit && A.P.spiritGuide) f.spirit = run.spirit;
   if (A.P.insideJob) { const mv = s => (s.def.fx.dmg || 0) * (s.def.fx.hits || 1) * s.power; B.rigged = B.skills.slice().sort((a, b) => mv(b) - mv(a))[0] || null; if (B.rigged) say(f, `[Rigged Bout: ${B.rigged.def.name} has been rigged, twice.]`, 'skill'); }
   [A, B].forEach(X => {
     const P = X.P;
     X.block += (P.startBlock || 0) + Math.round(((P.startBlockPct || 0) + (run.world.mod === 'siege' && !run.elite ? 0.15 : 0) + (f.rule === 'fortress' && X.isPlayer ? HOUSE_RULES.fortress.block : 0)) * X.maxHp);
-    if (P.noBlock) X.block = 0;
+    if (P.noBlock || A.P.nullBlock) X.block = 0;
     if (P.powerArmour) { X.armour = X.armourMax = Math.round(P.powerArmour * X.maxHp); say(f, `[Blast Plate: ${X.armour} armour.]`, 'skill'); }
     if (P.firstCrit) X.critNext = true;
     if (P.firstEvade) X.evade += 1;
@@ -2606,6 +2619,7 @@ function heal(f, X, v, full) {
 }
 function gainBlock(f, X, v) {
   if (X.P.noBlock) return; // Glass Cannon
+  if (f.A && f.A.P.nullBlock) return; // Null Guard: nobody gains Block
   if (!X.isPlayer && f.prec.includes('halfblock')) v /= 2; // Standing Precedent
   v = Math.round(v); if (v <= 0) return;
   X.block += v;
@@ -2616,6 +2630,7 @@ function gainBlock(f, X, v) {
 function addStatus(f, X, Y, kind, v) {
   if (v <= 0 || Y.hp <= 0) return;
   if (kind === 'burn' && Y.P.burnImmune) return; // Dragon Blood
+  if ((kind === 'burn' || kind === 'poison' || kind === 'bleed') && (X.P.overrun || Y.P.overrun)) v *= 2; // Buffer Overrun
   const P = X.P;
   if (kind === 'burn') { v += (P.burnPlus || 0) + (P.dotPlus || 0) + (P.burnLowDie ? lowDie(X) : 0); Y.burn += v; Y.burnFade = P.burnFade != null ? P.burnFade : 0.3; if (X.isPlayer) f.tally.burn += v; if (P.burnPoison) { Y.poison += P.burnPoison; } }
   if (kind === 'poison') { v += (P.poisonPlus || 0) + (P.dotPlus || 0); Y.poison += v; }
@@ -3515,6 +3530,7 @@ const REACTIONS = {
 // ---------- After a fight ----------
 function resolveFight(run, f, meta, rng) {
   const msgs = [], won = f.winner === 'A', spec = f.spec, lr = stream(run, 'loot', rng);
+  if (won && hasGift(run, 'g_leak')) run.leak = (run.leak || 0) + 1; // Memory Leak
   if (!won && hasGift(run, 'ironwill') && !run.elite) run.nextFlags.empower = Math.max(run.nextFlags.empower || 0, 2); // Iron Will
   bindMeta(meta);
   run.hp = Math.max(0, Math.min(f.A.hp, maxHp(run)));

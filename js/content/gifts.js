@@ -72,6 +72,22 @@ const GIFTS = {
   elf: { name: 'Elf-touched', cat: 'bloodline', cost: 3, desc: '+20% dodge. Each attack you dodge or evade gives the attacker 4 Bleed and makes your next hit critical.', lock: 'thornbane', p: { dodge: 0.2, dodgeBleed: 4, dodgeCrit: 1 }, flavour: "The fey brushed your cradle. You move the way they do." },
   demon: { name: 'Demon Blood', cat: 'bloodline', cost: 3, desc: 'All your damage +40%, and heal 10% of the damage you deal. Other healing is 50% weaker.', lock: 'comeback', p: { dmgPct: 0.4, healPct: -0.5, lifesteal: 0.1, drainFull: 1 }, flavour: "Something below lent you strength. It wants it back with interest." },
   lastwords: { name: 'Last Words', cat: 'combat', cost: 3, desc: 'Once per fight, dropping below 25% HP gives you Block equal to 40% of your max HP.', lock: 'chain', p: { lastWords: 0.4 }, flavour: "A dead champion's final gift. Make it mean something." },
+  // In-run Gifts added 12 Nov (Slaw: 30 in-run Gifts). Each leans on one archetype; GIFT_SYN says what they combo with.
+  firestarter: { name: 'Firestarter', cat: 'combat', cost: 2, desc: 'Your opponent starts each fight with 6 Burn, and Burn you apply +1.', p: { startBurn: 6, burnPlus: 1 }, flavour: "You arrive already on fire. The opponent catches it." },
+  nightshade: { name: 'Nightshade', cat: 'combat', cost: 2, desc: 'Your opponent starts each fight with 6 Poison, and Poison on them grows by 1 each turn.', p: { startPoison: 6, poisonGrow: 1 }, flavour: "A sprig in the handshake. It does the rest." },
+  serrated: { name: 'Serrated Edge', cat: 'combat', cost: 2, desc: 'Bleed you apply +2, and +15% damage to bleeding opponents.', p: { bleedPlus: 2, vsBleed: 0.15 }, flavour: "Every edge you carry has teeth." },
+  barbedguard: { name: 'Barbed Guard', cat: 'combat', cost: 2, desc: 'Gaining Block also gives Thorns equal to 30% of it.', p: { blockThorns: 0.3 }, flavour: "Your shield bites whoever leans on it." },
+  ironrebuke: { name: 'Iron Rebuke', cat: 'combat', cost: 2, desc: 'Gaining Block also deals 25% of it as damage to the opponent.', p: { blockStrike: 0.25 }, flavour: "Every guard you raise is also a shove." },
+  quickening: { name: 'Quickening', cat: 'combat', cost: 2, desc: 'Quick skills also give 4 Block and heal you 3.', p: { quickBlock: 4, quickHeal: 3 }, flavour: "Move fast enough and nothing lands cleanly." },
+  clockwork: { name: 'Clockwork Mind', cat: 'combat', cost: 2, desc: 'Quick skills that deal damage deal 5 more. Every third turn, all your cooldowns drop by 1.', p: { quickDmg: 5, tickDown: 1 }, flavour: "You count in gears. Every turn is a tooth." },
+  stormsense: { name: 'Storm Sense', cat: 'combat', cost: 2, desc: 'Your Stuns also Weaken for 2 turns, and you gain 6 Block whenever you Stun or Interrupt.', p: { stunWeaken: 2, stunBlock: 6 }, flavour: "You feel the strike coming. So you strike first." },
+  deathstoll: { name: "Death's Toll", cat: 'combat', cost: 2, desc: '+25% damage to opponents below 30% HP. The first time you hit an opponent below half, heal 12% of your max HP.', p: { execBonus: 0.25, reapBlood: 0.12 }, flavour: "The bell rings for them. You collect the fee." },
+  holywater: { name: 'Holy Water', cat: 'combat', cost: 2, desc: 'Once per fight, dropping below 30% HP heals you 25% of your max HP. Healing also gives Block equal to 30% of it.', p: { relic: 0.25, healBlock: 0.3 }, flavour: "Blessed by someone. Nobody remembers which god." },
+  badomen: { name: 'Bad Omen', cat: 'combat', cost: 2, desc: 'Opponents start each fight with 4 Misfortune, and your hits apply 1 more.', p: { startMisf: 4, hitMisf: 1 }, flavour: "Wherever you walk, mirrors crack a little." },
+  giantsbane: { name: "Giant's Bane", cat: 'combat', cost: 2, desc: '+25% damage to opponents with more max HP than you, and +15% to hard opponents.', p: { vsBigger: 0.25, vsHard: 0.15 }, flavour: "The bigger they are, the more of them to hit." },
+  sparedie: { name: 'Spare Die', cat: 'fortune', cost: 2, desc: 'Start each fight with 1 reroll, and +4 gold after each win where you rolled a 6.', p: { rerolls: 1, sixGold: 4 }, flavour: "One more in the sleeve. Always one more." },
+  warchest: { name: 'War Chest', cat: 'fortune', cost: 2, desc: '+3% damage for every 10 gold you hold when a fight starts, up to +25%.', p: { goldDmg: 0.03 }, flavour: "Money doesn't win fights. It buys what does." },
+  victorylap: { name: 'Victory Lap', cat: 'fortune', cost: 2, desc: '+3% damage for each fight won this run (up to +12%), and +2 gold after each win.', p: { winDmg: 0.03, goldPerWin: 2 }, flavour: "[The crowd likes a winner. It likes a show more.]" },
   illstarred: { name: 'Ill-Starred', cat: 'flaw', cost: -1, desc: 'Start each fight with 5 Curse.', p: { startCurse: 5 }, flavour: "Born under the wrong star. It has been following you since." },
   f_glass: { name: 'Glass Body', cat: 'flaw', cost: -2, desc: '20% less max HP.', flavour: "You bruise if someone looks at you too hard." },
   f_marked: { name: 'Marked by the System', cat: 'flaw', cost: -2, desc: 'Opponents are 10% stronger.', flavour: "[Entrant flagged for additional scrutiny.]" },
@@ -80,6 +96,20 @@ const GIFTS = {
   f_amnesia: { name: 'Amnesia', cat: 'flaw', cost: -1, desc: "The Tournament Archive is sealed for this run, and Scout's Post never opens.", flavour: "[Entrant memory unavailable. Please do not ask again.]" },
   f_sluggish: { name: 'Sluggish', cat: 'flaw', cost: -2, desc: 'Start every fight Weakened for 2 turns.', p: { sluggish: 2 }, flavour: "You were never a morning person, and every fight is a morning." },
   f_unlucky: { name: 'Unlucky', cat: 'flaw', cost: -1, desc: 'Rerolls cost 4 gold.', flavour: "The dice dislike you personally." },
+  // Glitched Gifts (12 Nov): never drawn normally. Where glitches are on, an in-run Gift offer sometimes swaps one in.
+  g_overflow: { name: 'Integer Overflow', cat: 'glitch', cost: 0, desc: 'All your damage +60%, but your max HP is 40% lower.', p: { dmgPct: 0.6 }, flavour: "[Damage value exceeds maximum. Wrapping around. Please stand clear.]" },
+  g_null: { name: 'Null Guard', cat: 'glitch', cost: 0, desc: 'Nobody can gain Block. Not your opponent, not you.', p: { nullBlock: 1 }, flavour: "[Block: null. Block: null. Block: null.]" },
+  g_overrun: { name: 'Buffer Overrun', cat: 'glitch', cost: 0, desc: 'Every Burn, Poison and Bleed is doubled, both ways.', p: { overrun: 1 }, flavour: "[Status buffer full. Excess written to adjacent Entrants.]" },
+  g_offbyone: { name: 'Off By One', cat: 'glitch', cost: 0, desc: 'Your skill cooldowns are 1 turn shorter, but every skill starts each fight on cooldown.', p: { offByOne: 1 }, flavour: "[Turn counter misaligned. Your turns now begin slightly early.]" },
+  g_leak: { name: 'Memory Leak', cat: 'glitch', cost: 0, desc: '+6 max HP for every fight you win this run, but each defeat costs 1 more Heart.', flavour: "[Entrant data growing. Cause unknown. Do not reboot.]" },
+  g_divzero: { name: 'Divide by Zero', cat: 'glitch', cost: 0, desc: 'Critical hits deal ×3 damage, but your critical chance is halved.', p: { critMult: 3, critHalf: 1 }, flavour: "[Critical value undefined. Assigning infinity. Rounding down to three.]" },
+  // Flaws added 12 Nov (Slaw: 15 Flaws)
+  f_brittle: { name: 'Brittle Bones', cat: 'flaw', cost: -1, desc: 'Every hit you take deals 2 more damage.', p: { flatDR: -2 }, flavour: "You break easily. You have broken often." },
+  f_slowheal: { name: 'Slow Healer', cat: 'flaw', cost: -1, desc: 'All your healing is 30% weaker.', p: { healPct: -0.3 }, flavour: "Cuts stay open. Bruises stay for weeks." },
+  f_stage: { name: 'Stage Fright', cat: 'flaw', cost: -1, desc: 'Your first damaging skill each fight deals half damage.', p: { firstHit: -0.5 }, flavour: "The crowd goes quiet. Your hands forget what they were doing." },
+  f_spend: { name: 'Spendthrift', cat: 'flaw', cost: -1, desc: 'You earn no interest on the gold you hold.', flavour: "Gold burns a hole in every pocket you own." },
+  f_hunted: { name: 'Hunted', cat: 'flaw', cost: -1, desc: 'Hard opponents are 20% stronger against you.', flavour: "[Bounty posted on this Entrant. Collectors notified.]" },
+  f_bleeder: { name: 'Bleeder', cat: 'flaw', cost: -1, desc: 'Start every fight with 5 Bleed.', flavour: "Your blood never learned to clot. Every fight starts red." },
 };
 // Affinity Gifts are only offered as the Additional Gift: +1 piece to one archetype.
 Object.keys(ARCH).forEach(k => { GIFTS['aff_' + k] = { name: `${ARCH[k].name} Affinity`, cat: 'extra', cost: 0, desc: `Your ${ARCH[k].name} bonuses count 1 extra piece.`, flavour: ARCH[k].line, arch: k }; });
@@ -101,6 +131,13 @@ const GIFT_SYN = {
   bornlucky: ['dicer', 'jinx', 'loadeddice', 'bond_house'], lucky: ['blade', 'trashtalk', 'bond_crow'], golden: ['fivefinger', 'treasure', 'gambler'], breath: ['berserker', 'bodydouble', 'lastwords'],
   gambler: ['bond_house', 'golden'], haggler: ['affinity', 'gacha'], treasure: ['spiritguide', 'fivefinger', 'golden'],
   ironwill: ['glass', 'bodydouble', 'storm'], dragon: ['pyre', 'catalyst', 'chatdecides'], elf: ['blade', 'nearmiss', 'lucky'], demon: ['reaper', 'vampire', 'berserker'], lastwords: ['bastion', 'hometown', 'bodydouble'],
+  firestarter: ['pyre', 'dragon', 'catalyst'], nightshade: ['venom', 'warden', 'dejavu'], serrated: ['blade', 'hedgewitch', 'elf'],
+  barbedguard: ['bastion', 'deserter', 'powerarmour'], ironrebuke: ['bastion', 'hometown', 'chatdecides'], quickening: ['arcanist', 'manaaffinity', 'lightfingers'],
+  clockwork: ['arcanist', 'encore', 'prodigy'], stormsense: ['storm', 'adminrights', 'insidejob'], deathstoll: ['reaper', 'demon', 'bodydouble'],
+  holywater: ['zealot', 'tidecaller', 'vampire'], badomen: ['jinx', 'bornlucky', 'bond_crow'], giantsbane: ['reaper', 'spiritguide', 'treasure'],
+  sparedie: ['dicer', 'loadeddice', 'bornlucky'], warchest: ['golden', 'fivefinger', 'treasure'], victorylap: ['reaper', 'bond_house', 'golden'],
+  g_overflow: ['hometown', 'bodydouble', 'nearmiss'], g_null: ['pyre', 'venom', 'reaper'], g_overrun: ['pyre', 'venom', 'blade'],
+  g_offbyone: ['arcanist', 'clockwork', 'prodigy'], g_leak: ['ironwill', 'victorylap', 'powerarmour'], g_divzero: ['blade', 'lucky', 'trashtalk'],
   bond_war: ['storm', 'silvertongue', 'lightningrod'], bond_trick: ['pyre', 'venom', 'blade'], bond_ruin: ['pyre', 'berserker', 'bodydouble'], bond_house: ['dicer', 'gambler', 'golden'], bond_crow: ['blade', 'lucky', 'trashtalk'],
 };
-const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw', retired: 'Retired' };
+const GIFT_CATS = { world: 'World', cheat: 'Cheat', growth: 'Growth', combat: 'Combat', fortune: 'Fortune', divine: 'Divine', bloodline: 'Bloodline', flaw: 'Flaw', glitch: 'Glitched', retired: 'Retired' };

@@ -57,6 +57,14 @@ Object.keys(G.GIFTS).filter(k => !['retired', 'extra', 'flaw'].includes(G.GIFTS[
 { const { f } = fightWith(['dragon']); G.addStatus(f, f.B, f.A, 'burn', 10); ok(f.A.burn === 0, "Dragon Blood: Burn can't hurt you"); }
 { const { f } = fightWith(['elf']); ok(f.A.P.dodgeCrit && f.A.dodge >= 0.2, 'Elf-touched: +20% dodge, a dodge sets a crit'); }
 { const { run } = fightWith(['hometown']); const bast = Object.keys(G.SKILLS).find(id => G.SKILLS[id].tags && G.SKILLS[id].tags.includes('bastion')); ok(G.giftFit(run, bast).includes('hometown'), 'a Bastion piece fits Hometown Crowd'); }
+// 15 Flaws, 30 in-run Gifts, glitched Gifts
+ok(G.flawsAllowed(Object.assign(G.newMeta(), { unlocks: new Proxy({}, { get: () => true }) })).length >= 15 || Object.keys(G.GIFTS).filter(k => G.GIFTS[k].cat === 'flaw').length === 15, '15 Flaws');
+ok(Object.keys(G.GIFTS).filter(k => G.SMALL_CATS.includes(G.GIFTS[k].cat)).length === 30, '30 in-run Gifts');
+{ const { run } = fightWith([]); let seen = 0; for (let i = 0; i < 200; i++) { const o = G.giftPickOffers(run, seeded(i)); if (o.some(k => G.GIFTS[k].cat === 'glitch')) seen++; } ok(seen > 10 && seen < 90, `glitched Gifts turn up in some picks (${seen}/200)`);
+  const n0 = run.notice || 0; G.applyGift(run, 'g_null', []); ok((run.notice || 0) === n0 + 1, 'a glitched Gift raises notice'); }
+{ const { f } = fightWith(['g_null']); G.gainBlock(f, f.A, 20); G.gainBlock(f, f.B, 20); ok(f.A.block === 0 && f.B.block === 0, 'Null Guard: nobody gains Block'); }
+{ const { f } = fightWith(['g_overrun']); const b0 = f.B.poison; G.addStatus(f, f.A, f.B, 'poison', 3); ok(f.B.poison - b0 >= 6, 'Buffer Overrun doubles statuses'); }
+{ const { f } = fightWith(['f_bleeder']); ok(f.A.bleed >= 5, 'Bleeder starts bleeding'); }
 // Sponsorship Offer replaces the Chosen Gifts
 ok(G.EVENTS.sponsorship && G.GIFTS.chosen_war.cat === 'retired', 'the Chosen Gifts are now the Sponsorship Offer event');
 console.log(fails ? `${fails} failed` : 'signature gifts: all passed');
