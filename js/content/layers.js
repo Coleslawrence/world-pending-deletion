@@ -101,6 +101,43 @@ const FATES = {
       { k: 'custom', tier: 'far', name: 'The Long Peace', text: 'No war in living memory. The weapons museum is very popular.' },
       { k: 'person', tier: 'city', name: 'The Retired General', text: 'Never fought a battle. Writes very good poems about it.' },
     ] },
+  // World expansion (12 Nov): four more Fates. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+  wyrm: { added: 'x3', name: "The Wyrm's Tithe", line: 'A dragon takes one town a year, and the year is nearly up.', crises: ['crisis_wyrm_1', 'crisis_wyrm_2'], crisisIfUsed: 'crisis_wyrm_2u',
+    ends: { lifted: 'the wyrm flew north this year and did not come back. The lots are burned.', sealed: 'the wyrm takes two towns a year now. Nobody draws lots. They wait.' }, mods: { bloodmoon: 5, none: 4, siege: 2 },
+    stages: ['the wyrm has been seen over the hills. The towns are drawing lots.', 'the lot has fallen. One town is packing.'],
+    promises: ['slay the wyrm', 'save the town that drew the lot'],
+    entries: [
+      { k: 'place', tier: 'city', name: 'The Lot Hall', text: 'Where the towns draw lots each year. The floor is worn smooth where people stand very still.' },
+      { k: 'place', tier: 'far', name: 'The Scorched Hill', text: 'Where the wyrm sleeps between tithes. Nothing grows there, and nobody goes to check.' },
+      { k: 'person', tier: 'city', name: 'The Wyrm-Watcher', text: 'Has watched the northern sky every night for thirty years. Has a very stiff neck.' },
+    ] },
+  drought: { added: 'x3', name: 'The Long Drought', line: 'No rain in four summers. The wells are guarded.', crises: ['crisis_drought_1', 'crisis_drought_2'], crisisIfUsed: 'crisis_drought_2u',
+    ends: { lifted: 'it rained. Everyone stood outside until they were soaked.', sealed: 'nobody under twelve has heard rain. The old songs about it have stopped making sense.' }, mods: { famine: 6, none: 4, market: 2 },
+    stages: ['the river is a road now. People walk down the middle of it.', 'the last well has a queue a day long.'],
+    promises: ['bring the rain back', 'fill the last well'],
+    entries: [
+      { k: 'place', tier: 'city', name: 'The Last Well', text: 'Guarded day and night. The guards drink last, and they are very thin.' },
+      { k: 'custom', tier: 'city', name: 'The Rain Dance', text: 'Danced every evening in the square. It has not worked once. Nobody has stopped.' },
+      { k: 'person', tier: 'city', name: 'The Water Warden', text: 'Measures out every cup. Has never given herself a full one.' },
+    ] },
+  cursedcrown: { added: 'x3', name: 'The Cursed Crown', line: 'Whoever wears it goes mad. It has had six owners this year.', crises: ['crisis_cursedcrown_1', 'crisis_cursedcrown_2'], crisisIfUsed: 'crisis_cursedcrown_2u',
+    ends: { lifted: 'the crown is at the bottom of the sea. The new king is very boring.', sealed: 'the crown sits on the throne by itself now. It has started giving orders.' }, mods: { strange: 5, none: 5, restless: 2 },
+    stages: ['the seventh owner of the crown has started talking to it.', 'nobody will take the crown now. It sits on the throne alone.'],
+    promises: ['bury the crown', 'see a sane ruler crowned'],
+    entries: [
+      { k: 'place', tier: 'city', name: 'The Empty Throne', text: 'Nobody sits on it. The crown does, some days.' },
+      { k: 'custom', tier: 'far', name: 'The Seven Coronations', text: 'There have been seven this year. The bunting is never taken down any more.' },
+      { k: 'person', tier: 'city', name: "The Crown's Keeper", text: 'Carries the crown on a cushion, with tongs. Has not looked at it in years.' },
+    ] },
+  vanishing: { added: 'x3', name: 'The Vanishing', line: 'One village a month is simply gone, and nobody remembers its name.', crises: ['crisis_vanishing_1', 'crisis_vanishing_2'], crisisIfUsed: 'crisis_vanishing_2u',
+    ends: { lifted: 'nothing has vanished for a season. People still count their streets each morning.', sealed: 'there are more blanks on the map than places now.' }, mods: { restless: 5, none: 5, strange: 2 },
+    stages: ['another village is gone. The maps have a blank where it was.', 'the capital has started counting its own streets.'],
+    promises: ['find the missing villages', 'keep the map whole'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Blank on the Map', text: 'A space on every map where something used to be. Nobody can say what.' },
+      { k: 'custom', tier: 'city', name: 'Counting the Streets', text: 'Every morning, every street is counted out loud. So far, the number holds.' },
+      { k: 'person', tier: 'city', name: 'The Last Mapmaker', text: 'Redraws the world every month. Uses more white ink each time.' },
+    ] },
 };
 // A Fate's line for a world type: its lineBy entry for that type, else its line
 function fateLine(F, type) { return (F.lineBy && F.lineBy[type]) || F.line; }
@@ -170,6 +207,39 @@ const PEOPLES = {
       { k: 'place', tier: 'far', name: 'The Waystones', text: 'Mark the old pilgrim road. Nobody remembers where it ends.' },
       { k: 'custom', tier: 'city', name: 'The Leaving Feast', text: 'Held whenever the caravans move on. Held a lot.' },
       { k: 'person', tier: 'city', name: 'The Road Elder', text: 'Has walked the whole road twice. Says it was shorter the first time.' },
+    ] },
+  // World expansion (12 Nov): four more Peoples. added: 'x3' keeps them out of Pending World days before ADDED_FROM.x3
+  order: { added: 'x3', name: 'The Sworn Order', line: 'Knights who swore an oath so long ago nobody remembers what it was for.',
+    custom: { name: 'Code of Combat', text: 'Beat a hard opponent and heal 15% of your max HP.' }, visit: { at: 4, event: 'order_vigil' },
+    roles: ['squire', 'oath-keeper'], epithets: ['the Sworn', 'of the Order'],
+    entries: [
+      { k: 'place', tier: 'city', name: 'The Chapter House', text: 'Where the knights meet. The oath is carved over the door, too worn to read.' },
+      { k: 'custom', tier: 'city', name: 'The Vigil of Arms', text: 'Every new knight kneels all night beside their sword. Most fall asleep. Nobody tells.' },
+      { k: 'person', tier: 'city', name: 'The Grand Master', text: 'Knows the oath by heart. Has never said it aloud, in case it is wrong.' },
+    ] },
+  guilds: { added: 'x3', name: 'Craft Guilds', line: 'Every trade has a guild, and every guild has a grudge.',
+    custom: { name: 'Guild marks', text: 'Merging a piece pays 2 gold.' }, visit: { at: 2, event: 'guild_masterpiece' },
+    roles: ['journeyman', 'guild runner'], epithets: ['the Journeyman', 'the Guild-Marked'],
+    entries: [
+      { k: 'place', tier: 'city', name: 'The Street of Guilds', text: 'Every hall is taller than the one beside it. The newest is mostly scaffolding.' },
+      { k: 'custom', tier: 'city', name: 'Masterpiece Day', text: 'Apprentices show their best work. The masters judge, and then argue for a year.' },
+      { k: 'person', tier: 'city', name: 'The Old Master', text: 'Made the city gates, the bells and the clock. Is still unhappy with the clock.' },
+    ] },
+  lodges: { added: 'x3', name: "Hunters' Lodges", line: 'Every village has a lodge, and every lodge has a wall of trophies.',
+    custom: { name: 'Trophies', text: 'Beating a monster pays 3 more gold.' }, visit: { at: 2, event: 'lodge_hunt' },
+    roles: ['tracker', 'skinner'], epithets: ['the Hunter', 'of the Lodge'],
+    entries: [
+      { k: 'place', tier: 'city', name: 'The Trophy Hall', text: 'Every wall is covered. They have started on the ceiling.' },
+      { k: 'custom', tier: 'city', name: 'The First Kill', text: 'A hunter keeps one tooth from their first kill. Some wear it. Some swallowed it.' },
+      { k: 'person', tier: 'city', name: 'The Old Tracker', text: 'Can tell what passed, when and how hungry it was. Cannot find her own keys.' },
+    ] },
+  mages: { added: 'x3', name: 'Hedge Mages', line: 'Every village has someone who knows a little magic, and charges a little for it.',
+    custom: { name: 'Hedge sight', text: 'Chance options in events +10%.' }, visit: { at: 6, event: 'hedge_circle' },
+    roles: ['herb gatherer', 'charm maker'], epithets: ['the Cunning', 'the Charmed'],
+    entries: [
+      { k: 'place', tier: 'far', name: 'The Crossroads Stone', text: 'Where the hedge mages meet at midsummer. Travellers take the long way round that week.' },
+      { k: 'custom', tier: 'city', name: 'Charm Day', text: 'Everyone buys a new charm and throws the old one in the river. The river is very lucky.' },
+      { k: 'person', tier: 'city', name: 'The Cunning Woman', text: 'Cures warts, finds lost things and knows who did it. Charges more for the last one.' },
     ] },
 };
 // A Confluence is a second world type pressing in on the first. It lends half the name and one record entry,
