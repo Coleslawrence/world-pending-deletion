@@ -570,6 +570,7 @@ function titleHTML() {
       ${canResume ? `<button class="btn primary" data-act="resume">Continue · ${saved.daily ? 'Pending World: ' : ''}${esc(saved.world.name)}, ${saved.stage === 'draft' || saved.startPts != null ? 'opening draft' : 'round ' + saved.round}</button>` : ''}
       ${dailyButton(canResume && saved)}
       <button class="btn ${canResume ? '' : 'primary'}" data-act="new">${canResume ? 'Abandon and start over' : 'Enter the tournament'}</button>
+      ${meta.wins > 0 && !canResume ? `<button class="btn ghost small" data-act="sheet" data-s="challenge">Challenge mode</button>` : ''}
       ${practiceSave() ? `<button class="btn" data-act="practice-resume">Continue the practice run</button>` : `<button class="btn ${meta.tutorialDone ? 'ghost small' : ''}" data-act="practice">${meta.tutorialDone ? 'Replay the practice run' : 'Practice run (tutorial)'}</button>`}
       <div class="row3"><button class="btn ghost" data-act="sheet" data-s="archive">Archive</button><button class="btn ghost" data-act="sheet" data-s="halls">Halls</button><button class="btn ghost" data-act="sheet" data-s="echoes">Echoes</button></div>
       <div class="row3"><button class="btn ghost small" data-act="sheet" data-s="howto">How to play</button><button class="btn ghost small" data-act="news">What's new${newsUnseen() ? ' <span class="badge">!</span>' : ''}</button><button class="btn ghost small" data-act="report">Report</button></div>
@@ -596,6 +597,7 @@ function worldsHTML() {
   const w = ui.world != null ? ui.worlds[ui.world] : null;
   const st = canSteer() ? `<button class="link steer" data-act="sheet" data-s="steer">${ui.worlds.some(x => x.steered) ? 'Ask for a different world' : 'None of these? Ask the System for a world'} · ${STEER_COST} Echoes</button>` : '';
   return `<main class="screen select worlds"><div class="sel-h"><button class="icon-btn" data-act="back-title" aria-label="Back">‹</button><div><div class="eyebrow">${preStep('World')}</div><h2>Choose a world to fight for</h2></div></div>
+    ${CHALLENGES[ui.challenge] ? `<button class="term set chal" data-act="sheet" data-s="challenge"><span class="tm-l">Challenge mode</span><span class="tm-v">${esc(CHALLENGES[ui.challenge].name)}</span><span class="tm-n">${esc(CHALLENGES[ui.challenge].say)}</span><span class="tm-go" aria-hidden="true">›</span></button>` : ''}
     <p class="hint">Higher ranks bring tougher opponents. Rank E and D worlds show 1 more Signature Gift.</p>
     <div class="picks">${cards}${st}</div>
     <div class="foot"><button class="btn primary" data-act="world-ok" ${w ? '' : 'disabled'}>${w ? (termsOn() ? 'Next: terms of entry' : 'Fight for ' + esc(w.name)) : 'Pick a world'}</button></div></main>`;
@@ -603,7 +605,7 @@ function worldsHTML() {
 
 // ---------- Terms of entry ----------
 // Everything you can set before a run that isn't the world or the champion, in one place: how hard (Priority, Challenge,
-// Entry Clause) and what you're playing for (run goal, Contracts, Back yourself). Each row shows what is set now and
+// Entry Clause) and what you're playing for (run goal with an optional stake; Contracts as a line to read). Each row shows what is set now and
 // opens the sheet that changes it. Skipped on the first run, when none of it means anything yet.
 function termsOn() { return !ui.daily && meta.runs > 0; }
 function termRow(s, label, value, note, set) {
@@ -614,16 +616,17 @@ function termsHTML() {
   const P = sanitizePriority(meta.priority), C = CHALLENGES[ui.challenge], K = sanitizeClauses(meta.clauses);
   const hard = [];
   if (P.max) hard.push(termRow('priority', 'Priority', P.set ? `${P.set} · ${esc(PRIORITY[P.set - 1].name)}` : '0 · Standard', P.set ? `+${Math.round(P.set * PRIORITY_ECHO * 100)}% Echoes. ${P.max} open.` : `Up to ${P.max} open. Higher pays more Echoes.`, P.set > 0));
-  if (meta.wins > 0) hard.push(termRow('challenge', 'Challenge', C ? esc(C.name) : 'None', C ? esc(C.say) : 'Special terms with a first-clear Echo prize.', !!C));
+  if (C) hard.push(termRow('challenge', 'Challenge', esc(C.name), esc(C.say), true));
   if (Object.keys(K.open).length > 1) { const L = CLAUSES[K.set]; hard.push(termRow('clauses', 'Entry Clause', esc(L.name), K.set === 'standard' ? 'Clauses give one thing and take another.' : `Gives: ${esc(L.give)} Takes: ${esc(L.take)}`, K.set !== 'standard')); }
-  const M = goalOffer(meta), CT = contractsOf(meta), n = contractBoard(CT.week).filter(id => CT.done[id]).length, B = meta.backing, BG = B && BACK_GOALS[B.goal];
-  const play = [termRow('goal', 'Run goal', M.pick ? esc(goalText(M.pick)) : 'None', M.pick ? `Pays ${GOAL_PAY[goalDef(M.pick).tier].echoes} Echoes if you meet it.` : 'Pick a target. Meet it and it pays Echoes.', !!M.pick),
-    termRow('contracts', 'Contracts', `${n} of 3 done`, "This week's jobs. They count in any run.", false)];
-  if (BG || meta.echoes >= BACK_STAKES[0]) play.push(termRow('backing', 'Back yourself', BG ? `${esc(BG.name)} · ${B.stake} Echoes` : 'No bet', BG ? `Pays ${Math.round(B.stake * BG.mul)} if you make it.` : 'Stake Echoes on how far you get.', !!BG));
+  const M = goalOffer(meta), CT = contractsOf(meta), board = contractBoard(CT.week), n = board.filter(id => CT.done[id]).length;
+  const gv = M.pick ? esc(goalText(M.pick)) : 'None', gn = M.pick ? `Pays ${GOAL_PAY[goalDef(M.pick).tier].echoes} Echoes if you meet it.${M.stake ? ` ${M.stake} Echoes staked: ${Math.round(M.stake * goalOdds(M.pick))} back if met.` : ''}` : 'Pick a target. Meet it and it pays Echoes. Stake Echoes on it for more.';
+  const play = [termRow('goal', 'Run goal', gv, gn, !!M.pick)];
+  // Contracts aren't a choice: every run works on them. A line to read, not a setting.
+  const contracts = `<button class="link tm-info" data-act="sheet" data-s="contracts">This week's Contracts: ${n} of 3 done. They count in any run ›</button>`;
   const guide = meta.runs === 1 ? '<p class="hint sysl">[Guide: all optional. Leave everything as it is and you play the standard tournament.]</p>' : '';
   return `<main class="screen select terms"><div class="sel-h"><button class="icon-btn" data-act="back-worlds" aria-label="Back">‹</button><div><div class="eyebrow">${preStep('Terms')} · ${esc(w.name)}</div><h2>[Terms of entry]</h2></div></div>
-    <p class="hint">Optional. These stay as you left them from run to run.</p>${guide}
-    <div class="picks">${hard.length ? `<h4 class="tm-h">How hard</h4><div class="tm-list">${hard.join('')}</div>` : ''}<h4 class="tm-h">What you play for</h4><div class="tm-list">${play.join('')}</div></div>
+    <p class="hint">${C ? `Challenge mode: ${esc(C.name)}. ` : ''}Optional. These stay as you left them from run to run.</p>${guide}
+    <div class="picks">${hard.length ? `<h4 class="tm-h">How hard</h4><div class="tm-list">${hard.join('')}</div>` : ''}<h4 class="tm-h">What you play for</h4><div class="tm-list">${play.join('')}</div>${contracts}</div>
     <div class="foot"><button class="btn primary" data-act="terms-ok">Next: your champion</button></div></main>`;
 }
 
@@ -1801,9 +1804,14 @@ function bracketSheet() {
   return sheetWrap('[Tournament bracket]', `<p class="sh-p">${lead}</p><div class="bk">${B.rows.map(row).join('')}</div>${elite}<p class="sh-p fine">Each round: choose an opponent, visit a district, shop, fight. Opponents are drawn when the round begins.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 function goalSheet() {
-  const M = goalOffer(meta), pay = id => { const P = GOAL_PAY[goalDef(id).tier]; return `Pays ${P.echoes} Echoes and ${P.xp} Mastery XP.`; };
+  const M = goalOffer(meta), CT = contractsOf(meta), board = contractBoard(CT.week);
+  const pay = id => { const P = GOAL_PAY[goalDef(id).tier]; return `Pays ${P.echoes} Echoes and ${P.xp} Mastery XP. Stake odds ×${goalOdds(id)}.${board.includes(id) && !CT.done[id] ? ' Also one of this week\'s Contracts.' : ''}`; };
   const one = (id, name, desc) => `<button class="choice ${M.pick === id ? 'on' : ''}" data-act="set-goal" data-k="${id || ''}"><div class="sr-h"><span class="sr-name">${esc(name)}</span>${M.pick === id ? '<span class="tagn">Chosen</span>' : ''}</div><div class="sr-desc">${esc(desc)}</div></button>`;
-  return sheetWrap('[Run goal]', `<p class="sh-p">[State your intentions. The System will hold you to them.] Choose one goal for your next world. Meet it and it pays when the run ends, win or lose.</p>${M.offer.map(id => one(id, goalText(id), pay(id))).join('')}${one(null, 'No goal', 'Play the world as it comes.')}<p class="sh-p fine">A new set of three is drawn after each world. Pending World takes no run goal.</p>`, `<button class="btn primary" data-act="close">Close</button>`);
+  // The stake rides on whichever goal is chosen: 0 to take it back, otherwise what it pays if the goal is met
+  const can = n => n === M.stake || meta.echoes + M.stake >= n;
+  const stake = M.pick ? `<h4>Stake · you have ${meta.echoes} Echoes</h4><div class="stakes">${[0].concat(GOAL_STAKES).map(n => `<button class="btn small ${M.stake === n ? 'primary' : 'ghost'}" data-act="set-stake" data-n="${n}" ${can(n) ? '' : 'disabled'}>${n ? n : 'None'}</button>`).join('')}</div>
+    <p class="sh-p fine">${M.stake ? `[${M.stake} Echoes on file. Meet the goal and the House pays ${Math.round(M.stake * goalOdds(M.pick))}. Miss it and they are kept.]` : `[The House takes bets on Entrants. Including from the Entrant.] Stake Echoes on this goal: met, it pays the stake ×${goalOdds(M.pick)}; missed, the stake is lost.`}</p>` : '';
+  return sheetWrap('[Run goal]', `<p class="sh-p">[State your intentions. The System will hold you to them.] Choose one goal for your next world. Meet it and it pays when the run ends, win or lose.</p>${M.offer.map(id => one(id, goalText(id), pay(id))).join('')}${one(null, 'No goal', 'Play the world as it comes.')}${stake}<p class="sh-p fine">A new set of three is drawn after each world. Pending World takes no run goal and leaves the stake for the next one.</p>`, `<button class="btn primary" data-act="close">Done</button>`);
 }
 function contractsSheet() {
   const C = contractsOf(meta), board = contractBoard(C.week), n = board.filter(id => C.done[id]).length;
@@ -1814,7 +1822,8 @@ function goalLines() {
   if (!run) return '';
   const c = (run.contractsDone || []).map(x => `<p class="pg-next good">[Contract fulfilled: ${esc(goalText(x.id))}. +${x.pay} Echoes.]</p>`).join('');
   const w = run.contractWeek ? `<p class="pg-next good">[All three Contracts done this week. Contract Mark: ${run.contractWeek} week${run.contractWeek > 1 ? 's' : ''}.]</p>` : '';
-  const g = run.goal && run.goal.paid != null ? (run.goal.met ? `<p class="pg-next good">[Run goal met: ${esc(goalText(run.goal.id))}. +${run.goal.paid} Echoes, +${run.goal.xp} Mastery XP.]</p>` : `<p class="pg-next bad">[Run goal missed: ${esc(goalText(run.goal.id))}.]</p>`) : '';
+  const st = run.goal && run.goal.stake ? (run.goal.met ? ` Stake paid: +${run.goal.won} Echoes.` : ` ${run.goal.stake} staked Echoes kept by the House.`) : '';
+  const g = run.goal && run.goal.paid != null ? (run.goal.met ? `<p class="pg-next good">[Run goal met: ${esc(goalText(run.goal.id))}. +${run.goal.paid} Echoes, +${run.goal.xp} Mastery XP.${st}]</p>` : `<p class="pg-next bad">[Run goal missed: ${esc(goalText(run.goal.id))}.${st}]</p>`) : '';
   return g + c + w;
 }
 // Patron bonds (Phase 7): each god's Bond level in the Archive, and the levels a run opened on the end screen
@@ -1849,7 +1858,7 @@ function notesSheet() {
 function noteLines() { const L = ((run && run.notesUp) || []).filter(x => x.level >= NOTE_LEVELS); return L.length ? `<p class="pg-next good">[Field notes complete: ${L.map(x => esc(ENEMIES[x.id].name)).join(', ')}.]</p>` : ''; }
 function pageLines() { return ((run && run.pagesOpened) || []).map(k => `<p class="pg-next good">[New page in the Archive: ${esc(STORY_PAGES[k].title)}.]</p>`).join(''); }
 function retiredLines() { return ((run && run.retired) || []).map(id => `<p class="pg-next good">[Rival retired: ${esc(ENEMIES[id].name)}. Trophy filed in the Archive.]</p>`).join(''); }
-function goalEchoes() { return run ? (run.goal && run.goal.paid || 0) + (run.contractsDone || []).reduce((a, x) => a + x.pay, 0) : 0; }
+function goalEchoes() { return run ? (run.goal && run.goal.paid || 0) + (run.goal && run.goal.won || 0) + (run.contractsDone || []).reduce((a, x) => a + x.pay, 0) : 0; }
 // Entry Clauses (Phase 5): the open ones to choose from, and the feats that open the rest
 function clausesSheet() {
   const K = sanitizeClauses(meta.clauses), open = Object.keys(CLAUSES).filter(k => K.open[k]), shut = Object.keys(CLAUSES).filter(k => !K.open[k]);
@@ -1865,10 +1874,11 @@ function prioritySheet() {
   const next = P.max < PRIORITY.length ? `<p class="sh-p fine">Spare a world at Priority ${P.max} to open Priority ${P.max + 1}.</p>` : '<p class="sh-p fine">Every level is open.</p>';
   return sheetWrap('[Priority]', `<p class="sh-p">[The System can give your world more of its attention. Each level adds one rule and keeps the ones before it. Higher levels pay more Echoes and raise your Marks.]</p>${list.join('')}${next}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
+// Challenge mode, from the title: choose the terms, then the world. Each has a first-clear prize and its own Mark.
 function challengeSheet() {
-  const done = (meta.marks && meta.marks.challenge) || {};
-  const one = (k, C) => `<button class="choice ${ui.challenge === k || (!k && !CHALLENGES[ui.challenge]) ? 'on' : ''}" data-act="set-challenge" data-k="${k || ''}"><div class="sr-h"><span class="sr-name">${esc(C.name)}</span><span class="tagn">${!k ? 'Standard' : done[k] ? `Cleared · ${markTier(done[k]).name}` : `First clear: ${CHALLENGE_ECHOES} Echoes`}</span></div><div class="sr-desc">${esc(C.say)}${flavHTML(C.flavour)}</div></button>`;
-  return sheetWrap('[Challenge worlds]', `<p class="sh-p">[The System has filed some worlds under special terms. Choose the terms, then choose the world.]</p>${one(null, { name: 'No challenge', say: 'The tournament as filed.' })}${Object.entries(CHALLENGES).map(([k, C]) => one(k, C)).join('')}`, `<button class="btn primary" data-act="close">Close</button>`);
+  const done = (meta.marks && meta.marks.challenge) || {}, start = ui.screen === 'title';
+  const one = (k, C) => `<button class="choice ${!start && (ui.challenge === k || (!k && !CHALLENGES[ui.challenge])) ? 'on' : ''}" data-act="set-challenge" data-k="${k || ''}"><div class="sr-h"><span class="sr-name">${esc(C.name)}</span><span class="tagn">${!k ? 'Standard' : done[k] ? `Cleared · ${markTier(done[k]).name}` : `First clear: ${CHALLENGE_ECHOES} Echoes`}</span></div><div class="sr-desc">${esc(C.say)}${flavHTML(C.flavour)}</div></button>`;
+  return sheetWrap('[Challenge mode]', `<p class="sh-p">[The System has filed some worlds under special terms. Choose the terms, then choose the world.] One fixed twist for the whole run, on top of your Priority.</p>${start ? '' : one(null, { name: 'Leave Challenge mode', say: 'Back to the tournament as filed.' })}${Object.entries(CHALLENGES).map(([k, C]) => one(k, C)).join('')}`, `<button class="btn primary" data-act="close">Close</button>`);
 }
 // Marks of mastery: a graded chip, the Archive's section, and the end screen's lines
 function markChip(kind, key) { const v = meta.marks && meta.marks[kind] && meta.marks[kind][key], T = v && markTier(v); return T ? `<span class="tag mark mk-${T.k}" title="Mark of mastery: ${T.name}, spared at Priority ${v - 1}">${T.name}</span>` : ''; }
@@ -1918,17 +1928,6 @@ function ladderLines() {
   const name = m => m.kind === 'arch' ? `${ARCH[m.key].name} (${run.world.name}'s archetype)` : m.kind === 'world' ? WORLD_TYPES[m.key].name : m.kind === 'clause' ? CLAUSES[m.key].name : CHALLENGES[m.key].name;
   return (L.marks.length ? `<p class="pg-next good">[Mark${L.marks.length > 1 ? 's' : ''} of mastery: ${L.marks.map(m => `${esc(name(m))} · ${m.tier}`).join(', ')}.]</p>` : '') + (L.opened ? `<p class="pg-next good">[Priority ${L.opened} is open: ${esc(PRIORITY[L.opened - 1].name)}.]</p>` : '') + (L.echoes ? `<p class="pg-next good">[Challenge world cleared for the first time. +${L.echoes} Echoes.]</p>` : '');
 }
-function backingSheet() {
-  const B = meta.backing;
-  if (B && BACK_GOALS[B.goal]) {
-    const G = BACK_GOALS[B.goal];
-    return sheetWrap('[Backing placed]', `<p class="sh-p">[You have backed yourself: ${esc(G.name)}. Stake ${B.stake} Echoes. Pays ${Math.round(B.stake * G.mul)} if you make it.]</p><p class="sh-p fine">It rides on your next world. Pending World and practice don't count.</p>`, `<div class="row2 even"><button class="btn" data-act="back-withdraw">Withdraw (${B.stake} back)</button><button class="btn primary" data-act="close">Keep it</button></div>`);
-  }
-  const stakes = BACK_STAKES.filter(n => n <= meta.echoes), st = stakes.includes(ui.backStake) ? ui.backStake : stakes[stakes.length > 1 ? 1 : 0];
-  const head = `<div class="row3">${stakes.map(n => `<button class="btn small ${n === st ? 'primary' : 'ghost'}" data-act="back-stake" data-n="${n}">${n} Echoes</button>`).join('')}</div>`;
-  const list = Object.entries(BACK_GOALS).map(([k, G]) => `<button class="choice" data-act="back-place" data-k="${k}" data-n="${st}"><div class="sr-h"><span class="sr-name">${esc(G.name)}</span><span class="price">Pays ${Math.round(st * G.mul)}</span></div><div class="sr-desc">${esc(G.desc)} Odds ×${G.mul}.</div></button>`).join('');
-  return sheetWrap('[Back yourself]', `<p class="sh-p">[The House takes bets on Entrants. Including from the Entrant. Stake Echoes on how far your next world gets.] You have <b>${meta.echoes}</b> Echoes.</p>${head}${list}`, `<button class="btn primary" data-act="close">Close</button>`);
-}
 function canSteer() { return !ui.daily && meta.echoes >= STEER_COST && ui.worlds && ui.worlds.length > 0; }
 function steerSheet() {
   const O = steerOptions(meta), name = { type: k => WORLD_TYPES[k].name, fate: k => FATES[k].name, people: k => PEOPLES[k].name }, line = { type: k => WORLD_TYPES[k].flavour, fate: k => FATES[k].line, people: k => PEOPLES[k].line };
@@ -1951,15 +1950,12 @@ function shareBlock(s, erased) {
 // End screen: what this run moved. Round and wins, then a bar each for Entrant Rank, Echoes and Titles, and the nearest goal.
 function progressHTML(e, s) {
   const titles = run && run.titles0 != null ? Math.max(0, Object.keys(meta.titles).length - run.titles0) : null;
-  const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.backing && run.backing.paid || 0) + (run && run.ladder && e.totalEchoes != null ? run.ladder.echoes : 0) + goalEchoes(), titles });
+  const P = runProgress(meta, { rp: e.rp || 0, echoes: (e.totalEchoes != null ? e.totalEchoes : e.echoes) + (run && run.ladder && e.totalEchoes != null ? run.ladder.echoes : 0) + goalEchoes(), titles });
   const unit = { rank: ' RP', echoes: '', titles: '' };
   const rows = masteryRowsFirst(P.bars.map(b => `<div class="pg-row pg-${b.k}" title="${esc(b.text)}"><span class="pg-l">${esc(b.label)}</span><span class="pg-bar" role="progressbar" aria-label="${esc(b.label + ': ' + b.text)}" aria-valuemin="0" aria-valuemax="${b.max}" aria-valuenow="${b.now}"><i style="width:${Math.round(100 * Math.min(1, b.now / (b.max || 1)))}%"></i></span><span class="pg-g">${b.gain ? `+${b.gain}${unit[b.k]}` : ''}</span></div>`).join(''));
-  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${backLine()}${ladderLines()}${masteryLines()}${goalLines()}${retiredLines()}${bondLines()}${pageLines()}${noteLines()}${designLines()}${clauseLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
+  return `<div class="progress"><p class="pg-head">Round <b>${s.round}</b> · <b>${run ? run.wins : '–'}</b> win${run && run.wins === 1 ? '' : 's'}</p><div class="pg-rows">${rows}</div>${ladderLines()}${masteryLines()}${goalLines()}${retiredLines()}${bondLines()}${pageLines()}${noteLines()}${designLines()}${clauseLines()}${P.next ? `<p class="pg-next">${esc(P.next)}</p>` : ''}</div>`;
 }
-function backLine() {
-  const B = run && run.backing && run.backing.settled && BACK_GOALS[run.backing.goal] ? run.backing : null; if (!B) return '';
-  return `<p class="pg-next ${B.met ? 'good' : 'bad'}">${B.met ? `[Backing paid: ${esc(BACK_GOALS[B.goal].name)}. +${B.paid} Echoes.]` : `[Backing lost: ${B.stake} Echoes. The House thanks you.]`}</p>`;
-}
+
 // M1: the ending plays the World Record before the end screen: erased, each entry is struck and deleted; spared, each
 // is stamped KEPT. Then the word lands and the screen behind it fills its bars. Once per ending; a tap skips it.
 function endIntro(e) {
@@ -2019,7 +2015,7 @@ function render() {
   const S = ui.sheet;
   if (S) {
     const t = S.type || S;
-    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, backing: backingSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, pages: pagesSheet, notes: notesSheet, quarters: quartersSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
+    const fn = { news: newsSheet, daily: dailySheet, dailyweek: weekSheet, dailycmp: compareSheet, record: recordSheet, steer: steerSheet, desk: deskSheet, bracket: bracketSheet, priority: prioritySheet, challenge: challengeSheet, mastery: masterySheet, designs: designsSheet, clauses: clausesSheet, goal: goalSheet, contracts: contractsSheet, pages: pagesSheet, notes: notesSheet, quarters: quartersSheet, piece: pieceSheet, stats: statsSheet, archetypes: archetypesSheet, scout: scoutSheet, skillinfo: skillInfoSheet, menu: menuSheet, howto: howtoSheet, archive: archiveSheet, halls: hallsSheet, echoes: echoesSheet, result: resultSheet, syslog: syslogSheet, report: reportSheet, evresult: evResultSheet, marks: marksSheet, note: noteSheet, savepick: savePickSheet, patch: patchSheet, settings: settingsSheet, hint: () => sheetWrap('[System hint]', `<div class="sysbox"><p>${esc(S.text)}</p></div>`, `<button class="btn primary" data-act="hint-done" data-k="${S.k}">OK</button>`), enchanter: () => enchantSheet(ui.enchantMods, 'option') }[t];
     sh = fn ? fn() : '';
   }
   if (!sh && run && ['choose', 'shop', 'district'].includes(scr) && run.pending.length) { sh = betweenPage(pendingSheet()); statLinesNotice(); }
@@ -2068,9 +2064,6 @@ function onAct(el) {
     case 'back-title': return go('title');
     case 'back-worlds': return go('worlds');
     case 'pick-world': ui.world = +d.i; return render();
-    case 'back-stake': ui.backStake = +d.n; return render();
-    case 'back-place': { if (placeBacking(meta, d.k, +d.n)) { saveMeta(); ui.sheet = null; toast(`[Backing placed: ${BACK_GOALS[d.k].name}. The House has noted your confidence.]`, 'class'); } return render(); }
-    case 'back-withdraw': { if (withdrawBacking(meta)) { saveMeta(); ui.sheet = null; toast('[Backing withdrawn. Stake returned. The House is disappointed.]', 'class'); } return render(); }
     case 'steer-tab': ui.steerTab = d.k; return render();
     case 'steer': {
       if (!canSteer()) return render();
@@ -2101,9 +2094,8 @@ function onAct(el) {
       if (run.daily) { if (run.ranked) { meta.daily = { date: run.daily, started: true }; saveMeta(); } run.log.push({ t: 'sys', text: pendingLine(run.world.name, ui.daily.count) }); }
       if (run.practice) run.gold = 2;
       if (!run.daily && !run.practice && meta.steer) { delete meta.steer; saveMeta(); } // a requested world is spent once a run starts
-      if (claimGoal(run, meta)) run.log.push({ t: 'class', text: `[Run goal on file: ${goalText(run.goal.id)}.]` });
+      if (claimGoal(run, meta)) run.log.push({ t: 'class', text: `[Run goal on file: ${goalText(run.goal.id)}.${run.goal.stake ? ` ${run.goal.stake} Echoes riding on it.` : ''}]` });
       if (!run.daily && !run.practice) saveMeta();
-      if (claimBacking(run, meta)) { saveMeta(); run.log.push({ t: 'class', text: `[Backing on file: ${BACK_GOALS[run.backing.goal].name}. ${run.backing.stake} Echoes riding on it.]` }); }
       pushMsgs(run.log.slice(), true);
       ui.draftSel = []; saveRun(); toast(`[Welcome, ${run.name}. Your Gifts have been installed.]`, 'sys'); return go('draft');
     }
@@ -2125,7 +2117,10 @@ function onAct(el) {
     case 'buy-decor': { if (buyDecor(meta, d.k)) { saveMeta(); toast(`[Furnishing delivered: ${DECOR[d.k].name}. Invoice filed.]`, 'class'); } return render(); }
     case 'buy-page': { const k = buyPage(meta); if (k) { saveMeta(); toast(`[Page released early: ${STORY_PAGES[k].title}. The System has noted your curiosity.]`, 'class'); } return render(); }
     case 'settle-erased': { const r = ui.result, e = r && r.settle && settleErased(meta, r.settle); if (e) { r.settled = e; saveMeta(); } return render(); }
-    case 'set-goal': setGoal(meta, d.k || null); saveMeta(); ui.sheet = null; return render();
+    case 'set-challenge': { const k = CHALLENGES[d.k] ? d.k : null; if (ui.screen === 'title' && k) { onAct({ dataset: { act: 'new' } }); ui.challenge = k; return render(); } ui.challenge = k; ui.sheet = null; if (!k && ui.screen === 'terms') return go('worlds'); return render(); }
+    case 'set-priority': setPriority(meta, +d.n); saveMeta(); ui.sheet = null; return render();
+    case 'set-goal': setGoal(meta, d.k || null); saveMeta(); return render(); // stays open: the stake is chosen below
+    case 'set-stake': if (setStake(meta, +d.n)) saveMeta(); return render();
     case 'file-design': if (fileDesign(meta, d.id)) { saveMeta(); toast(`[Filed: ${pieceDef(d.id).name}]`, 'level'); } return render();
     case 'unlock': { const u = UNLOCKS[d.k]; if (meta.echoes >= u.cost && !meta.unlocks[d.k]) { meta.echoes -= u.cost; meta.unlocks[d.k] = true; saveMeta(); toast(`[Unlocked: ${u.name}]`, 'level'); } return render(); }
     case 'hint-read': { const h = HINTS.find(x => x.k === d.k); if (h) ui.sheet = { type: 'hint', k: h.k, text: h.text }; return render(); }
@@ -2246,9 +2241,7 @@ function onAct(el) {
       saveRun(); return go(stageScreen());
     }
     case 'climb': if (!startEndless(run, meta)) return render(); ui.end = null; ui.sheet = null; ui.fight = null; saveRun(); saveMeta(); toast('[Past the Undefeated. Depth 1.]', 'class'); return go(stageScreen());
-    case 'set-priority': setPriority(meta, +d.n); saveMeta(); ui.sheet = null; return render();
     case 'mastery-open': ui.masteryK = ui.masteryK === d.k ? null : d.k; return render();
-    case 'set-challenge': ui.challenge = CHALLENGES[d.k] ? d.k : null; ui.sheet = null; return render();
     case 'enter-elite': startElite(run, meta); ui.end = null; ui.sheet = null; ui.fight = null; saveRun(); return go(stageScreen());
     case 'end-run': { const extra = run.eliteWins * 8 * (bountyOf(run, 'echoes') ? BOUNTIES.echoes.mul : 1); meta.echoes += extra; eliteRank(run, meta); saveMeta(); const snap = meta.champions[0]; ui.end = { kind: 'spared', snap, totalEchoes: echoesFor(run, 'spared') + extra, rp: run.rpEarned || 0, opened: run.trialOpened, observed: finishDaily(true) }; run.ended = true; lsDel(RUN_KEY); ui.fight = null; return go('end'); }
   }

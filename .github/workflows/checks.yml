@@ -69,8 +69,6 @@ jobs:
         run: node tools/spoils-test.js
       - name: World bounty test
         run: node tools/bounty-test.js
-      - name: Back yourself test
-        run: node tools/backing-test.js
       - name: Run shape test
         run: node tools/runshape-test.js
       - name: Bracket map test

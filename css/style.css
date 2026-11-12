@@ -136,6 +136,9 @@ p { margin: 0; }
 .tm-v { grid-area: v; font-size: var(--fs-3); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .tm-n { grid-area: n; font-size: var(--fs-2); color: var(--muted); }
 .tm-go { grid-area: go; font-size: var(--fs-4); color: var(--muted); }
+.link.tm-info { justify-self: start; text-align: left; font-size: var(--fs-2); color: var(--muted); padding: 4px 2px; }
+.term.chal { border-left-color: var(--bad-soft); }
+.stakes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .foot { display: grid; gap: 10px; }
 .kit-h { grid-column: 1 / -1; margin: 10px 0 0; font-size: 14px; }
 .sgrid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }

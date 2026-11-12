@@ -76,5 +76,23 @@ const ctx = (r, turn, won) => ({ run: r, f: { turn }, T: { healed: 0, taken: 5, 
 // --- practice checks nothing
 { const m = base(), r = newRun(m, {}, 'pr'); r.practice = true; r.goal = { id: 'spare', met: false }; r.path = G.contractBoard(G.contractsOf(m).week)[2].split(':')[1];
   G.settleGoals(r, m, 'spared'); ok(!r.goal.met && !Object.keys(m.contracts.done).length, 'practice runs meet no goals or Contracts'); }
+// --- stakes on the run goal (replaced Back yourself, 12 Nov)
+Object.entries(G.GOALS).forEach(([k, g]) => ok(g.arch || (g.odds >= 1.25 && g.odds <= 3), `${k} has stake odds between 1.25 and 3`));
+{ const meta = base(); meta.echoes = 30; const M = G.goalOffer(meta, G.seedRng('s'));
+  ok(!G.setStake(meta, 10), 'no stake without a goal');
+  G.setGoal(meta, M.offer[2]); ok(G.setStake(meta, 10) && meta.echoes === 20 && meta.goal.stake === 10, 'a stake costs Echoes now');
+  ok(G.setStake(meta, 25) && meta.echoes === 5, 'raising it costs the difference');
+  ok(!G.setStake(meta, 7) || meta.goal.stake === 0, 'only listed stakes');
+  G.setStake(meta, 25); G.setGoal(meta, M.offer[0]); ok(meta.goal.stake === 25 && meta.echoes === 5, 'changing the goal keeps the stake');
+  G.setGoal(meta, null); ok(meta.goal.stake === 0 && meta.echoes === 30, 'No goal returns the stake'); }
+{ const meta = base(); meta.echoes = 30; const M = G.goalOffer(meta, G.seedRng('s')); G.setGoal(meta, M.offer[1]); G.setStake(meta, 10);
+  const pw = newRun(meta, { seed: 'wpd:2026-11-08' }); ok(!G.claimGoal(pw, meta) && meta.goal && meta.goal.stake === 10, 'Pending World leaves the goal and its stake');
+  const run = newRun(meta, {}); G.claimGoal(run, meta); ok(run.goal && run.goal.stake === 10 && !meta.goal, 'a normal run takes the goal and stake');
+  run.goal.met = true; const before = meta.echoes; G.settleGoals(run, meta, 'erased');
+  ok(run.goal.won === Math.round(10 * G.goalOdds(run.goal.id)) && meta.echoes - before === run.goal.paid + run.goal.won, 'met: the stake pays at its odds'); }
+{ const meta = base(); meta.echoes = 30; const M = G.goalOffer(meta, G.seedRng('s')); G.setGoal(meta, M.offer[1]); G.setStake(meta, 5);
+  const run = newRun(meta, {}); G.claimGoal(run, meta); const before = meta.echoes; G.settleGoals(run, meta, 'erased');
+  ok(!run.goal.met ? run.goal.won === 0 && meta.echoes === before : true, 'missed: the stake is lost'); }
+{ const m = G.migrateMeta(Object.assign(G.newMeta(), { echoes: 3, backing: { goal: 'final', stake: 10 } })); ok(m.echoes === 13 && !m.backing, 'an old Back yourself stake is refunded'); }
 console.log(fails ? `${fails} failed` : 'goals: all passed');
 process.exit(fails ? 1 : 0);

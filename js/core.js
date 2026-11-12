@@ -312,7 +312,7 @@ function dailyScore(run) {
 function newMeta() { return { v: VERSION, echoes: 0, unlocks: {}, archive: { rivals: {}, beat: {}, finals: {}, evos: {}, reactions: {}, paths: {}, hidden: {}, quests: {}, issues: {} }, titles: {}, firsts: {}, found: {}, presets: [], erased: [], champions: [], runs: 0, wins: 0, rank: newRank(), priority: { max: 0, set: 0 }, marks: newMarks(), mastery: {}, designs: { found: {}, filed: {}, dry: 0 }, clauses: { open: { standard: 1 }, set: 'standard' }, contracts: { week: null, done: {}, weeks: 0 }, grudges: {}, bonds: {}, settled: [], story: { open: {}, since: 0 }, notes: {}, decor: {}, together: { spared: 0, runs: 0 } }; }
 function migrateMeta(m) {
   if (!m) return newMeta();
-  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; n.grudges = sanitizeGrudges(m.grudges); n.bonds = sanitizeBonds(m.bonds); n.settled = sanitizeSettled(m.settled); n.story = sanitizeStory(m.story); n.notes = sanitizeNotes(m.notes); n.decor = sanitizeDecor(m.decor); n.together = sanitizeTogether(m.together); return n; }
+  if (m.v === VERSION) { const n = Object.assign(newMeta(), m); n.archive = Object.assign(newMeta().archive, m.archive || {}); n.rank = sanitizeRank(m.rank, n); n.priority = sanitizePriority(m.priority); n.marks = Object.assign(newMarks(), m.marks || {}); n.mastery = sanitizeMastery(m.mastery); n.designs = sanitizeDesigns(m.designs); n.clauses = sanitizeClauses(m.clauses); n.contracts = sanitizeContracts(m.contracts, contractWeek()); n.goal = sanitizeGoal(m.goal); if (!n.goal) delete n.goal; if (m.backing && m.backing.stake > 0) { n.echoes += m.backing.stake; delete n.backing; } n.grudges = sanitizeGrudges(m.grudges); n.bonds = sanitizeBonds(m.bonds); n.settled = sanitizeSettled(m.settled); n.story = sanitizeStory(m.story); n.notes = sanitizeNotes(m.notes); n.decor = sanitizeDecor(m.decor); n.together = sanitizeTogether(m.together); return n; }
   const n = newMeta(); n.echoes = m.echoes || 0; n.runs = m.runs || 0; n.wins = m.wins || 0; return n;
 }
 function unlockedArch(meta) { return ARCH_KEYS.filter(k => START_ARCH.includes(k) || meta.unlocks['arch_' + k]); }
@@ -401,28 +401,6 @@ function worldBounty(worlds, rng) {
   return worlds;
 }
 function bountyOf(run, k) { return !!(run && run.world && run.world.bounty === k && !run.seed && !run.practice); }
-// Back yourself (an Echo sink): before a run, stake Echoes on how far it gets. Paid at the goal's odds when the run ends,
-// lost otherwise. Kept in meta.backing until a normal run starts (never Pending World or practice), then on run.backing.
-// Payouts set so good play about breaks even (playtest report N1, 11 Nov: at 2x/3x/4x it printed Echoes)
-const BACK_STAKES = [5, 10, 25];
-const BACK_GOALS = {
-  main: { name: 'Reach the main bracket', desc: 'Fight in round 4.', round: 4, mul: 1.25 },
-  final: { name: 'Reach the Final', desc: 'Face your Final Champion.', round: 8, mul: 2 },
-  spared: { name: 'Spare your world', desc: 'Beat the Final Champion.', mul: 1.5 },
-};
-function placeBacking(meta, goal, stake) {
-  if (meta.backing || !BACK_GOALS[goal] || !BACK_STAKES.includes(stake) || meta.echoes < stake) return false;
-  meta.echoes -= stake; meta.backing = { goal, stake }; return true;
-}
-function withdrawBacking(meta) { if (!meta.backing) return false; meta.echoes += meta.backing.stake; delete meta.backing; return true; }
-function claimBacking(run, meta) { if (run.seed || run.practice || !meta.backing) return false; run.backing = Object.assign({}, meta.backing); delete meta.backing; return true; }
-function settleBacking(run, meta, outcome) {
-  const B = run.backing; if (!B || B.settled) return null;
-  const G = BACK_GOALS[B.goal]; B.settled = true;
-  B.met = G ? (B.goal === 'spared' ? outcome !== 'erased' : run.round >= G.round) : false;
-  B.paid = B.met ? Math.round(B.stake * G.mul) : 0; meta.echoes += B.paid;
-  return B;
-}
 // Steer the next world (an Echo sink): pay STEER_COST Echoes to ask the System for one more world on the offer, built
 // around the layer you name: a world type, a Fate or a People. Everything else about it is drawn as usual. Only layers
 // that can come up for you are listed (a type whose home class is still locked can't). Pending World ignores it.
@@ -1483,24 +1461,36 @@ function settleGoals(run, meta, outcome) {
   goalCheck(run, meta, id => { const G = goalDef(id); return !!G.end && GOAL_ENDS[G.end](run, outcome, String(id).split(':')[1]); }, null);
   const g = run.goal; if (!g || g.paid != null || !goalDef(g.id)) return null;
   const P = GOAL_PAY[goalDef(g.id).tier]; g.paid = g.met ? P.echoes : 0; g.xp = g.met ? P.xp : 0; meta.echoes += g.paid;
+  if (g.stake) { g.won = g.met ? Math.round(g.stake * goalOdds(g.id)) : 0; meta.echoes += g.won; }
   return g;
 }
 // The run goal offer: one goal of each tier, drawn until a run takes it. pick: the one chosen, or null for none.
+// stake: Echoes already taken and riding on the pick (0 without a pick)
 function sanitizeGoal(M) {
   if (!M || !Array.isArray(M.offer) || M.offer.length !== 3 || !M.offer.every(id => goalValid(id) && !goalDef(id).arch)) return null;
-  return { offer: M.offer.slice(), pick: M.offer.includes(M.pick) ? M.pick : null };
+  const pick = M.offer.includes(M.pick) ? M.pick : null;
+  return { offer: M.offer.slice(), pick, stake: pick && GOAL_STAKES.includes(M.stake) ? M.stake : 0 };
 }
+function goalOdds(id) { const G = goalDef(id); return (G && G.odds) || 1.25; }
 function goalOffer(meta, rng) {
-  meta.goal = sanitizeGoal(meta.goal);
+  const old = meta.goal && meta.goal.stake, kept = sanitizeGoal(meta.goal); if (old && GOAL_STAKES.includes(old) && !(kept && kept.stake)) meta.echoes += old; // a stake on an offer that no longer holds is returned
+  meta.goal = kept;
   if (!meta.goal) { const ks = Object.keys(GOALS).filter(k => !GOALS[k].arch); meta.goal = { offer: [1, 2, 3].map(t => pick(ks.filter(k => GOALS[k].tier === t), rng)), pick: null }; }
   return meta.goal;
 }
-function setGoal(meta, id) { const M = goalOffer(meta); M.pick = M.offer.includes(id) ? id : null; return M.pick; }
+// Changing the goal keeps the stake on the new one; No goal returns it
+function setGoal(meta, id) { const M = goalOffer(meta); M.pick = M.offer.includes(id) ? id : null; if (!M.pick && M.stake) { meta.echoes += M.stake; M.stake = 0; } return M.pick; }
+// Stake Echoes on the chosen goal (0 takes it back). The old stake is returned first, so raising it costs the difference.
+function setStake(meta, n) {
+  const M = goalOffer(meta); n = GOAL_STAKES.includes(n) ? n : 0;
+  if (!M.pick || meta.echoes + M.stake < n) return false;
+  meta.echoes += M.stake - n; M.stake = n; return true;
+}
 // A normal run takes the chosen goal (Pending World and practice leave the offer for the next one)
 function claimGoal(run, meta) {
   if (run.seed || run.practice || run.script) return null;
   const M = sanitizeGoal(meta.goal); delete meta.goal;
-  if (M && M.pick) run.goal = { id: M.pick, met: false };
+  if (M && M.pick) run.goal = { id: M.pick, met: false, stake: M.stake || 0 };
   return run.goal || null;
 }
 
@@ -3683,7 +3673,6 @@ function endRun(run, meta, outcome) {
   else { meta.champions.unshift(snap); meta.champions = meta.champions.slice(0, 10); meta.wins++; }
   meta.runs++;
   const e = echoesFor(run, outcome); meta.echoes += e;
-  settleBacking(run, meta, outcome);
   settleGoals(run, meta, outcome);
   settleBonds(run, meta);
   const ladder = settleLadder(run, meta, outcome); meta.echoes += ladder.echoes;
@@ -3971,7 +3960,7 @@ if (typeof module !== 'undefined') module.exports = {
   RANK_LADDER, RANK_RP, TRIAL_ROUND, TRIAL_CONDS, PERKS, TRIAL_TEXT, COND_TEXT, newRank, rankIdx, nextRank, hasPerk, worldCap, sanitizeRank, rpFor, awardRank, openTrial, eliteRank, RANK_ADDRESS, RIVAL_LINES, FINAL_GREET, rankAddress, rankIntro, historyLine, CHAMP_STEP, champWin, runProgress, SEASON_PTS, SEASON_TITLE, weekOf, weekDates, seasonTable, trialSpec, trialMul, trialLine, perkOffers, settleTrial, choosePerk,
   mulberry32, hashStr, seedRng, runRng, stream, dailyDate, dailySeed, dailyWorld, dailyRecord, levelMeta, dailyScore,
   LORE, REC_SIZE, REC_MAX, loreName, loreWho, LAYER_BASE, FATES, PEOPLES, CONFLUENCE, layersOf, snapLayers, layerNames, recLore, settingOf, suits, WORLD_GEN, genWorld, genWorldV1, worldName, joinName, worldArch, buildRecord, ensureRecord, eraseRecord, restoreRecord, amendRecord, sanitizeRec, recLeft, recWorldGone, partialWords, recEntries, bioParts, recFragment,
-  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, SHARED_MILESTONES, sanitizeTogether, sharedReached, sharedNext, DECOR, quartersOf, sanitizeDecor, buyDecor, NOTE_LEVELS, noteFoes, sanitizeNotes, noteLevel, noteFoe, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, DOOR_SETS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BACK_STAKES, BACK_GOALS, placeBacking, withdrawBacking, claimBacking, settleBacking, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
+  pick, shuffle, newMeta, migrateMeta, unlockedArch, offerWorlds, PRIORITY, PRIORITY_ECHO, CHALLENGES, CHALLENGE_ECHOES, MARK_TIERS, DEPTH_SCALE, newMarks, sanitizePriority, setPriority, priorityRules, markTier, settleLadder, MASTERY_XP, MASTERY_PAY, MASTERY_LEVELS, MASTERY_LINES, MASTERY_MAX, masteryLevel, sanitizeMastery, masteryOf, masteryPieces, masteryPiece, masteryLevels, masteryOpen, masteryKit, masteryReward, masteryFrame, masteryLine, masteryXp, masteryShares, settleMastery, CLAUSES, CLAUSE_FEATS, sanitizeClauses, SHARED_MILESTONES, sanitizeTogether, sharedReached, sharedNext, DECOR, quartersOf, sanitizeDecor, buyDecor, NOTE_LEVELS, noteFoes, sanitizeNotes, noteLevel, noteFoe, STORY_PAGES, STORY_EVERY, STORY_PRICE, storyDrips, sanitizeStory, nextDrip, storyMoment, settleStory, buyPage, SETTLE_LINES, SETTLED_MAX, canSettle, settleLine, settleErased, sanitizeSettled, BONDS, BOND_AT, bondLevel, bondNext, sanitizeBonds, bondText, bondStart, settleBonds, GRUDGES, GRUDGE_RETIRE, grudgeOf, grudgeOn, sanitizeGrudges, noteGrudge, GOALS, GOAL_ENDS, GOAL_PAY, GOAL_STAKES, goalOdds, setStake, CONTRACT_ECHOES, goalDef, goalText, goalValid, contractWeek, contractBoard, sanitizeContracts, contractsOf, noteContract, goalEvent, settleGoals, sanitizeGoal, goalOffer, setGoal, claimGoal, setClause, clauseOf, openClauses, DESIGN_CHANCE, DESIGN_DRY, DESIGN_COST, designIds, sanitizeDesigns, designCost, designOpen, dropDesign, settleDesigns, fileDesign, depthMul, canClimb, startEndless, BRACKET_FIELD, BRACKET_STAGES, bracketStage, bracketMap, INTAKE, TOKENS, VOUCHERS, CURSES, DOOR_PAYS, AMENDMENTS, VOUCHER_PRICE, VOUCHER_CHANCE, AUGMENT_ROUNDS, DOOR_ROUNDS, DOOR_SETS, CURSE_FIGHTS, shaped, hasVoucher, amendIds, intakeOffers, takeIntake, tokenReady, voucherPool, buyVoucher, augmentOffers, takeAugment, doorOffer, takeDoor, tickCurse, toDistrict, BOUNTIES, worldBounty, bountyOf, STEER_COST, STEER_KINDS, steerOptions, steerWorld, RECENT_MAX, RECENT_TYPES, staleWorld, rememberWorld, worldPulse, FATE_TRACK, moveFate, fateState, fateEnd, closeFate, crisisDue, visitDue, checkMet, customOf, customPaid, clashOf, clashDue, silent, champTitle, foeLine, enchantCount, runeCount, applyAlways, WORLD_LEAN, worldTagged, newRun, hasGift, effStats, maxHp, POINT_PRICE, pointPrice, INCOME, interestOf, interestCap, LEVEL_MAX, LEVEL_PERKS, levelPerk, levelPerkOutcomes, levelPerkText, offerLevel, takeLevel, trainStat, oddsFor, poolIds, rollPiece, price, sellValue, refreshShop, reroll, income, interestCap, SHOP_KINDS, ensureShop, shopItem, ownedCopies,
   allPieces, findPiece, canBuy, buy, sell, addPiece, movePiece, equipBest, evolve, checkMerges, mergeNeed, wouldMerge, archCounts, runCounts, buildP, runP, favourTiers,
   makeChoices, specName, specRank, specStyle, specReward, SPOILS, SPOILS_SKIP, assignSpoils, spoilsOffers, spoilsText, takeSpoils, specKey, chooseOpponent, currentSpec, heartCost, makeWager, addFavour, rollDistricts, infirmary, sanctum, eventOpt, eventOpts, checkTag, RIVAL_REPLIES, rivalReplies, rivalReply, districtUp, DISTRICT_STAT, STAT_EASY, resolveEvent, prefixTargets, applyPrefix,
   rollDraft, rollGearDraft, rerollDraft, confirmDraft, startStat, rollStart, unrollStart, placeStartStats, SHARED, setShared, sanitizeSnap, enterChoose, leaveShop, useDistrict, curRound,
