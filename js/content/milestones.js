@@ -2,7 +2,7 @@
 'use strict';
 // Phase 8, step 3. Every tester's runs add to one shared count (Firestore shared/totals, see firestore.rules): worlds
 // spared by everyone together. Each milestone reached opens something small for everyone: a System line on the title
-// screen, a piece of decor in Entrant Quarters, or an Archive page.
+// screen, a piece of decor in Handler's Quarters, or an Archive page.
 //   at: worlds spared by all Entrants.  line: the System's line once reached.  decor / page: what else it opens.
 const SHARED_MILESTONES = [
   { at: 10, line: '[Ten worlds spared by this group of Entrants. The System has adjusted its expectations. Slightly.]' },
