@@ -232,6 +232,7 @@ function pending(run, meta) {
     if (p.type === 'rune') { for (const m of glitchLast(p.mods)) { const t = G.prefixTargets(run, m).filter(x => x.mods.length < 2 && run.bar.some(b => b && b.u === x.u)); if (t.length) { G.applyPrefix(run, t[0].u, m); break; } } }
     if (p.type === 'event') { const E = G.EVENTS[p.key]; const order = G.eventOpts(run, p.key).sort((a, b) => !!E.opts[b].check - !!E.opts[a].check); for (const i of order) if (G.resolveEvent(run, p.key, i, meta, null, [])) break; } // a stat line when one is shown
     if (p.type === 'gift') G.applyGift(run, p.offers[0], []);
+    if (p.type === 'rule') { run.pending.unshift(p); G.takeRule(run, 0, []); }
     if (p.type === 'spoils') { run.pending.unshift(p); G.takeSpoils(run, 0, []); }
     if (p.type === 'intake') { run.pending.unshift(p); G.takeIntake(run, Math.floor(Math.random() * p.offers.length), []); }
     if (p.type === 'augment') { run.pending.unshift(p); G.takeAugment(run, Math.random() < 0.5 && p.offers.length ? 0 : 'skip', []); }

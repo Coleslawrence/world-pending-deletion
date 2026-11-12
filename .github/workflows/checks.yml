@@ -61,6 +61,8 @@ jobs:
         run: node tools/prefix-test.js
       - name: Gifts test
         run: node tools/gifts-test.js
+      - name: Signature Gifts test
+        run: node tools/signature-test.js
       - name: End screen progress test
         run: node tools/progress-test.js
       - name: Spoils test

@@ -46,7 +46,7 @@ for (let k = 0; k < 200; k++) {
   ok(!G.startStat(run, 'STR', 1), 'no fifth point');
   ok(G.placeStartStats(run) && run.stats.VIT === 6 && run.startPts === undefined, 'points placed');
   ok(run.hp > hp0, 'VIT points add HP');
-  const lucky = mk(['bornlucky']); ok(lucky.statFloor.LUK === 4, 'Born Lucky raises the floor');
+  const lucky = mk(['bornlucky']); ok(lucky.statFloor.LUK === 5, 'Born Lucky raises the floor (+3)');
   const a = mk([], 'seed-a'), b = mk([], 'seed-a');
   G.rollStart(a); G.rollStart(b);
   ok(JSON.stringify(a.stats) === JSON.stringify(b.stats) && a.startPts === 0, 'same seed, same roll');
