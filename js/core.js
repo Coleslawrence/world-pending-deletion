@@ -1321,14 +1321,59 @@ function quartersOf(meta) {
   const G = meta.grudges || {}, beat = (meta.archive && meta.archive.beat) || {};
   const trophies = RIVALS.filter(k => G[k] && G[k].retired && GRUDGES[k]).map(k => ({ k, name: GRUDGES[k].trophy, from: ENEMIES[k].name }));
   const crowns = Object.keys(ENEMIES).filter(k => ENEMIES[k].final && beat[k]).map(k => ({ k, name: `Crown of ${ENEMIES[k].name.replace(/^The /, 'the ')}` }));
-  const seen = {}, shards = (meta.erased || []).concat(meta.settled || []).map(s => s.worldName).filter(w => w && !seen[w] && (seen[w] = 1)).map(w => ({ name: `Shard of ${w}` }));
+  const seen = {}, shards = (meta.erased || []).concat(meta.settled || []).filter(s => s.worldName && !seen[s.worldName] && (seen[s.worldName] = 1)).map(s => ({ name: `Shard of ${s.worldName}`, snap: s }));
   const shared = sharedReached(meta).map(M => M.decor).filter(Boolean), decor = Object.keys(DECOR).filter(k => (meta.decor && meta.decor[k]) || shared.includes(k));
-  return { trophies, crowns, shards, decor };
+  const memories = REMNANT_ENTRIES.map(E => ({ k: E.k, label: E.label, m: remnantMem(meta, E.k) })).filter(x => x.m).map(x => ({ k: x.k, label: x.label, name: x.m.obj.name, lore: x.m.obj.lore }));
+  return { trophies, crowns, shards, decor, memories };
 }
 function sanitizeDecor(D) { const out = {}; Object.keys(DECOR).forEach(k => { if (D && D[k]) out[k] = 1; }); return out; }
 function buyDecor(meta, k) { if (!DECOR[k] || DECOR[k].shared || (meta.decor && meta.decor[k]) || meta.echoes < DECOR[k].cost) return false; meta.echoes -= DECOR[k].cost; meta.decor = Object.assign(sanitizeDecor(meta.decor), { [k]: 1 }); return true; }
 
 // ---------- Field notes (Phase 8) ----------
+// ---------- The Remnant (content in remnant.js) ----------
+// meta.remnant: { no: the Remnant's number, draw: { arch, fate, people, type: 3 keys each, drawn once }, mem: { entry k: option index } }.
+// Entries open by finished runs (REMNANT_AT), last day first. A memory can be changed any time (Slaw, 12 Nov). Story only.
+function remnantOf(meta) {
+  if (!meta.remnant || !meta.remnant.no || !meta.remnant.draw) {
+    const three = keys => shuffle(keys, Math.random).slice(0, 3);
+    meta.remnant = { no: String(1000 + Math.floor(Math.random() * 9000)), draw: { arch: three(ARCH_KEYS), fate: three(Object.keys(FATES)), people: three(Object.keys(PEOPLES)), type: three(Object.keys(WORLD_TYPES)) }, mem: (meta.remnant && meta.remnant.mem) || {} };
+  }
+  return meta.remnant;
+}
+const remnantOpened = meta => REMNANT_AT.filter(n => (meta.runs || 0) >= n).length;
+// The 3 options of an entry, as { t, obj }
+function remnantOpts(meta, E) {
+  if (E.opts) return E.opts;
+  const R = remnantOf(meta);
+  return (R.draw[E.from] || []).filter(k => E.from === 'arch' ? ARCH[k] : E.from === 'fate' ? FATES[k] : E.from === 'people' ? PEOPLES[k] : WORLD_TYPES[k]).map(k => ({ t: E.text(k), obj: E.obj(k), key: k }));
+}
+// The remembered option of entry k, or null
+function remnantMem(meta, k) {
+  const E = REMNANT_ENTRIES.find(x => x.k === k), R = meta.remnant;
+  if (!E || !R || !R.mem || R.mem[k] == null) return null;
+  return remnantOpts(meta, E)[R.mem[k]] || null;
+}
+function remnantRecoverable(meta) { const R = remnantOf(meta); return REMNANT_ENTRIES.slice(0, remnantOpened(meta)).filter(E => R.mem[E.k] == null).length; }
+function remember(meta, k, i) {
+  const at = REMNANT_ENTRIES.findIndex(x => x.k === k), R = remnantOf(meta);
+  if (at < 0 || at >= remnantOpened(meta) || !(i >= 0 && i < remnantOpts(meta, REMNANT_ENTRIES[at]).length)) return false;
+  R.mem[k] = +i; return true;
+}
+// Recognition lines (text only): before the first fight in a world that shares your world's kind, Fate or People, and
+// from your remembered type's Final Champion. Never in practice.
+function remnantLines(run, meta, spec) {
+  if (!meta || !meta.remnant || run.practice || run.script || run.elite) return [];
+  const out = [], T = remnantMem(meta, 'type'), F = remnantMem(meta, 'fate'), P = remnantMem(meta, 'people'), w = run.world;
+  if (run.round === 1 && !run.remnantSeen) {
+    run.remnantSeen = true;
+    if (T && w.type === T.key) out.push(REMNANT_LINES.type(WORLD_TYPES[w.type].name));
+    else if (F && w.fate === F.key) out.push(REMNANT_LINES.fate(FATES[w.fate].name));
+    else if (P && w.people === P.key) out.push(REMNANT_LINES.people(PEOPLES[w.people].name));
+  }
+  if (T && spec && spec.kind === 'final' && !spec.snap && WORLD_TYPES[T.key] && WORLD_TYPES[T.key].final === spec.id) out.push(REMNANT_LINES.final);
+  return out;
+}
+
 // meta.notes: { enemy id: fights against it }. Each fight (not practice) fills in its Archive notes: 1 fight its HP and
 // rank, 2 its style and Reflexes, 3 its full move list. Knowledge only: nothing about a fight changes.
 const NOTE_LEVELS = 3;
@@ -3976,6 +4021,7 @@ function choosePerk(run, meta, k, msgs) {
 }
 
 if (typeof module !== 'undefined') module.exports = {
+  remnantOf, remnantOpened, remnantOpts, remnantMem, remnantRecoverable, remember, remnantLines,
   forecast, cloneFight,
   blankFighter, fighterSkills, _test: { useSkill, startTurn, hit, dmgMult, rollDice, resolveDice },
   VERSION, STATS, STAT_INFO, RANKS, RESIST, STAT_FACES, resistOf, resistance, PRICE, ARCH, ARCH_KEYS, START_ARCH, archTier, SKILLS, SHOP_SKILLS, GEAR, GEAR_SLOTS, STAR_MULT, gearPas, gearText, gearTop, readHits, readDef, ADVANCE, advOf, advance, gearStats, isGear, pieceDef, baseId,
