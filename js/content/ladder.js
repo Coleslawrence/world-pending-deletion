@@ -17,7 +17,7 @@ const PRIORITY = [
   { name: 'Personal Interest', say: 'The Final Champion has 25% more HP and deals 15% more damage.', finalHp: 1.25, finalDmg: 1.15 },
 ];
 const PRIORITY_ECHO = 0.1;
-// Challenge worlds: one fixed twist for the whole run, chosen on the world screen once you have spared a world.
+// Challenge worlds: one fixed twist for the whole run, chosen from Challenge mode on the title screen once you have spared a world.
 // The first time you spare a world under each, it pays CHALLENGE_ECHOES and a Mark.
 //   rule fields as above, plus: gold (starting gold), winGold, archs (how many archetypes the pool keeps)
 const CHALLENGES = {
